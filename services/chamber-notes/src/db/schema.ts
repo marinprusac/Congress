@@ -5,6 +5,7 @@ export const notes = sqliteTable("notes", {
   title: text("title").notNull().unique(),
   frontmatterJson: text("frontmatter_json").notNull().default("{}"),
   body: text("body").notNull().default(""),
+  pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });

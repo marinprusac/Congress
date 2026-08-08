@@ -61,6 +61,7 @@ function toSummary(row: typeof notes.$inferSelect): NoteSummary {
     title: row.title,
     frontmatter: JSON.parse(row.frontmatterJson),
     excerpt: makeExcerpt(row.body),
+    pinned: row.pinned,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -88,6 +89,16 @@ function getBacklinks(title: string): Backlink[] {
 
 export async function listNotes(): Promise<NoteSummary[]> {
   const rows = db.select().from(notes).orderBy(desc(notes.updatedAt)).all();
+  return rows.map(toSummary);
+}
+
+export async function listPinnedNotes(): Promise<NoteSummary[]> {
+  const rows = db
+    .select()
+    .from(notes)
+    .where(eq(notes.pinned, true))
+    .orderBy(desc(notes.updatedAt))
+    .all();
   return rows.map(toSummary);
 }
 
@@ -164,6 +175,7 @@ export async function updateNote(id: number, input: UpdateNoteRequest): Promise<
       title: input.title ?? existing.title,
       frontmatterJson,
       body,
+      pinned: input.pinned ?? existing.pinned,
       updatedAt: new Date(),
     })
     .where(eq(notes.id, id))

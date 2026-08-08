@@ -8,6 +8,7 @@ export const noteSummarySchema = z.object({
   title: z.string(),
   frontmatter: noteFrontmatterSchema,
   excerpt: z.string(),
+  pinned: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -43,5 +44,6 @@ export type CreateNoteRequest = z.infer<typeof createNoteRequestSchema>;
 export const updateNoteRequestSchema = z.object({
   title: z.string().min(1).optional(),
   content: z.string().optional(),
+  pinned: z.boolean().optional(),
 });
 export type UpdateNoteRequest = z.infer<typeof updateNoteRequestSchema>;

@@ -9,12 +9,14 @@ import { WidgetPreviewPage } from "@/pages/WidgetPreviewPage";
 export function App() {
   return (
     <Routes>
+      {/* No Layout chrome here — this route is embedded in an iframe as
+          Capitol's homepage widget for this Chamber, not visited directly. */}
+      <Route path="widget" element={<WidgetPreviewPage />} />
       <Route element={<Layout />}>
         <Route index element={<NotesListPage />} />
         <Route path="n/:id" element={<NoteViewPage />} />
         <Route path="new" element={<NewNotePage />} />
         <Route path="settings" element={<SettingsPage />} />
-        <Route path="widget" element={<WidgetPreviewPage />} />
       </Route>
     </Routes>
   );

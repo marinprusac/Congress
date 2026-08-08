@@ -5,6 +5,7 @@ import { createNoteRequestSchema, updateNoteRequestSchema } from "@congress/shar
 import { notesManifest } from "./manifest.js";
 import {
   listNotes,
+  listPinnedNotes,
   searchNotes,
   getNote,
   createNote,
@@ -12,9 +13,6 @@ import {
   deleteNote,
   TitleConflictError,
 } from "./notes.js";
-import { db } from "./db/client.js";
-import { notes } from "./db/schema.js";
-import { desc } from "drizzle-orm";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -22,18 +20,8 @@ export const app = new Hono<{ Bindings: HttpBindings }>();
 app.get("/manifest", (c) => c.json(notesManifest));
 app.get("/health", (c) => c.json({ status: "ok" }));
 
-app.get("/api/widget", (c) => {
-  const total = db.select().from(notes).all().length;
-  const recent = db
-    .select({ title: notes.title })
-    .from(notes)
-    .orderBy(desc(notes.updatedAt))
-    .limit(5)
-    .all();
-  return c.json({
-    summary: total === 1 ? "1 note" : `${total} notes`,
-    items: recent.map((n) => ({ label: n.title })),
-  });
+app.get("/api/notes/pinned", async (c) => {
+  return c.json(await listPinnedNotes());
 });
 
 app.get("/api/notes/search", async (c) => {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchNote, fetchNotes, updateNote, deleteNote } from "@/lib/api";
+import { fetchNote, fetchNotes, updateNote, deleteNote, setPinned } from "@/lib/api";
 import { NoteMarkdown } from "@/components/NoteMarkdown";
 import { stripFrontmatter } from "@/lib/frontmatter";
 
@@ -42,6 +42,14 @@ export function NoteViewPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notes"] });
       navigate("/");
+    },
+  });
+
+  const pinMutation = useMutation({
+    mutationFn: (pinned: boolean) => setPinned(noteId, pinned),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["note", noteId], updated);
+      queryClient.invalidateQueries({ queryKey: ["notes"] });
     },
   });
 
@@ -87,6 +95,12 @@ export function NoteViewPage() {
             </>
           ) : (
             <>
+              <button
+                onClick={() => pinMutation.mutate(!note.pinned)}
+                className="text-accent hover:underline"
+              >
+                {note.pinned ? "Unpin" : "Pin"}
+              </button>
               <button onClick={() => setEditing(true)} className="text-accent hover:underline">
                 Edit
               </button>

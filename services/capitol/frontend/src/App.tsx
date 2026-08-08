@@ -1,4 +1,4 @@
-import { ChamberLedger } from "@/components/ChamberLedger";
+import { WidgetGrid } from "@/components/WidgetGrid";
 import { LoginGate, SignOutControl } from "@/components/LoginGate";
 
 export function App() {
@@ -13,7 +13,7 @@ export function App() {
           <SignOutControl />
         </header>
         <main className="mx-auto max-w-3xl px-6 py-10">
-          <ChamberLedger />
+          <WidgetGrid />
         </main>
       </div>
     </LoginGate>

@@ -1,10 +1,4 @@
-import type {
-  NoteSummary,
-  NoteDetail,
-  CreateNoteRequest,
-  UpdateNoteRequest,
-  ChamberWidget,
-} from "@congress/shared-types";
+import type { NoteSummary, NoteDetail, CreateNoteRequest, UpdateNoteRequest } from "@congress/shared-types";
 
 // In production this Chamber's frontend is proxied through Capitol at
 // "/notes/*", but its API calls still need to reach Capitol's gateway at
@@ -56,6 +50,14 @@ export async function deleteNote(id: number): Promise<void> {
   }
 }
 
-export function fetchWidget(): Promise<ChamberWidget> {
-  return fetch(`${API_BASE}/widget`).then((res) => json(res));
+export function fetchPinnedNotes(): Promise<NoteSummary[]> {
+  return fetch(`${API_BASE}/notes/pinned`).then((res) => json(res));
+}
+
+export function setPinned(id: number, pinned: boolean): Promise<NoteDetail> {
+  return fetch(`${API_BASE}/notes/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pinned }),
+  }).then((res) => json(res));
 }
