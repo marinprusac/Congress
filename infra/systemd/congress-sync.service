@@ -1,0 +1,7 @@
+[Unit]
+Description=Congress - pull latest main and restart services if changed
+
+[Service]
+Type=oneshot
+User=marin
+ExecStart=/srv/congress/infra/deploy/sync.sh

@@ -1,0 +1,15 @@
+[Unit]
+Description=Congress - Capitol service
+After=network.target
+
+[Service]
+Type=simple
+User=marin
+WorkingDirectory=/srv/congress/services/capitol
+ExecStart=/usr/bin/pnpm run start
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

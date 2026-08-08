@@ -1,0 +1,22 @@
+#!/bin/sh
+# Blocks pushes to main/master from this server clone.
+# This machine may run an autonomous AI with commit/push access; commits it
+# makes must land on a review branch (server-ai/*), never go straight to the
+# branch the deploy-sync timer auto-pulls and auto-restarts services from.
+#
+# This file is not itself run by git (hooks live outside version control, in
+# .git/hooks/) - it's checked in here as the source of truth. Install with:
+#   cp infra/deploy/pre-push-hook .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+protected='refs/heads/main refs/heads/master'
+
+while read local_ref local_sha remote_ref remote_sha; do
+  for ref in $protected; do
+    if [ "$remote_ref" = "$ref" ]; then
+      echo "refusing to push $remote_ref from this server clone (see .git/hooks/pre-push)" >&2
+      echo "push to a server-ai/* branch and open a PR instead" >&2
+      exit 1
+    fi
+  done
+done
+
+exit 0
