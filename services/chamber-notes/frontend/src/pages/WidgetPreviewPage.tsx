@@ -14,9 +14,16 @@ export function WidgetPreviewPage() {
 
   return (
     <div className="flex h-screen flex-col bg-parchment p-3 text-ink">
-      <p className="mb-2 shrink-0 font-mono text-[10px] uppercase tracking-widest text-dust">
-        Pinned
-      </p>
+      <div className="mb-2 flex shrink-0 items-baseline justify-between">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-dust">Pinned</p>
+        <a
+          href="/notes/new"
+          target="_top"
+          className="font-mono text-[10px] uppercase tracking-wide text-accent hover:underline"
+        >
+          + New
+        </a>
+      </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading && <p className="font-mono text-xs text-dust">Loading —</p>}
         {isError && <p className="font-mono text-xs text-alert">Notes unavailable.</p>}

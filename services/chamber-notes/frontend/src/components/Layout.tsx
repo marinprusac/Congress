@@ -1,4 +1,5 @@
 import { Link, Outlet } from "react-router-dom";
+import { NotesMark } from "@/components/NotesMark";
 
 export function Layout() {
   return (
@@ -8,7 +9,8 @@ export function Layout() {
           ← Capitol
         </a>
         <div className="flex items-baseline justify-between">
-          <Link to="/">
+          <Link to="/" className="flex items-center gap-3">
+            <NotesMark className="h-8 w-8 text-ink" />
             <h1 className="font-display text-4xl">Notes</h1>
           </Link>
           <nav className="flex gap-4 font-mono text-xs uppercase tracking-wide text-slate">

@@ -1,9 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchRegistry } from "@/lib/api";
-
-function docketLabel(index: number): string {
-  return `CH.${String(index + 1).padStart(2, "0")}`;
-}
+import { ChamberMark } from "@/components/icons";
 
 export function WidgetGrid() {
   const { data, isLoading, isError } = useQuery({
@@ -27,7 +24,7 @@ export function WidgetGrid() {
 
       {!isLoading && !isError && data && data.length > 0 && (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
-          {data.map((chamber, index) => {
+          {data.map((chamber) => {
             const active = chamber.status === "active";
             return (
               <div
@@ -36,10 +33,11 @@ export function WidgetGrid() {
                   active ? "bg-parchment" : "bg-ink/[0.06]"
                 }`}
               >
-                <div className="relative z-10 flex shrink-0 items-baseline justify-between border-b border-dust px-3 py-2">
-                  <span className="font-mono text-[10px] uppercase tracking-widest text-dust">
-                    {docketLabel(index)}
-                  </span>
+                <div className="relative z-10 flex shrink-0 items-center justify-between border-b border-dust px-3 py-2">
+                  <ChamberMark
+                    name={chamber.name}
+                    className={`h-4 w-4 ${active ? "text-ink" : "text-dust"}`}
+                  />
                   {active ? (
                     <a
                       href={chamber.routes.home}
