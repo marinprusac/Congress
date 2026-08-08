@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchRegistry } from "@/lib/api";
+import { ChamberWidgetSlot } from "@/components/ChamberWidgetSlot";
 
 function docketLabel(index: number, name: string): string {
   const number = String(index + 1).padStart(2, "0");
@@ -47,23 +48,25 @@ export function ChamberLedger() {
           !isError &&
           data &&
           data.map((chamber, index) => (
-            <div
-              key={chamber.name}
-              className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-6 border-b border-dust px-1 py-2"
-            >
-              <span className="font-mono text-sm text-ink">
-                {docketLabel(index, chamber.name)}
-              </span>
-              <span
-                className={`font-mono text-sm ${
-                  chamber.status === "active" ? "text-accent" : "text-alert"
-                }`}
-              >
-                {chamber.status}
-              </span>
-              <span className="font-mono text-sm text-slate">
-                {formatTimestamp(chamber.lastHeartbeatAt)}
-              </span>
+            <div key={chamber.name} className="border-b border-dust px-1 py-2">
+              <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-6">
+                <span className="font-mono text-sm text-ink">
+                  {docketLabel(index, chamber.name)}
+                </span>
+                <span
+                  className={`font-mono text-sm ${
+                    chamber.status === "active" ? "text-accent" : "text-alert"
+                  }`}
+                >
+                  {chamber.status}
+                </span>
+                <span className="font-mono text-sm text-slate">
+                  {formatTimestamp(chamber.lastHeartbeatAt)}
+                </span>
+              </div>
+              <div className="mt-2">
+                <ChamberWidgetSlot chamberName={chamber.name} status={chamber.status} />
+              </div>
             </div>
           ))}
       </div>

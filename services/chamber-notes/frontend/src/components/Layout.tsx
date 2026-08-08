@@ -1,0 +1,30 @@
+import { Link, Outlet } from "react-router-dom";
+
+export function Layout() {
+  return (
+    <div className="min-h-screen bg-parchment text-ink">
+      <header className="border-b border-dust px-6 py-8">
+        <p className="font-mono text-xs uppercase tracking-widest text-dust">Congress · CH.—</p>
+        <div className="flex items-baseline justify-between">
+          <Link to="/">
+            <h1 className="font-display text-4xl">Notes</h1>
+          </Link>
+          <nav className="flex gap-4 font-mono text-xs uppercase tracking-wide text-slate">
+            <Link to="/" className="hover:text-accent">
+              All Notes
+            </Link>
+            <Link to="/new" className="hover:text-accent">
+              New
+            </Link>
+            <Link to="/settings" className="hover:text-accent">
+              Settings
+            </Link>
+          </nav>
+        </div>
+      </header>
+      <main className="mx-auto max-w-3xl px-6 py-10">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
