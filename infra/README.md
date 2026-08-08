@@ -1,8 +1,14 @@
 # Deployment
 
-Congress runs on a single Hetzner VPS (`congress-vps` in Tailscale), following
-section 7 of the project brief: each service is a plain `systemd` unit bound
-to `127.0.0.1`, no Docker, no public HTTPS listener.
+Congress runs on a single Hetzner VPS (`178.105.180.7`), one plain `systemd`
+unit per service bound to `127.0.0.1`, no Docker.
+
+This deviates from the project brief's original access model (Tailscale-only,
+no public listener, network membership as the sole access control — brief
+section 7). That was tried first and worked, but was abandoned in favor of
+public access at `congress.marinprusac.com` gated by a master-password
+session cookie (`services/capitol/src/sessionAuth.ts`), by explicit user
+decision. See "Access control" below for what that means in practice.
 
 ## Layout on the server
 
@@ -12,9 +18,13 @@ to `127.0.0.1`, no Docker, no public HTTPS listener.
   not the user's own key, and not added to the server's default SSH agent).
 - Ports: this VPS already runs other services on `3000` and `4000`, so
   Capitol's production port differs from its dev default: **Capitol `8000`**,
-  **Notes Chamber `8011`** (matches dev default). Both bind `127.0.0.1` only.
+  **Notes Chamber `8011`** (matches dev default). Both bind `127.0.0.1` only —
+  the only thing reachable from outside the box at all is Caddy, on 80/443.
 - Each service's `.env` (untracked, created by hand on the server) sets
-  `NODE_ENV=production` and a shared `CONGRESS_INTERNAL_TOKEN`.
+  `NODE_ENV=production` and a shared `CONGRESS_INTERNAL_TOKEN`. Capitol's
+  `.env` additionally sets `CONGRESS_MASTER_PASSWORD_HASH` and
+  `SESSION_SECRET` (see `services/capitol/.env.example` for how to generate
+  each).
 
 ## Process management
 
@@ -24,32 +34,49 @@ Each Chamber added later gets its own unit following the same template:
 `User=marin`, `WorkingDirectory=` the service dir, `ExecStart=/usr/bin/pnpm run start`,
 `Restart=on-failure`.
 
-## Exposure: Tailscale Serve, not Caddy
+## Access control
 
-The brief flagged this as a detail to confirm at build time. This server
-already runs a shared public Caddyfile for unrelated sites
-(marinprusac.com, Vaultwarden, the Obsidian WebDAV endpoint, etc.), all bound
-to the same `0.0.0.0:443` listener. Adding a Congress site block to that same
-Caddyfile would make it reachable by anyone who connects to the server's
-public IP with the right SNI/Host header, regardless of DNS — Caddy doesn't
-scope a site block to a specific network interface.
+There is no network-level gate anymore — `congress.marinprusac.com` resolves
+publicly and Caddy proxies it to Capitol like any other site on this server.
+The **only** thing standing between the open internet and this data is the
+master-password cookie:
 
-Instead, Capitol is exposed with `tailscale serve`:
+- `POST /auth/login` checks the password (sha256'd, timing-safe compared)
+  and sets a signed, `HttpOnly`, `Secure` session cookie. Rate-limited per
+  source IP (5 attempts / 15 min lockout) — see `sessionAuth.ts`.
+- Everything that carries real data — `/capitol/registry`, `/api/:chamber/*`
+  (the gateway to every Chamber), and the frontend — requires that cookie.
+  `/health`, `/manifest`, and the static frontend shell stay open (nothing
+  sensitive, and the login page itself has to load unauthenticated).
+- `/mcp` is gated separately, by the existing `CONGRESS_INTERNAL_TOKEN`
+  header rather than the session cookie, since MCP clients are machines, not
+  browsers with cookies.
 
-```
-sudo tailscale serve --bg 8000
-```
+Changing the password: update `CONGRESS_MASTER_PASSWORD_HASH` in
+`services/capitol/.env` on the server and `sudo systemctl restart congress-capitol`.
 
-This terminates HTTPS using Tailscale's own cert for the tailnet's `.ts.net`
-MagicDNS name and only listens on the tailnet interface — it is never
-reachable from the public internet, with no dependency on Caddy or the
-existing public Caddyfile at all. Check current state with
-`sudo tailscale serve status`.
+## Exposure: Caddy + public DNS
+
+- Hetzner DNS (this domain's nameservers) has an A record:
+  `congress.marinprusac.com` → `178.105.180.7`.
+- `infra/caddy/congress.caddy` is a standard site block (same pattern as
+  this server's other sites — see `dav.caddy`, `wiki.caddy`), reverse-proxying
+  to `127.0.0.1:8000`. Caddy handles ACME/HTTPS automatically, same as every
+  other site on this box. Installed by copying it to `/etc/caddy/` and adding
+  `import /etc/caddy/congress.caddy` to the top-level Caddyfile, then
+  `sudo systemctl reload caddy` (reload, not restart — this Caddy instance
+  also serves marinprusac.com, Vaultwarden, and the Obsidian WebDAV sync,
+  and a reload doesn't drop their connections).
+
+An earlier iteration exposed Capitol tailnet-only via Tailscale (`tailscale
+serve`, bound to `127.0.0.1:8000`). That's been fully torn down — Tailscale
+is uninstalled from the VPS and the user's other devices — in favor of the
+setup above.
 
 ## Sync: laptop → GitHub → server
 
-There is no public webhook endpoint (would contradict the Tailscale-only
-design), so the server polls instead:
+No webhook (would need its own public endpoint and auth story); the server
+polls instead:
 
 - `infra/deploy/sync.sh` — fetches `origin/main`; if it moved, fast-forwards
   (never rebases/force-merges), reinstalls deps (`--frozen-lockfile`),
@@ -78,21 +105,12 @@ machine. Server-side AI work must go to a `server-ai/*` branch and get
 reviewed/merged from the laptop — `main` is the only branch the sync timer
 trusts, and it should only ever move via a reviewed merge.
 
-## Verified
-
-Deployed and end-to-end verified on `congress-vps` (2026-08-08): both
-services running under systemd, registry/heartbeat/gateway loop confirmed
-in production, and this line's own commit was picked up by the sync timer
-without any manual step on the server.
-
-## First-time server bootstrap (reference, already done for congress-vps)
+## First-time server bootstrap (reference, already done for this VPS)
 
 ```
-curl -fsSL https://tailscale.com/install.sh | sudo sh
-sudo tailscale up --ssh --hostname=congress-vps   # then open the printed auth URL
+sudo mkdir -p /srv/congress && sudo chown marin:marin /srv/congress
 ssh-keygen -t ed25519 -f ~/.ssh/congress_deploy_key -N "" -C "congress-vps-deploy"
 # add ~/.ssh/congress_deploy_key.pub as a repo deploy key with write access
-sudo mkdir -p /srv/congress && sudo chown marin:marin /srv/congress
 GIT_SSH_COMMAND="ssh -i ~/.ssh/congress_deploy_key -o IdentitiesOnly=yes" \
   git clone git@github.com:marinprusac/Congress.git /srv/congress
 cd /srv/congress
@@ -108,5 +126,9 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now congress-capitol congress-chamber-notes
 sudo cp infra/systemd/congress-sync.timer /etc/systemd/system/
 sudo systemctl enable --now congress-sync.timer
-sudo tailscale serve --bg 8000
+# add congress.marinprusac.com A record -> this VPS's public IP in Hetzner DNS
+sudo cp infra/caddy/congress.caddy /etc/caddy/
+echo 'import /etc/caddy/congress.caddy' | sudo tee -a /etc/caddy/Caddyfile
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
 ```

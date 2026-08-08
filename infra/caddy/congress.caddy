@@ -1,0 +1,21 @@
+# Reverse proxy for Capitol on the Hetzner VPS. Caddy handles automatic
+# HTTPS (ACME) with no extra config needed.
+#
+# This VPS runs a shared top-level /etc/caddy/Caddyfile that imports
+# per-site snippets, so install this as /etc/caddy/congress.caddy and add
+# `import /etc/caddy/congress.caddy` to the top level of the main Caddyfile,
+# then `sudo systemctl reload caddy`.
+#
+# Congress has no network-level access control now that this is public
+# (see infra/README.md) - the master-password session cookie in
+# services/capitol/src/sessionAuth.ts is the only gate. That cookie is set
+# with Secure, so it only works over HTTPS, which is exactly what this
+# block provides.
+congress.marinprusac.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8000
+
+    log {
+        output file /var/log/caddy/congress-access.log
+    }
+}
