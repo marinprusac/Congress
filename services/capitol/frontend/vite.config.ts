@@ -14,6 +14,17 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
+      workbox: {
+        // Without this, the service worker's NavigationRoute serves the
+        // cached Capitol app shell for every top-level navigation,
+        // including "/notes" and any other Chamber path proxied through
+        // server.ts's chamberFrontendProxy — silently shadowing them even
+        // though the server itself proxies correctly (curl bypasses the
+        // service worker, which is why this only shows up in a browser).
+        // Only "/" is a real Capitol route, so only "/" gets the offline
+        // app-shell fallback; everything else always hits the network.
+        navigateFallbackDenylist: [/^\/(?!$)/],
+      },
       manifest: {
         name: "Congress",
         short_name: "Congress",
