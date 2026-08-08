@@ -8,6 +8,7 @@ import {
 } from "@congress/shared-types";
 import { env } from "./env.js";
 import { requireInternalToken } from "./auth.js";
+import { authRoutes, requireSession } from "./sessionAuth.js";
 import { capitolManifest } from "./manifest.js";
 import {
   registerChamber,
@@ -24,7 +25,9 @@ export const app = new Hono<{ Bindings: HttpBindings }>();
 app.get("/manifest", (c) => c.json(capitolManifest));
 app.get("/health", (c) => c.json({ status: "ok" }));
 
-app.get("/capitol/registry", (c) => c.json(listChambers()));
+app.route("/auth", authRoutes);
+
+app.get("/capitol/registry", requireSession, (c) => c.json(listChambers()));
 
 app.post("/capitol/register", requireInternalToken, async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -58,8 +61,13 @@ app.post("/capitol/heartbeat", requireInternalToken, async (c) => {
   return c.json(entry, 200);
 });
 
-app.all("/api/:chamber/*", forwardToChamber);
+app.all("/api/:chamber/*", requireSession, forwardToChamber);
 
+// /mcp is called by MCP clients (Claude Code), not the browser, so it's
+// gated by the same shared-secret header Chambers use to register/heartbeat
+// rather than the browser session cookie.
+app.use("/mcp", requireInternalToken);
+app.use("/mcp/*", requireInternalToken);
 app.route("/mcp", mcpApp);
 
 app.use(
