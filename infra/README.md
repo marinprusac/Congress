@@ -78,6 +78,13 @@ machine. Server-side AI work must go to a `server-ai/*` branch and get
 reviewed/merged from the laptop — `main` is the only branch the sync timer
 trusts, and it should only ever move via a reviewed merge.
 
+## Verified
+
+Deployed and end-to-end verified on `congress-vps` (2026-08-08): both
+services running under systemd, registry/heartbeat/gateway loop confirmed
+in production, and this line's own commit was picked up by the sync timer
+without any manual step on the server.
+
 ## First-time server bootstrap (reference, already done for congress-vps)
 
 ```
