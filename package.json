@@ -1,0 +1,9 @@
+{
+  "name": "congress",
+  "private": true,
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "dev:capitol": "pnpm --filter capitol dev:server",
+    "dev:capitol:web": "pnpm --filter capitol dev:web"
+  }
+}
