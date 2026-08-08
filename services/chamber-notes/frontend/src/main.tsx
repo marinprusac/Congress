@@ -12,7 +12,7 @@ if (!rootElement) throw new Error("Root element not found");
 createRoot(rootElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.PROD ? "/notes" : "/"}>
         <App />
       </BrowserRouter>
     </QueryClientProvider>

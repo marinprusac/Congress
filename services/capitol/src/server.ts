@@ -1,5 +1,6 @@
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
+import type { Context } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import {
   registerRequestSchema,
@@ -16,8 +17,10 @@ import {
   recordHeartbeat,
   listChambers,
   sweepStaleChambers,
+  getChamber,
 } from "./registry.js";
-import { forwardToChamber } from "./gateway.js";
+import { forwardToChamber, forwardToChamberFrontend } from "./gateway.js";
+import { hasValidSession } from "./sessionAuth.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -69,6 +72,22 @@ app.all("/api/:chamber/*", requireSession, forwardToChamber);
 app.use("/mcp", requireInternalToken);
 app.use("/mcp/*", requireInternalToken);
 app.route("/mcp", mcpApp);
+
+// Each Chamber's own frontend is reachable through Capitol at
+// "/<chamberName>/*", proxied straight through to that Chamber's process.
+// Only intercepts paths whose first segment is an actually-registered
+// Chamber name, so it can't shadow Capitol's own static assets or routes.
+async function chamberFrontendProxy(c: Context<{ Bindings: HttpBindings }>) {
+  const chamberName = c.req.param("chamberName") ?? "";
+  const chamber = getChamber(chamberName);
+  if (!chamber) return undefined;
+  if (!(await hasValidSession(c))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  return forwardToChamberFrontend(c, chamber);
+}
+app.all("/:chamberName", async (c, next) => (await chamberFrontendProxy(c)) ?? next());
+app.all("/:chamberName/*", async (c, next) => (await chamberFrontendProxy(c)) ?? next());
 
 app.use(
   "/*",

@@ -49,9 +49,13 @@ function recordSuccess(ip: string): void {
   attemptsByIp.delete(ip);
 }
 
-export const requireSession: MiddlewareHandler<{ Bindings: HttpBindings }> = async (c, next) => {
+export async function hasValidSession(c: Parameters<typeof getSignedCookie>[0]): Promise<boolean> {
   const cookie = await getSignedCookie(c, env.SESSION_SECRET, COOKIE_NAME);
-  if (cookie !== SESSION_VALUE) {
+  return cookie === SESSION_VALUE;
+}
+
+export const requireSession: MiddlewareHandler<{ Bindings: HttpBindings }> = async (c, next) => {
+  if (!(await hasValidSession(c))) {
     return c.json({ error: "unauthorized" }, 401);
   }
   await next();

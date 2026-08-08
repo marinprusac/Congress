@@ -50,9 +50,18 @@ export function ChamberLedger() {
           data.map((chamber, index) => (
             <div key={chamber.name} className="border-b border-dust px-1 py-2">
               <div className="grid grid-cols-[1fr_auto_auto] items-baseline gap-x-6">
-                <span className="font-mono text-sm text-ink">
-                  {docketLabel(index, chamber.name)}
-                </span>
+                {chamber.status === "active" ? (
+                  <a
+                    href={chamber.routes.home}
+                    className="font-mono text-sm text-ink underline decoration-dust underline-offset-4 hover:text-accent hover:decoration-accent"
+                  >
+                    {docketLabel(index, chamber.name)}
+                  </a>
+                ) : (
+                  <span className="font-mono text-sm text-ink">
+                    {docketLabel(index, chamber.name)}
+                  </span>
+                )}
                 <span
                   className={`font-mono text-sm ${
                     chamber.status === "active" ? "text-accent" : "text-alert"
