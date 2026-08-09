@@ -8,6 +8,7 @@ import {
   ExhibitChip,
   ExhibitAnnotatedText,
   ExhibitSharingBadge,
+  ShareControl,
   navigateToExhibit,
 } from "@congress/exhibit-ui";
 import { fetchDocument, updateDocument, deleteDocument, downloadUrl } from "@/lib/api";
@@ -110,6 +111,7 @@ export function DocumentViewPage() {
             </>
           ) : (
             <>
+              <ShareControl chamber="documents" exhibitId={`document-${doc.id}`} exhibitName={doc.title} />
               <button onClick={() => setEditing(true)} className="text-accent hover:underline">
                 Edit
               </button>

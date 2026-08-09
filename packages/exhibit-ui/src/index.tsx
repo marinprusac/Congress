@@ -12,3 +12,5 @@ export { ExhibitAnnotatedText } from "./ExhibitAnnotatedText.js";
 export { navigateToExhibit } from "./navigateToExhibit.js";
 export { useExhibitSharing } from "./useExhibitSharing.js";
 export { ExhibitSharingBadge } from "./ExhibitSharingBadge.js";
+export { CreateShareForm } from "./CreateShareForm.js";
+export { ShareControl } from "./ShareControl.js";

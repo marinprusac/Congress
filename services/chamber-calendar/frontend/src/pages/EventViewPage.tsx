@@ -1,7 +1,13 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { CapitolExhibitResolveResult } from "@congress/shared-types";
-import { ExhibitAnnotatedText, ExhibitChip, ExhibitSharingBadge, navigateToExhibit } from "@congress/exhibit-ui";
+import {
+  ExhibitAnnotatedText,
+  ExhibitChip,
+  ExhibitSharingBadge,
+  ShareControl,
+  navigateToExhibit,
+} from "@congress/exhibit-ui";
 import { fetchEvent } from "@/lib/api";
 import { formatEventFullRange } from "@/lib/datetime";
 import { toExhibitId } from "@/lib/exhibits";
@@ -46,12 +52,15 @@ export function EventViewPage() {
           {event.title}
           {exhibitId && <ExhibitSharingBadge exhibitId={exhibitId} className="exhibit-sharing-badge" />}
         </h2>
-        <Link
-          to={`/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}/edit`}
-          className="shrink-0 font-mono text-xs uppercase tracking-wide text-accent hover:underline"
-        >
-          Edit
-        </Link>
+        <div className="flex shrink-0 items-center gap-3 font-mono text-xs uppercase tracking-wide">
+          {exhibitId && <ShareControl chamber="calendar" exhibitId={exhibitId} exhibitName={event.title} />}
+          <Link
+            to={`/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}/edit`}
+            className="text-accent hover:underline"
+          >
+            Edit
+          </Link>
+        </div>
       </div>
 
       <dl className="space-y-4 font-mono text-sm">

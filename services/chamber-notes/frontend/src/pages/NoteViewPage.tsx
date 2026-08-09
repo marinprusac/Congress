@@ -7,6 +7,7 @@ import {
   ExhibitPickerDropdown,
   ExhibitChip,
   ExhibitSharingBadge,
+  ShareControl,
   navigateToExhibit,
 } from "@congress/exhibit-ui";
 import { fetchNote, updateNote, deleteNote, setPinned } from "@/lib/api";
@@ -123,6 +124,7 @@ export function NoteViewPage() {
               >
                 {note.pinned ? "Unpin" : "Pin"}
               </button>
+              <ShareControl chamber="notes" exhibitId={`note-${noteId}`} exhibitName={note.title} />
               <button onClick={() => setEditing(true)} className="text-accent hover:underline">
                 Edit
               </button>
