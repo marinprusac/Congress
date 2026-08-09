@@ -159,7 +159,7 @@ export function NoteViewPage() {
       )}
 
       {editing ? (
-        <>
+        <div className="exhibit-field">
           <textarea
             {...picker.fieldProps}
             value={draftContent}
@@ -172,9 +172,9 @@ export function NoteViewPage() {
             renderIcon={(chamber) => getChamberIcon(chamber)}
             className="exhibit-picker-dropdown"
           />
-        </>
+        </div>
       ) : (
-        <NoteMarkdown body={body} />
+        <NoteMarkdown body={body} onDoubleClick={() => setEditing(true)} />
       )}
 
       {!editing && (

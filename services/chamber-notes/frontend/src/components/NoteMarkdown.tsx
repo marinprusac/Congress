@@ -7,16 +7,17 @@ import { getChamberIcon } from "./ChamberIcon";
 
 interface NoteMarkdownProps {
   body: string;
+  onDoubleClick?: () => void;
 }
 
-export function NoteMarkdown({ body }: NoteMarkdownProps) {
+export function NoteMarkdown({ body, onDoubleClick }: NoteMarkdownProps) {
   const navigate = useNavigate();
   const transformed = toMarkdownWithExhibitLinks(body);
   const tokens = extractExhibitTokens(body);
   const { resultsByToken } = useResolvedExhibits(tokens);
 
   return (
-    <div className="note-prose">
+    <div className="note-prose" onDoubleClick={onDoubleClick} title={onDoubleClick ? "Double-click to edit" : undefined}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         // react-markdown's default urlTransform strips any URL scheme outside

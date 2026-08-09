@@ -14,3 +14,5 @@ export { useExhibitSharing } from "./useExhibitSharing.js";
 export { ExhibitSharingBadge } from "./ExhibitSharingBadge.js";
 export { CreateShareForm } from "./CreateShareForm.js";
 export { ShareControl } from "./ShareControl.js";
+export { ChamberLayout } from "./ChamberLayout.js";
+export type { ChamberNavLink } from "./ChamberLayout.js";

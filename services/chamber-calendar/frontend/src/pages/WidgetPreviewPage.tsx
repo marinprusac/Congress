@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchEvents } from "@/lib/api";
-import { formatEventTime } from "@/lib/datetime";
+import { formatWidgetEventTime } from "@/lib/datetime";
 
 const WIDGET_WINDOW_DAYS = 14;
 const MAX_EVENTS = 5;
@@ -56,7 +56,7 @@ export function WidgetPreviewPage() {
               className="block border-b border-dust py-1.5 first:pt-0 last:border-b-0 hover:text-accent"
             >
               <div className="font-display text-sm text-ink">{event.title}</div>
-              <div className="font-mono text-[10px] text-dust">{formatEventTime(event)}</div>
+              <div className="font-mono text-[10px] text-dust">{formatWidgetEventTime(event)}</div>
             </a>
           ))}
       </div>

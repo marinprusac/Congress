@@ -49,19 +49,21 @@ export function UploadDocumentPage() {
         <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">
           Description (optional, [[ to reference an Exhibit)
         </label>
-        <textarea
-          {...picker.fieldProps}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={8}
-          placeholder="Type [[ to reference a note, event, or other Exhibit."
-          className="mb-4 w-full border border-dust bg-parchment p-3 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-        />
-        <ExhibitPickerDropdown
-          picker={picker}
-          renderIcon={(chamber) => getChamberIcon(chamber)}
-          className="exhibit-picker-dropdown"
-        />
+        <div className="exhibit-field mb-4">
+          <textarea
+            {...picker.fieldProps}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={8}
+            placeholder="Type [[ to reference a note, event, or other Exhibit."
+            className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          />
+          <ExhibitPickerDropdown
+            picker={picker}
+            renderIcon={(chamber) => getChamberIcon(chamber)}
+            className="exhibit-picker-dropdown"
+          />
+        </div>
 
         {mutation.isError && (
           <p className="mb-4 font-mono text-sm text-alert">{(mutation.error as Error).message}</p>

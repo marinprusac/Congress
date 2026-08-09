@@ -149,7 +149,7 @@ export function DocumentViewPage() {
       </dl>
 
       {editing ? (
-        <>
+        <div className="exhibit-field">
           <textarea
             {...picker.fieldProps}
             value={draftDescription}
@@ -162,7 +162,7 @@ export function DocumentViewPage() {
             renderIcon={(chamber) => getChamberIcon(chamber)}
             className="exhibit-picker-dropdown"
           />
-        </>
+        </div>
       ) : doc.description ? (
         <ExhibitAnnotatedText
           text={doc.description}

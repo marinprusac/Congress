@@ -145,7 +145,7 @@ export function EventForm({
         />
       </div>
 
-      <div>
+      <div className="exhibit-field">
         <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Description</label>
         <textarea
           {...picker.fieldProps}

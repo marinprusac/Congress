@@ -53,6 +53,34 @@ export function formatEventTime(event: CalendarEvent): string {
   return `${TIME_FORMAT.format(new Date(event.start))} – ${TIME_FORMAT.format(new Date(event.end))}`;
 }
 
+function localDateOnly(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+const WIDGET_SHORT_DATE_FORMAT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+
+// Same time-only text as formatEventTime, but for the homepage widget where
+// events from many different days are listed together - without this,
+// "2:00 PM" reads as today even when the event is next week. Near-term
+// events get a compact "+N" day offset; anything further out gets a short
+// date instead of an ever-growing "+13".
+export function formatWidgetEventTime(event: CalendarEvent): string {
+  const eventDateStr = event.allDay ? event.start : localDateOnly(new Date(event.start));
+  const todayStr = localDateOnly(new Date());
+  const timePart = formatEventTime(event);
+
+  if (eventDateStr === todayStr) return timePart;
+
+  const offsetDays = Math.round(
+    (new Date(`${eventDateStr}T00:00:00`).getTime() - new Date(`${todayStr}T00:00:00`).getTime()) /
+      (24 * 60 * 60 * 1000)
+  );
+
+  if (offsetDays > 0 && offsetDays <= 9) return `+${offsetDays} · ${timePart}`;
+  return `${WIDGET_SHORT_DATE_FORMAT.format(new Date(`${eventDateStr}T00:00:00`))} · ${timePart}`;
+}
+
 const FULL_DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
   month: "short",

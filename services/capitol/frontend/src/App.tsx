@@ -9,7 +9,7 @@ function Home() {
   return (
     <div className="min-h-screen bg-parchment text-ink">
       <CapitolHeader />
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main className="mx-auto max-w-4xl px-6 py-10">
         <WidgetGrid />
       </main>
     </div>
