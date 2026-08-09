@@ -36,7 +36,10 @@ export function NoteViewPage() {
     enabled: Number.isInteger(noteId) && !editing,
   });
 
-  const picker = useExhibitPicker((newValue) => setDraftContent(newValue));
+  const picker = useExhibitPicker({
+    value: draftContent,
+    onChange: (newValue) => setDraftContent(newValue),
+  });
 
   const updateMutation = useMutation({
     mutationFn: (input: { title: string; content: string }) => updateNote(noteId, input),
@@ -146,17 +149,8 @@ export function NoteViewPage() {
 
       {editing ? (
         <>
-          <div className="mb-2 flex justify-end">
-            <button
-              type="button"
-              onClick={() => picker.openHere()}
-              className="font-mono text-xs uppercase tracking-wide text-accent hover:underline"
-            >
-              + Exhibit
-            </button>
-          </div>
           <textarea
-            ref={picker.attachRef}
+            {...picker.fieldProps}
             value={draftContent}
             onChange={(e) => setDraftContent(e.target.value)}
             rows={20}

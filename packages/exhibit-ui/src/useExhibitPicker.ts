@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { useExhibitSearch } from "./useExhibitSearch.js";
 import { buildExhibitToken } from "./token.js";
@@ -11,12 +12,6 @@ interface TriggerState {
   cursor: number;
 }
 
-function sameTrigger(a: TriggerState | null, b: TriggerState | null): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return a.triggerStart === b.triggerStart && a.query === b.query && a.cursor === b.cursor;
-}
-
 export interface ExhibitPickerState {
   open: boolean;
   query: string;
@@ -26,51 +21,52 @@ export interface ExhibitPickerState {
   setActiveIndex: (index: number) => void;
   select: (result: CapitolExhibitSearchResult) => void;
   close: () => void;
-  // Explicitly opens the picker at the current cursor (inserting "[[" if
-  // needed) - a guaranteed-to-work fallback for mobile keyboards where
-  // detecting "[[" from raw keystrokes is unreliable (autocorrect/predictive
-  // text can intercept or rewrite bracket characters before they ever reach
-  // the DOM's "input" event in a form this hook can parse).
-  openHere: () => void;
-  // Attach to the target textarea/input's `ref` prop.
-  attachRef: (el: PickerElement | null) => void;
+  // Spread onto the target <textarea>/<input>. Deliberately does NOT include
+  // value/onChange - the field stays owned by the consumer's own state.
+  fieldProps: {
+    ref: (el: PickerElement | null) => void;
+    onKeyDown: (e: ReactKeyboardEvent<PickerElement>) => void;
+    onSelect: () => void;
+    onClick: () => void;
+  };
+}
+
+interface UseExhibitPickerOptions {
+  // Current value of the (controlled) field being watched.
+  value: string;
+  // Called when a selection replaces the "[[query" span with a real token.
+  onChange: (newValue: string, newCursor: number) => void;
 }
 
 // Detects "[[" typed immediately before the cursor (with no "]]" or newline
 // since), tracking the query text as the user keeps typing, so a consumer
 // can drive an <ExhibitPickerDropdown> off the returned state.
 //
-// Takes ownership of the target element via `attachRef` (a callback ref)
-// rather than accepting an external RefObject. A callback ref is the only
-// reliable way to know exactly when the element mounts/unmounts - an
-// earlier version accepted a plain RefObject and tried to react to it via a
-// useEffect dependency, but `ref.current` is read during render, before the
-// browser has actually attached the DOM node during commit, so the
-// dependency array never saw the change and listeners were never attached
-// at all. All listeners are attached exactly once per mounted element (not
-// re-bound on every keystroke) - doing that on every keystroke was enough
-// to make mobile browsers reset the textarea's caret to the end of the
-// value and occasionally drop the next keystroke.
-export function useExhibitPicker(onInsert: (newValue: string, newCursor: number) => void): ExhibitPickerState {
+// Detection deliberately runs in an effect keyed on the *controlled* value,
+// rather than from a native "input" listener on the element. A native
+// listener attached directly to the element fires before React's delegated
+// onChange, so calling setState from it re-renders the controlled field
+// while the consumer's state still holds the previous value - React then
+// writes that stale value back to the DOM and the keystroke that caused it
+// is silently erased. In practice that ate the second "[" of every "[[",
+// i.e. exactly the keystroke that first produces a trigger. Reading
+// selection in an effect (after React has committed the new value) avoids
+// racing the controlled value entirely.
+export function useExhibitPicker({ value, onChange }: UseExhibitPickerOptions): ExhibitPickerState {
   const [element, setElement] = useState<PickerElement | null>(null);
   const attachRef = useCallback((el: PickerElement | null) => setElement(el), []);
 
-  const [trigger, setTriggerState] = useState<TriggerState | null>(null);
+  const [trigger, setTrigger] = useState<TriggerState | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const { results, loading } = useExhibitSearch(trigger?.query ?? "");
+  // Bumped by caret-only movements (click / arrow keys / selection changes),
+  // which don't alter `value` but can still open or close the picker.
+  const [caretTick, setCaretTick] = useState(0);
+  const bumpCaret = useCallback(() => setCaretTick((t) => t + 1), []);
+
+  const { results, loading } = useExhibitSearch(trigger?.query ?? "", trigger !== null);
 
   const triggerRef = useRef(trigger);
-  // Only actually update state (and trigger a re-render) when something
-  // meaningfully changed - re-renders caused by "input" and "keyup" both
-  // firing for the same keystroke, mid-typing, are exactly the kind of
-  // extra churn that has been observed to interfere with mobile virtual
-  // keyboards/autocorrect.
-  const setTrigger = useCallback((next: TriggerState | null) => {
-    if (sameTrigger(triggerRef.current, next)) return;
-    triggerRef.current = next;
-    setTriggerState(next);
-  }, []);
-
+  triggerRef.current = trigger;
   const resultsRef = useRef(results);
   resultsRef.current = results;
   const activeIndexRef = useRef(activeIndex);
@@ -78,7 +74,31 @@ export function useExhibitPicker(onInsert: (newValue: string, newCursor: number)
 
   useEffect(() => setActiveIndex(0), [trigger?.query]);
 
-  const close = useCallback(() => setTrigger(null), [setTrigger]);
+  const close = useCallback(() => setTrigger(null), []);
+
+  // Runs after commit, so `element.value` and its selection already reflect
+  // `value` - safe to read without fighting the controlled field.
+  useEffect(() => {
+    if (!element) {
+      setTrigger(null);
+      return;
+    }
+    if (document.activeElement !== element) return;
+
+    const cursor = element.selectionStart ?? value.length;
+    const beforeCursor = value.slice(0, cursor);
+    const triggerStart = beforeCursor.lastIndexOf("[[");
+    if (triggerStart === -1) {
+      setTrigger(null);
+      return;
+    }
+    const between = beforeCursor.slice(triggerStart + 2);
+    if (between.includes("]]") || between.includes("\n")) {
+      setTrigger(null);
+      return;
+    }
+    setTrigger({ triggerStart, query: between, cursor });
+  }, [element, value, caretTick]);
 
   const select = useCallback(
     (result: CapitolExhibitSearchResult) => {
@@ -87,11 +107,10 @@ export function useExhibitPicker(onInsert: (newValue: string, newCursor: number)
 
       const token = buildExhibitToken({ chamber: result.chamber, id: result.id });
       const inserted = `[[${token}|${result.name}]]`;
-      const value = element.value;
       const newValue = value.slice(0, current.triggerStart) + inserted + value.slice(current.cursor);
       const newCursor = current.triggerStart + inserted.length;
 
-      onInsert(newValue, newCursor);
+      onChange(newValue, newCursor);
       setTrigger(null);
 
       requestAnimationFrame(() => {
@@ -99,75 +118,14 @@ export function useExhibitPicker(onInsert: (newValue: string, newCursor: number)
         element.setSelectionRange(newCursor, newCursor);
       });
     },
-    [element, onInsert, setTrigger]
+    [element, value, onChange]
   );
   const selectRef = useRef(select);
   selectRef.current = select;
 
-  const openHere = useCallback(() => {
-    if (!element) return;
-    // If the field wasn't already focused, its selection defaults to 0
-    // rather than reflecting where the user would expect to type next -
-    // treat that case as "start from the end" instead of inserting at the
-    // very beginning of existing text.
-    const wasFocused = document.activeElement === element;
-    element.focus();
-    const cursor = wasFocused ? (element.selectionStart ?? element.value.length) : element.value.length;
-    const value = element.value;
-    const beforeCursor = value.slice(0, cursor);
-    // Already sitting right after an open "[[" (e.g. the auto-detector
-    // caught it but the dropdown got dismissed) - just reopen in place
-    // instead of inserting a second pair.
-    const existingStart = beforeCursor.lastIndexOf("[[");
-    if (existingStart !== -1) {
-      const between = beforeCursor.slice(existingStart + 2);
-      if (!between.includes("]]") && !between.includes("\n")) {
-        setTrigger({ triggerStart: existingStart, query: between, cursor });
-        return;
-      }
-    }
-
-    const newValue = beforeCursor + "[[" + value.slice(cursor);
-    const newCursor = cursor + 2;
-    onInsert(newValue, newCursor);
-    setTrigger({ triggerStart: cursor, query: "", cursor: newCursor });
-
-    requestAnimationFrame(() => {
-      element.focus();
-      element.setSelectionRange(newCursor, newCursor);
-    });
-  }, [element, onInsert, setTrigger]);
-
-  useEffect(() => {
-    if (!element) return;
-    const el = element;
-
-    function detectTrigger(e?: Event) {
-      // Skip while a mobile IME/autocorrect composition is in progress -
-      // reading `el.value` mid-composition can catch a transient,
-      // about-to-be-replaced string, and setting state here has been
-      // observed to interrupt the composition on Android. `compositionend`
-      // (registered below) re-runs this once the composed text settles.
-      if (e instanceof InputEvent && e.isComposing) return;
-
-      const cursor = el.selectionStart ?? el.value.length;
-      const beforeCursor = el.value.slice(0, cursor);
-      const triggerStart = beforeCursor.lastIndexOf("[[");
-      if (triggerStart === -1) {
-        setTrigger(null);
-        return;
-      }
-      const between = beforeCursor.slice(triggerStart + 2);
-      if (between.includes("]]") || between.includes("\n")) {
-        setTrigger(null);
-        return;
-      }
-      setTrigger({ triggerStart, query: between, cursor });
-    }
-
-    function handleKeyDown(e: KeyboardEvent) {
-      const current = triggerRef.current;
-      if (!current) return;
+  const onKeyDown = useCallback(
+    (e: ReactKeyboardEvent<PickerElement>) => {
+      if (!triggerRef.current) return;
 
       if (e.key === "Escape") {
         e.preventDefault();
@@ -191,21 +149,9 @@ export function useExhibitPicker(onInsert: (newValue: string, newCursor: number)
           selectRef.current(active);
         }
       }
-    }
-
-    el.addEventListener("input", detectTrigger);
-    el.addEventListener("click", detectTrigger);
-    el.addEventListener("keyup", detectTrigger);
-    el.addEventListener("compositionend", detectTrigger);
-    el.addEventListener("keydown", handleKeyDown as EventListener);
-    return () => {
-      el.removeEventListener("input", detectTrigger);
-      el.removeEventListener("click", detectTrigger);
-      el.removeEventListener("keyup", detectTrigger);
-      el.removeEventListener("compositionend", detectTrigger);
-      el.removeEventListener("keydown", handleKeyDown as EventListener);
-    };
-  }, [element, setTrigger]);
+    },
+    []
+  );
 
   return {
     open: trigger !== null,
@@ -216,7 +162,6 @@ export function useExhibitPicker(onInsert: (newValue: string, newCursor: number)
     setActiveIndex,
     select,
     close,
-    openHere,
-    attachRef,
+    fieldProps: { ref: attachRef, onKeyDown, onSelect: bumpCaret, onClick: bumpCaret },
   };
 }

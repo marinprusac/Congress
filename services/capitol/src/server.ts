@@ -77,10 +77,11 @@ app.post("/capitol/exhibits/sync", requireInternalToken, async (c) => {
   return c.json({ ok: true });
 });
 
+// An empty query is meaningful here - it asks each Chamber for its most
+// recent Exhibits, which is what the "[[" picker shows before anything has
+// been typed.
 app.get("/capitol/exhibits/search", requireSession, async (c) => {
-  const query = c.req.query("q") ?? "";
-  if (!query.trim()) return c.json({ results: [] });
-  const results = await searchExhibits(query);
+  const results = await searchExhibits(c.req.query("q") ?? "");
   return c.json({ results });
 });
 

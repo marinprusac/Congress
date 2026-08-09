@@ -25,7 +25,9 @@ export function ExhibitPickerDropdown({ picker, renderIcon, className }: Exhibit
         <div className="exhibit-picker-empty">Searching —</div>
       )}
       {!picker.loading && picker.results.length === 0 && (
-        <div className="exhibit-picker-empty">No matches</div>
+        <div className="exhibit-picker-empty">
+          {picker.query.trim() ? "No matches" : "— Nothing to reference yet —"}
+        </div>
       )}
       {picker.results.map((result: CapitolExhibitSearchResult, index: number) => (
         <div

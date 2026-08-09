@@ -1,4 +1,4 @@
-import { like, or, inArray } from "drizzle-orm";
+import { like, or, inArray, desc } from "drizzle-orm";
 import type { ExhibitSearchResult, ExhibitResolveResult, ExhibitSyncRequest } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { notes } from "./db/schema.js";
@@ -16,12 +16,16 @@ function parseNoteId(exhibitId: string): number | null {
   return Number.isInteger(id) ? id : null;
 }
 
+// An empty query matches everything ("%%"), which combined with the
+// most-recent-first ordering is exactly the "show me what's there" listing
+// the picker wants before the user has typed anything.
 export async function searchNoteExhibits(query: string, limit = 10): Promise<ExhibitSearchResult[]> {
   const pattern = `%${query}%`;
   const rows = db
     .select()
     .from(notes)
     .where(or(like(notes.title, pattern), like(notes.body, pattern)))
+    .orderBy(desc(notes.updatedAt))
     .limit(limit)
     .all();
   return rows.map((row) => ({

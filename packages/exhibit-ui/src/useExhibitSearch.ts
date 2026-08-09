@@ -8,7 +8,14 @@ const DEBOUNCE_MS = 150;
 // proxy rule for "/capitol" in each Chamber's vite.config.ts locally.
 const SEARCH_URL = "/capitol/exhibits/search";
 
-export function useExhibitSearch(query: string): {
+// An empty query is a real query, not a no-op: it asks for the most recent
+// Exhibits, so typing "[[" immediately shows a browsable list rather than
+// an unhelpful "No matches". `enabled` (rather than a non-empty query) is
+// what gates fetching.
+export function useExhibitSearch(
+  query: string,
+  enabled: boolean
+): {
   results: CapitolExhibitSearchResult[];
   loading: boolean;
 } {
@@ -17,7 +24,7 @@ export function useExhibitSearch(query: string): {
   const requestId = useRef(0);
 
   useEffect(() => {
-    if (!query.trim()) {
+    if (!enabled) {
       setResults([]);
       setLoading(false);
       return;
@@ -44,7 +51,7 @@ export function useExhibitSearch(query: string): {
     }, DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, enabled]);
 
   return { results, loading };
 }

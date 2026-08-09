@@ -92,10 +92,11 @@ app.delete("/api/notes/:id", async (c) => {
   return c.body(null, 204);
 });
 
+// An empty query returns the most recently updated notes rather than
+// nothing - it's what the cross-Chamber "[[" picker shows on open.
 app.get("/api/exhibits/search", async (c) => {
   const query = c.req.query("q") ?? "";
   const limit = Number(c.req.query("limit")) || undefined;
-  if (!query.trim()) return c.json({ results: [] });
   return c.json({ results: await searchNoteExhibits(query, limit) });
 });
 
