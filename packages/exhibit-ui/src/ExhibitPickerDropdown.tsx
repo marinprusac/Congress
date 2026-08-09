@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import type { ExhibitPickerState } from "./useExhibitPicker.js";
+import { useKeyboardInset } from "./useKeyboardInset.js";
 
 interface ExhibitPickerDropdownProps {
   picker: ExhibitPickerState;
@@ -19,8 +20,15 @@ interface ExhibitPickerDropdownProps {
 // (and occasionally drop the next keystroke), since it's a layout mutation
 // happening right as the focused element changes.
 export function ExhibitPickerDropdown({ picker, renderIcon, className }: ExhibitPickerDropdownProps) {
+  const keyboardInset = useKeyboardInset();
+
   return (
-    <div className={className} role="listbox" hidden={!picker.open}>
+    <div
+      className={className}
+      role="listbox"
+      hidden={!picker.open}
+      style={keyboardInset > 0 ? { bottom: `calc(0.5rem + ${keyboardInset}px)` } : undefined}
+    >
       {picker.loading && picker.results.length === 0 && (
         <div className="exhibit-picker-empty">Searching —</div>
       )}
