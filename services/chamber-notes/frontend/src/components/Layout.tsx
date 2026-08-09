@@ -5,7 +5,7 @@ export function Layout() {
   return (
     <div className="min-h-screen bg-parchment text-ink">
       <header className="border-b border-dust px-6 py-8">
-        <a href="/" className="font-mono text-xs uppercase tracking-widest text-dust hover:text-accent">
+        <a href="/" className="block font-mono text-xs uppercase tracking-widest text-dust hover:text-accent">
           ← Capitol
         </a>
         <div className="flex items-baseline justify-between">

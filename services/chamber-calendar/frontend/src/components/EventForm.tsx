@@ -72,7 +72,7 @@ export function EventForm({
           onChange={(e) => set("calendarKey", e.target.value)}
           disabled={calendarLocked}
           required
-          className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink disabled:text-dust"
+          className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink disabled:text-dust"
         >
           <option value="" disabled>
             Select a calendar —
@@ -105,25 +105,25 @@ export function EventForm({
         All day
       </label>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="min-w-0">
           <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Start</label>
           <input
             type={values.allDay ? "date" : "datetime-local"}
             value={values.start}
             onChange={(e) => set("start", e.target.value)}
             required
-            className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink"
+            className="w-full min-w-0 border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">End</label>
           <input
             type={values.allDay ? "date" : "datetime-local"}
             value={values.end}
             onChange={(e) => set("end", e.target.value)}
             required
-            className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink"
+            className="w-full min-w-0 border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
           />
         </div>
       </div>
@@ -134,7 +134,7 @@ export function EventForm({
           type="text"
           value={values.location}
           onChange={(e) => set("location", e.target.value)}
-          className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink"
+          className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
         />
       </div>
 
@@ -144,7 +144,7 @@ export function EventForm({
           value={values.description}
           onChange={(e) => set("description", e.target.value)}
           rows={4}
-          className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink"
+          className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
         />
       </div>
 

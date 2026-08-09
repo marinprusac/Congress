@@ -139,7 +139,7 @@ export function NoteViewPage() {
           value={draftContent}
           onChange={(e) => setDraftContent(e.target.value)}
           rows={20}
-          className="w-full border border-dust bg-parchment p-3 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
         />
       ) : (
         <NoteMarkdown body={body} resolveTitle={(t) => titleToId.get(t.toLowerCase())} />

@@ -44,7 +44,7 @@ export function NewNotePage() {
           onChange={(e) => setContent(e.target.value)}
           rows={16}
           placeholder={"---\ntags: []\n---\nStart writing. Link to other notes with [[Note Title]]."}
-          className="mb-4 w-full border border-dust bg-parchment p-3 font-mono text-sm text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          className="mb-4 w-full border border-dust bg-parchment p-3 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
         />
 
         {mutation.isError && (

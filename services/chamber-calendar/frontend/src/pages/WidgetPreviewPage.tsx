@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchEvents } from "@/lib/api";
 import { formatEventTime } from "@/lib/datetime";
@@ -11,8 +12,14 @@ const MAX_EVENTS = 5;
 // the iframe and navigates Capitol's own tab, rather than routing inside
 // the small embedded frame.
 export function WidgetPreviewPage() {
-  const from = new Date().toISOString();
-  const to = new Date(Date.now() + WIDGET_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  // Computed once per mount, not per render — recomputing from Date.now()
+  // directly in the render body would change the query key on every render
+  // (react-query treats it as a brand new query), and each resolved fetch
+  // triggers a re-render that computes yet another new key, looping forever.
+  const [{ from, to }] = useState(() => ({
+    from: new Date().toISOString(),
+    to: new Date(Date.now() + WIDGET_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+  }));
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["events", "widget", from, to],

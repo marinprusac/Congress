@@ -38,7 +38,7 @@ export function NotesListPage() {
         placeholder="Search notes —"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        className="mb-6 w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+        className="mb-6 w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
       />
 
       <div className="border-t border-dust">
