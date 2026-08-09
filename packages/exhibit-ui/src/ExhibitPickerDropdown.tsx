@@ -8,15 +8,19 @@ interface ExhibitPickerDropdownProps {
   className?: string;
 }
 
-// Renders inline, directly under the textarea it's attached to - not
-// caret-positioned. Keeps this v1 implementation simple; the textarea keeps
-// focus throughout, so keyboard nav (handled in useExhibitPicker) and click
-// selection both work regardless of where this renders.
+// Positioned by CSS as a viewport-anchored overlay (not caret-positioned) -
+// the textarea keeps focus throughout, so keyboard nav (handled in
+// useExhibitPicker) and click selection both work regardless of where this
+// renders.
+//
+// Always renders its container, toggling only the `hidden` attribute -
+// mounting/unmounting this DOM node exactly when "[[" is typed was enough to
+// make mobile browsers reset the textarea's caret to the end of the value
+// (and occasionally drop the next keystroke), since it's a layout mutation
+// happening right as the focused element changes.
 export function ExhibitPickerDropdown({ picker, renderIcon, className }: ExhibitPickerDropdownProps) {
-  if (!picker.open) return null;
-
   return (
-    <div className={className} role="listbox">
+    <div className={className} role="listbox" hidden={!picker.open}>
       {picker.loading && picker.results.length === 0 && (
         <div className="exhibit-picker-empty">Searching —</div>
       )}

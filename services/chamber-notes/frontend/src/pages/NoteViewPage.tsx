@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CapitolExhibitResolveResult } from "@congress/shared-types";
@@ -23,7 +23,6 @@ export function NoteViewPage() {
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftContent, setDraftContent] = useState("");
-  const contentRef = useRef<HTMLTextAreaElement>(null);
 
   const noteQuery = useQuery({
     queryKey: ["note", noteId],
@@ -37,7 +36,7 @@ export function NoteViewPage() {
     enabled: Number.isInteger(noteId) && !editing,
   });
 
-  const picker = useExhibitPicker(contentRef, (newValue) => setDraftContent(newValue));
+  const picker = useExhibitPicker((newValue) => setDraftContent(newValue));
 
   const updateMutation = useMutation({
     mutationFn: (input: { title: string; content: string }) => updateNote(noteId, input),
@@ -146,9 +145,9 @@ export function NoteViewPage() {
       )}
 
       {editing ? (
-        <div className="relative">
+        <>
           <textarea
-            ref={contentRef}
+            ref={picker.attachRef}
             value={draftContent}
             onChange={(e) => setDraftContent(e.target.value)}
             rows={20}
@@ -159,7 +158,7 @@ export function NoteViewPage() {
             renderIcon={(chamber) => getChamberIcon(chamber)}
             className="exhibit-picker-dropdown"
           />
-        </div>
+        </>
       ) : (
         <NoteMarkdown body={body} />
       )}

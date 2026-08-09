@@ -207,18 +207,24 @@
   color: var(--color-dust);
 }
 
+/* Fixed to the viewport, not positioned relative to the textarea - a
+   textarea can be far taller than the screen on mobile, which left an
+   earlier textarea-relative version rendered off-screen below the fold. */
 .exhibit-picker-dropdown {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  margin-top: 4px;
-  z-index: 20;
-  max-height: 12rem;
+  position: fixed;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 50;
+  max-height: 40vh;
   overflow-y: auto;
   border: 1px solid var(--color-dust);
   background-color: var(--color-parchment);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-ink) 15%, transparent);
+  box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
+}
+
+.exhibit-picker-dropdown[hidden] {
+  display: none;
 }
 
 .exhibit-picker-option {
