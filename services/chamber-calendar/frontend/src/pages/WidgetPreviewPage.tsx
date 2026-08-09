@@ -51,7 +51,7 @@ export function WidgetPreviewPage() {
           events.map((event) => (
             <a
               key={event.id}
-              href={`/calendar/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}/edit`}
+              href={`/calendar/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}`}
               target="_top"
               className="block border-b border-dust py-1.5 first:pt-0 last:border-b-0 hover:text-accent"
             >

@@ -74,7 +74,7 @@ export function AgendaPage() {
           {group.events.map((event) => (
             <Link
               key={event.id}
-              to={`/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}/edit`}
+              to={`/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}`}
               className="flex items-baseline gap-4 border-b border-dust px-1 py-3 hover:bg-ink/[0.03]"
             >
               <span className="w-28 shrink-0 font-mono text-xs text-dust">{formatEventTime(event)}</span>

@@ -75,10 +75,10 @@ export function NoteViewPage() {
           <input
             value={draftTitle}
             onChange={(e) => setDraftTitle(e.target.value)}
-            className="font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+            className="min-w-0 flex-1 font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           />
         ) : (
-          <h2 className="font-display text-3xl text-ink">{note.title}</h2>
+          <h2 className="min-w-0 flex-1 font-display text-3xl text-ink">{note.title}</h2>
         )}
         <div className="flex shrink-0 gap-3 font-mono text-xs uppercase tracking-wide">
           {editing ? (

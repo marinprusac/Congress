@@ -52,3 +52,38 @@ export function formatEventTime(event: CalendarEvent): string {
   if (event.allDay) return "All day";
   return `${TIME_FORMAT.format(new Date(event.start))} – ${TIME_FORMAT.format(new Date(event.end))}`;
 }
+
+const FULL_DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+const FULL_DATE_TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+function addDaysToDateOnly(dateStr: string, delta: number): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + delta);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Google's all-day "end" date is exclusive (the day after the event's last
+// actual day), so it's shifted back by one day before being displayed.
+export function formatEventFullRange(event: CalendarEvent): string {
+  if (event.allDay) {
+    const start = FULL_DATE_FORMAT.format(new Date(`${event.start}T00:00:00`));
+    const lastDay = addDaysToDateOnly(event.end, -1);
+    if (lastDay <= event.start) return start;
+    return `${start} – ${FULL_DATE_FORMAT.format(new Date(`${lastDay}T00:00:00`))}`;
+  }
+  return `${FULL_DATE_TIME_FORMAT.format(new Date(event.start))} – ${FULL_DATE_TIME_FORMAT.format(new Date(event.end))}`;
+}
