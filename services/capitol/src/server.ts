@@ -6,6 +6,8 @@ import {
   registerRequestSchema,
   deregisterRequestSchema,
   heartbeatRequestSchema,
+  exhibitSyncRequestSchema,
+  capitolExhibitResolveRequestSchema,
 } from "@congress/shared-types";
 import { env } from "./env.js";
 import { requireInternalToken } from "./auth.js";
@@ -21,6 +23,7 @@ import {
 } from "./registry.js";
 import { forwardToChamber, forwardToChamberFrontend } from "./gateway.js";
 import { hasValidSession } from "./sessionAuth.js";
+import { syncExhibit, searchExhibits, resolveExhibits, getBacklinks } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -62,6 +65,38 @@ app.post("/capitol/heartbeat", requireInternalToken, async (c) => {
   const entry = recordHeartbeat(parsed.data.name);
   if (!entry) return c.json({ error: "chamber_not_found" }, 404);
   return c.json(entry, 200);
+});
+
+app.post("/capitol/exhibits/sync", requireInternalToken, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = exhibitSyncRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  syncExhibit(parsed.data);
+  return c.json({ ok: true });
+});
+
+app.get("/capitol/exhibits/search", requireSession, async (c) => {
+  const query = c.req.query("q") ?? "";
+  if (!query.trim()) return c.json({ results: [] });
+  const results = await searchExhibits(query);
+  return c.json({ results });
+});
+
+app.post("/capitol/exhibits/resolve", requireSession, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = capitolExhibitResolveRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  const results = await resolveExhibits(parsed.data.refs);
+  return c.json({ results });
+});
+
+app.get("/capitol/exhibits/:id/backlinks", requireSession, async (c) => {
+  const backlinks = await getBacklinks(c.req.param("id"));
+  return c.json({ backlinks });
 });
 
 app.all("/api/:chamber/*", requireSession, forwardToChamber);

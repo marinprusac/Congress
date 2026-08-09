@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { listChambers, getChamber } from "../registry.js";
+import { searchExhibits, resolveExhibits } from "../exhibits.js";
 
 export function registerTools(server: McpServer) {
   server.registerTool(
@@ -34,6 +35,40 @@ export function registerTools(server: McpServer) {
       }
       return {
         content: [{ type: "text", text: JSON.stringify(chamber, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "search_exhibits",
+    {
+      title: "Search Exhibits",
+      description:
+        "Search for Exhibits (notes, calendar events, and other referenceable objects) across every active Chamber.",
+      inputSchema: { query: z.string().min(1) },
+    },
+    async ({ query }) => {
+      const results = await searchExhibits(query);
+      return {
+        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "resolve_exhibits",
+    {
+      title: "Resolve Exhibits",
+      description:
+        "Batch-resolve a list of Exhibit references (id + owning chamber) into their current name/url, or a deleted/unavailable status.",
+      inputSchema: {
+        refs: z.array(z.object({ id: z.string().min(1), chamber: z.string().min(1) })),
+      },
+    },
+    async ({ refs }) => {
+      const results = await resolveExhibits(refs);
+      return {
+        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
       };
     }
   );

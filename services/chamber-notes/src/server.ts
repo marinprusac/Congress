@@ -1,7 +1,11 @@
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
-import { createNoteRequestSchema, updateNoteRequestSchema } from "@congress/shared-types";
+import {
+  createNoteRequestSchema,
+  updateNoteRequestSchema,
+  exhibitResolveRequestSchema,
+} from "@congress/shared-types";
 import { notesManifest } from "./manifest.js";
 import {
   listNotes,
@@ -13,6 +17,7 @@ import {
   deleteNote,
   TitleConflictError,
 } from "./notes.js";
+import { searchNoteExhibits, resolveNoteExhibits } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -85,6 +90,22 @@ app.delete("/api/notes/:id", async (c) => {
   const deleted = await deleteNote(id);
   if (!deleted) return c.json({ error: "not_found" }, 404);
   return c.body(null, 204);
+});
+
+app.get("/api/exhibits/search", async (c) => {
+  const query = c.req.query("q") ?? "";
+  const limit = Number(c.req.query("limit")) || undefined;
+  if (!query.trim()) return c.json({ results: [] });
+  return c.json({ results: await searchNoteExhibits(query, limit) });
+});
+
+app.post("/api/exhibits/resolve", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = exhibitResolveRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  return c.json({ results: await resolveNoteExhibits(parsed.data.ids) });
 });
 
 app.route("/mcp", mcpApp);

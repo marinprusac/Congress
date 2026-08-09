@@ -14,24 +14,9 @@ export const noteSummarySchema = z.object({
 });
 export type NoteSummary = z.infer<typeof noteSummarySchema>;
 
-export const wikiLinkSchema = z.object({
-  target: z.string(),
-  alias: z.string().nullable(),
-  resolved: z.boolean(),
-});
-export type WikiLink = z.infer<typeof wikiLinkSchema>;
-
-export const backlinkSchema = z.object({
-  id: z.number().int(),
-  title: z.string(),
-});
-export type Backlink = z.infer<typeof backlinkSchema>;
-
 export const noteDetailSchema = noteSummarySchema.extend({
   // Full raw markdown, including the frontmatter fence if present - what an editor should load.
   content: z.string(),
-  outgoingLinks: z.array(wikiLinkSchema),
-  backlinks: z.array(backlinkSchema),
 });
 export type NoteDetail = z.infer<typeof noteDetailSchema>;
 

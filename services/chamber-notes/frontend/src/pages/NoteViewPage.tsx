@@ -1,9 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchNote, fetchNotes, updateNote, deleteNote, setPinned } from "@/lib/api";
+import type { CapitolExhibitResolveResult } from "@congress/shared-types";
+import { useExhibitPicker, ExhibitPickerDropdown, ExhibitChip } from "@congress/exhibit-ui";
+import { fetchNote, updateNote, deleteNote, setPinned } from "@/lib/api";
 import { NoteMarkdown } from "@/components/NoteMarkdown";
+import { getChamberIcon } from "@/components/ChamberIcon";
 import { stripFrontmatter } from "@/lib/frontmatter";
+
+async function fetchBacklinks(exhibitId: string): Promise<CapitolExhibitResolveResult[]> {
+  const res = await fetch(`/capitol/exhibits/${exhibitId}/backlinks`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as { backlinks: CapitolExhibitResolveResult[] };
+  return data.backlinks;
+}
 
 export function NoteViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +23,7 @@ export function NoteViewPage() {
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftContent, setDraftContent] = useState("");
+  const contentRef = useRef<HTMLTextAreaElement>(null);
 
   const noteQuery = useQuery({
     queryKey: ["note", noteId],
@@ -20,13 +31,13 @@ export function NoteViewPage() {
     enabled: Number.isInteger(noteId),
   });
 
-  const notesIndexQuery = useQuery({ queryKey: ["notes"], queryFn: fetchNotes });
+  const backlinksQuery = useQuery({
+    queryKey: ["exhibit-backlinks", noteId],
+    queryFn: () => fetchBacklinks(`note-${noteId}`),
+    enabled: Number.isInteger(noteId) && !editing,
+  });
 
-  const titleToId = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const n of notesIndexQuery.data ?? []) map.set(n.title.toLowerCase(), n.id);
-    return map;
-  }, [notesIndexQuery.data]);
+  const picker = useExhibitPicker(contentRef, (newValue) => setDraftContent(newValue));
 
   const updateMutation = useMutation({
     mutationFn: (input: { title: string; content: string }) => updateNote(noteId, input),
@@ -135,30 +146,41 @@ export function NoteViewPage() {
       )}
 
       {editing ? (
-        <textarea
-          value={draftContent}
-          onChange={(e) => setDraftContent(e.target.value)}
-          rows={20}
-          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-        />
+        <div className="relative">
+          <textarea
+            ref={contentRef}
+            value={draftContent}
+            onChange={(e) => setDraftContent(e.target.value)}
+            rows={20}
+            className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          />
+          <ExhibitPickerDropdown
+            picker={picker}
+            renderIcon={(chamber) => getChamberIcon(chamber)}
+            className="exhibit-picker-dropdown"
+          />
+        </div>
       ) : (
-        <NoteMarkdown body={body} resolveTitle={(t) => titleToId.get(t.toLowerCase())} />
+        <NoteMarkdown body={body} />
       )}
 
       {!editing && (
         <section className="mt-10 border-t border-dust pt-4">
           <h3 className="mb-2 font-mono text-xs uppercase tracking-wide text-dust">
-            Backlinks ({note.backlinks.length})
+            Referenced by ({backlinksQuery.data?.length ?? 0})
           </h3>
-          {note.backlinks.length === 0 ? (
-            <p className="font-mono text-sm text-dust">— No notes link here —</p>
+          {(backlinksQuery.data?.length ?? 0) === 0 ? (
+            <p className="font-mono text-sm text-dust">— Nothing references this note —</p>
           ) : (
             <ul>
-              {note.backlinks.map((b) => (
-                <li key={b.id} className="border-b border-dust py-2">
-                  <Link to={`/n/${b.id}`} className="font-mono text-sm wikilink-resolved">
-                    {b.title}
-                  </Link>
+              {backlinksQuery.data?.map((b) => (
+                <li key={`${b.chamber}:${b.id}`} className="border-b border-dust py-2">
+                  <ExhibitChip
+                    result={b}
+                    renderIcon={(chamber) => getChamberIcon(chamber)}
+                    onNavigate={(r) => navigate(r.url)}
+                    className="exhibit-chip font-mono text-sm"
+                  />
                 </li>
               ))}
             </ul>

@@ -15,6 +15,13 @@
       "when": 1786231757992,
       "tag": "0001_rare_elektra",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786283993317,
+      "tag": "0002_same_cannonball",
+      "breakpoints": true
     }
   ]
 }

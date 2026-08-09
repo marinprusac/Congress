@@ -153,19 +153,96 @@
 }
 
 .note-link,
-.wikilink-resolved {
+.exhibit-chip[data-exhibit-state="resolved"] {
   color: var(--color-accent);
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
   text-underline-offset: 2px;
 }
 
-.note-link:hover {
+.note-link:hover,
+.exhibit-chip[data-exhibit-state="resolved"]:hover {
   text-decoration-color: var(--color-accent);
 }
 
-.wikilink-unresolved {
+.exhibit-chip[data-exhibit-state="resolved"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+.exhibit-chip-icon svg,
+.exhibit-chip-prefix {
+  color: var(--color-slate);
+}
+
+.exhibit-chip-icon svg {
+  width: 0.9em;
+  height: 0.9em;
+  vertical-align: -0.1em;
+}
+
+.exhibit-chip-prefix {
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.exhibit-chip-prefix::after {
+  content: " — ";
+}
+
+.exhibit-chip[data-exhibit-state="deleted"] {
+  color: var(--color-dust);
+  text-decoration: line-through;
+}
+
+.exhibit-chip[data-exhibit-state="unavailable"] {
   color: var(--color-dust);
   text-decoration: underline dotted;
   text-underline-offset: 2px;
+}
+
+.exhibit-chip-loading {
+  color: var(--color-dust);
+}
+
+.exhibit-picker-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  z-index: 20;
+  max-height: 12rem;
+  overflow-y: auto;
+  border: 1px solid var(--color-dust);
+  background-color: var(--color-parchment);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-ink) 15%, transparent);
+}
+
+.exhibit-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.4em 0.6em;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.exhibit-picker-option.active {
+  background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.exhibit-picker-icon svg {
+  width: 0.9em;
+  height: 0.9em;
+}
+
+.exhibit-picker-empty {
+  padding: 0.4em 0.6em;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--color-dust);
 }

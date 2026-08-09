@@ -32,7 +32,7 @@ export function registerTools(server: McpServer) {
     "get_note",
     {
       title: "Get Note",
-      description: "Get a single note's full content, frontmatter, outgoing links, and backlinks.",
+      description: "Get a single note's full content and frontmatter. Use Capitol's resolve_exhibits/search_exhibits for outgoing references and backlinks.",
       inputSchema: { id: z.number().int() },
     },
     async ({ id }) => {
@@ -47,7 +47,7 @@ export function registerTools(server: McpServer) {
     {
       title: "Create Note",
       description:
-        "Create a new note. Content may include a YAML frontmatter fence and [[wiki links]].",
+        "Create a new note. Content may include a YAML frontmatter fence and [[exhibit:chamber:id|Name]] Exhibit references.",
       inputSchema: { title: z.string().min(1), content: z.string().default("") },
     },
     async ({ title, content }) => {

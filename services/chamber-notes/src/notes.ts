@@ -1,16 +1,23 @@
 import matter from "gray-matter";
 import { and, desc, eq, like, ne, or, sql } from "drizzle-orm";
-import type {
-  NoteSummary,
-  NoteDetail,
-  CreateNoteRequest,
-  UpdateNoteRequest,
-  WikiLink,
-  Backlink,
-} from "@congress/shared-types";
+import type { NoteSummary, NoteDetail, CreateNoteRequest, UpdateNoteRequest } from "@congress/shared-types";
+import { parseExhibitToken } from "@congress/shared-types";
 import { db } from "./db/client.js";
-import { notes, links } from "./db/schema.js";
+import { notes } from "./db/schema.js";
 import { extractWikiLinks, makeExcerpt } from "./wikilinks.js";
+import { toExhibitId, pushExhibitSync } from "./exhibits.js";
+
+// Outgoing refs are bare Exhibit ids (e.g. "note-3"), matching the id space
+// used by exhibit_cache/exhibit_refs - not the "exhibit:chamber:id" token
+// syntax, which only exists for embedding a reference in markdown text.
+function extractOutgoingExhibitRefs(body: string): string[] {
+  const ids = new Set<string>();
+  for (const link of extractWikiLinks(body)) {
+    const parsed = parseExhibitToken(link.target);
+    if (parsed) ids.add(parsed.id);
+  }
+  return [...ids];
+}
 
 export class TitleConflictError extends Error {
   constructor(title: string) {
@@ -43,18 +50,6 @@ async function titleExists(title: string, excludeId?: number): Promise<boolean> 
   return Boolean(row);
 }
 
-function syncLinks(noteId: number, body: string) {
-  db.delete(links).where(eq(links.sourceNoteId, noteId)).run();
-  const parsed = extractWikiLinks(body);
-  const uniqueTargets = new Map<string, string>();
-  for (const link of parsed) {
-    uniqueTargets.set(link.target.toLowerCase(), link.target);
-  }
-  for (const target of uniqueTargets.values()) {
-    db.insert(links).values({ sourceNoteId: noteId, targetTitle: target }).run();
-  }
-}
-
 function toSummary(row: typeof notes.$inferSelect): NoteSummary {
   return {
     id: row.id,
@@ -65,26 +60,6 @@ function toSummary(row: typeof notes.$inferSelect): NoteSummary {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
-}
-
-async function resolveOutgoingLinks(noteId: number): Promise<WikiLink[]> {
-  const rows = db.select().from(links).where(eq(links.sourceNoteId, noteId)).all();
-  const result: WikiLink[] = [];
-  for (const row of rows) {
-    const exists = await titleExists(row.targetTitle);
-    result.push({ target: row.targetTitle, alias: null, resolved: exists });
-  }
-  return result;
-}
-
-function getBacklinks(title: string): Backlink[] {
-  const rows = db
-    .select({ id: notes.id, title: notes.title })
-    .from(links)
-    .innerJoin(notes, eq(links.sourceNoteId, notes.id))
-    .where(sql`lower(${links.targetTitle}) = lower(${title})`)
-    .all();
-  return rows;
 }
 
 export async function listNotes(): Promise<NoteSummary[]> {
@@ -117,15 +92,9 @@ export async function getNote(id: number): Promise<NoteDetail | null> {
   const row = db.select().from(notes).where(eq(notes.id, id)).get();
   if (!row) return null;
   const frontmatter = JSON.parse(row.frontmatterJson);
-  const [outgoingLinks, backlinks] = await Promise.all([
-    resolveOutgoingLinks(row.id),
-    Promise.resolve(getBacklinks(row.title)),
-  ]);
   return {
     ...toSummary(row),
     content: reconstructContent(frontmatter, row.body),
-    outgoingLinks,
-    backlinks,
   };
 }
 
@@ -147,7 +116,13 @@ export async function createNote(input: CreateNoteRequest): Promise<NoteDetail> 
     .returning()
     .get();
 
-  syncLinks(inserted.id, body);
+  await pushExhibitSync({
+    id: toExhibitId(inserted.id),
+    type: "note",
+    name: inserted.title,
+    url: `/n/${inserted.id}`,
+    outgoingRefs: extractOutgoingExhibitRefs(body),
+  });
 
   const created = await getNote(inserted.id);
   if (!created) throw new Error("Failed to read back created note");
@@ -181,14 +156,30 @@ export async function updateNote(id: number, input: UpdateNoteRequest): Promise<
     .where(eq(notes.id, id))
     .run();
 
-  if (input.content !== undefined) {
-    syncLinks(id, body);
-  }
+  const finalTitle = input.title ?? existing.title;
+  await pushExhibitSync({
+    id: toExhibitId(id),
+    type: "note",
+    name: finalTitle,
+    url: `/n/${id}`,
+    outgoingRefs: extractOutgoingExhibitRefs(body),
+  });
 
   return getNote(id);
 }
 
 export async function deleteNote(id: number): Promise<boolean> {
+  const existing = db.select().from(notes).where(eq(notes.id, id)).get();
   const result = db.delete(notes).where(eq(notes.id, id)).run();
+  if (result.changes > 0 && existing) {
+    await pushExhibitSync({
+      id: toExhibitId(id),
+      type: "note",
+      name: existing.title,
+      url: `/n/${id}`,
+      outgoingRefs: [],
+      deleted: true,
+    });
+  }
   return result.changes > 0;
 }
