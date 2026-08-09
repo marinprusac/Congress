@@ -36,7 +36,7 @@ export function WidgetGrid() {
                 <div className="relative z-10 flex shrink-0 items-center justify-between border-b border-dust px-3 py-2">
                   <ChamberMark
                     name={chamber.name}
-                    className={`h-4 w-4 ${active ? "text-ink" : "text-dust"}`}
+                    className={`h-5 w-5 ${active ? "text-ink" : "text-dust"}`}
                   />
                   {active ? (
                     <a
