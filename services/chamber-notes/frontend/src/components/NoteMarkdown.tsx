@@ -41,7 +41,7 @@ export function NoteMarkdown({ body, resolveTitle }: NoteMarkdownProps) {
               );
             }
             return (
-              <a {...props} href={href} target="_blank" rel="noopener noreferrer">
+              <a {...props} href={href} target="_blank" rel="noopener noreferrer" className="note-link">
                 {children}
               </a>
             );

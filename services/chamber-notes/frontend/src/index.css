@@ -55,10 +55,42 @@
 
 .note-prose h1,
 .note-prose h2,
-.note-prose h3 {
+.note-prose h3,
+.note-prose h4,
+.note-prose h5,
+.note-prose h6 {
   font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.25;
   margin-top: 1.5em;
   margin-bottom: 0.5em;
+}
+
+.note-prose h1 {
+  font-size: 2em;
+}
+
+.note-prose h2 {
+  font-size: 1.6em;
+}
+
+.note-prose h3 {
+  font-size: 1.3em;
+}
+
+.note-prose h4 {
+  font-size: 1.15em;
+}
+
+.note-prose h5 {
+  font-size: 1em;
+}
+
+.note-prose h6 {
+  font-size: 0.9em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-slate);
 }
 
 .note-prose p {
@@ -120,11 +152,16 @@
   text-align: left;
 }
 
+.note-link,
 .wikilink-resolved {
   color: var(--color-accent);
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
   text-underline-offset: 2px;
+}
+
+.note-link:hover {
+  text-decoration-color: var(--color-accent);
 }
 
 .wikilink-unresolved {
