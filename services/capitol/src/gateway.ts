@@ -31,6 +31,11 @@ async function proxyRequest(c: Context, targetUrl: string): Promise<Response> {
     headers: forwardHeaders,
     body: hasBody ? c.req.raw.body : undefined,
     duplex: hasBody ? "half" : undefined,
+    // Relay a Chamber's redirect (e.g. an OAuth "start" route sending the
+    // browser to Google) as-is, rather than following it server-side —
+    // fetch() would otherwise silently resolve the redirect target itself
+    // and hand back that page's body under this request's original status.
+    redirect: "manual",
     signal: AbortSignal.timeout(FORWARD_TIMEOUT_MS),
   });
 

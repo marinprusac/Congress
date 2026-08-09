@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_DIR="/srv/congress"
 BRANCH="main"
-SERVICES=(congress-capitol congress-chamber-notes)
+SERVICES=(congress-capitol congress-chamber-notes congress-chamber-calendar)
 
 cd "$REPO_DIR"
 
@@ -23,6 +23,7 @@ git merge --ff-only "origin/$BRANCH"
 pnpm install --frozen-lockfile
 pnpm --filter capitol build:web
 pnpm --filter chamber-notes build:web
+pnpm --filter chamber-calendar build:web
 
 for svc in "${SERVICES[@]}"; do
   sudo /usr/bin/systemctl restart "$svc"

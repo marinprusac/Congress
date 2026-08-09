@@ -33,6 +33,19 @@ function NotesMark(props: IconProps) {
   );
 }
 
+// Placeholder mark for Calendar — swap for a hand-picked shape from the
+// licensed abstract icon pack, same as Notes' mark was. Kept in sync with
+// services/chamber-calendar/frontend/src/components/CalendarMark.tsx.
+function CalendarMark(props: IconProps) {
+  return (
+    <svg viewBox="0 0 256 256" fill="currentColor" {...props}>
+      <g transform={GROUP_TRANSFORM}>
+      <path d="M 45 5 L 85 45 L 45 85 L 5 45 Z M 45 20 L 60 45 L 45 70 L 30 45 Z" />
+      </g>
+    </svg>
+  );
+}
+
 // Fallback for any Chamber without a dedicated mark yet.
 function DefaultChamberMark(props: IconProps) {
   return (
@@ -46,6 +59,7 @@ function DefaultChamberMark(props: IconProps) {
 
 const CHAMBER_MARKS: Record<string, (props: IconProps) => ReactElement> = {
   notes: NotesMark,
+  calendar: CalendarMark,
 };
 
 export function ChamberMark({ name, ...props }: IconProps & { name: string }) {
