@@ -146,6 +146,15 @@ export function NoteViewPage() {
 
       {editing ? (
         <>
+          <div className="mb-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => picker.openHere()}
+              className="font-mono text-xs uppercase tracking-wide text-accent hover:underline"
+            >
+              + Exhibit
+            </button>
+          </div>
           <textarea
             ref={picker.attachRef}
             value={draftContent}

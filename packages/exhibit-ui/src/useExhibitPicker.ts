@@ -11,6 +11,12 @@ interface TriggerState {
   cursor: number;
 }
 
+function sameTrigger(a: TriggerState | null, b: TriggerState | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.triggerStart === b.triggerStart && a.query === b.query && a.cursor === b.cursor;
+}
+
 export interface ExhibitPickerState {
   open: boolean;
   query: string;
@@ -20,6 +26,12 @@ export interface ExhibitPickerState {
   setActiveIndex: (index: number) => void;
   select: (result: CapitolExhibitSearchResult) => void;
   close: () => void;
+  // Explicitly opens the picker at the current cursor (inserting "[[" if
+  // needed) - a guaranteed-to-work fallback for mobile keyboards where
+  // detecting "[[" from raw keystrokes is unreliable (autocorrect/predictive
+  // text can intercept or rewrite bracket characters before they ever reach
+  // the DOM's "input" event in a form this hook can parse).
+  openHere: () => void;
   // Attach to the target textarea/input's `ref` prop.
   attachRef: (el: PickerElement | null) => void;
 }
@@ -43,12 +55,22 @@ export function useExhibitPicker(onInsert: (newValue: string, newCursor: number)
   const [element, setElement] = useState<PickerElement | null>(null);
   const attachRef = useCallback((el: PickerElement | null) => setElement(el), []);
 
-  const [trigger, setTrigger] = useState<TriggerState | null>(null);
+  const [trigger, setTriggerState] = useState<TriggerState | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const { results, loading } = useExhibitSearch(trigger?.query ?? "");
 
   const triggerRef = useRef(trigger);
-  triggerRef.current = trigger;
+  // Only actually update state (and trigger a re-render) when something
+  // meaningfully changed - re-renders caused by "input" and "keyup" both
+  // firing for the same keystroke, mid-typing, are exactly the kind of
+  // extra churn that has been observed to interfere with mobile virtual
+  // keyboards/autocorrect.
+  const setTrigger = useCallback((next: TriggerState | null) => {
+    if (sameTrigger(triggerRef.current, next)) return;
+    triggerRef.current = next;
+    setTriggerState(next);
+  }, []);
+
   const resultsRef = useRef(results);
   resultsRef.current = results;
   const activeIndexRef = useRef(activeIndex);
@@ -56,7 +78,7 @@ export function useExhibitPicker(onInsert: (newValue: string, newCursor: number)
 
   useEffect(() => setActiveIndex(0), [trigger?.query]);
 
-  const close = useCallback(() => setTrigger(null), []);
+  const close = useCallback(() => setTrigger(null), [setTrigger]);
 
   const select = useCallback(
     (result: CapitolExhibitSearchResult) => {
@@ -77,16 +99,57 @@ export function useExhibitPicker(onInsert: (newValue: string, newCursor: number)
         element.setSelectionRange(newCursor, newCursor);
       });
     },
-    [element, onInsert]
+    [element, onInsert, setTrigger]
   );
   const selectRef = useRef(select);
   selectRef.current = select;
+
+  const openHere = useCallback(() => {
+    if (!element) return;
+    // If the field wasn't already focused, its selection defaults to 0
+    // rather than reflecting where the user would expect to type next -
+    // treat that case as "start from the end" instead of inserting at the
+    // very beginning of existing text.
+    const wasFocused = document.activeElement === element;
+    element.focus();
+    const cursor = wasFocused ? (element.selectionStart ?? element.value.length) : element.value.length;
+    const value = element.value;
+    const beforeCursor = value.slice(0, cursor);
+    // Already sitting right after an open "[[" (e.g. the auto-detector
+    // caught it but the dropdown got dismissed) - just reopen in place
+    // instead of inserting a second pair.
+    const existingStart = beforeCursor.lastIndexOf("[[");
+    if (existingStart !== -1) {
+      const between = beforeCursor.slice(existingStart + 2);
+      if (!between.includes("]]") && !between.includes("\n")) {
+        setTrigger({ triggerStart: existingStart, query: between, cursor });
+        return;
+      }
+    }
+
+    const newValue = beforeCursor + "[[" + value.slice(cursor);
+    const newCursor = cursor + 2;
+    onInsert(newValue, newCursor);
+    setTrigger({ triggerStart: cursor, query: "", cursor: newCursor });
+
+    requestAnimationFrame(() => {
+      element.focus();
+      element.setSelectionRange(newCursor, newCursor);
+    });
+  }, [element, onInsert, setTrigger]);
 
   useEffect(() => {
     if (!element) return;
     const el = element;
 
-    function detectTrigger() {
+    function detectTrigger(e?: Event) {
+      // Skip while a mobile IME/autocorrect composition is in progress -
+      // reading `el.value` mid-composition can catch a transient,
+      // about-to-be-replaced string, and setting state here has been
+      // observed to interrupt the composition on Android. `compositionend`
+      // (registered below) re-runs this once the composed text settles.
+      if (e instanceof InputEvent && e.isComposing) return;
+
       const cursor = el.selectionStart ?? el.value.length;
       const beforeCursor = el.value.slice(0, cursor);
       const triggerStart = beforeCursor.lastIndexOf("[[");
@@ -133,14 +196,16 @@ export function useExhibitPicker(onInsert: (newValue: string, newCursor: number)
     el.addEventListener("input", detectTrigger);
     el.addEventListener("click", detectTrigger);
     el.addEventListener("keyup", detectTrigger);
+    el.addEventListener("compositionend", detectTrigger);
     el.addEventListener("keydown", handleKeyDown as EventListener);
     return () => {
       el.removeEventListener("input", detectTrigger);
       el.removeEventListener("click", detectTrigger);
       el.removeEventListener("keyup", detectTrigger);
+      el.removeEventListener("compositionend", detectTrigger);
       el.removeEventListener("keydown", handleKeyDown as EventListener);
     };
-  }, [element]);
+  }, [element, setTrigger]);
 
   return {
     open: trigger !== null,
@@ -151,6 +216,7 @@ export function useExhibitPicker(onInsert: (newValue: string, newCursor: number)
     setActiveIndex,
     select,
     close,
+    openHere,
     attachRef,
   };
 }
