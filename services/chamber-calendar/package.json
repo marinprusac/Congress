@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@congress/shared-types": "workspace:*",
+    "@congress/exhibit-ui": "workspace:*",
     "@hono/node-server": "^2.1.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "better-sqlite3": "^13.0.3",

@@ -5,3 +5,8 @@ export { useExhibitPicker } from "./useExhibitPicker.js";
 export type { ExhibitPickerState } from "./useExhibitPicker.js";
 export { ExhibitPickerDropdown } from "./ExhibitPickerDropdown.js";
 export { ExhibitChip } from "./ExhibitChip.js";
+export { extractExhibitTokens, splitExhibitText } from "./textSegments.js";
+export type { ExhibitTextSegment } from "./textSegments.js";
+export { useResolvedExhibits } from "./useResolvedExhibits.js";
+export { ExhibitAnnotatedText } from "./ExhibitAnnotatedText.js";
+export { navigateToExhibit } from "./navigateToExhibit.js";

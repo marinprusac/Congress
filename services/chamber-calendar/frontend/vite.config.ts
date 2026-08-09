@@ -4,6 +4,10 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 const PROXY_TARGET = "http://127.0.0.1:8012";
+// Exhibit search/resolve/backlinks go straight to Capitol, not this
+// Chamber's own backend - in prod this resolves same-origin through
+// Capitol's proxy automatically, so only dev needs an explicit target.
+const CAPITOL_PROXY_TARGET = "http://127.0.0.1:3000";
 const root = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig(({ command }) => ({
@@ -24,6 +28,7 @@ export default defineConfig(({ command }) => ({
       "/manifest": PROXY_TARGET,
       "/health": PROXY_TARGET,
       "/mcp": PROXY_TARGET,
+      "/capitol": CAPITOL_PROXY_TARGET,
     },
   },
 }));

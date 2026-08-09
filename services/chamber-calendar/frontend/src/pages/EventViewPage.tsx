@@ -1,7 +1,18 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import type { CapitolExhibitResolveResult } from "@congress/shared-types";
+import { ExhibitAnnotatedText, ExhibitChip, navigateToExhibit } from "@congress/exhibit-ui";
 import { fetchEvent } from "@/lib/api";
 import { formatEventFullRange } from "@/lib/datetime";
+import { toExhibitId } from "@/lib/exhibits";
+import { getChamberIcon } from "@/components/ChamberIcon";
+
+async function fetchBacklinks(exhibitId: string): Promise<CapitolExhibitResolveResult[]> {
+  const res = await fetch(`/capitol/exhibits/${exhibitId}/backlinks`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as { backlinks: CapitolExhibitResolveResult[] };
+  return data.backlinks;
+}
 
 export function EventViewPage() {
   const { accountId, calendarId, eventId } = useParams<{
@@ -9,11 +20,20 @@ export function EventViewPage() {
     calendarId: string;
     eventId: string;
   }>();
+  const navigate = useNavigate();
 
   const { data: event, isLoading, isError } = useQuery({
     queryKey: ["events", accountId, calendarId, eventId],
     queryFn: () => fetchEvent(Number(accountId), calendarId!, eventId!),
     enabled: Boolean(accountId && calendarId && eventId),
+  });
+
+  const exhibitId =
+    accountId && calendarId && eventId ? toExhibitId(Number(accountId), calendarId, eventId) : null;
+  const backlinksQuery = useQuery({
+    queryKey: ["exhibit-backlinks", exhibitId],
+    queryFn: () => fetchBacklinks(exhibitId!),
+    enabled: exhibitId !== null,
   });
 
   if (isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
@@ -49,7 +69,14 @@ export function EventViewPage() {
         {event.description && (
           <div>
             <dt className="mb-1 text-xs uppercase tracking-wide text-dust">Description</dt>
-            <dd className="whitespace-pre-wrap text-ink">{event.description}</dd>
+            <dd className="text-ink">
+              <ExhibitAnnotatedText
+                text={event.description}
+                renderIcon={(chamber) => getChamberIcon(chamber)}
+                onNavigate={(r) => navigateToExhibit("calendar", r, navigate)}
+                className="whitespace-pre-wrap"
+              />
+            </dd>
           </div>
         )}
       </dl>
@@ -64,6 +91,28 @@ export function EventViewPage() {
           Open in Google Calendar ↗
         </a>
       )}
+
+      <section className="mt-10 border-t border-dust pt-4">
+        <h3 className="mb-2 font-mono text-xs uppercase tracking-wide text-dust">
+          Referenced by ({backlinksQuery.data?.length ?? 0})
+        </h3>
+        {(backlinksQuery.data?.length ?? 0) === 0 ? (
+          <p className="font-mono text-sm text-dust">— Nothing references this event —</p>
+        ) : (
+          <ul>
+            {backlinksQuery.data?.map((b) => (
+              <li key={`${b.chamber}:${b.id}`} className="border-b border-dust py-2">
+                <ExhibitChip
+                  result={b}
+                  renderIcon={(chamber) => getChamberIcon(chamber)}
+                  onNavigate={(r) => navigateToExhibit("calendar", r, navigate)}
+                  className="exhibit-chip font-mono text-sm"
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </section>
   );
 }

@@ -25,14 +25,3 @@ export function decodeExhibitLinkHref(href: string): string | null {
   if (!href.startsWith(EXHIBIT_LINK_SCHEME)) return null;
   return decodeURIComponent(href.slice(EXHIBIT_LINK_SCHEME.length));
 }
-
-// Unique list of valid Exhibit tokens referenced in a note body, in
-// first-seen order - used to batch-resolve before rendering.
-export function extractExhibitTokens(body: string): string[] {
-  const tokens = new Set<string>();
-  for (const match of body.matchAll(WIKILINK_PATTERN)) {
-    const target = match[1]?.trim();
-    if (target && parseExhibitToken(target)) tokens.add(target);
-  }
-  return [...tokens];
-}

@@ -12,6 +12,7 @@ import { googleCalendarFetch } from "./client.js";
 import { getAccountRow } from "./accounts.js";
 import { listSelectedCalendarsInternal } from "./calendars.js";
 import { AccountNeedsReconnectError } from "./accounts.js";
+import { toExhibitId, extractOutgoingExhibitRefs, pushExhibitSync } from "../exhibits.js";
 
 interface GoogleEventTime {
   date?: string;
@@ -147,6 +148,16 @@ export async function getEvent(accountId: number, calendarId: string, eventId: s
   return normalizeGoogleEvent(raw, accountId, calendarId, summary, colorHex);
 }
 
+async function syncEventExhibit(result: CalendarEvent): Promise<void> {
+  await pushExhibitSync({
+    id: toExhibitId(result.accountId, result.calendarId, result.id),
+    type: "event",
+    name: result.title,
+    url: `/e/${result.accountId}/${encodeURIComponent(result.calendarId)}/${encodeURIComponent(result.id)}`,
+    outgoingRefs: extractOutgoingExhibitRefs(result.description ?? ""),
+  });
+}
+
 export async function createEvent(input: CreateEventRequest): Promise<CalendarEvent> {
   const account = requireAccount(input.accountId);
   const raw = (await googleCalendarFetch(account, `/calendars/${encodeURIComponent(input.calendarId)}/events`, {
@@ -154,7 +165,9 @@ export async function createEvent(input: CreateEventRequest): Promise<CalendarEv
     body: JSON.stringify(toGoogleEventBody(input)),
   })) as GoogleEvent;
   const { summary, colorHex } = calendarMeta(input.accountId, input.calendarId);
-  return normalizeGoogleEvent(raw, input.accountId, input.calendarId, summary, colorHex);
+  const result = normalizeGoogleEvent(raw, input.accountId, input.calendarId, summary, colorHex);
+  await syncEventExhibit(result);
+  return result;
 }
 
 export async function updateEvent(
@@ -173,14 +186,27 @@ export async function updateEvent(
     }
   )) as GoogleEvent;
   const { summary, colorHex } = calendarMeta(accountId, calendarId);
-  return normalizeGoogleEvent(raw, accountId, calendarId, summary, colorHex);
+  const result = normalizeGoogleEvent(raw, accountId, calendarId, summary, colorHex);
+  await syncEventExhibit(result);
+  return result;
 }
 
 export async function deleteEvent(accountId: number, calendarId: string, eventId: string): Promise<void> {
   const account = requireAccount(accountId);
+  // Fetched first so the deletion sync push carries a real title - Google's
+  // DELETE response has no body to read one back from.
+  const existing = await getEvent(accountId, calendarId, eventId);
   await googleCalendarFetch(
     account,
     `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
     { method: "DELETE" }
   );
+  await pushExhibitSync({
+    id: toExhibitId(accountId, calendarId, eventId),
+    type: "event",
+    name: existing.title,
+    url: `/e/${accountId}/${encodeURIComponent(calendarId)}/${encodeURIComponent(eventId)}`,
+    outgoingRefs: [],
+    deleted: true,
+  });
 }

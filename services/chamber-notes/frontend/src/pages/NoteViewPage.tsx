@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CapitolExhibitResolveResult } from "@congress/shared-types";
-import { useExhibitPicker, ExhibitPickerDropdown, ExhibitChip } from "@congress/exhibit-ui";
+import { useExhibitPicker, ExhibitPickerDropdown, ExhibitChip, navigateToExhibit } from "@congress/exhibit-ui";
 import { fetchNote, updateNote, deleteNote, setPinned } from "@/lib/api";
 import { NoteMarkdown } from "@/components/NoteMarkdown";
 import { getChamberIcon } from "@/components/ChamberIcon";
@@ -180,7 +180,7 @@ export function NoteViewPage() {
                   <ExhibitChip
                     result={b}
                     renderIcon={(chamber) => getChamberIcon(chamber)}
-                    onNavigate={(r) => navigate(r.url)}
+                    onNavigate={(r) => navigateToExhibit("notes", r, navigate)}
                     className="exhibit-chip font-mono text-sm"
                   />
                 </li>

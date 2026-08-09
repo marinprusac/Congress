@@ -6,6 +6,7 @@ import {
   setCalendarSelectionRequestSchema,
   createEventRequestSchema,
   updateEventRequestSchema,
+  exhibitResolveRequestSchema,
 } from "@congress/shared-types";
 import { calendarManifest } from "./manifest.js";
 import { buildAuthUrl, exchangeCodeForTokens, decodeIdToken, createOAuthState, consumeOAuthState } from "./google/oauth.js";
@@ -19,6 +20,7 @@ import {
 import { listGoogleCalendars, listSelectedCalendarsForUI, setCalendarSelection } from "./google/calendars.js";
 import { listEvents, getEvent, createEvent, updateEvent, deleteEvent } from "./google/events.js";
 import { GoogleApiError } from "./google/client.js";
+import { searchEventExhibits, resolveEventExhibits } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -166,6 +168,21 @@ app.delete("/api/events/:accountId/:calendarId/:eventId", async (c) => {
   } catch (err) {
     return mapError(c, err);
   }
+});
+
+app.get("/api/exhibits/search", async (c) => {
+  const query = c.req.query("q") ?? "";
+  const limit = Number(c.req.query("limit")) || undefined;
+  return c.json({ results: await searchEventExhibits(query, limit) });
+});
+
+app.post("/api/exhibits/resolve", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = exhibitResolveRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  return c.json({ results: await resolveEventExhibits(parsed.data.ids) });
 });
 
 app.route("/mcp", mcpApp);

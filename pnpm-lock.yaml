@@ -136,6 +136,9 @@ importers:
 
   services/chamber-calendar:
     dependencies:
+      '@congress/exhibit-ui':
+        specifier: workspace:*
+        version: link:../../packages/exhibit-ui
       '@congress/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
