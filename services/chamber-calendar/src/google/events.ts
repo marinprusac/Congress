@@ -4,6 +4,8 @@ import type {
   ListEventsResponse,
   CreateEventRequest,
   UpdateEventRequest,
+  SharedExhibitContent,
+  UpdateSharedExhibitContentRequest,
 } from "@congress/shared-types";
 import { googleAccounts, selectedCalendars } from "../db/schema.js";
 import { db } from "../db/client.js";
@@ -12,7 +14,7 @@ import { googleCalendarFetch } from "./client.js";
 import { getAccountRow } from "./accounts.js";
 import { listSelectedCalendarsInternal } from "./calendars.js";
 import { AccountNeedsReconnectError } from "./accounts.js";
-import { toExhibitId, extractOutgoingExhibitRefs, pushExhibitSync } from "../exhibits.js";
+import { toExhibitId, extractOutgoingExhibitRefs, pushExhibitSync, parseExhibitId } from "../exhibits.js";
 
 interface GoogleEventTime {
   date?: string;
@@ -189,6 +191,48 @@ export async function updateEvent(
   const result = normalizeGoogleEvent(raw, accountId, calendarId, summary, colorHex);
   await syncEventExhibit(result);
   return result;
+}
+
+function formatEventBody(event: CalendarEvent): string {
+  const lines = [`${event.start} – ${event.end}`];
+  if (event.location) lines.push(`Location: ${event.location}`);
+  if (event.description) lines.push("", event.description);
+  return lines.join("\n");
+}
+
+function toExhibitContent(id: string, event: CalendarEvent): SharedExhibitContent {
+  return { id, chamber: "calendar", type: "event", name: event.title, body: formatEventBody(event), isBinary: false };
+}
+
+export async function getEventExhibitContent(id: string): Promise<SharedExhibitContent | null> {
+  const parsed = parseExhibitId(id);
+  if (!parsed || !getAccountRow(parsed.accountId)) return null;
+  try {
+    const event = await getEvent(parsed.accountId, parsed.calendarId, parsed.eventId);
+    return toExhibitContent(id, event);
+  } catch {
+    return null;
+  }
+}
+
+// The generic envelope's "body" only ever round-trips through an event's
+// description - reschedules (start/end/location) aren't editable via a
+// share, deliberately narrower than the full owner-only update endpoint.
+export async function updateEventExhibitContent(
+  id: string,
+  input: UpdateSharedExhibitContentRequest
+): Promise<SharedExhibitContent | null> {
+  const parsed = parseExhibitId(id);
+  if (!parsed || !getAccountRow(parsed.accountId)) return null;
+  try {
+    const event = await updateEvent(parsed.accountId, parsed.calendarId, parsed.eventId, {
+      title: input.title,
+      description: input.body,
+    });
+    return toExhibitContent(id, event);
+  } catch {
+    return null;
+  }
 }
 
 export async function deleteEvent(accountId: number, calendarId: string, eventId: string): Promise<void> {

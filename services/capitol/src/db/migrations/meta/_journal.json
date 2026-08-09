@@ -15,6 +15,13 @@
       "when": 1786283592713,
       "tag": "0001_worried_synch",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786299903274,
+      "tag": "0002_cold_anthem",
+      "breakpoints": true
     }
   ]
 }

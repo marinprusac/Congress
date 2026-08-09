@@ -1,7 +1,7 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { CapitolExhibitResolveResult } from "@congress/shared-types";
-import { ExhibitAnnotatedText, ExhibitChip, navigateToExhibit } from "@congress/exhibit-ui";
+import { ExhibitAnnotatedText, ExhibitChip, ExhibitSharingBadge, navigateToExhibit } from "@congress/exhibit-ui";
 import { fetchEvent } from "@/lib/api";
 import { formatEventFullRange } from "@/lib/datetime";
 import { toExhibitId } from "@/lib/exhibits";
@@ -42,7 +42,10 @@ export function EventViewPage() {
   return (
     <section>
       <div className="mb-6 flex items-start justify-between gap-4 border-b border-dust pb-4">
-        <h2 className="min-w-0 font-display text-3xl text-ink">{event.title}</h2>
+        <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
+          {event.title}
+          {exhibitId && <ExhibitSharingBadge exhibitId={exhibitId} className="exhibit-sharing-badge" />}
+        </h2>
         <Link
           to={`/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}/edit`}
           className="shrink-0 font-mono text-xs uppercase tracking-wide text-accent hover:underline"

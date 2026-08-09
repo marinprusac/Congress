@@ -5,6 +5,7 @@ import {
   createNoteRequestSchema,
   updateNoteRequestSchema,
   exhibitResolveRequestSchema,
+  updateSharedExhibitContentRequestSchema,
 } from "@congress/shared-types";
 import { notesManifest } from "./manifest.js";
 import {
@@ -17,7 +18,12 @@ import {
   deleteNote,
   TitleConflictError,
 } from "./notes.js";
-import { searchNoteExhibits, resolveNoteExhibits } from "./exhibits.js";
+import {
+  searchNoteExhibits,
+  resolveNoteExhibits,
+  getNoteExhibitContent,
+  updateNoteExhibitContent,
+} from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -107,6 +113,34 @@ app.post("/api/exhibits/resolve", async (c) => {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
   return c.json({ results: await resolveNoteExhibits(parsed.data.ids) });
+});
+
+// Backing the token-scoped Exhibit Sharing proxy at Capitol - unauthenticated
+// here, same trust model as /exhibits/search and /exhibits/resolve above,
+// since Capitol has already validated the share token + closure membership
+// before ever proxying a request through to this route.
+app.get("/api/exhibits/:id/content", async (c) => {
+  const content = await getNoteExhibitContent(c.req.param("id"));
+  if (!content) return c.json({ error: "not_found" }, 404);
+  return c.json(content);
+});
+
+app.patch("/api/exhibits/:id/content", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = updateSharedExhibitContentRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  try {
+    const content = await updateNoteExhibitContent(c.req.param("id"), parsed.data);
+    if (!content) return c.json({ error: "not_found" }, 404);
+    return c.json(content);
+  } catch (err) {
+    if (err instanceof TitleConflictError) {
+      return c.json({ error: "title_conflict", message: err.message }, 409);
+    }
+    throw err;
+  }
 });
 
 app.route("/mcp", mcpApp);

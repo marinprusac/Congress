@@ -7,6 +7,7 @@ import {
   createEventRequestSchema,
   updateEventRequestSchema,
   exhibitResolveRequestSchema,
+  updateSharedExhibitContentRequestSchema,
 } from "@congress/shared-types";
 import { calendarManifest } from "./manifest.js";
 import { buildAuthUrl, exchangeCodeForTokens, decodeIdToken, createOAuthState, consumeOAuthState } from "./google/oauth.js";
@@ -18,7 +19,15 @@ import {
   AccountNeedsReconnectError,
 } from "./google/accounts.js";
 import { listGoogleCalendars, listSelectedCalendarsForUI, setCalendarSelection } from "./google/calendars.js";
-import { listEvents, getEvent, createEvent, updateEvent, deleteEvent } from "./google/events.js";
+import {
+  listEvents,
+  getEvent,
+  createEvent,
+  updateEvent,
+  deleteEvent,
+  getEventExhibitContent,
+  updateEventExhibitContent,
+} from "./google/events.js";
 import { GoogleApiError } from "./google/client.js";
 import { searchEventExhibits, resolveEventExhibits } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
@@ -183,6 +192,27 @@ app.post("/api/exhibits/resolve", async (c) => {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
   return c.json({ results: await resolveEventExhibits(parsed.data.ids) });
+});
+
+// Backing the token-scoped Exhibit Sharing proxy at Capitol - unauthenticated
+// here, same trust model as /exhibits/search and /exhibits/resolve above,
+// since Capitol has already validated the share token + closure membership
+// before ever proxying a request through to this route.
+app.get("/api/exhibits/:id/content", async (c) => {
+  const content = await getEventExhibitContent(c.req.param("id"));
+  if (!content) return c.json({ error: "not_found" }, 404);
+  return c.json(content);
+});
+
+app.patch("/api/exhibits/:id/content", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = updateSharedExhibitContentRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  const content = await updateEventExhibitContent(c.req.param("id"), parsed.data);
+  if (!content) return c.json({ error: "not_found" }, 404);
+  return c.json(content);
 });
 
 app.route("/mcp", mcpApp);

@@ -75,6 +75,32 @@ export async function forwardToChamber(c: Context): Promise<Response> {
   }
 }
 
+// Proxies to an explicit path on a named Chamber's apiBase, rather than
+// deriving the path by stripping a fixed prefix off the incoming request
+// (as forwardToChamber does for "/api/:chamber/*"). Used by the share
+// routes, whose own URL shape ("/capitol/shared/:token/exhibits/:id") has
+// nothing to do with the target Chamber route ("/exhibits/:id/content").
+export async function proxyToChamberPath(c: Context, chamberName: string, path: string): Promise<Response> {
+  const chamber = getChamber(chamberName);
+
+  if (!chamber) {
+    return c.json({ error: "chamber_not_found", chamber: chamberName }, 503);
+  }
+
+  if (chamber.status !== "active") {
+    return c.json({ error: "chamber_offline", chamber: chamberName }, 503);
+  }
+
+  const search = new URL(c.req.url).search;
+  const targetUrl = `${chamber.apiBase}${path}${search}`;
+
+  try {
+    return await proxyRequest(c, targetUrl);
+  } catch {
+    return c.json({ error: "chamber_unreachable", chamber: chamberName }, 503);
+  }
+}
+
 // Proxies a Chamber's own built frontend (its static assets + SPA shell)
 // through Capitol at "/<chamberName>/*", so each Chamber's UI is reachable
 // without exposing its port directly. The Chamber's frontend build must set

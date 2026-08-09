@@ -17,7 +17,7 @@ export function toExhibitId(accountId: number, calendarId: string, eventId: stri
   return `${EVENT_ID_PREFIX}${accountId}:${encodeURIComponent(calendarId)}:${encodeURIComponent(eventId)}`;
 }
 
-function parseExhibitId(id: string): { accountId: number; calendarId: string; eventId: string } | null {
+export function parseExhibitId(id: string): { accountId: number; calendarId: string; eventId: string } | null {
   if (!id.startsWith(EVENT_ID_PREFIX)) return null;
   const parts = id.slice(EVENT_ID_PREFIX.length).split(":");
   if (parts.length !== 3) return null;

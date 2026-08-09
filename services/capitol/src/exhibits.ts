@@ -71,7 +71,7 @@ export async function searchExhibits(query: string): Promise<CapitolExhibitSearc
   return perChamberResults.flat();
 }
 
-async function resolveOneLive(id: string, chamber: string): Promise<CapitolExhibitResolveResult> {
+export async function resolveOneLive(id: string, chamber: string): Promise<CapitolExhibitResolveResult> {
   const entry = getChamber(chamber);
   if (!entry || entry.status !== "active") {
     return { id, chamber, unavailable: true };

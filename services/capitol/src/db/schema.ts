@@ -45,3 +45,20 @@ export const exhibitRefs = sqliteTable(
     index("exhibit_refs_target_id_idx").on(table.targetId),
   ]
 );
+
+// A grant of view/edit access to one exhibit's closure (itself plus
+// recursively-referenced exhibits, up to maxDepth) to a holder of `id` as a
+// bearer token. One row per recipient - sharing the same root with two
+// people is two independently-revocable rows.
+export const shares = sqliteTable("shares", {
+  id: text("id").primaryKey(),
+  rootId: text("root_id").notNull(),
+  rootChamber: text("root_chamber").notNull(),
+  maxDepth: integer("max_depth").notNull(),
+  permission: text("permission", { enum: ["view", "edit"] }).notNull(),
+  label: text("label").notNull().default(""),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+  revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+  lastAccessedAt: integer("last_accessed_at", { mode: "timestamp_ms" }),
+});

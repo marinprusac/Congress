@@ -1,8 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import type { HttpBindings } from "@hono/node-server";
-import { updateDocumentRequestSchema, exhibitResolveRequestSchema } from "@congress/shared-types";
+import {
+  updateDocumentRequestSchema,
+  exhibitResolveRequestSchema,
+  updateSharedExhibitContentRequestSchema,
+} from "@congress/shared-types";
 import { documentsManifest } from "./manifest.js";
 import {
   listDocuments,
@@ -14,7 +18,13 @@ import {
   FileTooLargeError,
   MAX_FILE_SIZE_BYTES,
 } from "./documents.js";
-import { searchDocumentExhibits, resolveDocumentExhibits } from "./exhibits.js";
+import {
+  searchDocumentExhibits,
+  resolveDocumentExhibits,
+  getDocumentExhibitContent,
+  updateDocumentExhibitContent,
+  parseDocumentId,
+} from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -87,9 +97,7 @@ app.delete("/api/documents/:id", async (c) => {
   return c.body(null, 204);
 });
 
-app.get("/api/documents/:id/download", async (c) => {
-  const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
+async function serveDocumentFile(c: Context, id: number): Promise<Response> {
   const file = await getDocumentFile(id);
   if (!file) return c.json({ error: "not_found" }, 404);
 
@@ -103,6 +111,12 @@ app.get("/api/documents/:id/download", async (c) => {
     `attachment; filename="${safeFallback}"; filename*=UTF-8''${encodeURIComponent(file.filename)}`
   );
   return c.body(bytes);
+}
+
+app.get("/api/documents/:id/download", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
+  return serveDocumentFile(c, id);
 });
 
 // An empty query returns the most recently updated documents rather than
@@ -120,6 +134,33 @@ app.post("/api/exhibits/resolve", async (c) => {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
   return c.json({ results: await resolveDocumentExhibits(parsed.data.ids) });
+});
+
+// Backing the token-scoped Exhibit Sharing proxy at Capitol - unauthenticated
+// here, same trust model as /exhibits/search and /exhibits/resolve above,
+// since Capitol has already validated the share token + closure membership
+// before ever proxying a request through to this route.
+app.get("/api/exhibits/:id/content", async (c) => {
+  const content = await getDocumentExhibitContent(c.req.param("id"));
+  if (!content) return c.json({ error: "not_found" }, 404);
+  return c.json(content);
+});
+
+app.patch("/api/exhibits/:id/content", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = updateSharedExhibitContentRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  const content = await updateDocumentExhibitContent(c.req.param("id"), parsed.data);
+  if (!content) return c.json({ error: "not_found" }, 404);
+  return c.json(content);
+});
+
+app.get("/api/exhibits/:id/content/download", async (c) => {
+  const documentId = parseDocumentId(c.req.param("id"));
+  if (documentId === null) return c.json({ error: "not_found" }, 404);
+  return serveDocumentFile(c, documentId);
 });
 
 app.route("/mcp", mcpApp);

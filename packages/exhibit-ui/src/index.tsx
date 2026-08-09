@@ -10,3 +10,5 @@ export type { ExhibitTextSegment } from "./textSegments.js";
 export { useResolvedExhibits } from "./useResolvedExhibits.js";
 export { ExhibitAnnotatedText } from "./ExhibitAnnotatedText.js";
 export { navigateToExhibit } from "./navigateToExhibit.js";
+export { useExhibitSharing } from "./useExhibitSharing.js";
+export { ExhibitSharingBadge } from "./ExhibitSharingBadge.js";

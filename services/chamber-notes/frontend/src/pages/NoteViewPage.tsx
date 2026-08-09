@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CapitolExhibitResolveResult } from "@congress/shared-types";
-import { useExhibitPicker, ExhibitPickerDropdown, ExhibitChip, navigateToExhibit } from "@congress/exhibit-ui";
+import {
+  useExhibitPicker,
+  ExhibitPickerDropdown,
+  ExhibitChip,
+  ExhibitSharingBadge,
+  navigateToExhibit,
+} from "@congress/exhibit-ui";
 import { fetchNote, updateNote, deleteNote, setPinned } from "@/lib/api";
 import { NoteMarkdown } from "@/components/NoteMarkdown";
 import { getChamberIcon } from "@/components/ChamberIcon";
@@ -91,7 +97,10 @@ export function NoteViewPage() {
             className="min-w-0 flex-1 font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           />
         ) : (
-          <h2 className="min-w-0 flex-1 font-display text-3xl text-ink">{note.title}</h2>
+          <h2 className="flex min-w-0 flex-1 items-center gap-3 font-display text-3xl text-ink">
+            {note.title}
+            <ExhibitSharingBadge exhibitId={`note-${noteId}`} className="exhibit-sharing-badge" />
+          </h2>
         )}
         <div className="flex shrink-0 gap-3 font-mono text-xs uppercase tracking-wide">
           {editing ? (

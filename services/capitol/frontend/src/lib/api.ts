@@ -1,4 +1,4 @@
-import type { ChamberRegistryEntry } from "@congress/shared-types";
+import type { ChamberRegistryEntry, ShareSummary, CreateShareRequest } from "@congress/shared-types";
 
 export async function fetchAuthStatus(): Promise<{ authenticated: boolean }> {
   const res = await fetch("/auth/status");
@@ -27,4 +27,26 @@ export async function fetchRegistry(): Promise<ChamberRegistryEntry[]> {
     throw new Error(`Failed to fetch registry: ${res.status}`);
   }
   return res.json();
+}
+
+export async function fetchShares(): Promise<ShareSummary[]> {
+  const res = await fetch("/capitol/shares");
+  if (!res.ok) throw new Error(`Failed to fetch shares: ${res.status}`);
+  const data = (await res.json()) as { shares: ShareSummary[] };
+  return data.shares;
+}
+
+export async function createShare(input: CreateShareRequest): Promise<ShareSummary> {
+  const res = await fetch("/capitol/shares", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`Failed to create share: ${res.status}`);
+  return res.json();
+}
+
+export async function revokeShare(token: string): Promise<void> {
+  const res = await fetch(`/capitol/shares/${encodeURIComponent(token)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`Failed to revoke share: ${res.status}`);
 }

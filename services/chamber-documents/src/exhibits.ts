@@ -1,8 +1,15 @@
 import { like, or, inArray, desc } from "drizzle-orm";
-import type { ExhibitSearchResult, ExhibitResolveResult, ExhibitSyncRequest } from "@congress/shared-types";
+import type {
+  ExhibitSearchResult,
+  ExhibitResolveResult,
+  ExhibitSyncRequest,
+  SharedExhibitContent,
+  UpdateSharedExhibitContentRequest,
+} from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { documents } from "./db/schema.js";
 import { env } from "./env.js";
+import { getDocument, updateDocument } from "./documents.js";
 
 const DOCUMENT_ID_PREFIX = "document-";
 
@@ -10,7 +17,7 @@ export function toExhibitId(documentId: number): string {
   return `${DOCUMENT_ID_PREFIX}${documentId}`;
 }
 
-function parseDocumentId(exhibitId: string): number | null {
+export function parseDocumentId(exhibitId: string): number | null {
   if (!exhibitId.startsWith(DOCUMENT_ID_PREFIX)) return null;
   const id = Number(exhibitId.slice(DOCUMENT_ID_PREFIX.length));
   return Number.isInteger(id) ? id : null;
@@ -53,6 +60,46 @@ export async function resolveDocumentExhibits(ids: string[]): Promise<ExhibitRes
     if (!row) return { id, deleted: true };
     return { id, name: row.title, url: `/d/${row.id}` };
   });
+}
+
+// The generic content contract behind Exhibit Sharing. Documents are binary,
+// so "body" carries only the description text (itself may contain further
+// [[ references) and the actual bytes are reached via downloadUrl, a second
+// chamber-side route (GET /api/exhibits/:id/content/download) that Capitol's
+// share proxy calls separately.
+export async function getDocumentExhibitContent(id: string): Promise<SharedExhibitContent | null> {
+  const documentId = parseDocumentId(id);
+  if (documentId === null) return null;
+  const doc = await getDocument(documentId);
+  if (!doc) return null;
+  return {
+    id,
+    chamber: "documents",
+    type: "document",
+    name: doc.title,
+    body: doc.description,
+    isBinary: true,
+    downloadUrl: `/api/exhibits/${id}/content/download`,
+  };
+}
+
+export async function updateDocumentExhibitContent(
+  id: string,
+  input: UpdateSharedExhibitContentRequest
+): Promise<SharedExhibitContent | null> {
+  const documentId = parseDocumentId(id);
+  if (documentId === null) return null;
+  const updated = await updateDocument(documentId, { title: input.title, description: input.body });
+  if (!updated) return null;
+  return {
+    id,
+    chamber: "documents",
+    type: "document",
+    name: updated.title,
+    body: updated.description,
+    isBinary: true,
+    downloadUrl: `/api/exhibits/${id}/content/download`,
+  };
 }
 
 function authHeaders(): Record<string, string> {

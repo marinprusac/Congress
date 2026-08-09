@@ -42,6 +42,9 @@ importers:
 
   services/capitol:
     dependencies:
+      '@congress/exhibit-ui':
+        specifier: workspace:*
+        version: link:../../packages/exhibit-ui
       '@congress/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
@@ -90,6 +93,9 @@ importers:
       react-dom:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
+      react-router-dom:
+        specifier: ^7.18.2
+        version: 7.18.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0

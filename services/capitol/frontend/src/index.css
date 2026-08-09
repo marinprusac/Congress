@@ -52,3 +52,49 @@
     }
   }
 }
+
+.exhibit-chip[data-exhibit-state="resolved"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+  text-underline-offset: 2px;
+}
+
+.exhibit-chip[data-exhibit-state="resolved"]:hover {
+  text-decoration-color: var(--color-accent);
+}
+
+.exhibit-chip-icon svg,
+.exhibit-chip-prefix {
+  color: var(--color-slate);
+}
+
+.exhibit-chip-icon svg {
+  width: 0.9em;
+  height: 0.9em;
+  vertical-align: -0.1em;
+}
+
+.exhibit-chip-prefix {
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.exhibit-chip-prefix::after {
+  content: " — ";
+}
+
+.exhibit-chip[data-exhibit-state="deleted"] {
+  color: var(--color-dust);
+  text-decoration: line-through;
+}
+
+.exhibit-chip[data-exhibit-state="unavailable"] {
+  color: var(--color-dust);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}

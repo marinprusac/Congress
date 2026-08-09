@@ -1,8 +1,15 @@
 import { like, or, inArray, desc } from "drizzle-orm";
-import type { ExhibitSearchResult, ExhibitResolveResult, ExhibitSyncRequest } from "@congress/shared-types";
+import type {
+  ExhibitSearchResult,
+  ExhibitResolveResult,
+  ExhibitSyncRequest,
+  SharedExhibitContent,
+  UpdateSharedExhibitContentRequest,
+} from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { notes } from "./db/schema.js";
 import { env } from "./env.js";
+import { getNote, updateNote } from "./notes.js";
 
 const NOTE_ID_PREFIX = "note-";
 
@@ -10,7 +17,7 @@ export function toExhibitId(noteId: number): string {
   return `${NOTE_ID_PREFIX}${noteId}`;
 }
 
-function parseNoteId(exhibitId: string): number | null {
+export function parseNoteId(exhibitId: string): number | null {
   if (!exhibitId.startsWith(NOTE_ID_PREFIX)) return null;
   const id = Number(exhibitId.slice(NOTE_ID_PREFIX.length));
   return Number.isInteger(id) ? id : null;
@@ -53,6 +60,28 @@ export async function resolveNoteExhibits(ids: string[]): Promise<ExhibitResolve
     if (!row) return { id, deleted: true };
     return { id, name: row.title, url: `/n/${row.id}` };
   });
+}
+
+// The generic content contract behind Exhibit Sharing - a share recipient
+// only ever knows an exhibit id, never that it's specifically a "note", so
+// this maps the note-specific detail shape into the canonical envelope.
+export async function getNoteExhibitContent(id: string): Promise<SharedExhibitContent | null> {
+  const noteId = parseNoteId(id);
+  if (noteId === null) return null;
+  const note = await getNote(noteId);
+  if (!note) return null;
+  return { id, chamber: "notes", type: "note", name: note.title, body: note.content, isBinary: false };
+}
+
+export async function updateNoteExhibitContent(
+  id: string,
+  input: UpdateSharedExhibitContentRequest
+): Promise<SharedExhibitContent | null> {
+  const noteId = parseNoteId(id);
+  if (noteId === null) return null;
+  const updated = await updateNote(noteId, { title: input.title, content: input.body });
+  if (!updated) return null;
+  return { id, chamber: "notes", type: "note", name: updated.title, body: updated.content, isBinary: false };
 }
 
 function authHeaders(): Record<string, string> {
