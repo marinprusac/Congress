@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import type { CapitolExhibitSearchResult, ShareSummary, SharePermission } from "@congress/shared-types";
 import { useExhibitSearch } from "./useExhibitSearch.js";
+import { ShareFieldsEditor } from "./ShareFieldsEditor.js";
+import { CopyLinkButton } from "./CopyLinkButton.js";
 
 interface ShareRoot {
   chamber: string;
@@ -155,63 +157,20 @@ export function CreateShareForm({ fixedRoot, onCreated, className }: CreateShare
         </div>
       )}
 
-      <label className="share-field">
-        <span className="share-field-label">Permission</span>
-        <select
-          className="share-select"
-          value={permission}
-          onChange={(e) => setPermission(e.target.value as SharePermission)}
-        >
-          <option value="view">View</option>
-          <option value="edit">Edit</option>
-        </select>
-      </label>
-
-      <label className="share-field">
-        <span className="share-field-label">Label (optional)</span>
-        <input
-          className="share-input"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder="e.g. for Claude — architecture"
-        />
-      </label>
-
-      <label className="share-checkbox">
-        <input type="checkbox" checked={depthEnabled} onChange={(e) => setDepthEnabled(e.target.checked)} />
-        Also share referenced exhibits
-      </label>
-      {depthEnabled && (
-        <label className="share-field share-field-nested">
-          <span className="share-field-label">
-            Max depth ({maxDepth} hop{maxDepth === 1 ? "" : "s"})
-          </span>
-          <input
-            type="number"
-            min={1}
-            max={10}
-            className="share-input"
-            value={maxDepth}
-            onChange={(e) => setMaxDepth(Number(e.target.value))}
-          />
-        </label>
-      )}
-
-      <label className="share-checkbox">
-        <input type="checkbox" checked={expiryEnabled} onChange={(e) => setExpiryEnabled(e.target.checked)} />
-        Set an expiration date
-      </label>
-      {expiryEnabled && (
-        <label className="share-field share-field-nested">
-          <span className="share-field-label">Expires</span>
-          <input
-            type="date"
-            className="share-input"
-            value={expiresAt}
-            onChange={(e) => setExpiresAt(e.target.value)}
-          />
-        </label>
-      )}
+      <ShareFieldsEditor
+        permission={permission}
+        onPermissionChange={setPermission}
+        label={label}
+        onLabelChange={setLabel}
+        depthEnabled={depthEnabled}
+        onDepthEnabledChange={setDepthEnabled}
+        maxDepth={maxDepth}
+        onMaxDepthChange={setMaxDepth}
+        expiryEnabled={expiryEnabled}
+        onExpiryEnabledChange={setExpiryEnabled}
+        expiresAt={expiresAt}
+        onExpiresAtChange={setExpiresAt}
+      />
 
       {error && <p className="share-error">{error}</p>}
 
@@ -222,9 +181,12 @@ export function CreateShareForm({ fixedRoot, onCreated, className }: CreateShare
       {createdLink && (
         <div className="share-result">
           <span className="share-field-label">Share link</span>
-          <a href={createdLink} className="share-result-link">
-            {createdLink}
-          </a>
+          <div className="share-row-link">
+            <a href={createdLink} className="share-result-link">
+              {createdLink}
+            </a>
+            <CopyLinkButton link={createdLink} />
+          </div>
         </div>
       )}
     </form>

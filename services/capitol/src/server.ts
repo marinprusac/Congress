@@ -9,6 +9,7 @@ import {
   exhibitSyncRequestSchema,
   capitolExhibitResolveRequestSchema,
   createShareRequestSchema,
+  updateShareRequestSchema,
 } from "@congress/shared-types";
 import { env } from "./env.js";
 import { requireInternalToken } from "./auth.js";
@@ -25,7 +26,7 @@ import {
 import { forwardToChamber, forwardToChamberFrontend, proxyToChamberPath } from "./gateway.js";
 import { hasValidSession } from "./sessionAuth.js";
 import { syncExhibit, searchExhibits, resolveExhibits, getBacklinks } from "./exhibits.js";
-import { createShare, listShares, revokeShare, getExhibitSharing } from "./shares.js";
+import { createShare, listShares, listSharesForRoot, updateShare, revokeShare, getExhibitSharing } from "./shares.js";
 import { requireShareToken, type ShareVariables } from "./shareAuth.js";
 import { mcpApp } from "./mcp/server.js";
 
@@ -108,6 +109,10 @@ app.get("/capitol/exhibits/:id/sharing", requireSession, async (c) => {
   return c.json({ shares });
 });
 
+app.get("/capitol/exhibits/:id/shares", requireSession, (c) => {
+  return c.json({ shares: listSharesForRoot(c.req.param("id")) });
+});
+
 app.post("/capitol/shares", requireSession, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = createShareRequestSchema.safeParse(body);
@@ -118,6 +123,17 @@ app.post("/capitol/shares", requireSession, async (c) => {
 });
 
 app.get("/capitol/shares", requireSession, (c) => c.json({ shares: listShares() }));
+
+app.patch("/capitol/shares/:token", requireSession, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = updateShareRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  const updated = updateShare(c.req.param("token"), parsed.data);
+  if (!updated) return c.json({ error: "not_found" }, 404);
+  return c.json(updated);
+});
 
 app.delete("/capitol/shares/:token", requireSession, (c) => {
   if (!revokeShare(c.req.param("token"))) {

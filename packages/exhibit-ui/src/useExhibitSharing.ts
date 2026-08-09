@@ -1,37 +1,29 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { ExhibitSharingEntry } from "@congress/shared-types";
 
-const SHARING_URL = (id: string) => `/capitol/exhibits/${encodeURIComponent(id)}/sharing`;
+async function fetchExhibitSharing(exhibitId: string): Promise<ExhibitSharingEntry[]> {
+  const res = await fetch(`/capitol/exhibits/${encodeURIComponent(exhibitId)}/sharing`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as { shares: ExhibitSharingEntry[] };
+  return data.shares;
+}
+
+// Exported so ShareControl can invalidate exactly this query after a
+// create/update/revoke, making the badge on the same page update
+// immediately - both share the same QueryClient instance the host app
+// already provides.
+export function exhibitSharingQueryKey(exhibitId: string) {
+  return ["exhibit-sharing", exhibitId] as const;
+}
 
 // Drives the "Shared" / "Shared (inherited)" badge on a Chamber's own view
 // pages - the owner-facing counterpart to a share recipient's token-scoped
-// view. Recomputed on every mount/id-change rather than cached, so editing
-// an exhibit to add a new [[ reference (making the newly-referenced exhibit
-// inherited-shared) is reflected the next time its page is visited.
+// view.
 export function useExhibitSharing(exhibitId: string): { entries: ExhibitSharingEntry[]; loading: boolean } {
-  const [entries, setEntries] = useState<ExhibitSharingEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading } = useQuery({
+    queryKey: exhibitSharingQueryKey(exhibitId),
+    queryFn: () => fetchExhibitSharing(exhibitId),
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-
-    fetch(SHARING_URL(exhibitId))
-      .then((res) => (res.ok ? res.json() : { shares: [] }))
-      .then((data: { shares: ExhibitSharingEntry[] }) => {
-        if (!cancelled) setEntries(data.shares);
-      })
-      .catch(() => {
-        if (!cancelled) setEntries([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [exhibitId]);
-
-  return { entries, loading };
+  return { entries: data ?? [], loading: isLoading };
 }

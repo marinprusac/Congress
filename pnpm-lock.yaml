@@ -20,6 +20,9 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
     devDependencies:
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
       '@types/react':
         specifier: ^19.2.18
         version: 19.2.18

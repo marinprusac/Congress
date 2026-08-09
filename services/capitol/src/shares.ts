@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { eq, and, isNull } from "drizzle-orm";
-import type { CreateShareRequest, ShareSummary, ShareClosureEntry, ExhibitSharingEntry } from "@congress/shared-types";
+import { eq, and, isNull, desc } from "drizzle-orm";
+import type {
+  CreateShareRequest,
+  UpdateShareRequest,
+  ShareSummary,
+  ShareClosureEntry,
+  ExhibitSharingEntry,
+} from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { shares, exhibitCache, exhibitRefs } from "./db/schema.js";
 import { resolveOneLive } from "./exhibits.js";
@@ -45,6 +51,31 @@ export function createShare(input: CreateShareRequest): ShareSummary {
 
 export function listShares(): ShareSummary[] {
   return db.select().from(shares).all().map(toSummary);
+}
+
+// Shares rooted exactly at this exhibit - what a "Share" button on that
+// exhibit's own view page manages. Deliberately excludes shares that merely
+// reach this exhibit by inheritance (those belong to a different root and
+// aren't this exhibit's to edit/revoke).
+export function listSharesForRoot(rootId: string): ShareSummary[] {
+  return db.select().from(shares).where(eq(shares.rootId, rootId)).orderBy(desc(shares.createdAt)).all().map(toSummary);
+}
+
+export function updateShare(token: string, input: UpdateShareRequest): ShareSummary | null {
+  const existing = getShareRow(token);
+  if (!existing) return null;
+
+  const next = {
+    permission: input.permission ?? existing.permission,
+    maxDepth:
+      input.maxDepth !== undefined ? Math.min(Math.max(input.maxDepth, 0), MAX_DEPTH_CEILING) : existing.maxDepth,
+    label: input.label !== undefined ? input.label : existing.label,
+    expiresAt:
+      input.expiresAt === undefined ? existing.expiresAt : input.expiresAt === null ? null : new Date(input.expiresAt),
+  };
+
+  db.update(shares).set(next).where(eq(shares.id, token)).run();
+  return toSummary({ ...existing, ...next });
 }
 
 export function revokeShare(token: string): boolean {

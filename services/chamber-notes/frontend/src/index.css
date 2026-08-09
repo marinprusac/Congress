@@ -481,3 +481,103 @@
 .share-picker-clear:hover {
   color: var(--color-alert);
 }
+
+.share-section-heading {
+  font-family: var(--font-mono);
+  font-size: 0.7em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-dust);
+  margin: 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-dust);
+}
+
+.share-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.share-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border: 1px solid var(--color-dust);
+  padding: 0.6rem;
+}
+
+.share-row-inactive {
+  opacity: 0.55;
+}
+
+.share-row-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.share-row-label {
+  font-family: var(--font-body);
+  font-size: 0.95em;
+  color: var(--color-ink);
+}
+
+.share-row-meta {
+  font-family: var(--font-mono);
+  font-size: 0.75em;
+  color: var(--color-dust);
+}
+
+.share-row-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.share-copy-button {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.7em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.2em 0.5em;
+  border: 1px solid var(--color-dust);
+  color: var(--color-ink);
+  background: transparent;
+}
+
+.share-copy-button:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.share-row-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.share-row-action {
+  font-family: var(--font-mono);
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.share-row-action:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.share-row-action:disabled {
+  opacity: 0.5;
+}
+
+.share-row-action-danger {
+  color: var(--color-alert);
+}
