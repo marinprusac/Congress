@@ -88,9 +88,13 @@
   color: var(--color-slate);
 }
 
+.note-table-wrapper {
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+
 .note-prose table {
   border-collapse: collapse;
-  margin: 0.75em 0;
   width: 100%;
 }
 

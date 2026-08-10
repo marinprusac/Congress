@@ -35,16 +35,16 @@ export function EventViewPage() {
 
   return (
     <section>
-      <div className="mb-6 flex items-start justify-between gap-4 border-b border-dust pb-4">
+      <div className="mb-6 flex flex-col gap-3 border-b border-dust pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
           {event.title}
           <ExhibitSharingBadge exhibitId={exhibitId} className="exhibit-sharing-badge" />
         </h2>
-        <div className="flex shrink-0 items-center gap-3 font-mono text-xs uppercase tracking-wide">
+        <div className="flex shrink-0 items-center gap-5 font-mono text-xs uppercase tracking-wide">
           <ShareControl chamber="calendar" exhibitId={exhibitId} exhibitName={event.title} />
           <Link
             to={`/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}/edit`}
-            className="text-accent hover:underline"
+            className="tap-target text-accent hover:underline"
           >
             Edit
           </Link>

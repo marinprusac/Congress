@@ -73,6 +73,11 @@
   min-height: 100vh;
   background-color: var(--color-parchment);
   color: var(--color-ink);
+  /* Resolve to 0 on any device without a notch/rounded corner, so this is
+     safe to apply unconditionally rather than gating it to mobile widths. */
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 .chamber-header {
@@ -137,8 +142,15 @@
 }
 
 @media (max-width: 640px) {
+  /* The nav's total on-screen height (a fixed content height plus whatever
+     the home indicator reserves below it) - shared with the mobile picker
+     dropdown below so it can sit above the nav instead of overlapping it. */
+  :root {
+    --mobile-nav-height: calc(3rem + env(safe-area-inset-bottom));
+  }
+
   .chamber-shell {
-    padding-bottom: 4rem;
+    padding-bottom: var(--mobile-nav-height);
   }
 
   .chamber-header .chamber-nav {
@@ -155,11 +167,20 @@
     justify-content: space-around;
     border-top: 1px solid var(--color-dust);
     background-color: var(--color-parchment);
-    padding: 0.6rem 0;
+    /* The home indicator's reserved strip goes below the link row, inside
+       the nav's own background, rather than left to the page underneath. */
+    padding-bottom: env(safe-area-inset-bottom);
     box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 15%, transparent);
   }
 
   .chamber-mobile-nav-link {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    /* A real tap target (~44pt+) instead of just the text's own line height -
+       the row's fixed 3rem in --mobile-nav-height above assumes this. */
+    min-height: 3rem;
     font-family: var(--font-mono);
     font-size: 0.7em;
     text-transform: uppercase;
@@ -171,6 +192,16 @@
   .chamber-mobile-nav-link.active {
     color: var(--color-accent);
   }
+}
+
+/* Expands a small inline text action's hit area toward Apple's ~44pt tap
+   target guidance without changing its visual size or shifting surrounding
+   layout - padding pushes the invisible click box out, the matching
+   negative margin pulls the visible box back to where it was. */
+.tap-target {
+  display: inline-block;
+  padding: 0.6em 0.4em;
+  margin: -0.6em -0.4em;
 }
 
 .note-link,
@@ -304,7 +335,11 @@
   position: fixed;
   left: 0.5rem;
   right: 0.5rem;
-  bottom: 0.5rem;
+  /* Clears the mobile bottom nav (a fixed element in the same corner)
+     instead of sitting underneath it - falls back to a plain 0.5rem
+     when --mobile-nav-height isn't defined (i.e. above the 640px
+     breakpoint, where the desktop override below replaces this anyway). */
+  bottom: calc(var(--mobile-nav-height, 0px) + 0.5rem);
   z-index: 50;
   max-height: 40vh;
   overflow-y: auto;
@@ -558,6 +593,9 @@
 }
 
 .share-picker-clear {
+  display: inline-block;
+  padding: 0.5em;
+  margin: -0.5em;
   color: var(--color-dust);
 }
 
@@ -638,10 +676,11 @@
 
 .share-row-actions {
   display: flex;
-  gap: 0.75rem;
+  gap: 1.25rem;
 }
 
 .share-row-action {
+  display: inline-block;
   font-family: var(--font-mono);
   font-size: 0.75em;
   text-transform: uppercase;
@@ -649,7 +688,8 @@
   color: var(--color-accent);
   background: none;
   border: none;
-  padding: 0;
+  padding: 0.5em 0.3em;
+  margin: -0.5em -0.3em;
   cursor: pointer;
 }
 

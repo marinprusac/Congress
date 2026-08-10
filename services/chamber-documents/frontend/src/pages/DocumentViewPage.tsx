@@ -69,7 +69,7 @@ export function DocumentViewPage() {
 
   return (
     <article>
-      <div className="mb-6 flex items-start justify-between gap-4 border-b border-dust pb-4">
+      <div className="mb-6 flex flex-col gap-3 border-b border-dust pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         {editing ? (
           <input
             value={draftTitle}
@@ -82,23 +82,23 @@ export function DocumentViewPage() {
             <ExhibitSharingBadge exhibitId={`document-${doc.id}`} className="exhibit-sharing-badge" />
           </h2>
         )}
-        <div className="flex shrink-0 gap-3 font-mono text-xs uppercase tracking-wide">
+        <div className="flex shrink-0 gap-5 font-mono text-xs uppercase tracking-wide">
           {editing ? (
             <>
               <button
                 onClick={() => updateMutation.mutate({ title: draftTitle, description: draftDescription })}
-                className="text-accent hover:underline"
+                className="tap-target text-accent hover:underline"
               >
                 Save
               </button>
-              <button onClick={() => setEditing(false)} className="text-slate hover:underline">
+              <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
                 Cancel
               </button>
             </>
           ) : (
             <>
               <ShareControl chamber="documents" exhibitId={`document-${doc.id}`} exhibitName={doc.title} />
-              <button onClick={() => setEditing(true)} className="text-accent hover:underline">
+              <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
                 Edit
               </button>
               <button
@@ -107,7 +107,7 @@ export function DocumentViewPage() {
                     deleteMutation.mutate();
                   }
                 }}
-                className="text-alert hover:underline"
+                className="tap-target text-alert hover:underline"
               >
                 Delete
               </button>

@@ -70,7 +70,7 @@ export function NotesListPage() {
               <button
                 type="button"
                 onClick={() => pinMutation.mutate({ id: note.id, pinned: !note.pinned })}
-                className="shrink-0 font-mono text-xs uppercase tracking-wide text-dust hover:text-accent"
+                className="tap-target shrink-0 font-mono text-xs uppercase tracking-wide text-dust hover:text-accent"
               >
                 {note.pinned ? "Unpin" : "Pin"}
               </button>

@@ -26,6 +26,14 @@ export function NoteMarkdown({ body, onDoubleClick }: NoteMarkdownProps) {
         // else keeps the default rule.
         urlTransform={(url) => (url.startsWith("exhibit-ref:") ? url : defaultUrlTransform(url))}
         components={{
+          // A wide table has no reason to shrink its columns to fit a phone
+          // screen - scrolling horizontally within its own bounds reads
+          // better than either overflowing the page or squashing cells.
+          table: ({ node: _node, ...props }) => (
+            <div className="note-table-wrapper">
+              <table {...props} />
+            </div>
+          ),
           a: ({ href, children, node: _node, ...props }) => {
             const token = href ? decodeExhibitLinkHref(href) : null;
             if (token) {

@@ -102,7 +102,7 @@ export function NoteViewPage() {
 
   return (
     <article>
-      <div className="mb-6 flex items-start justify-between gap-4 border-b border-dust pb-4">
+      <div className="mb-6 flex flex-col gap-3 border-b border-dust pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         {editing ? (
           <input
             value={draftTitle}
@@ -115,7 +115,7 @@ export function NoteViewPage() {
             <ExhibitSharingBadge exhibitId={`note-${noteId}`} className="exhibit-sharing-badge" />
           </h2>
         )}
-        <div className="flex shrink-0 items-center gap-3 font-mono text-xs uppercase tracking-wide">
+        <div className="flex shrink-0 items-center gap-5 font-mono text-xs uppercase tracking-wide">
           {editing ? (
             <>
               {settingsQuery.data?.autoSave && (
@@ -127,10 +127,10 @@ export function NoteViewPage() {
                       : ""}
                 </span>
               )}
-              <button onClick={saveExplicit} className="text-accent hover:underline">
+              <button onClick={saveExplicit} className="tap-target text-accent hover:underline">
                 Save
               </button>
-              <button onClick={() => setEditing(false)} className="text-slate hover:underline">
+              <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
                 Cancel
               </button>
             </>
@@ -138,12 +138,12 @@ export function NoteViewPage() {
             <>
               <button
                 onClick={() => pinMutation.mutate(!note.pinned)}
-                className="text-accent hover:underline"
+                className="tap-target text-accent hover:underline"
               >
                 {note.pinned ? "Unpin" : "Pin"}
               </button>
               <ShareControl chamber="notes" exhibitId={`note-${noteId}`} exhibitName={note.title} />
-              <button onClick={() => setEditing(true)} className="text-accent hover:underline">
+              <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
                 Edit
               </button>
               <button
@@ -152,7 +152,7 @@ export function NoteViewPage() {
                     deleteMutation.mutate();
                   }
                 }}
-                className="text-alert hover:underline"
+                className="tap-target text-alert hover:underline"
               >
                 Delete
               </button>

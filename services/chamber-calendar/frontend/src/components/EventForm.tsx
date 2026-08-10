@@ -174,7 +174,7 @@ export function EventForm({
             type="button"
             onClick={onDelete}
             disabled={deleting}
-            className="font-mono text-xs uppercase tracking-wide text-alert hover:underline disabled:opacity-50"
+            className="tap-target font-mono text-xs uppercase tracking-wide text-alert hover:underline disabled:opacity-50"
           >
             {deleting ? "Deleting —" : "Delete"}
           </button>

@@ -91,7 +91,7 @@ export function SharedViewPage() {
 
   if (detailQuery.isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-parchment font-mono text-sm text-dust">
+      <div className="flex min-h-screen items-center justify-center bg-parchment pt-[env(safe-area-inset-top)] font-mono text-sm text-dust">
         Loading —
       </div>
     );
@@ -99,7 +99,7 @@ export function SharedViewPage() {
 
   if (detailQuery.isError || !detailQuery.data) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-parchment px-6 text-center text-ink">
+      <div className="flex min-h-screen items-center justify-center bg-parchment px-6 pt-[env(safe-area-inset-top)] text-center text-ink">
         <p className="font-mono text-sm text-alert">
           This share link is invalid, expired, or has been revoked.
         </p>
@@ -111,7 +111,7 @@ export function SharedViewPage() {
   const content = contentQuery.data;
 
   return (
-    <div className="min-h-screen bg-parchment text-ink">
+    <div className="min-h-screen bg-parchment pt-[env(safe-area-inset-top)] text-ink">
       <header className="flex items-center gap-3 border-b border-dust px-6 py-6">
         <CapitolMark className="h-6 w-6 text-ink" />
         <div>
@@ -157,7 +157,7 @@ export function SharedViewPage() {
           )}
           {content && (
             <article>
-              <div className="mb-6 flex items-start justify-between gap-4 border-b border-dust pb-4">
+              <div className="mb-6 flex flex-col gap-3 border-b border-dust pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                 {editing ? (
                   <input
                     value={draftTitle}
@@ -168,21 +168,21 @@ export function SharedViewPage() {
                   <h2 className="min-w-0 flex-1 font-display text-3xl text-ink">{content.name}</h2>
                 )}
                 {share.permission === "edit" && (
-                  <div className="flex shrink-0 gap-3 font-mono text-xs uppercase tracking-wide">
+                  <div className="flex shrink-0 gap-5 font-mono text-xs uppercase tracking-wide">
                     {editing ? (
                       <>
                         <button
                           onClick={() => updateMutation.mutate({ title: draftTitle, body: draftBody })}
-                          className="text-accent hover:underline"
+                          className="tap-target text-accent hover:underline"
                         >
                           Save
                         </button>
-                        <button onClick={() => setEditing(false)} className="text-slate hover:underline">
+                        <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
                           Cancel
                         </button>
                       </>
                     ) : (
-                      <button onClick={() => setEditing(true)} className="text-accent hover:underline">
+                      <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
                         Edit
                       </button>
                     )}

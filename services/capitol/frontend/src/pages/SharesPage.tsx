@@ -41,9 +41,9 @@ function SharesList() {
                   {expired && !revoked && " · Expired"}
                 </p>
               </div>
-              <div className="flex shrink-0 gap-3 font-mono text-xs uppercase tracking-wide">
+              <div className="flex shrink-0 gap-5 font-mono text-xs uppercase tracking-wide">
                 {!inactive && (
-                  <a href={`/shared/${share.token}`} className="text-accent hover:underline">
+                  <a href={`/shared/${share.token}`} className="tap-target text-accent hover:underline">
                     Open
                   </a>
                 )}
@@ -52,7 +52,7 @@ function SharesList() {
                     onClick={() => {
                       if (confirm("Revoke this share? This cannot be undone.")) revokeMutation.mutate(share.token);
                     }}
-                    className="text-alert hover:underline"
+                    className="tap-target text-alert hover:underline"
                   >
                     Revoke
                   </button>
