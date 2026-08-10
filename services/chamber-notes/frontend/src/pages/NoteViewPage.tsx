@@ -10,7 +10,7 @@ import {
   ShareControl,
   navigateToExhibit,
 } from "@congress/exhibit-ui";
-import { fetchNote, updateNote, deleteNote, setPinned } from "@/lib/api";
+import { fetchNote, updateNote, deleteNote, setPinned, fetchSettings } from "@/lib/api";
 import { NoteMarkdown } from "@/components/NoteMarkdown";
 import { getChamberIcon } from "@/components/ChamberIcon";
 import { stripFrontmatter } from "@/lib/frontmatter";
@@ -43,6 +43,8 @@ export function NoteViewPage() {
     enabled: Number.isInteger(noteId) && !editing,
   });
 
+  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
+
   const picker = useExhibitPicker({
     value: draftContent,
     onChange: (newValue) => setDraftContent(newValue),
@@ -53,9 +55,12 @@ export function NoteViewPage() {
     onSuccess: (updated) => {
       queryClient.setQueryData(["note", noteId], updated);
       queryClient.invalidateQueries({ queryKey: ["notes"] });
-      setEditing(false);
     },
   });
+
+  function saveExplicit() {
+    updateMutation.mutate({ title: draftTitle, content: draftContent }, { onSuccess: () => setEditing(false) });
+  }
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteNote(noteId),
@@ -80,6 +85,27 @@ export function NoteViewPage() {
     }
   }, [noteQuery.data, editing]);
 
+  useEffect(() => {
+    if (!editing || !settingsQuery.data?.autoSave || !noteQuery.data) return;
+    if (draftTitle === noteQuery.data.title && draftContent === noteQuery.data.content) return;
+    const timer = setTimeout(() => {
+      updateMutation.mutate({ title: draftTitle, content: draftContent });
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [editing, settingsQuery.data?.autoSave, draftTitle, draftContent, noteQuery.data]);
+
+  useEffect(() => {
+    if (!editing) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveExplicit();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [editing, draftTitle, draftContent]);
+
   if (!Number.isInteger(noteId)) return <p className="font-mono text-sm text-alert">Invalid note id.</p>;
   if (noteQuery.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
   if (noteQuery.isError || !noteQuery.data)
@@ -103,13 +129,19 @@ export function NoteViewPage() {
             <ExhibitSharingBadge exhibitId={`note-${noteId}`} className="exhibit-sharing-badge" />
           </h2>
         )}
-        <div className="flex shrink-0 gap-3 font-mono text-xs uppercase tracking-wide">
+        <div className="flex shrink-0 items-center gap-3 font-mono text-xs uppercase tracking-wide">
           {editing ? (
             <>
-              <button
-                onClick={() => updateMutation.mutate({ title: draftTitle, content: draftContent })}
-                className="text-accent hover:underline"
-              >
+              {settingsQuery.data?.autoSave && (
+                <span className="normal-case tracking-normal text-dust">
+                  {updateMutation.isPending
+                    ? "Saving —"
+                    : draftTitle === note.title && draftContent === note.content
+                      ? "Saved"
+                      : ""}
+                </span>
+              )}
+              <button onClick={saveExplicit} className="text-accent hover:underline">
                 Save
               </button>
               <button onClick={() => setEditing(false)} className="text-slate hover:underline">

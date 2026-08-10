@@ -6,6 +6,7 @@ import {
   updateNoteRequestSchema,
   exhibitResolveRequestSchema,
   updateSharedExhibitContentRequestSchema,
+  updateNotesSettingsRequestSchema,
 } from "@congress/shared-types";
 import { notesManifest } from "./manifest.js";
 import {
@@ -18,6 +19,7 @@ import {
   deleteNote,
   TitleConflictError,
 } from "./notes.js";
+import { getSettings, updateSettings } from "./settings.js";
 import {
   searchNoteExhibits,
   resolveNoteExhibits,
@@ -141,6 +143,19 @@ app.patch("/api/exhibits/:id/content", async (c) => {
     }
     throw err;
   }
+});
+
+app.get("/api/settings", async (c) => {
+  return c.json(await getSettings());
+});
+
+app.put("/api/settings", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = updateNotesSettingsRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  return c.json(await updateSettings(parsed.data));
 });
 
 app.route("/mcp", mcpApp);

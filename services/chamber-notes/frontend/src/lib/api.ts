@@ -1,4 +1,11 @@
-import type { NoteSummary, NoteDetail, CreateNoteRequest, UpdateNoteRequest } from "@congress/shared-types";
+import type {
+  NoteSummary,
+  NoteDetail,
+  CreateNoteRequest,
+  UpdateNoteRequest,
+  NotesSettings,
+  UpdateNotesSettingsRequest,
+} from "@congress/shared-types";
 
 // In production this Chamber's frontend is proxied through Capitol at
 // "/notes/*", but its API calls still need to reach Capitol's gateway at
@@ -59,5 +66,17 @@ export function setPinned(id: number, pinned: boolean): Promise<NoteDetail> {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pinned }),
+  }).then((res) => json(res));
+}
+
+export function fetchSettings(): Promise<NotesSettings> {
+  return fetch(`${API_BASE}/settings`).then((res) => json(res));
+}
+
+export function updateSettings(input: UpdateNotesSettingsRequest): Promise<NotesSettings> {
+  return fetch(`${API_BASE}/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
   }).then((res) => json(res));
 }
