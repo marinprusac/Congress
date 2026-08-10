@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { CapitolExhibitResolveResult } from "@congress/shared-types";
 import {
   useExhibitPicker,
   ExhibitPickerDropdown,
-  ExhibitChip,
   ExhibitSharingBadge,
+  ExhibitLinksLayout,
   ShareControl,
   navigateToExhibit,
 } from "@congress/exhibit-ui";
@@ -14,13 +13,6 @@ import { fetchNote, updateNote, deleteNote, setPinned, fetchSettings } from "@/l
 import { NoteMarkdown } from "@/components/NoteMarkdown";
 import { getChamberIcon } from "@/components/ChamberIcon";
 import { stripFrontmatter } from "@/lib/frontmatter";
-
-async function fetchBacklinks(exhibitId: string): Promise<CapitolExhibitResolveResult[]> {
-  const res = await fetch(`/capitol/exhibits/${exhibitId}/backlinks`);
-  if (!res.ok) return [];
-  const data = (await res.json()) as { backlinks: CapitolExhibitResolveResult[] };
-  return data.backlinks;
-}
 
 export function NoteViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -35,12 +27,6 @@ export function NoteViewPage() {
     queryKey: ["note", noteId],
     queryFn: () => fetchNote(noteId),
     enabled: Number.isInteger(noteId),
-  });
-
-  const backlinksQuery = useQuery({
-    queryKey: ["exhibit-backlinks", noteId],
-    queryFn: () => fetchBacklinks(`note-${noteId}`),
-    enabled: Number.isInteger(noteId) && !editing,
   });
 
   const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
@@ -206,31 +192,15 @@ export function NoteViewPage() {
           />
         </div>
       ) : (
-        <NoteMarkdown body={body} onDoubleClick={() => setEditing(true)} />
-      )}
-
-      {!editing && (
-        <section className="mt-10 border-t border-dust pt-4">
-          <h3 className="mb-2 font-mono text-xs uppercase tracking-wide text-dust">
-            Referenced by ({backlinksQuery.data?.length ?? 0})
-          </h3>
-          {(backlinksQuery.data?.length ?? 0) === 0 ? (
-            <p className="font-mono text-sm text-dust">— Nothing references this note —</p>
-          ) : (
-            <ul>
-              {backlinksQuery.data?.map((b) => (
-                <li key={`${b.chamber}:${b.id}`} className="border-b border-dust py-2">
-                  <ExhibitChip
-                    result={b}
-                    renderIcon={(chamber) => getChamberIcon(chamber)}
-                    onNavigate={(r) => navigateToExhibit("notes", r, navigate)}
-                    className="exhibit-chip font-mono text-sm"
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <ExhibitLinksLayout
+          exhibitId={`note-${noteId}`}
+          emptyBacklinksLabel="Nothing references this note"
+          emptyFrontlinksLabel="This note references nothing"
+          renderIcon={(chamber) => getChamberIcon(chamber)}
+          onNavigate={(r) => navigateToExhibit("notes", r, navigate)}
+        >
+          <NoteMarkdown body={body} onDoubleClick={() => setEditing(true)} />
+        </ExhibitLinksLayout>
       )}
     </article>
   );

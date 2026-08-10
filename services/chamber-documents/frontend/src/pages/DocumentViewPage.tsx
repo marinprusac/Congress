@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { CapitolExhibitResolveResult } from "@congress/shared-types";
 import {
   useExhibitPicker,
   ExhibitPickerDropdown,
-  ExhibitChip,
   ExhibitAnnotatedText,
   ExhibitSharingBadge,
+  ExhibitLinksLayout,
   ShareControl,
   navigateToExhibit,
 } from "@congress/exhibit-ui";
@@ -18,13 +17,6 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-async function fetchBacklinks(exhibitId: string): Promise<CapitolExhibitResolveResult[]> {
-  const res = await fetch(`/capitol/exhibits/${exhibitId}/backlinks`);
-  if (!res.ok) return [];
-  const data = (await res.json()) as { backlinks: CapitolExhibitResolveResult[] };
-  return data.backlinks;
 }
 
 export function DocumentViewPage() {
@@ -40,12 +32,6 @@ export function DocumentViewPage() {
     queryKey: ["document", documentId],
     queryFn: () => fetchDocument(documentId),
     enabled: Number.isInteger(documentId),
-  });
-
-  const backlinksQuery = useQuery({
-    queryKey: ["exhibit-backlinks", documentId],
-    queryFn: () => fetchBacklinks(`document-${documentId}`),
-    enabled: Number.isInteger(documentId) && !editing,
   });
 
   const picker = useExhibitPicker({ value: draftDescription, onChange: setDraftDescription });
@@ -163,39 +149,25 @@ export function DocumentViewPage() {
             className="exhibit-picker-dropdown"
           />
         </div>
-      ) : doc.description ? (
-        <ExhibitAnnotatedText
-          text={doc.description}
+      ) : (
+        <ExhibitLinksLayout
+          exhibitId={`document-${doc.id}`}
+          emptyBacklinksLabel="Nothing references this document"
+          emptyFrontlinksLabel="This document references nothing"
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onNavigate={(r) => navigateToExhibit("documents", r, navigate)}
-          className="whitespace-pre-wrap font-mono text-sm text-ink"
-        />
-      ) : (
-        <p className="font-mono text-sm text-dust">— No description —</p>
-      )}
-
-      {!editing && (
-        <section className="mt-10 border-t border-dust pt-4">
-          <h3 className="mb-2 font-mono text-xs uppercase tracking-wide text-dust">
-            Referenced by ({backlinksQuery.data?.length ?? 0})
-          </h3>
-          {(backlinksQuery.data?.length ?? 0) === 0 ? (
-            <p className="font-mono text-sm text-dust">— Nothing references this document —</p>
+        >
+          {doc.description ? (
+            <ExhibitAnnotatedText
+              text={doc.description}
+              renderIcon={(chamber) => getChamberIcon(chamber)}
+              onNavigate={(r) => navigateToExhibit("documents", r, navigate)}
+              className="whitespace-pre-wrap font-mono text-sm text-ink"
+            />
           ) : (
-            <ul>
-              {backlinksQuery.data?.map((b) => (
-                <li key={`${b.chamber}:${b.id}`} className="border-b border-dust py-2">
-                  <ExhibitChip
-                    result={b}
-                    renderIcon={(chamber) => getChamberIcon(chamber)}
-                    onNavigate={(r) => navigateToExhibit("documents", r, navigate)}
-                    className="exhibit-chip font-mono text-sm"
-                  />
-                </li>
-              ))}
-            </ul>
+            <p className="font-mono text-sm text-dust">— No description —</p>
           )}
-        </section>
+        </ExhibitLinksLayout>
       )}
     </article>
   );

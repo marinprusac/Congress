@@ -141,3 +141,25 @@ export async function getBacklinks(id: string): Promise<CapitolExhibitResolveRes
   const refs = rows.map((r) => ({ id: r.sourceId, chamber: r.sourceChamber }));
   return resolveExhibits(refs);
 }
+
+// Unlike getBacklinks, a target's chamber is never recorded in exhibit_refs
+// (only the source's is - see the schema comment), so this can only resolve
+// against exhibit_cache and must skip a target with no cache row instead of
+// guessing a chamber for a live resolve - the same tradeoff computeShareClosure
+// makes for the same reason. In practice this doesn't arise: a chamber syncs
+// on every create, and a "[[" reference can only target something that
+// already exists.
+export async function getFrontlinks(id: string): Promise<CapitolExhibitResolveResult[]> {
+  const rows = db.select().from(exhibitRefs).where(eq(exhibitRefs.sourceId, id)).all();
+  const results: CapitolExhibitResolveResult[] = [];
+  for (const { targetId } of rows) {
+    const cached = db.select().from(exhibitCache).where(eq(exhibitCache.id, targetId)).get();
+    if (!cached) continue;
+    results.push(
+      cached.deleted
+        ? { id: targetId, chamber: cached.chamber, deleted: true }
+        : { id: targetId, chamber: cached.chamber, name: cached.name, url: cached.url }
+    );
+  }
+  return results;
+}

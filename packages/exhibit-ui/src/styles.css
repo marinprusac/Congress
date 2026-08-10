@@ -251,6 +251,43 @@
   border: 1px dashed var(--color-dust);
 }
 
+/* Mobile default: content on top, backlinks/frontlinks stacked as a
+   two-column row below it. */
+.exhibit-links-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "main main"
+    "back front";
+  gap: 2rem 1.5rem;
+}
+
+.exhibit-links-main {
+  grid-area: main;
+  min-width: 0;
+}
+
+.exhibit-links-panel-back {
+  grid-area: back;
+  min-width: 0;
+}
+
+.exhibit-links-panel-front {
+  grid-area: front;
+  min-width: 0;
+}
+
+/* Desktop: backlinks and frontlinks flank the content instead of stacking
+   below it. */
+@media (min-width: 641px) {
+  .exhibit-links-layout {
+    grid-template-columns: 12rem minmax(0, 1fr) 12rem;
+    grid-template-areas: "back main front";
+    gap: 0 2rem;
+    align-items: start;
+  }
+}
+
 /* The field wrapper every [[ picker call site wraps its <textarea> +
    <ExhibitPickerDropdown> in - gives the desktop rule below a positioning
    anchor so the picker can render right under the field instead of pinned
