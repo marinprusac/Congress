@@ -7,7 +7,45 @@ import { getChamberIcon } from "./ChamberIcon";
 
 interface NoteMarkdownProps {
   body: string;
-  onDoubleClick?: () => void;
+  // Called with how far through the rendered text (0 = start, 1 = end) the
+  // double-click landed, so the caller can place the editor's caret roughly
+  // where the reader was looking instead of always at the top.
+  onDoubleClick?: (fraction: number) => void;
+}
+
+// Range.toString() of everything from the start of the container up to the
+// clicked point gives the rendered plain-text length before the click -
+// dividing by the container's total text length turns that into a
+// resolution-independent fraction. This is only ever "roughly" right
+// against the raw markdown source (bold/links/wikilinks change how many
+// source characters a given amount of rendered text costs), which is all
+// double-click-to-edit needs.
+function estimateTextFraction(container: HTMLElement, x: number, y: number): number {
+  const doc = container.ownerDocument;
+  const docWithCaret = doc as Document & {
+    caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+  };
+
+  let range: Range | null = null;
+  if (docWithCaret.caretRangeFromPoint) {
+    range = docWithCaret.caretRangeFromPoint(x, y);
+  } else if (docWithCaret.caretPositionFromPoint) {
+    const pos = docWithCaret.caretPositionFromPoint(x, y);
+    if (pos) {
+      range = doc.createRange();
+      range.setStart(pos.offsetNode, pos.offset);
+    }
+  }
+  if (!range || !container.contains(range.startContainer)) return 0;
+
+  const measured = doc.createRange();
+  measured.selectNodeContents(container);
+  measured.setEnd(range.startContainer, range.startOffset);
+  const before = measured.toString().length;
+
+  const total = container.textContent?.length ?? 0;
+  return total === 0 ? 0 : Math.min(1, Math.max(0, before / total));
 }
 
 export function NoteMarkdown({ body, onDoubleClick }: NoteMarkdownProps) {
@@ -17,7 +55,11 @@ export function NoteMarkdown({ body, onDoubleClick }: NoteMarkdownProps) {
   const { resultsByToken } = useResolvedExhibits(tokens);
 
   return (
-    <div className="note-prose" onDoubleClick={onDoubleClick} title={onDoubleClick ? "Double-click to edit" : undefined}>
+    <div
+      className="note-prose"
+      onDoubleClick={(e) => onDoubleClick?.(estimateTextFraction(e.currentTarget, e.clientX, e.clientY))}
+      title={onDoubleClick ? "Double-click to edit" : undefined}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         // react-markdown's default urlTransform strips any URL scheme outside

@@ -433,6 +433,28 @@
   letter-spacing: normal;
 }
 
+/* Below `sm`, .share-control-popover's `right: 0` is relative to the
+   trigger button, not the viewport - on an action bar that isn't flush
+   against the screen's right edge (e.g. Share sitting between Pin and
+   Edit), the 320px-wide popover overshoots the left edge of the screen
+   and is unreachable. Anchoring it to the viewport as a fixed sheet
+   guarantees it stays fully on-screen regardless of where the trigger
+   sits, and caps its height so a tall share list scrolls instead of
+   running off the bottom. */
+@media (max-width: 640px) {
+  .share-control-popover {
+    position: fixed;
+    top: auto;
+    right: 1rem;
+    bottom: 1rem;
+    left: 1rem;
+    width: auto;
+    max-width: none;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+}
+
 .share-form {
   display: flex;
   flex-direction: column;
