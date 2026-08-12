@@ -26,7 +26,7 @@ import {
 import { forwardToChamber, forwardToChamberFrontend, proxyToChamberPath } from "./gateway.js";
 import { hasValidSession } from "./sessionAuth.js";
 import { syncExhibit, searchExhibits, resolveExhibits, getBacklinks, getFrontlinks } from "./exhibits.js";
-import { createShare, listShares, listSharesForRoot, updateShare, revokeShare, getExhibitSharing } from "./shares.js";
+import { createShare, listShares, listSharesForExhibit, updateShare, revokeShare, getExhibitSharing } from "./shares.js";
 import { requireShareToken, type ShareVariables } from "./shareAuth.js";
 import { mcpApp } from "./mcp/server.js";
 
@@ -114,8 +114,8 @@ app.get("/capitol/exhibits/:id/sharing", requireSession, async (c) => {
   return c.json({ shares });
 });
 
-app.get("/capitol/exhibits/:id/shares", requireSession, (c) => {
-  return c.json({ shares: listSharesForRoot(c.req.param("id")) });
+app.get("/capitol/exhibits/:id/shares", requireSession, async (c) => {
+  return c.json({ shares: await listSharesForExhibit(c.req.param("id")) });
 });
 
 app.post("/capitol/shares", requireSession, async (c) => {

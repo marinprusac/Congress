@@ -61,6 +61,28 @@ export function listSharesForRoot(rootId: string): ShareSummary[] {
   return db.select().from(shares).where(eq(shares.rootId, rootId)).orderBy(desc(shares.createdAt)).all().map(toSummary);
 }
 
+// Every share whose closure reaches this exhibit - its own root shares
+// (direct: true, including inactive ones, same as listSharesForRoot) plus
+// any other active share that merely passes through it via inheritance
+// (direct: false). Powers the exhibit's "Share" popover so a share created
+// on an ancestor exhibit can be found and edited from a descendant's own
+// page too, not just from the ancestor's.
+export async function listSharesForExhibit(id: string): Promise<ShareSummary[]> {
+  const direct = listSharesForRoot(id).map((s) => ({ ...s, direct: true }));
+
+  const activeShares = db.select().from(shares).where(isNull(shares.revokedAt)).all().filter(isShareActive);
+  const inherited: ShareSummary[] = [];
+  for (const share of activeShares) {
+    if (share.rootId === id) continue;
+    const entry = await isExhibitInShare(share, id);
+    if (entry && entry.depth > 0) {
+      inherited.push({ ...toSummary(share), direct: false });
+    }
+  }
+
+  return [...direct, ...inherited];
+}
+
 export function updateShare(token: string, input: UpdateShareRequest): ShareSummary | null {
   const existing = getShareRow(token);
   if (!existing) return null;

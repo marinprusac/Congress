@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -22,6 +22,8 @@ export function NoteViewPage() {
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftContent, setDraftContent] = useState("");
+  const articleRef = useRef<HTMLElement>(null);
+  const contentFieldRef = useRef<HTMLTextAreaElement | null>(null);
 
   const noteQuery = useQuery({
     queryKey: ["note", noteId],
@@ -81,6 +83,20 @@ export function NoteViewPage() {
   }, [editing, settingsQuery.data?.autoSave, draftTitle, draftContent, noteQuery.data]);
 
   useEffect(() => {
+    if (!editing || !noteQuery.data) return;
+    function onOutsideDown(e: MouseEvent) {
+      if (!(e.target instanceof Node) || articleRef.current?.contains(e.target)) return;
+      if (draftTitle === noteQuery.data!.title && draftContent === noteQuery.data!.content) {
+        setEditing(false);
+      } else {
+        saveExplicit();
+      }
+    }
+    document.addEventListener("mousedown", onOutsideDown);
+    return () => document.removeEventListener("mousedown", onOutsideDown);
+  }, [editing, draftTitle, draftContent, noteQuery.data]);
+
+  useEffect(() => {
     if (!editing) return;
     function onKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
@@ -100,8 +116,21 @@ export function NoteViewPage() {
   const note = noteQuery.data;
   const body = stripFrontmatter(note.content);
 
+  function editAtFraction(fraction: number) {
+    const prefixLength = note.content.length - body.length;
+    const offset = Math.round(prefixLength + fraction * body.length);
+    setEditing(true);
+    requestAnimationFrame(() => {
+      const el = contentFieldRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(offset, offset);
+      }
+    });
+  }
+
   return (
-    <article>
+    <article ref={articleRef}>
       <div className="mb-6 flex flex-col gap-3 border-b border-dust pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         {editing ? (
           <input
@@ -118,7 +147,7 @@ export function NoteViewPage() {
         <div className="flex shrink-0 items-center gap-5 font-mono text-xs uppercase tracking-wide">
           {editing ? (
             <>
-              {settingsQuery.data?.autoSave && (
+              {settingsQuery.data?.autoSave ? (
                 <span className="normal-case tracking-normal text-dust">
                   {updateMutation.isPending
                     ? "Saving —"
@@ -126,10 +155,11 @@ export function NoteViewPage() {
                       ? "Saved"
                       : ""}
                 </span>
+              ) : (
+                <button onClick={saveExplicit} className="tap-target text-accent hover:underline">
+                  Save
+                </button>
               )}
-              <button onClick={saveExplicit} className="tap-target text-accent hover:underline">
-                Save
-              </button>
               <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
                 Cancel
               </button>
@@ -180,6 +210,10 @@ export function NoteViewPage() {
         <div className="exhibit-field">
           <textarea
             {...picker.fieldProps}
+            ref={(el) => {
+              picker.fieldProps.ref(el);
+              contentFieldRef.current = el;
+            }}
             value={draftContent}
             onChange={(e) => setDraftContent(e.target.value)}
             rows={20}
@@ -199,7 +233,7 @@ export function NoteViewPage() {
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onNavigate={(r) => navigateToExhibit("notes", r, navigate)}
         >
-          <NoteMarkdown body={body} onDoubleClick={() => setEditing(true)} />
+          <NoteMarkdown body={body} onDoubleClick={editAtFraction} />
         </ExhibitLinksLayout>
       )}
     </article>

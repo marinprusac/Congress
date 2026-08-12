@@ -109,6 +109,7 @@ function ShareRow({
       <div className="share-row-header">
         <span className="share-row-label">{share.label || "(untitled share)"}</span>
         <span className="share-row-meta">
+          {share.direct === false && "Inherited · "}
           {share.permission} · {share.maxDepth === 0 ? "root only" : `${share.maxDepth} hop${share.maxDepth === 1 ? "" : "s"}`}
           {revoked && " · Revoked"}
           {expired && !revoked && " · Expired"}

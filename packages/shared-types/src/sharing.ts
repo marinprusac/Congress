@@ -3,7 +3,13 @@ import { z } from "zod";
 export const sharePermissionSchema = z.enum(["view", "edit"]);
 export type SharePermission = z.infer<typeof sharePermissionSchema>;
 
-// Owner-facing summary of a share, returned by GET /capitol/shares.
+// Owner-facing summary of a share, returned by GET /capitol/shares and
+// GET /capitol/exhibits/:id/shares. `direct` only carries meaning in the
+// latter (exhibit-scoped) response - it's omitted (equivalent to true) for
+// endpoints not scoped to a particular exhibit. false means the share's
+// root is some other exhibit and this one is merely reached through its
+// closure - the share still belongs to whoever owns the root, but is
+// editable/revocable the same way since sharing is entirely token-scoped.
 export const shareSummarySchema = z.object({
   token: z.string(),
   rootId: z.string(),
@@ -15,6 +21,7 @@ export const shareSummarySchema = z.object({
   expiresAt: z.string().nullable(),
   revokedAt: z.string().nullable(),
   lastAccessedAt: z.string().nullable(),
+  direct: z.boolean().optional(),
 });
 export type ShareSummary = z.infer<typeof shareSummarySchema>;
 
