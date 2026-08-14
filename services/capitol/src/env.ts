@@ -1,6 +1,9 @@
-import "dotenv/config";
+import { loadEnv } from "@congress/chamber-kit";
 import { z } from "zod";
 
+// Capitol's own shape - unrelated to chamberEnvSchema (that's for Chambers
+// registering with Capitol; Capitol has no CAPITOL_URL/heartbeat-client
+// fields of its own, and adds auth fields no Chamber needs).
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default("127.0.0.1"),
@@ -15,12 +18,4 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 
-const parsed = envSchema.safeParse(process.env);
-
-if (!parsed.success) {
-  console.error("Invalid environment configuration:");
-  console.error(parsed.error.flatten().fieldErrors);
-  throw new Error("Failed to load environment configuration");
-}
-
-export const env = parsed.data;
+export const env = loadEnv(envSchema);

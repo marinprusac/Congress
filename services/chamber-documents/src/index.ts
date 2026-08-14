@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { serve } from "@hono/node-server";
+import { createCapitolRegistration } from "@congress/chamber-kit";
 import { env } from "./env.js";
 import { app } from "./server.js";
 import { runMigrations, closeDb } from "./db/client.js";
-import { registerWithCapitolUntilSuccess, startHeartbeat, stopHeartbeat, deregisterFromCapitol } from "./registerWithCapitol.js";
+import { documentsManifest } from "./manifest.js";
 
 runMigrations();
 
@@ -14,6 +15,14 @@ if (!existsSync(env.FILES_DIR)) {
 const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (info) => {
   console.log(`Documents Chamber listening on http://${info.address}:${info.port}`);
 });
+
+const { registerWithCapitolUntilSuccess, startHeartbeat, stopHeartbeat, deregisterFromCapitol } =
+  createCapitolRegistration({
+    manifest: documentsManifest,
+    capitolUrl: env.CAPITOL_URL,
+    internalToken: env.CONGRESS_INTERNAL_TOKEN,
+    heartbeatIntervalMs: env.HEARTBEAT_INTERVAL_MS,
+  });
 
 registerWithCapitolUntilSuccess().then(() => {
   startHeartbeat();
