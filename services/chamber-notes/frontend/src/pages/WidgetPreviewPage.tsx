@@ -1,11 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { WidgetPreviewShell } from "@congress/exhibit-ui";
 import { fetchPinnedNotes } from "@/lib/api";
 
-// Rendered chrome-free — this page is embedded directly as Capitol's
-// homepage widget for this Chamber (via an iframe at chamber.routes.widget),
-// not visited on its own. Links use target="_top" so a click breaks out of
-// the iframe and navigates Capitol's own tab, rather than routing inside
-// the small embedded frame.
 export function WidgetPreviewPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["notes", "pinned"],
@@ -13,36 +9,25 @@ export function WidgetPreviewPage() {
   });
 
   return (
-    <div className="flex h-screen flex-col bg-parchment p-3 text-ink">
-      <div className="mb-2 flex shrink-0 items-baseline justify-between">
-        <p className="font-mono text-[10px] uppercase tracking-widest text-dust">Pinned</p>
+    <WidgetPreviewShell
+      label="Pinned"
+      addHref="/notes/new"
+      isLoading={isLoading}
+      isError={isError}
+      errorLabel="Notes unavailable."
+      isEmpty={(data?.length ?? 0) === 0}
+      emptyLabel="— No pinned notes —"
+    >
+      {data?.map((note) => (
         <a
-          href="/notes/new"
+          key={note.id}
+          href={`/notes/n/${note.id}`}
           target="_top"
-          className="font-mono text-[10px] uppercase tracking-wide text-accent hover:underline"
+          className="block border-b border-dust py-1.5 font-display text-sm text-ink first:pt-0 last:border-b-0 hover:text-accent"
         >
-          + New
+          {note.title}
         </a>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {isLoading && <p className="font-mono text-xs text-dust">Loading —</p>}
-        {isError && <p className="font-mono text-xs text-alert">Notes unavailable.</p>}
-        {!isLoading && !isError && data?.length === 0 && (
-          <p className="font-mono text-xs text-dust">— No pinned notes —</p>
-        )}
-        {!isLoading &&
-          !isError &&
-          data?.map((note) => (
-            <a
-              key={note.id}
-              href={`/notes/n/${note.id}`}
-              target="_top"
-              className="block border-b border-dust py-1.5 font-display text-sm text-ink first:pt-0 last:border-b-0 hover:text-accent"
-            >
-              {note.title}
-            </a>
-          ))}
-      </div>
-    </div>
+      ))}
+    </WidgetPreviewShell>
   );
 }

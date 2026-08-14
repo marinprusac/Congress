@@ -1,7 +1,7 @@
-import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import type { HttpBindings } from "@hono/node-server";
+import { mountManifestAndHealth, mountStaticFrontend } from "@congress/chamber-kit";
 import {
   registerRequestSchema,
   deregisterRequestSchema,
@@ -34,8 +34,7 @@ import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
 
-app.get("/manifest", (c) => c.json(capitolManifest));
-app.get("/health", (c) => c.json({ status: "ok" }));
+mountManifestAndHealth(app, capitolManifest);
 
 app.route("/auth", authRoutes);
 
@@ -242,13 +241,7 @@ async function chamberFrontendProxy(c: Context<{ Bindings: HttpBindings }>) {
 app.all("/:chamberName", async (c, next) => (await chamberFrontendProxy(c)) ?? next());
 app.all("/:chamberName/*", async (c, next) => (await chamberFrontendProxy(c)) ?? next());
 
-app.use(
-  "/*",
-  serveStatic({
-    root: "./frontend/dist",
-  })
-);
-app.get("*", serveStatic({ path: "./frontend/dist/index.html" }));
+mountStaticFrontend(app);
 
 let sweepInterval: ReturnType<typeof setInterval> | undefined;
 

@@ -1,9 +1,14 @@
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { extractExhibitTokens, useResolvedExhibits, ExhibitChip, navigateToExhibit } from "@congress/exhibit-ui";
+import {
+  extractExhibitTokens,
+  useResolvedExhibits,
+  ExhibitChip,
+  navigateToExhibit,
+  getChamberIcon,
+} from "@congress/exhibit-ui";
 import { toMarkdownWithExhibitLinks, decodeExhibitLinkHref } from "@/lib/wikilinks";
-import { getChamberIcon } from "./ChamberIcon";
 
 interface NoteMarkdownProps {
   body: string;

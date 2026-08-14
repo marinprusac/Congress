@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useExhibitPicker, ExhibitPickerDropdown } from "@congress/exhibit-ui";
+import { useExhibitPicker, ExhibitPickerDropdown, getChamberIcon } from "@congress/exhibit-ui";
 import { uploadDocument } from "@/lib/api";
-import { getChamberIcon } from "@/components/ChamberIcon";
 
 export function UploadDocumentPage() {
   const navigate = useNavigate();

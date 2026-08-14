@@ -20,3 +20,5 @@ export { useExhibitLinks } from "./useExhibitLinks.js";
 export { ExhibitLinksLayout } from "./ExhibitLinksLayout.js";
 export { useAppliedTheme, useCapitolSettings, updateCapitolSettings, capitolSettingsQueryKey } from "./useAppliedTheme.js";
 export { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
+export { ChamberMark, CapitolMark, getChamberIcon } from "./ChamberMarks.js";
+export { WidgetPreviewShell } from "./WidgetPreviewShell.js";

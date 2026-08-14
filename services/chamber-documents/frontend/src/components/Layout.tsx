@@ -1,6 +1,5 @@
-import { ChamberLayout } from "@congress/exhibit-ui";
+import { ChamberLayout, getChamberIcon } from "@congress/exhibit-ui";
 import { FileText } from "lucide-react";
-import { getChamberIcon } from "@/components/ChamberIcon";
 
 const NAV_LINKS = [
   { to: "/", label: "All Documents" },

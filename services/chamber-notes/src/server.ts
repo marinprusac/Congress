@@ -1,13 +1,13 @@
-import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
+import { createNoteRequestSchema, updateNoteRequestSchema, updateNotesSettingsRequestSchema } from "@congress/shared-types";
 import {
-  createNoteRequestSchema,
-  updateNoteRequestSchema,
-  exhibitResolveRequestSchema,
-  updateSharedExhibitContentRequestSchema,
-  updateNotesSettingsRequestSchema,
-} from "@congress/shared-types";
+  mountManifestAndHealth,
+  mountExhibitSearchRoutes,
+  mountExhibitContentRoutes,
+  mountSettingsRoutes,
+  mountStaticFrontend,
+} from "@congress/chamber-kit";
 import { notesManifest } from "./manifest.js";
 import {
   listNotes,
@@ -20,18 +20,12 @@ import {
   TitleConflictError,
 } from "./notes.js";
 import { getSettings, updateSettings } from "./settings.js";
-import {
-  searchNoteExhibits,
-  resolveNoteExhibits,
-  getNoteExhibitContent,
-  updateNoteExhibitContent,
-} from "./exhibits.js";
+import { searchNoteExhibits, resolveNoteExhibits, getNoteExhibitContent, updateNoteExhibitContent } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
 
-app.get("/manifest", (c) => c.json(notesManifest));
-app.get("/health", (c) => c.json({ status: "ok" }));
+mountManifestAndHealth(app, notesManifest);
 
 app.get("/api/notes/pinned", async (c) => {
   return c.json(await listPinnedNotes());
@@ -100,70 +94,19 @@ app.delete("/api/notes/:id", async (c) => {
   return c.body(null, 204);
 });
 
-// An empty query returns the most recently updated notes rather than
-// nothing - it's what the cross-Chamber "[[" picker shows on open.
-app.get("/api/exhibits/search", async (c) => {
-  const query = c.req.query("q") ?? "";
-  const limit = Number(c.req.query("limit")) || undefined;
-  return c.json({ results: await searchNoteExhibits(query, limit) });
-});
+mountExhibitSearchRoutes(app, { search: searchNoteExhibits, resolve: resolveNoteExhibits });
 
-app.post("/api/exhibits/resolve", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = exhibitResolveRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+mountExhibitContentRoutes(
+  app,
+  { getContent: getNoteExhibitContent, updateContent: updateNoteExhibitContent },
+  {
+    onUpdateError: (c, err) =>
+      err instanceof TitleConflictError ? c.json({ error: "title_conflict", message: err.message }, 409) : undefined,
   }
-  return c.json({ results: await resolveNoteExhibits(parsed.data.ids) });
-});
+);
 
-// Backing the token-scoped Exhibit Sharing proxy at Capitol - unauthenticated
-// here, same trust model as /exhibits/search and /exhibits/resolve above,
-// since Capitol has already validated the share token + closure membership
-// before ever proxying a request through to this route.
-app.get("/api/exhibits/:id/content", async (c) => {
-  const content = await getNoteExhibitContent(c.req.param("id"));
-  if (!content) return c.json({ error: "not_found" }, 404);
-  return c.json(content);
-});
-
-app.patch("/api/exhibits/:id/content", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = updateSharedExhibitContentRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  try {
-    const content = await updateNoteExhibitContent(c.req.param("id"), parsed.data);
-    if (!content) return c.json({ error: "not_found" }, 404);
-    return c.json(content);
-  } catch (err) {
-    if (err instanceof TitleConflictError) {
-      return c.json({ error: "title_conflict", message: err.message }, 409);
-    }
-    throw err;
-  }
-});
-
-app.get("/api/settings", async (c) => {
-  return c.json(await getSettings());
-});
-
-app.put("/api/settings", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = updateNotesSettingsRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  return c.json(await updateSettings(parsed.data));
-});
+mountSettingsRoutes(app, { getSettings, updateSettings }, updateNotesSettingsRequestSchema);
 
 app.route("/mcp", mcpApp);
 
-app.use(
-  "/*",
-  serveStatic({
-    root: "./frontend/dist",
-  })
-);
-app.get("*", serveStatic({ path: "./frontend/dist/index.html" }));
+mountStaticFrontend(app);

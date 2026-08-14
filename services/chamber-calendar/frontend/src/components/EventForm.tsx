@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useExhibitPicker, ExhibitPickerDropdown } from "@congress/exhibit-ui";
+import { useExhibitPicker, ExhibitPickerDropdown, getChamberIcon } from "@congress/exhibit-ui";
 import { fetchSelectedCalendars } from "@/lib/api";
-import { getChamberIcon } from "@/components/ChamberIcon";
 
 export interface EventFormValues {
   calendarKey: string; // `${accountId}::${googleCalendarId}`

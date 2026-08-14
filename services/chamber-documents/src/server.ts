@@ -1,12 +1,13 @@
 import { readFile } from "node:fs/promises";
-import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono, type Context } from "hono";
 import type { HttpBindings } from "@hono/node-server";
+import { updateDocumentRequestSchema } from "@congress/shared-types";
 import {
-  updateDocumentRequestSchema,
-  exhibitResolveRequestSchema,
-  updateSharedExhibitContentRequestSchema,
-} from "@congress/shared-types";
+  mountManifestAndHealth,
+  mountExhibitSearchRoutes,
+  mountExhibitContentRoutes,
+  mountStaticFrontend,
+} from "@congress/chamber-kit";
 import { documentsManifest } from "./manifest.js";
 import {
   listDocuments,
@@ -29,8 +30,7 @@ import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
 
-app.get("/manifest", (c) => c.json(documentsManifest));
-app.get("/health", (c) => c.json({ status: "ok" }));
+mountManifestAndHealth(app, documentsManifest);
 
 app.get("/api/documents", async (c) => {
   return c.json(await listDocuments());
@@ -119,43 +119,9 @@ app.get("/api/documents/:id/download", async (c) => {
   return serveDocumentFile(c, id);
 });
 
-// An empty query returns the most recently updated documents rather than
-// nothing - it's what the cross-Chamber "[[" picker shows on open.
-app.get("/api/exhibits/search", async (c) => {
-  const query = c.req.query("q") ?? "";
-  const limit = Number(c.req.query("limit")) || undefined;
-  return c.json({ results: await searchDocumentExhibits(query, limit) });
-});
+mountExhibitSearchRoutes(app, { search: searchDocumentExhibits, resolve: resolveDocumentExhibits });
 
-app.post("/api/exhibits/resolve", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = exhibitResolveRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  return c.json({ results: await resolveDocumentExhibits(parsed.data.ids) });
-});
-
-// Backing the token-scoped Exhibit Sharing proxy at Capitol - unauthenticated
-// here, same trust model as /exhibits/search and /exhibits/resolve above,
-// since Capitol has already validated the share token + closure membership
-// before ever proxying a request through to this route.
-app.get("/api/exhibits/:id/content", async (c) => {
-  const content = await getDocumentExhibitContent(c.req.param("id"));
-  if (!content) return c.json({ error: "not_found" }, 404);
-  return c.json(content);
-});
-
-app.patch("/api/exhibits/:id/content", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = updateSharedExhibitContentRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  const content = await updateDocumentExhibitContent(c.req.param("id"), parsed.data);
-  if (!content) return c.json({ error: "not_found" }, 404);
-  return c.json(content);
-});
+mountExhibitContentRoutes(app, { getContent: getDocumentExhibitContent, updateContent: updateDocumentExhibitContent });
 
 app.get("/api/exhibits/:id/content/download", async (c) => {
   const documentId = parseDocumentId(c.req.param("id"));
@@ -165,10 +131,4 @@ app.get("/api/exhibits/:id/content/download", async (c) => {
 
 app.route("/mcp", mcpApp);
 
-app.use(
-  "/*",
-  serveStatic({
-    root: "./frontend/dist",
-  })
-);
-app.get("*", serveStatic({ path: "./frontend/dist/index.html" }));
+mountStaticFrontend(app);

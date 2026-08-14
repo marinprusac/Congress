@@ -1,6 +1,4 @@
-import { ChamberLayout } from "@congress/exhibit-ui";
-import { NotesMark } from "@/components/NotesMark";
-import { getChamberIcon } from "@/components/ChamberIcon";
+import { ChamberLayout, ChamberMark, getChamberIcon } from "@congress/exhibit-ui";
 
 const NAV_LINKS = [
   { to: "/", label: "All Notes" },
@@ -11,7 +9,7 @@ const NAV_LINKS = [
 export function Layout() {
   return (
     <ChamberLayout
-      icon={<NotesMark className="h-8 w-8 text-ink" />}
+      icon={<ChamberMark name="notes" className="h-8 w-8 text-ink" />}
       title="Notes"
       navLinks={NAV_LINKS}
       ownChamber="notes"

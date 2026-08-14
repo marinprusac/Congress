@@ -1,4 +1,3 @@
-import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono, type Context } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import {
@@ -6,9 +5,13 @@ import {
   setCalendarSelectionRequestSchema,
   createEventRequestSchema,
   updateEventRequestSchema,
-  exhibitResolveRequestSchema,
-  updateSharedExhibitContentRequestSchema,
 } from "@congress/shared-types";
+import {
+  mountManifestAndHealth,
+  mountExhibitSearchRoutes,
+  mountExhibitContentRoutes,
+  mountStaticFrontend,
+} from "@congress/chamber-kit";
 import { calendarManifest } from "./manifest.js";
 import { buildAuthUrl, exchangeCodeForTokens, decodeIdToken, createOAuthState, consumeOAuthState } from "./google/oauth.js";
 import {
@@ -44,8 +47,7 @@ function mapError(c: Context, err: unknown): Response {
   throw err;
 }
 
-app.get("/manifest", (c) => c.json(calendarManifest));
-app.get("/health", (c) => c.json({ status: "ok" }));
+mountManifestAndHealth(app, calendarManifest);
 
 app.get("/api/accounts", (c) => c.json(listAccounts()));
 
@@ -179,48 +181,10 @@ app.delete("/api/events/:accountId/:calendarId/:eventId", async (c) => {
   }
 });
 
-app.get("/api/exhibits/search", async (c) => {
-  const query = c.req.query("q") ?? "";
-  const limit = Number(c.req.query("limit")) || undefined;
-  return c.json({ results: await searchEventExhibits(query, limit) });
-});
+mountExhibitSearchRoutes(app, { search: searchEventExhibits, resolve: resolveEventExhibits });
 
-app.post("/api/exhibits/resolve", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = exhibitResolveRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  return c.json({ results: await resolveEventExhibits(parsed.data.ids) });
-});
-
-// Backing the token-scoped Exhibit Sharing proxy at Capitol - unauthenticated
-// here, same trust model as /exhibits/search and /exhibits/resolve above,
-// since Capitol has already validated the share token + closure membership
-// before ever proxying a request through to this route.
-app.get("/api/exhibits/:id/content", async (c) => {
-  const content = await getEventExhibitContent(c.req.param("id"));
-  if (!content) return c.json({ error: "not_found" }, 404);
-  return c.json(content);
-});
-
-app.patch("/api/exhibits/:id/content", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = updateSharedExhibitContentRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  const content = await updateEventExhibitContent(c.req.param("id"), parsed.data);
-  if (!content) return c.json({ error: "not_found" }, 404);
-  return c.json(content);
-});
+mountExhibitContentRoutes(app, { getContent: getEventExhibitContent, updateContent: updateEventExhibitContent });
 
 app.route("/mcp", mcpApp);
 
-app.use(
-  "/*",
-  serveStatic({
-    root: "./frontend/dist",
-  })
-);
-app.get("*", serveStatic({ path: "./frontend/dist/index.html" }));
+mountStaticFrontend(app);

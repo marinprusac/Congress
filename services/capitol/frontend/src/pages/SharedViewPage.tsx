@@ -2,9 +2,14 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CapitolExhibitResolveResult, ShareClosureEntry } from "@congress/shared-types";
-import { ExhibitChip, extractExhibitTokens, splitExhibitText, parseExhibitToken } from "@congress/exhibit-ui";
+import {
+  ExhibitChip,
+  extractExhibitTokens,
+  splitExhibitText,
+  parseExhibitToken,
+  CapitolMark,
+} from "@congress/exhibit-ui";
 import { fetchSharedDetail, fetchSharedContent, sharedDownloadUrl, updateSharedContent } from "@/lib/sharedApi";
-import { CapitolMark } from "@/components/icons";
 
 function formatDepthLabel(depth: number): string {
   return depth === 0 ? "Root" : `Depth ${depth}`;

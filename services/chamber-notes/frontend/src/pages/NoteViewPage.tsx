@@ -8,10 +8,10 @@ import {
   ExhibitLinksLayout,
   ShareControl,
   navigateToExhibit,
+  getChamberIcon,
 } from "@congress/exhibit-ui";
 import { fetchNote, updateNote, deleteNote, setPinned, fetchSettings } from "@/lib/api";
 import { NoteMarkdown } from "@/components/NoteMarkdown";
-import { getChamberIcon } from "@/components/ChamberIcon";
 import { stripFrontmatter } from "@/lib/frontmatter";
 
 export function NoteViewPage() {

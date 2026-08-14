@@ -9,9 +9,9 @@ import {
   ExhibitLinksLayout,
   ShareControl,
   navigateToExhibit,
+  getChamberIcon,
 } from "@congress/exhibit-ui";
 import { fetchDocument, updateDocument, deleteDocument, downloadUrl } from "@/lib/api";
-import { getChamberIcon } from "@/components/ChamberIcon";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

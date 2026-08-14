@@ -6,11 +6,11 @@ import {
   ExhibitLinksLayout,
   ShareControl,
   navigateToExhibit,
+  getChamberIcon,
 } from "@congress/exhibit-ui";
 import { fetchEvent } from "@/lib/api";
 import { formatEventFullRange } from "@/lib/datetime";
 import { toExhibitId } from "@/lib/exhibits";
-import { getChamberIcon } from "@/components/ChamberIcon";
 
 export function EventViewPage() {
   const { accountId, calendarId, eventId } = useParams<{

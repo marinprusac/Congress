@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCapitolSettings } from "@congress/exhibit-ui";
+import { useCapitolSettings, ChamberMark } from "@congress/exhibit-ui";
 import { fetchRegistry } from "@/lib/api";
-import { ChamberMark } from "@/components/icons";
 
 export function WidgetGrid() {
   const { data, isLoading, isError } = useQuery({

@@ -1,5 +1,6 @@
 import { parseExhibitToken } from "@congress/shared-types";
-import type { ExhibitSearchResult, ExhibitResolveResult, ExhibitSyncRequest } from "@congress/shared-types";
+import type { ExhibitSearchResult, ExhibitResolveResult } from "@congress/shared-types";
+import { createPushExhibitSync } from "@congress/chamber-kit";
 import { env } from "./env.js";
 import { googleCalendarFetch } from "./google/client.js";
 import { getAccountRow } from "./google/accounts.js";
@@ -128,25 +129,8 @@ export async function resolveEventExhibits(ids: string[]): Promise<ExhibitResolv
   );
 }
 
-function authHeaders(): Record<string, string> {
-  return {
-    "Content-Type": "application/json",
-    "X-Congress-Internal-Token": env.CONGRESS_INTERNAL_TOKEN,
-  };
-}
-
-export async function pushExhibitSync(push: Omit<ExhibitSyncRequest, "chamber">): Promise<void> {
-  try {
-    const res = await fetch(`${env.CAPITOL_URL}/capitol/exhibits/sync`, {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ chamber: "calendar", ...push }),
-      signal: AbortSignal.timeout(5_000),
-    });
-    if (!res.ok) {
-      console.warn(`Exhibit sync rejected by Capitol: ${res.status}`);
-    }
-  } catch (err) {
-    console.warn(`Exhibit sync failed: ${(err as Error).message}`);
-  }
-}
+export const pushExhibitSync = createPushExhibitSync({
+  chamber: "calendar",
+  capitolUrl: env.CAPITOL_URL,
+  internalToken: env.CONGRESS_INTERNAL_TOKEN,
+});

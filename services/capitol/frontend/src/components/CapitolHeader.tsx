@@ -1,7 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { GlobalExhibitSearch } from "@congress/exhibit-ui";
+import { GlobalExhibitSearch, CapitolMark, ChamberMark } from "@congress/exhibit-ui";
 import { SignOutControl } from "@/components/LoginGate";
-import { CapitolMark, ChamberMark } from "@/components/icons";
 
 export function CapitolHeader() {
   const location = useLocation();

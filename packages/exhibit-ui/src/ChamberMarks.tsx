@@ -5,6 +5,11 @@ type IconProps = Omit<SVGProps<SVGSVGElement>, "viewBox" | "fill">;
 // Sourced from "35 Abstract Shape Icons" by Stockslord.com, recolored to
 // currentColor so each mark can inherit the ink/dust palette and respond to
 // hover/offline states like everything else in the UI.
+//
+// The single source of truth for every Chamber's mark (and Capitol's own) -
+// each frontend is a fully separate build, but they all need to render
+// every Chamber's icon (Exhibit chips point at Chambers other than their
+// own), so this lives in the one package every frontend already shares.
 const GROUP_TRANSFORM = "translate(1.4065934065934016 1.4065934065934016) scale(2.81 2.81)";
 
 // Capitol's own mark: a cluster of circles orbiting a larger one — the hub
@@ -75,7 +80,18 @@ const CHAMBER_MARKS: Record<string, (props: IconProps) => ReactElement> = {
   documents: DocumentsMark,
 };
 
+// Always renders something - unrecognized Chambers fall back to
+// DefaultChamberMark. Use this where a guaranteed icon is wanted (e.g. next
+// to a known Chamber's name in a header).
 export function ChamberMark({ name, ...props }: IconProps & { name: string }) {
   const Mark = CHAMBER_MARKS[name] ?? DefaultChamberMark;
   return <Mark {...props} />;
+}
+
+// Returns null for an unrecognized Chamber so callers fall back to their own
+// designed text-prefix state instead of a broken icon (used by Exhibit chips,
+// where "unrecognized" is an expected, handled case).
+export function getChamberIcon(chamber: string, props?: IconProps): ReactElement | null {
+  const Mark = CHAMBER_MARKS[chamber];
+  return Mark ? <Mark {...props} /> : null;
 }
