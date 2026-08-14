@@ -8,6 +8,14 @@
 
 @import "tailwindcss";
 
+/* Tailwind's automatic content detection skips node_modules, and pnpm
+   workspace packages resolve through a node_modules symlink - so without
+   this, any class used only inside this package's own components (never
+   coincidentally duplicated in a consuming app's own source) silently
+   never gets generated for that app. `@source` is an explicit include,
+   which bypasses that exclusion. */
+@source "./";
+
 @import "@fontsource/fraunces/400.css";
 @import "@fontsource/fraunces/600.css";
 @import "@fontsource/ibm-plex-sans/400.css";
