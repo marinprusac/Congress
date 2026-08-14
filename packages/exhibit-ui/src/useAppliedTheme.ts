@@ -32,6 +32,11 @@ function forcedThemeFromUrl(): "dark" | "light" | null {
   return value === "dark" || value === "light" ? value : null;
 }
 
+// Same key the bootstrap <script> in every frontend's index.html reads
+// synchronously before first paint (see that script for why) - keep the
+// two in sync by hand, since the inline script can't import this module.
+const THEME_STORAGE_KEY = "congress-theme";
+
 // Fetches the owner's Congress-wide dark mode preference and applies it as
 // a data-theme attribute on the document root, which styles.css's dark
 // palette override keys off. Called once near the root of every Congress
@@ -47,11 +52,27 @@ function forcedThemeFromUrl(): "dark" | "light" | null {
 // it passes it along explicitly as a ?theme= param on the iframe's src
 // instead of making every embedded widget independently fetch its own
 // copy - this branch applies that directly and skips the fetch entirely.
+//
+// Two things guard against a flash of the wrong theme:
+//  - The fetch takes a moment, and while it's pending `data` is undefined.
+//    Leaving the attribute untouched in that case (rather than falling
+//    back to "light") matters because the bootstrap script below already
+//    set it correctly from a cached value before this component even
+//    mounted - overwriting that with a hardcoded default would itself
+//    cause a light-then-dark flash independent of the fetch.
+//  - Once resolved, the value is cached to localStorage so the *next*
+//    load's bootstrap script has a same-origin-shared, synchronous answer
+//    instead of guessing - this is a paint-time cache, not a source of
+//    truth, so a changed setting still self-corrects the moment the fetch
+//    on the new load resolves.
 export function useAppliedTheme(): void {
   const forced = forcedThemeFromUrl();
   const { data } = useCapitolSettings(forced === null);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = forced ?? (data?.darkMode ? "dark" : "light");
-  }, [forced, data?.darkMode]);
+    const theme = forced ?? (data ? (data.darkMode ? "dark" : "light") : null);
+    if (theme === null) return;
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [forced, data]);
 }

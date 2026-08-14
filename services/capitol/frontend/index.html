@@ -2,9 +2,22 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Applies a cached theme before first paint, so switching between
+         Chambers (or reopening one later) doesn't flash light before
+         useAppliedTheme's fetch resolves - see that hook. Nothing to do on
+         a genuine first-ever visit with no cache yet; that flash is
+         unavoidable without server-rendering this page. -->
+    <script>
+      (function () {
+        var theme = localStorage.getItem("congress-theme");
+        if (theme === "dark" || theme === "light") {
+          document.documentElement.dataset.theme = theme;
+        }
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#2B4A3E" />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
     <!-- iOS ignores the manifest's theme_color for the standalone status bar -
          this is the only way to make it blend with the app instead of showing
          a plain default bar. black-translucent lets content draw under the
