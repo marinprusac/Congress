@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useCapitolSettings } from "@congress/exhibit-ui";
 import { fetchRegistry } from "@/lib/api";
 import { ChamberMark } from "@/components/icons";
 
@@ -7,6 +8,10 @@ export function WidgetGrid() {
     queryKey: ["capitol", "registry"],
     queryFn: fetchRegistry,
   });
+  const { data: settings } = useCapitolSettings();
+  // Told explicitly rather than left to fetch its own copy - see
+  // useAppliedTheme's forcedThemeFromUrl for why.
+  const theme = settings?.darkMode ? "dark" : "light";
 
   return (
     <section>
@@ -53,7 +58,7 @@ export function WidgetGrid() {
                 <div className="relative z-10 min-h-0 flex-1">
                   {active && (
                     <iframe
-                      src={chamber.routes.widget}
+                      src={`${chamber.routes.widget}?theme=${theme}`}
                       title={`${chamber.displayName} widget`}
                       className="h-full w-full border-0"
                     />
@@ -68,7 +73,7 @@ export function WidgetGrid() {
                       className="pointer-events-none absolute inset-0 z-20"
                       style={{
                         backgroundImage:
-                          "repeating-linear-gradient(135deg, transparent, transparent 7px, rgba(28,28,26,0.12) 7px, rgba(28,28,26,0.12) 8px)",
+                          "repeating-linear-gradient(135deg, transparent, transparent 7px, color-mix(in srgb, var(--color-ink) 12%, transparent) 7px, color-mix(in srgb, var(--color-ink) 12%, transparent) 8px)",
                       }}
                     />
                   </>
