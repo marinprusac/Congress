@@ -56,6 +56,13 @@ function normalizeGoogleEvent(
   };
 }
 
+// <input type="datetime-local"> values look like "2026-08-15T02:03" - valid
+// RFC3339 (what Google's API requires) needs seconds too, or Google 400s
+// with an opaque "Bad Request".
+function toRfc3339DateTime(value: string): string {
+  return /T\d{2}:\d{2}$/.test(value) ? `${value}:00` : value;
+}
+
 function toGoogleEventBody(input: {
   title?: string;
   description?: string;
@@ -70,10 +77,14 @@ function toGoogleEventBody(input: {
   if (input.description !== undefined) body.description = input.description;
   if (input.location !== undefined) body.location = input.location;
   if (input.start !== undefined) {
-    body.start = input.allDay ? { date: input.start } : { dateTime: input.start, timeZone: input.timeZone };
+    body.start = input.allDay
+      ? { date: input.start }
+      : { dateTime: toRfc3339DateTime(input.start), timeZone: input.timeZone };
   }
   if (input.end !== undefined) {
-    body.end = input.allDay ? { date: input.end } : { dateTime: input.end, timeZone: input.timeZone };
+    body.end = input.allDay
+      ? { date: input.end }
+      : { dateTime: toRfc3339DateTime(input.end), timeZone: input.timeZone };
   }
   return body;
 }
