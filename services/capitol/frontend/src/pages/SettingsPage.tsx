@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCapitolSettings, updateCapitolSettings, capitolSettingsQueryKey, fetchRegistry } from "@congress/exhibit-ui";
 import { CapitolHeader } from "@/components/CapitolHeader";
+import { SignOutControl } from "@/components/LoginGate";
 
 function WidgetVisibilitySection() {
   const queryClient = useQueryClient();
@@ -78,6 +79,10 @@ export function SettingsPage() {
         )}
 
         <WidgetVisibilitySection />
+
+        <div className="mt-10 border-t border-dust pt-6">
+          <SignOutControl />
+        </div>
       </main>
     </div>
   );

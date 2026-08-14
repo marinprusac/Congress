@@ -151,92 +151,21 @@ html[data-theme="dark"] {
   gap: 1.25rem;
 }
 
-.chamber-nav {
-  display: flex;
-  gap: 1rem;
-  font-family: var(--font-mono);
-  font-size: 0.7em;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-slate);
-}
-
-.chamber-nav-link:hover {
-  color: var(--color-accent);
-}
-
 .chamber-main {
   margin: 0 auto;
   max-width: 56rem;
   padding: 2.5rem 1.5rem;
 }
 
-.chamber-mobile-nav {
-  display: none;
-}
-
-@media (max-width: 640px) {
-  /* The nav's total on-screen height (a fixed content height plus whatever
-     the home indicator reserves below it) - shared with the mobile picker
-     dropdown below so it can sit above the nav instead of overlapping it.
-     Now the combined height of .chamber-mobile-nav stacked directly above
-     .chamber-picker-mobile (see below), which is the one that actually
-     touches the bottom edge and reserves the home-indicator strip. */
-  :root {
-    --chamber-picker-height: calc(3rem + env(safe-area-inset-bottom));
-    --mobile-nav-height: calc(3rem + var(--chamber-picker-height));
-  }
-
-  .chamber-shell {
-    padding-bottom: var(--mobile-nav-height);
-  }
-
-  .chamber-header .chamber-nav {
-    display: none;
-  }
-
-  .chamber-mobile-nav {
-    display: flex;
-    position: fixed;
-    bottom: var(--chamber-picker-height);
-    left: 0;
-    right: 0;
-    z-index: 40;
-    justify-content: space-around;
-    border-top: 1px solid var(--color-dust);
-    background-color: var(--color-parchment);
-    box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 15%, transparent);
-  }
-
-  .chamber-mobile-nav-link {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    justify-content: center;
-    /* A real tap target (~44pt+) instead of just the text's own line height -
-       the row's fixed 3rem in --mobile-nav-height above assumes this. */
-    min-height: 3rem;
-    font-family: var(--font-mono);
-    font-size: 0.7em;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-slate);
-  }
-
-  .chamber-mobile-nav-link:hover,
-  .chamber-mobile-nav-link.active {
-    color: var(--color-accent);
-  }
-}
-
 /* ChamberPicker - persistent nav between Capitol and every Chamber, mounted
    once inside ChamberLayout (every Chamber gets it for free) and once in
-   Capitol's own App.tsx. Desktop: fixed vertical bar on the left. Mobile:
-   fixed bar at the very bottom of the screen - stacked below a Chamber's
-   own .chamber-mobile-nav when one is present (see --chamber-picker-height
-   above), or alone when the host page has no bottom nav of its own
-   (Capitol, via .capitol-shell below). */
-.chamber-picker-mobile {
+   Capitol's own App.tsx. Desktop: fixed sidebar on the left, with whichever
+   entry is currently open showing its own sub-navigation (Settings, New,
+   Shares, ...) nested directly beneath it - every other entry stays a bare
+   icon+label row. Mobile: that same current-entry sub-navigation becomes a
+   fixed bar sitting directly above the icon-only switcher bar. */
+.chamber-picker-mobile,
+.chamber-picker-mobile-subnav {
   display: none;
 }
 
@@ -264,7 +193,6 @@ html[data-theme="dark"] {
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem;
-  margin-bottom: 0.5rem;
   color: var(--color-ink);
   font-family: var(--font-display);
   font-size: 1.1rem;
@@ -283,7 +211,7 @@ html[data-theme="dark"] {
 
 .chamber-picker-divider {
   height: 1px;
-  margin: 0 0.5rem 0.75rem;
+  margin: 0.5rem 0.5rem 0.75rem;
   background-color: var(--color-dust);
 }
 
@@ -317,6 +245,31 @@ html[data-theme="dark"] {
   white-space: nowrap;
 }
 
+/* The current entry's own sub-navigation (e.g. Notes' "New"/"Settings",
+   Capitol's "Shares"/"Settings"), nested directly beneath its row - only
+   ever rendered for whichever entry is current (see ChamberPicker), never
+   for the others. */
+.chamber-picker-subnav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin: 0 0 0.5rem 2.5rem;
+}
+
+.chamber-picker-subnav-link {
+  padding: 0.15rem 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.7em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-dust);
+}
+
+.chamber-picker-subnav-link:hover,
+.chamber-picker-subnav-link.active {
+  color: var(--color-accent);
+}
+
 /* Reserves room for the desktop sidebar on whichever element is each host
    page's own outermost container. */
 @media (min-width: 641px) {
@@ -331,12 +284,55 @@ html[data-theme="dark"] {
 }
 
 @media (max-width: 640px) {
+  /* The icon bar's own height (bottom-most, touches the home indicator),
+     plus the current entry's sub-nav bar stacked directly above it - every
+     host page (Capitol included) always has both, so this combined height
+     is what every page's own bottom padding needs to reserve. */
   :root {
     --chamber-picker-height: calc(3rem + env(safe-area-inset-bottom));
+    --mobile-nav-height: calc(3rem + var(--chamber-picker-height));
+  }
+
+  .chamber-shell,
+  .capitol-shell {
+    padding-bottom: var(--mobile-nav-height);
   }
 
   .chamber-picker-desktop {
     display: none;
+  }
+
+  .chamber-picker-mobile-subnav {
+    display: flex;
+    position: fixed;
+    bottom: var(--chamber-picker-height);
+    left: 0;
+    right: 0;
+    z-index: 40;
+    justify-content: space-around;
+    border-top: 1px solid var(--color-dust);
+    background-color: var(--color-parchment);
+    box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 15%, transparent);
+  }
+
+  .chamber-picker-mobile-subnav-link {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    /* A real tap target (~44pt+) instead of just the text's own line height -
+       the row's fixed 3rem in --mobile-nav-height above assumes this. */
+    min-height: 3rem;
+    font-family: var(--font-mono);
+    font-size: 0.7em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-slate);
+  }
+
+  .chamber-picker-mobile-subnav-link:hover,
+  .chamber-picker-mobile-subnav-link.active {
+    color: var(--color-accent);
   }
 
   .chamber-picker-mobile {
@@ -381,12 +377,6 @@ html[data-theme="dark"] {
   .chamber-picker-icon-capitol {
     width: 1.5rem;
     height: 1.5rem;
-  }
-
-  /* Capitol's own page shell has no .chamber-mobile-nav of its own, so it
-     only ever needs to reserve room for the picker bar by itself. */
-  .capitol-shell {
-    padding-bottom: var(--chamber-picker-height);
   }
 }
 

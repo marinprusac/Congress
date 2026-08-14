@@ -1,11 +1,16 @@
 import { Route, Routes, useLocation } from "react-router-dom";
-import { useAppliedTheme, ChamberPicker } from "@congress/exhibit-ui";
+import { useAppliedTheme, ChamberPicker, type ChamberNavLink } from "@congress/exhibit-ui";
 import { WidgetGrid } from "@/components/WidgetGrid";
 import { LoginGate } from "@/components/LoginGate";
 import { CapitolHeader } from "@/components/CapitolHeader";
 import { SharesPage } from "@/pages/SharesPage";
 import { SharedViewPage } from "@/pages/SharedViewPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+
+const CAPITOL_NAV_LINKS: ChamberNavLink[] = [
+  { to: "/shares", label: "Shares" },
+  { to: "/settings", label: "Settings" },
+];
 
 function Home() {
   return (
@@ -27,7 +32,7 @@ export function App() {
 
   return (
     <>
-      {showPicker && <ChamberPicker current="capitol" />}
+      {showPicker && <ChamberPicker current="capitol" currentNavLinks={CAPITOL_NAV_LINKS} />}
       <Routes>
         {/* Deliberately outside LoginGate - a share recipient has no Congress
             login at all, and never should need one to reach this page. */}

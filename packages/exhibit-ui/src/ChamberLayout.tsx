@@ -1,12 +1,9 @@
 import type { ReactNode } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, Outlet, useNavigate } from "react-router-dom";
 import { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
-import { ChamberPicker } from "./ChamberPicker.js";
+import { ChamberPicker, type ChamberNavLink } from "./ChamberPicker.js";
 
-export interface ChamberNavLink {
-  to: string;
-  label: string;
-}
+export type { ChamberNavLink };
 
 interface ChamberLayoutProps {
   icon: ReactNode;
@@ -19,16 +16,16 @@ interface ChamberLayoutProps {
 }
 
 // Shared shell for every Chamber's own frontend (Notes/Calendar/Documents) -
-// header, primary nav, and a bottom nav bar that only renders on narrow
-// viewports (see .chamber-mobile-nav in styles.css), since the top nav's
-// small text links aren't a comfortable phone target.
+// header plus content. Primary navigation (navLinks) lives entirely in
+// ChamberPicker now, nested under this Chamber's own entry since it's the
+// current one - see .chamber-picker-subnav / .chamber-picker-mobile-subnav
+// in styles.css.
 export function ChamberLayout({ icon, title, navLinks, ownChamber, renderIcon }: ChamberLayoutProps) {
-  const location = useLocation();
   const navigate = useNavigate();
 
   return (
     <div className="chamber-shell">
-      <ChamberPicker current={ownChamber} />
+      <ChamberPicker current={ownChamber} currentNavLinks={navLinks} currentLabel={title} />
       <header className="chamber-header">
         <div className="chamber-header-row">
           <Link to="/" className="chamber-title-link">
@@ -37,30 +34,12 @@ export function ChamberLayout({ icon, title, navLinks, ownChamber, renderIcon }:
           </Link>
           <div className="chamber-header-actions">
             <GlobalExhibitSearch ownChamber={ownChamber} navigate={navigate} renderIcon={renderIcon} />
-            <nav className="chamber-nav">
-              {navLinks.map((link) => (
-                <Link key={link.to} to={link.to} className="chamber-nav-link">
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
           </div>
         </div>
       </header>
       <main className="chamber-main">
         <Outlet />
       </main>
-      <nav className="chamber-mobile-nav">
-        {navLinks.map((link) => (
-          <Link
-            key={link.to}
-            to={link.to}
-            className={location.pathname === link.to ? "chamber-mobile-nav-link active" : "chamber-mobile-nav-link"}
-          >
-            {link.label}
-          </Link>
-        ))}
-      </nav>
     </div>
   );
 }

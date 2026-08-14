@@ -1,6 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { GlobalExhibitSearch, CapitolMark, ChamberMark } from "@congress/exhibit-ui";
-import { SignOutControl } from "@/components/LoginGate";
 
 export function CapitolHeader() {
   const location = useLocation();
@@ -33,13 +32,6 @@ export function CapitolHeader() {
             navigate={navigate}
             renderIcon={(chamber) => <ChamberMark name={chamber} />}
           />
-          <Link to="/shares" className="font-mono text-xs uppercase tracking-wide text-dust hover:text-ink">
-            Shares
-          </Link>
-          <Link to="/settings" className="font-mono text-xs uppercase tracking-wide text-dust hover:text-ink">
-            Settings
-          </Link>
-          <SignOutControl />
         </div>
       </div>
     </header>
