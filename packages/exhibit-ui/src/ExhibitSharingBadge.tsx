@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useExhibitSharing } from "./useExhibitSharing.js";
 import { EditShareModal } from "./EditShareModal.js";
 
@@ -13,12 +13,25 @@ interface ExhibitSharingBadgeProps {
 // this is exactly what depth 0 vs depth > 0 in the closure means.
 //
 // Doubles as the owner's entry point to manage that share: clicking it opens
-// EditShareModal scoped to the first relevant share, rather than navigating
-// to the recipient-facing /shared view (that page is for people without a
+// EditShareModal (an anchored popover, same look as ShareControl's own)
+// scoped to the first relevant share, rather than navigating to the
+// recipient-facing /shared view (that page is for people without a
 // Congress login, not for the owner editing their own share).
 export function ExhibitSharingBadge({ exhibitId, className }: ExhibitSharingBadgeProps) {
   const { entries, loading } = useExhibitSharing(exhibitId);
   const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onOutsideDown(e: MouseEvent) {
+      if (!(e.target instanceof Node) || containerRef.current?.contains(e.target)) return;
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onOutsideDown);
+    return () => document.removeEventListener("mousedown", onOutsideDown);
+  }, [open]);
+
   if (loading || entries.length === 0) return null;
 
   const direct = entries.filter((e) => e.direct);
@@ -28,10 +41,10 @@ export function ExhibitSharingBadge({ exhibitId, className }: ExhibitSharingBadg
   const target = relevant[0]!;
 
   return (
-    <>
+    <div className="share-control" ref={containerRef}>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => setOpen((o) => !o)}
         className={className}
         data-sharing-state={isDirect ? "direct" : "inherited"}
         title={`Shared via: ${labels}`}
@@ -41,6 +54,6 @@ export function ExhibitSharingBadge({ exhibitId, className }: ExhibitSharingBadg
       {open && (
         <EditShareModal exhibitId={exhibitId} token={target.token} onClose={() => setOpen(false)} />
       )}
-    </>
+    </div>
   );
 }

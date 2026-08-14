@@ -28,10 +28,13 @@ export function ChamberLayout({ icon, title, navLinks, ownChamber, renderIcon }:
       <ChamberPicker current={ownChamber} currentNavLinks={navLinks} currentLabel={title} />
       <header className="chamber-header">
         <div className="chamber-header-row">
-          <Link to="/" className="chamber-title-link">
-            {icon}
-            <h1 className="chamber-title">{title}</h1>
-          </Link>
+          <div>
+            <p className="chamber-eyebrow">Congress</p>
+            <Link to="/" className="chamber-title-link">
+              {icon}
+              <h1 className="chamber-title">{title}</h1>
+            </Link>
+          </div>
           <div className="chamber-header-actions">
             <GlobalExhibitSearch ownChamber={ownChamber} navigate={navigate} renderIcon={renderIcon} />
           </div>

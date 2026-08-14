@@ -35,6 +35,11 @@ async function patchUpdateShare(token: string, input: UpdateShareRequest): Promi
 // appears (see ExhibitSharingBadge) - the badge only carries a token, so
 // the full ShareSummary (maxDepth/expiresAt/rootId/rootChamber) needed to
 // prefill ShareFieldsEditor is fetched here, scoped to this exhibit.
+//
+// Reuses ShareControl's own .share-control-popover anchored-dropdown look
+// (its parent renders the .share-control positioning context) rather than
+// a fixed-backdrop dialog, so editing a share reads the same as creating
+// one instead of a heavier, unrelated interaction.
 export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProps) {
   const queryClient = useQueryClient();
   const { data: shares, isLoading } = useQuery({
@@ -95,43 +100,41 @@ export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProp
   }
 
   return (
-    <div className="share-edit-overlay" onClick={onClose}>
-      <div className="share-edit-panel" onClick={(e) => e.stopPropagation()}>
-        <div className="share-edit-header">
-          <span className="share-field-label">Edit share</span>
-          <button type="button" className="share-edit-close" onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
-
-        {isLoading && <p className="font-mono text-sm">Loading —</p>}
-        {!isLoading && !share && <p className="share-error">Share not found.</p>}
-
-        {share && (
-          <form onSubmit={handleSubmit} className="share-form">
-            <ShareFieldsEditor
-              permission={permission}
-              onPermissionChange={setPermission}
-              label={label}
-              onLabelChange={setLabel}
-              depthEnabled={depthEnabled}
-              onDepthEnabledChange={setDepthEnabled}
-              maxDepth={maxDepth}
-              onMaxDepthChange={setMaxDepth}
-              expiryEnabled={expiryEnabled}
-              onExpiryEnabledChange={setExpiryEnabled}
-              expiresAt={expiresAt}
-              onExpiresAtChange={setExpiresAt}
-            />
-
-            {error && <p className="share-error">{error}</p>}
-
-            <button type="submit" className="share-submit" disabled={pending}>
-              {pending ? "Saving —" : "Save changes"}
-            </button>
-          </form>
-        )}
+    <div className="share-control-popover">
+      <div className="share-edit-header">
+        <span className="share-field-label">Edit share</span>
+        <button type="button" className="share-picker-clear" onClick={onClose} aria-label="Close">
+          ×
+        </button>
       </div>
+
+      {isLoading && <p className="font-mono text-sm">Loading —</p>}
+      {!isLoading && !share && <p className="share-error">Share not found.</p>}
+
+      {share && (
+        <form onSubmit={handleSubmit} className="share-form">
+          <ShareFieldsEditor
+            permission={permission}
+            onPermissionChange={setPermission}
+            label={label}
+            onLabelChange={setLabel}
+            depthEnabled={depthEnabled}
+            onDepthEnabledChange={setDepthEnabled}
+            maxDepth={maxDepth}
+            onMaxDepthChange={setMaxDepth}
+            expiryEnabled={expiryEnabled}
+            onExpiryEnabledChange={setExpiryEnabled}
+            expiresAt={expiresAt}
+            onExpiresAtChange={setExpiresAt}
+          />
+
+          {error && <p className="share-error">{error}</p>}
+
+          <button type="submit" className="share-submit" disabled={pending}>
+            {pending ? "Saving —" : "Save changes"}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

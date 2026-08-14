@@ -127,10 +127,22 @@ html[data-theme="dark"] {
 @media (min-width: 641px) {
   .chamber-header-row {
     flex-direction: row;
-    align-items: baseline;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
   }
+}
+
+/* "Congress" eyebrow above the title - matches CapitolHeader's own, so
+   every Chamber's header reads as part of the same system Capitol's does. */
+.chamber-eyebrow {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.7em;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-dust);
 }
 
 .chamber-title-link {
@@ -928,49 +940,15 @@ html[data-theme="dark"] {
   color: var(--color-accent);
 }
 
-/* EditShareModal - the only overlay-style dialog in this package so far
-   (everything else is an inline popover, see .share-control-popover). A
-   plain fixed backdrop + centered panel, since the badge that triggers it
-   can appear anywhere in a page, not just next to a fixed action bar. */
-.share-edit-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  background: color-mix(in srgb, var(--color-ink) 45%, transparent);
-}
-
-.share-edit-panel {
-  width: 100%;
-  max-width: 360px;
-  max-height: calc(100vh - 3rem);
-  overflow-y: auto;
-  border: 1px solid var(--color-dust);
-  background: var(--color-parchment);
-  color: var(--color-ink);
-  padding: 1.25rem;
-  box-shadow: 0 8px 32px color-mix(in srgb, var(--color-ink) 25%, transparent);
-}
-
+/* EditShareModal reuses .share-control-popover directly (see
+   ExhibitSharingBadge, which wraps its trigger in .share-control the same
+   way ShareControl does) - editing a share should look and behave exactly
+   like creating one, not a heavier, different kind of interaction. Only
+   its own small header row (title + close) is unique to it. */
 .share-edit-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 0.75rem;
-}
-
-.share-edit-close {
-  font-size: 1.2em;
-  line-height: 1;
-  color: var(--color-dust);
-  padding: 0.25em;
-  margin: -0.25em;
-}
-
-.share-edit-close:hover {
-  color: var(--color-alert);
 }
 

@@ -63,13 +63,15 @@ function DocumentsMark(props: IconProps) {
   );
 }
 
-// Tasks: a single thick checkmark - completion is the one thing every other
-// Chamber's exhibit type doesn't have, so it's the mark's whole subject.
+// Tasks: a nested, receding star - marking a task done is the one thing
+// every other Chamber's exhibit type doesn't have, and starring is the
+// closest everyday shorthand for "this matters, track it."
 function TasksMark(props: IconProps) {
   return (
     <svg viewBox="0 0 256 256" fill="currentColor" {...props}>
       <g transform={GROUP_TRANSFORM}>
-      <path d="M 15 48 L 35 68 L 75 18 L 68 10 L 35 52 L 22 40 Z" />
+      <path d="M 72.812 87.798 L 45 73.176 L 17.188 87.798 L 22.5 56.829 L 0 34.896 l 31.094 -4.518 L 45 2.202 l 13.906 28.177 L 90 34.896 L 67.5 56.829 L 72.812 87.798 z M 45 68.735 l 22.592 11.877 l -4.315 -25.156 l 18.278 -17.816 l -25.258 -3.669 L 45 11.083 L 33.704 33.971 L 8.446 37.641 l 18.277 17.816 l -4.315 25.156 L 45 68.735 z M 59.52 69.502 L 45 61.869 l -14.52 7.633 l 2.773 -16.166 L 21.507 41.884 l 16.233 -2.358 L 45 24.816 l 7.26 14.71 l 16.234 2.358 L 56.747 53.336 L 59.52 69.502 z M 29.953 44.629 l 7.523 7.334 L 35.7 62.317 l 9.3 -4.889 l 9.3 4.889 l -1.777 -10.354 l 7.525 -7.334 l -10.398 -1.51 L 45 33.697 l -4.65 9.422 L 29.953 44.629 z" />
+      <polygon points="39.1,47.24 42.05,50.12 41.36,54.17 45,52.26 48.64,54.17 47.95,50.12 50.9,47.24 46.82,46.65 45,42.96 43.18,46.65" />
       </g>
     </svg>
   );
