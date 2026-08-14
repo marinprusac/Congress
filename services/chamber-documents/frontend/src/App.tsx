@@ -1,4 +1,5 @@
 import { Route, Routes } from "react-router-dom";
+import { useAppliedTheme } from "@congress/exhibit-ui";
 import { Layout } from "@/components/Layout";
 import { DocumentsListPage } from "@/pages/DocumentsListPage";
 import { DocumentViewPage } from "@/pages/DocumentViewPage";
@@ -7,6 +8,8 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { WidgetPreviewPage } from "@/pages/WidgetPreviewPage";
 
 export function App() {
+  useAppliedTheme();
+
   return (
     <Routes>
       {/* No Layout chrome here — this route is embedded in an iframe as

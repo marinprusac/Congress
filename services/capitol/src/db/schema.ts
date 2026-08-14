@@ -62,3 +62,10 @@ export const shares = sqliteTable("shares", {
   revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
   lastAccessedAt: integer("last_accessed_at", { mode: "timestamp_ms" }),
 });
+
+// Single-row table (id is always 1) - one Congress-wide settings scope, not
+// per-user or per-Chamber.
+export const settings = sqliteTable("settings", {
+  id: integer("id").primaryKey().default(1),
+  darkMode: integer("dark_mode", { mode: "boolean" }).notNull().default(false),
+});

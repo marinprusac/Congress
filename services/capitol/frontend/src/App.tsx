@@ -1,9 +1,11 @@
 import { Route, Routes } from "react-router-dom";
+import { useAppliedTheme } from "@congress/exhibit-ui";
 import { WidgetGrid } from "@/components/WidgetGrid";
 import { LoginGate } from "@/components/LoginGate";
 import { CapitolHeader } from "@/components/CapitolHeader";
 import { SharesPage } from "@/pages/SharesPage";
 import { SharedViewPage } from "@/pages/SharedViewPage";
+import { SettingsPage } from "@/pages/SettingsPage";
 
 function Home() {
   return (
@@ -17,6 +19,8 @@ function Home() {
 }
 
 export function App() {
+  useAppliedTheme();
+
   return (
     <Routes>
       {/* Deliberately outside LoginGate - a share recipient has no Congress
@@ -27,6 +31,14 @@ export function App() {
         element={
           <LoginGate>
             <SharesPage />
+          </LoginGate>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <LoginGate>
+            <SettingsPage />
           </LoginGate>
         }
       />

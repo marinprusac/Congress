@@ -18,3 +18,5 @@ export { ChamberLayout } from "./ChamberLayout.js";
 export type { ChamberNavLink } from "./ChamberLayout.js";
 export { useExhibitLinks } from "./useExhibitLinks.js";
 export { ExhibitLinksLayout } from "./ExhibitLinksLayout.js";
+export { useAppliedTheme, useCapitolSettings, updateCapitolSettings, capitolSettingsQueryKey } from "./useAppliedTheme.js";
+export { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";

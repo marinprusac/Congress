@@ -10,6 +10,7 @@ import {
   capitolExhibitResolveRequestSchema,
   createShareRequestSchema,
   updateShareRequestSchema,
+  updateCapitolSettingsRequestSchema,
 } from "@congress/shared-types";
 import { env } from "./env.js";
 import { requireInternalToken } from "./auth.js";
@@ -28,6 +29,7 @@ import { hasValidSession } from "./sessionAuth.js";
 import { syncExhibit, searchExhibits, resolveExhibits, getBacklinks, getFrontlinks } from "./exhibits.js";
 import { createShare, listShares, listSharesForExhibit, updateShare, revokeShare, getExhibitSharing } from "./shares.js";
 import { requireShareToken, type ShareVariables } from "./shareAuth.js";
+import { getSettings, updateSettings } from "./settings.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -38,6 +40,17 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 app.route("/auth", authRoutes);
 
 app.get("/capitol/registry", requireSession, (c) => c.json(listChambers()));
+
+app.get("/capitol/settings", requireSession, async (c) => c.json(await getSettings()));
+
+app.put("/capitol/settings", requireSession, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = updateCapitolSettingsRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  return c.json(await updateSettings(parsed.data));
+});
 
 app.post("/capitol/register", requireInternalToken, async (c) => {
   const body = await c.req.json().catch(() => null);

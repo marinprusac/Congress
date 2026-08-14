@@ -1,9 +1,11 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { GlobalExhibitSearch } from "@congress/exhibit-ui";
 import { SignOutControl } from "@/components/LoginGate";
-import { CapitolMark } from "@/components/icons";
+import { CapitolMark, ChamberMark } from "@/components/icons";
 
 export function CapitolHeader() {
   const location = useLocation();
+  const navigate = useNavigate();
   const isHome = location.pathname === "/";
 
   return (
@@ -26,9 +28,17 @@ export function CapitolHeader() {
             </Link>
           </div>
         </div>
-        <div className="flex items-center gap-5">
+        <div className="flex flex-wrap items-center justify-end gap-5">
+          <GlobalExhibitSearch
+            ownChamber=""
+            navigate={navigate}
+            renderIcon={(chamber) => <ChamberMark name={chamber} />}
+          />
           <Link to="/shares" className="font-mono text-xs uppercase tracking-wide text-dust hover:text-ink">
             Shares
+          </Link>
+          <Link to="/settings" className="font-mono text-xs uppercase tracking-wide text-dust hover:text-ink">
+            Settings
           </Link>
           <SignOutControl />
         </div>
