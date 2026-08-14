@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -27,6 +27,7 @@ export function DocumentViewPage() {
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
+  const titleFieldRef = useRef<HTMLInputElement | null>(null);
 
   const documentQuery = useQuery({
     queryKey: ["document", documentId],
@@ -67,17 +68,30 @@ export function DocumentViewPage() {
 
   const doc = documentQuery.data;
 
+  function editTitle() {
+    setEditing(true);
+    requestAnimationFrame(() => {
+      titleFieldRef.current?.focus();
+      titleFieldRef.current?.select();
+    });
+  }
+
   return (
     <article>
       <div className="mb-6 flex flex-col gap-3 border-b border-dust pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         {editing ? (
           <input
+            ref={titleFieldRef}
             value={draftTitle}
             onChange={(e) => setDraftTitle(e.target.value)}
             className="min-w-0 flex-1 font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           />
         ) : (
-          <h2 className="flex min-w-0 flex-1 items-center gap-3 font-display text-3xl text-ink">
+          <h2
+            className="flex min-w-0 flex-1 items-center gap-3 font-display text-3xl text-ink"
+            onDoubleClick={editTitle}
+            title="Double-click to edit"
+          >
             {doc.title}
             <ExhibitSharingBadge exhibitId={`document-${doc.id}`} className="exhibit-sharing-badge" />
           </h2>

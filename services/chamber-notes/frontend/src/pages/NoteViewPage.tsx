@@ -24,6 +24,7 @@ export function NoteViewPage() {
   const [draftContent, setDraftContent] = useState("");
   const articleRef = useRef<HTMLElement>(null);
   const contentFieldRef = useRef<HTMLTextAreaElement | null>(null);
+  const titleFieldRef = useRef<HTMLInputElement | null>(null);
 
   const noteQuery = useQuery({
     queryKey: ["note", noteId],
@@ -116,6 +117,14 @@ export function NoteViewPage() {
   const note = noteQuery.data;
   const body = stripFrontmatter(note.content);
 
+  function editTitle() {
+    setEditing(true);
+    requestAnimationFrame(() => {
+      titleFieldRef.current?.focus();
+      titleFieldRef.current?.select();
+    });
+  }
+
   function editAtFraction(fraction: number) {
     const prefixLength = note.content.length - body.length;
     const offset = Math.round(prefixLength + fraction * body.length);
@@ -134,12 +143,17 @@ export function NoteViewPage() {
       <div className="mb-6 flex flex-col gap-3 border-b border-dust pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         {editing ? (
           <input
+            ref={titleFieldRef}
             value={draftTitle}
             onChange={(e) => setDraftTitle(e.target.value)}
             className="min-w-0 flex-1 font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           />
         ) : (
-          <h2 className="flex min-w-0 flex-1 items-center gap-3 font-display text-3xl text-ink">
+          <h2
+            className="flex min-w-0 flex-1 items-center gap-3 font-display text-3xl text-ink"
+            onDoubleClick={editTitle}
+            title="Double-click to edit"
+          >
             {note.title}
             <ExhibitSharingBadge exhibitId={`note-${noteId}`} className="exhibit-sharing-badge" />
           </h2>
@@ -153,7 +167,7 @@ export function NoteViewPage() {
                 </button>
               )}
               <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
-                Cancel
+                {settingsQuery.data?.autoSave ? "Close" : "Cancel"}
               </button>
             </>
           ) : (
