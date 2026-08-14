@@ -8,6 +8,12 @@ function formatTimestamp(value: string | null): string {
   return new Date(value).toISOString().replace("T", " ").slice(0, 16);
 }
 
+function isActive(share: { revokedAt: string | null; expiresAt: string | null }): boolean {
+  if (share.revokedAt) return false;
+  if (share.expiresAt && new Date(share.expiresAt).getTime() <= Date.now()) return false;
+  return true;
+}
+
 function SharesList() {
   const queryClient = useQueryClient();
   const { data, isLoading, isError } = useQuery({ queryKey: ["capitol", "shares"], queryFn: fetchShares });
@@ -19,49 +25,43 @@ function SharesList() {
 
   if (isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
   if (isError) return <p className="font-mono text-sm text-alert">Failed to load shares.</p>;
-  if (!data || data.length === 0) return <p className="font-mono text-sm text-dust">— No shares yet —</p>;
+
+  // Revoked/expired shares no longer grant access to anything, so there's no
+  // reason to keep showing them here - they'd only accumulate and clutter
+  // the list over time.
+  const active = data?.filter(isActive) ?? [];
+  if (active.length === 0) return <p className="font-mono text-sm text-dust">— No shares yet —</p>;
 
   return (
     <div className="border-t border-dust">
-      {data.map((share) => {
-        const revoked = Boolean(share.revokedAt);
-        const expired = share.expiresAt ? new Date(share.expiresAt).getTime() <= Date.now() : false;
-        const inactive = revoked || expired;
-        return (
-          <div key={share.token} className={`border-b border-dust px-1 py-3 ${inactive ? "opacity-50" : ""}`}>
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="font-display text-lg text-ink">{share.label || "(untitled share)"}</p>
-                <p className="font-mono text-xs text-slate">
-                  {share.rootChamber} — {share.rootId} · {share.permission} · depth {share.maxDepth}
-                </p>
-                <p className="font-mono text-xs text-dust">
-                  Created {formatTimestamp(share.createdAt)} · Last accessed {formatTimestamp(share.lastAccessedAt)}
-                  {revoked && " · Revoked"}
-                  {expired && !revoked && " · Expired"}
-                </p>
-              </div>
-              <div className="flex shrink-0 gap-5 font-mono text-xs uppercase tracking-wide">
-                {!inactive && (
-                  <a href={`/shared/${share.token}`} className="tap-target text-accent hover:underline">
-                    Open
-                  </a>
-                )}
-                {!revoked && (
-                  <button
-                    onClick={() => {
-                      if (confirm("Revoke this share? This cannot be undone.")) revokeMutation.mutate(share.token);
-                    }}
-                    className="tap-target text-alert hover:underline"
-                  >
-                    Revoke
-                  </button>
-                )}
-              </div>
+      {active.map((share) => (
+        <div key={share.token} className="border-b border-dust px-1 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="font-display text-lg text-ink">{share.label || "(untitled share)"}</p>
+              <p className="font-mono text-xs text-slate">
+                {share.rootChamber} — {share.rootId} · {share.permission} · depth {share.maxDepth}
+              </p>
+              <p className="font-mono text-xs text-dust">
+                Created {formatTimestamp(share.createdAt)} · Last accessed {formatTimestamp(share.lastAccessedAt)}
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-5 font-mono text-xs uppercase tracking-wide">
+              <a href={`/shared/${share.token}`} className="tap-target text-accent hover:underline">
+                Open
+              </a>
+              <button
+                onClick={() => {
+                  if (confirm("Revoke this share? This cannot be undone.")) revokeMutation.mutate(share.token);
+                }}
+                className="tap-target text-alert hover:underline"
+              >
+                Revoke
+              </button>
             </div>
           </div>
-        );
-      })}
+        </div>
+      ))}
     </div>
   );
 }

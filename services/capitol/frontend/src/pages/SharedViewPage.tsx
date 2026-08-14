@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CapitolExhibitResolveResult, ShareClosureEntry } from "@congress/shared-types";
 import { ExhibitChip, extractExhibitTokens, splitExhibitText, parseExhibitToken } from "@congress/exhibit-ui";
@@ -52,6 +52,8 @@ function SharedBody({
 
 export function SharedViewPage() {
   const { token } = useParams<{ token: string }>();
+  const [searchParams] = useSearchParams();
+  const exhibitParam = searchParams.get("exhibit");
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -64,7 +66,13 @@ export function SharedViewPage() {
     enabled: Boolean(token),
   });
 
-  const activeId = selectedId ?? detailQuery.data?.rootId ?? null;
+  // A "shared" badge on an inherited exhibit links here with ?exhibit= so
+  // this opens straight on that exhibit instead of always defaulting to the
+  // share's root - falls back to the root when the param is missing or
+  // isn't actually in this share's closure.
+  const exhibitParamInClosure =
+    exhibitParam && detailQuery.data?.closure.some((entry) => entry.id === exhibitParam) ? exhibitParam : null;
+  const activeId = selectedId ?? exhibitParamInClosure ?? detailQuery.data?.rootId ?? null;
 
   const contentQuery = useQuery({
     queryKey: ["shared", token, "content", activeId],

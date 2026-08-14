@@ -147,15 +147,7 @@ export function NoteViewPage() {
         <div className="flex shrink-0 items-center gap-5 font-mono text-xs uppercase tracking-wide">
           {editing ? (
             <>
-              {settingsQuery.data?.autoSave ? (
-                <span className="normal-case tracking-normal text-dust">
-                  {updateMutation.isPending
-                    ? "Saving —"
-                    : draftTitle === note.title && draftContent === note.content
-                      ? "Saved"
-                      : ""}
-                </span>
-              ) : (
+              {!settingsQuery.data?.autoSave && (
                 <button onClick={saveExplicit} className="tap-target text-accent hover:underline">
                   Save
                 </button>
