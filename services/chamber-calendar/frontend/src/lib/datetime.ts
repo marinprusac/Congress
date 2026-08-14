@@ -97,6 +97,17 @@ const FULL_DATE_TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
 });
 
+const AGENDA_RANGE_FORMAT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+
+// Label for the Agenda page's currently-fetched window, e.g. "Aug 15 – Sep 13"
+// - `to` is the exclusive upper bound used for the API call, so the last day
+// actually shown is one day before it.
+export function formatDateRange(from: Date, to: Date): string {
+  const lastDay = new Date(to);
+  lastDay.setDate(lastDay.getDate() - 1);
+  return `${AGENDA_RANGE_FORMAT.format(from)} – ${AGENDA_RANGE_FORMAT.format(lastDay)}`;
+}
+
 function addDaysToDateOnly(dateStr: string, delta: number): string {
   const d = new Date(`${dateStr}T00:00:00`);
   d.setDate(d.getDate() + delta);

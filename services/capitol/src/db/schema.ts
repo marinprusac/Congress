@@ -68,4 +68,6 @@ export const shares = sqliteTable("shares", {
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
   darkMode: integer("dark_mode", { mode: "boolean" }).notNull().default(false),
+  // Chamber names hidden from the homepage widget grid, JSON-encoded.
+  hiddenWidgetsJson: text("hidden_widgets_json").notNull().default("[]"),
 });

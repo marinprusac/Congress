@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchEvents } from "@/lib/api";
-import { groupEventsByDay, formatEventTime } from "@/lib/datetime";
+import { groupEventsByDay, formatEventTime, formatDateRange } from "@/lib/datetime";
 
 const WINDOW_DAYS = 30;
 const SHIFT_DAYS = 14;
@@ -22,8 +22,9 @@ function startOfToday(): Date {
 export function AgendaPage() {
   const [anchor, setAnchor] = useState(startOfToday);
 
+  const windowEnd = addDays(anchor, WINDOW_DAYS);
   const from = anchor.toISOString();
-  const to = addDays(anchor, WINDOW_DAYS).toISOString();
+  const to = windowEnd.toISOString();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["events", from, to],
@@ -34,18 +35,21 @@ export function AgendaPage() {
 
   return (
     <section>
-      <div className="mb-6 flex items-baseline justify-between border-b border-dust pb-4">
+      <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2 border-b border-dust pb-4">
         <h2 className="font-display text-3xl text-ink">Agenda</h2>
-        <div className="flex gap-3 font-mono text-xs uppercase tracking-wide text-slate">
-          <button onClick={() => setAnchor((a) => addDays(a, -SHIFT_DAYS))} className="hover:text-accent">
-            ← Prev
-          </button>
-          <button onClick={() => setAnchor(startOfToday())} className="hover:text-accent">
-            Today
-          </button>
-          <button onClick={() => setAnchor((a) => addDays(a, SHIFT_DAYS))} className="hover:text-accent">
-            Next →
-          </button>
+        <div className="flex items-baseline gap-4">
+          <span className="font-mono text-xs text-dust">{formatDateRange(anchor, windowEnd)}</span>
+          <div className="flex gap-3 font-mono text-xs uppercase tracking-wide text-slate">
+            <button onClick={() => setAnchor((a) => addDays(a, -SHIFT_DAYS))} className="hover:text-accent">
+              ← Prev
+            </button>
+            <button onClick={() => setAnchor(startOfToday())} className="hover:text-accent">
+              Today
+            </button>
+            <button onClick={() => setAnchor((a) => addDays(a, SHIFT_DAYS))} className="hover:text-accent">
+              Next →
+            </button>
+          </div>
         </div>
       </div>
 

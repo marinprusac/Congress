@@ -14,6 +14,7 @@ export { useExhibitSharing } from "./useExhibitSharing.js";
 export { ExhibitSharingBadge } from "./ExhibitSharingBadge.js";
 export { CreateShareForm } from "./CreateShareForm.js";
 export { ShareControl } from "./ShareControl.js";
+export { EditShareModal } from "./EditShareModal.js";
 export { ChamberLayout } from "./ChamberLayout.js";
 export type { ChamberNavLink } from "./ChamberLayout.js";
 export { useExhibitLinks } from "./useExhibitLinks.js";
@@ -22,3 +23,5 @@ export { useAppliedTheme, useCapitolSettings, updateCapitolSettings, capitolSett
 export { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
 export { ChamberMark, CapitolMark, getChamberIcon } from "./ChamberMarks.js";
 export { WidgetPreviewShell } from "./WidgetPreviewShell.js";
+export { fetchRegistry } from "./registry.js";
+export { ChamberPicker } from "./ChamberPicker.js";

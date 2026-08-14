@@ -1,0 +1,1 @@
+ALTER TABLE `settings` ADD `hidden_widgets_json` text DEFAULT '[]' NOT NULL;

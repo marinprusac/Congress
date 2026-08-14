@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
+import { ChamberPicker } from "./ChamberPicker.js";
 
 export interface ChamberNavLink {
   to: string;
@@ -27,6 +28,7 @@ export function ChamberLayout({ icon, title, navLinks, ownChamber, renderIcon }:
 
   return (
     <div className="chamber-shell">
+      <ChamberPicker current={ownChamber} />
       <header className="chamber-header">
         <a href="/" className="chamber-back-link">
           ← Capitol

@@ -63,6 +63,18 @@ function DocumentsMark(props: IconProps) {
   );
 }
 
+// Tasks: a single thick checkmark - completion is the one thing every other
+// Chamber's exhibit type doesn't have, so it's the mark's whole subject.
+function TasksMark(props: IconProps) {
+  return (
+    <svg viewBox="0 0 256 256" fill="currentColor" {...props}>
+      <g transform={GROUP_TRANSFORM}>
+      <path d="M 15 48 L 35 68 L 75 18 L 68 10 L 35 52 L 22 40 Z" />
+      </g>
+    </svg>
+  );
+}
+
 // Fallback for any Chamber without a dedicated mark yet.
 function DefaultChamberMark(props: IconProps) {
   return (
@@ -78,6 +90,7 @@ const CHAMBER_MARKS: Record<string, (props: IconProps) => ReactElement> = {
   notes: NotesMark,
   calendar: CalendarMark,
   documents: DocumentsMark,
+  tasks: TasksMark,
 };
 
 // Always renders something - unrecognized Chambers fall back to

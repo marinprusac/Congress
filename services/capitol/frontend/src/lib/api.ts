@@ -1,4 +1,4 @@
-import type { ChamberRegistryEntry, ShareSummary } from "@congress/shared-types";
+import type { ShareSummary } from "@congress/shared-types";
 
 export async function fetchAuthStatus(): Promise<{ authenticated: boolean }> {
   const res = await fetch("/auth/status");
@@ -19,14 +19,6 @@ export async function login(password: string): Promise<{ ok: true } | { ok: fals
 
 export async function logout(): Promise<void> {
   await fetch("/auth/logout", { method: "POST" });
-}
-
-export async function fetchRegistry(): Promise<ChamberRegistryEntry[]> {
-  const res = await fetch("/capitol/registry");
-  if (!res.ok) {
-    throw new Error(`Failed to fetch registry: ${res.status}`);
-  }
-  return res.json();
 }
 
 export async function fetchShares(): Promise<ShareSummary[]> {

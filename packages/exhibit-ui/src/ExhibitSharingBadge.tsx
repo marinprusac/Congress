@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { useExhibitSharing } from "./useExhibitSharing.js";
+import { EditShareModal } from "./EditShareModal.js";
 
 interface ExhibitSharingBadgeProps {
   exhibitId: string;
@@ -10,13 +12,13 @@ interface ExhibitSharingBadgeProps {
 // via another exhibit's [[ reference), direct takes visual precedence -
 // this is exactly what depth 0 vs depth > 0 in the closure means.
 //
-// Doubles as the "view this share" entry point: it links straight into the
-// shared view, scoped to this exhibit via ?exhibit= (a no-op for a direct
-// share, since the shared view already opens on its root by default; load-
-// bearing for an inherited one, which otherwise has no way to land on
-// anything but the share's root).
+// Doubles as the owner's entry point to manage that share: clicking it opens
+// EditShareModal scoped to the first relevant share, rather than navigating
+// to the recipient-facing /shared view (that page is for people without a
+// Congress login, not for the owner editing their own share).
 export function ExhibitSharingBadge({ exhibitId, className }: ExhibitSharingBadgeProps) {
   const { entries, loading } = useExhibitSharing(exhibitId);
+  const [open, setOpen] = useState(false);
   if (loading || entries.length === 0) return null;
 
   const direct = entries.filter((e) => e.direct);
@@ -26,13 +28,19 @@ export function ExhibitSharingBadge({ exhibitId, className }: ExhibitSharingBadg
   const target = relevant[0]!;
 
   return (
-    <a
-      href={`/shared/${target.token}?exhibit=${encodeURIComponent(exhibitId)}`}
-      className={className}
-      data-sharing-state={isDirect ? "direct" : "inherited"}
-      title={`Shared via: ${labels}`}
-    >
-      {isDirect ? "Shared" : "Shared (inherited)"}
-    </a>
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={className}
+        data-sharing-state={isDirect ? "direct" : "inherited"}
+        title={`Shared via: ${labels}`}
+      >
+        {isDirect ? "Shared" : "Shared (inherited)"}
+      </button>
+      {open && (
+        <EditShareModal exhibitId={exhibitId} token={target.token} onClose={() => setOpen(false)} />
+      )}
+    </>
   );
 }

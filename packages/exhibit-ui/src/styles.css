@@ -192,9 +192,13 @@ html[data-theme="dark"] {
 @media (max-width: 640px) {
   /* The nav's total on-screen height (a fixed content height plus whatever
      the home indicator reserves below it) - shared with the mobile picker
-     dropdown below so it can sit above the nav instead of overlapping it. */
+     dropdown below so it can sit above the nav instead of overlapping it.
+     Now the combined height of .chamber-mobile-nav stacked directly above
+     .chamber-picker-mobile (see below), which is the one that actually
+     touches the bottom edge and reserves the home-indicator strip. */
   :root {
-    --mobile-nav-height: calc(3rem + env(safe-area-inset-bottom));
+    --chamber-picker-height: calc(3rem + env(safe-area-inset-bottom));
+    --mobile-nav-height: calc(3rem + var(--chamber-picker-height));
   }
 
   .chamber-shell {
@@ -208,16 +212,13 @@ html[data-theme="dark"] {
   .chamber-mobile-nav {
     display: flex;
     position: fixed;
-    bottom: 0;
+    bottom: var(--chamber-picker-height);
     left: 0;
     right: 0;
     z-index: 40;
     justify-content: space-around;
     border-top: 1px solid var(--color-dust);
     background-color: var(--color-parchment);
-    /* The home indicator's reserved strip goes below the link row, inside
-       the nav's own background, rather than left to the page underneath. */
-    padding-bottom: env(safe-area-inset-bottom);
     box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 15%, transparent);
   }
 
@@ -239,6 +240,117 @@ html[data-theme="dark"] {
   .chamber-mobile-nav-link:hover,
   .chamber-mobile-nav-link.active {
     color: var(--color-accent);
+  }
+}
+
+/* ChamberPicker - persistent nav between Capitol and every Chamber, mounted
+   once inside ChamberLayout (every Chamber gets it for free) and once in
+   Capitol's own App.tsx. Desktop: fixed vertical bar on the left. Mobile:
+   fixed bar at the very bottom of the screen - stacked below a Chamber's
+   own .chamber-mobile-nav when one is present (see --chamber-picker-height
+   above), or alone when the host page has no bottom nav of its own
+   (Capitol, via .capitol-shell below). */
+.chamber-picker-mobile {
+  display: none;
+}
+
+.chamber-picker-desktop {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: 3.5rem;
+  padding-top: calc(1rem + env(safe-area-inset-top));
+  padding-left: env(safe-area-inset-left);
+  border-right: 1px solid var(--color-dust);
+  background-color: var(--color-parchment);
+}
+
+.chamber-picker-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--color-dust);
+}
+
+.chamber-picker-link:hover,
+.chamber-picker-link.active {
+  color: var(--color-accent);
+}
+
+.chamber-picker-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Reserves room for the desktop sidebar on whichever element is each host
+   page's own outermost container. */
+@media (min-width: 641px) {
+  .chamber-shell,
+  .capitol-shell {
+    padding-left: calc(3.5rem + env(safe-area-inset-left));
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --chamber-picker-height: calc(3rem + env(safe-area-inset-bottom));
+  }
+
+  .chamber-picker-desktop {
+    display: none;
+  }
+
+  .chamber-picker-mobile {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 41;
+    justify-content: space-around;
+    align-items: center;
+    height: var(--chamber-picker-height);
+    border-top: 1px solid var(--color-dust);
+    background-color: var(--color-parchment);
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 15%, transparent);
+  }
+
+  .chamber-picker-mobile-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    min-height: 3rem;
+    min-width: 2.5rem;
+    color: var(--color-dust);
+  }
+
+  .chamber-picker-mobile-link:hover,
+  .chamber-picker-mobile-link.active {
+    color: var(--color-accent);
+  }
+
+  .chamber-picker-mobile-label {
+    font-family: var(--font-mono);
+    font-size: 0.6em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Capitol's own page shell has no .chamber-mobile-nav of its own, so it
+     only ever needs to reserve room for the picker bar by itself. */
+  .capitol-shell {
+    padding-bottom: var(--chamber-picker-height);
   }
 }
 
@@ -318,6 +430,7 @@ html[data-theme="dark"] {
   border-radius: 999px;
   white-space: nowrap;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .exhibit-sharing-badge:hover {
@@ -787,5 +900,51 @@ html[data-theme="dark"] {
 .share-copy-button:hover {
   border-color: var(--color-accent);
   color: var(--color-accent);
+}
+
+/* EditShareModal - the only overlay-style dialog in this package so far
+   (everything else is an inline popover, see .share-control-popover). A
+   plain fixed backdrop + centered panel, since the badge that triggers it
+   can appear anywhere in a page, not just next to a fixed action bar. */
+.share-edit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: color-mix(in srgb, var(--color-ink) 45%, transparent);
+}
+
+.share-edit-panel {
+  width: 100%;
+  max-width: 360px;
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+  border: 1px solid var(--color-dust);
+  background: var(--color-parchment);
+  color: var(--color-ink);
+  padding: 1.25rem;
+  box-shadow: 0 8px 32px color-mix(in srgb, var(--color-ink) 25%, transparent);
+}
+
+.share-edit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.share-edit-close {
+  font-size: 1.2em;
+  line-height: 1;
+  color: var(--color-dust);
+  padding: 0.25em;
+  margin: -0.25em;
+}
+
+.share-edit-close:hover {
+  color: var(--color-alert);
 }
 

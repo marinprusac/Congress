@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_DIR="/srv/congress"
 BRANCH="main"
-SERVICES=(congress-capitol congress-chamber-notes congress-chamber-calendar congress-chamber-documents)
+SERVICES=(congress-capitol congress-chamber-notes congress-chamber-calendar congress-chamber-documents congress-chamber-tasks)
 
 cd "$REPO_DIR"
 
@@ -25,6 +25,7 @@ pnpm --filter capitol build:web
 pnpm --filter chamber-notes build:web
 pnpm --filter chamber-calendar build:web
 pnpm --filter chamber-documents build:web
+pnpm --filter chamber-tasks build:web
 
 for svc in "${SERVICES[@]}"; do
   sudo /usr/bin/systemctl restart "$svc"

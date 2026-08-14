@@ -1,0 +1,15 @@
+[Unit]
+Description=Congress - Tasks Chamber
+After=network.target congress-capitol.service
+
+[Service]
+Type=simple
+User=marin
+WorkingDirectory=/srv/congress/services/chamber-tasks
+ExecStart=/usr/bin/pnpm run start
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

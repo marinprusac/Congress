@@ -70,7 +70,7 @@ export function SharesPage() {
   const queryClient = useQueryClient();
 
   return (
-    <div className="min-h-screen bg-parchment text-ink">
+    <div className="min-h-screen bg-parchment text-ink capitol-shell">
       <CapitolHeader />
       <main className="mx-auto max-w-4xl px-6 py-10">
         <h2 className="mb-6 font-display text-2xl text-ink">Shares</h2>

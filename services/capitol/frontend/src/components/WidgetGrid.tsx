@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCapitolSettings, ChamberMark } from "@congress/exhibit-ui";
-import { fetchRegistry } from "@/lib/api";
+import { useCapitolSettings, ChamberMark, fetchRegistry } from "@congress/exhibit-ui";
 
 export function WidgetGrid() {
   const { data, isLoading, isError } = useQuery({
@@ -11,6 +10,8 @@ export function WidgetGrid() {
   // Told explicitly rather than left to fetch its own copy - see
   // useAppliedTheme's forcedThemeFromUrl for why.
   const theme = settings?.darkMode ? "dark" : "light";
+  const hiddenWidgets = settings?.hiddenWidgets ?? [];
+  const visibleData = data?.filter((chamber) => !hiddenWidgets.includes(chamber.name));
 
   return (
     <section>
@@ -26,9 +27,15 @@ export function WidgetGrid() {
         </div>
       )}
 
-      {!isLoading && !isError && data && data.length > 0 && (
+      {!isLoading && !isError && data && data.length > 0 && visibleData?.length === 0 && (
+        <div className="border-y border-dust px-1 py-3 font-mono text-sm text-dust">
+          — All Chambers hidden — enable them in Settings —
+        </div>
+      )}
+
+      {!isLoading && !isError && visibleData && visibleData.length > 0 && (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
-          {data.map((chamber) => {
+          {visibleData.map((chamber) => {
             const active = chamber.status === "active";
             return (
               <div

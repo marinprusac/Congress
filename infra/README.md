@@ -18,8 +18,10 @@ decision. See "Access control" below for what that means in practice.
   not the user's own key, and not added to the server's default SSH agent).
 - Ports: this VPS already runs other services on `3000` and `4000`, so
   Capitol's production port differs from its dev default: **Capitol `8000`**,
-  **Notes Chamber `8011`** (matches dev default). Both bind `127.0.0.1` only —
-  the only thing reachable from outside the box at all is Caddy, on 80/443.
+  **Notes Chamber `8011`**, **Calendar Chamber `8012`**, **Documents Chamber
+  `8013`**, **Tasks Chamber `8014`** (each Chamber matches its dev default).
+  All bind `127.0.0.1` only — the only thing reachable from outside the box
+  at all is Caddy, on 80/443.
 - Each service's `.env` (untracked, created by hand on the server) sets
   `NODE_ENV=production` and a shared `CONGRESS_INTERNAL_TOKEN`. Capitol's
   `.env` additionally sets `CONGRESS_MASTER_PASSWORD_HASH` and
