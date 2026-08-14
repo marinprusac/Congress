@@ -22,19 +22,20 @@ export function ChamberPicker({ current }: ChamberPickerProps) {
       <nav className="chamber-picker-desktop" aria-label="Chambers">
         <a
           href="/"
-          className={current === "capitol" ? "chamber-picker-link active" : "chamber-picker-link"}
-          title="Capitol"
+          className={current === "capitol" ? "chamber-picker-capitol-link active" : "chamber-picker-capitol-link"}
         >
-          <CapitolMark className="chamber-picker-icon" />
+          <CapitolMark className="chamber-picker-capitol-icon" />
+          <span className="chamber-picker-label">Capitol</span>
         </a>
+        <div className="chamber-picker-divider" />
         {chambers.map((chamber) => (
           <a
             key={chamber.name}
             href={chamber.routes.home}
             className={current === chamber.name ? "chamber-picker-link active" : "chamber-picker-link"}
-            title={chamber.displayName}
           >
             <ChamberMark name={chamber.name} className="chamber-picker-icon" />
+            <span className="chamber-picker-label">{chamber.displayName}</span>
           </a>
         ))}
       </nav>
@@ -44,7 +45,7 @@ export function ChamberPicker({ current }: ChamberPickerProps) {
           href="/"
           className={current === "capitol" ? "chamber-picker-mobile-link active" : "chamber-picker-mobile-link"}
         >
-          <CapitolMark className="chamber-picker-icon" />
+          <CapitolMark className="chamber-picker-icon chamber-picker-icon-capitol" />
           {current === "capitol" && <span className="chamber-picker-mobile-label">Capitol</span>}
         </a>
         {chambers.map((chamber) => (

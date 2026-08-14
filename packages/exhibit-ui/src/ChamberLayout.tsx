@@ -30,9 +30,6 @@ export function ChamberLayout({ icon, title, navLinks, ownChamber, renderIcon }:
     <div className="chamber-shell">
       <ChamberPicker current={ownChamber} />
       <header className="chamber-header">
-        <a href="/" className="chamber-back-link">
-          ← Capitol
-        </a>
         <div className="chamber-header-row">
           <Link to="/" className="chamber-title-link">
             {icon}
