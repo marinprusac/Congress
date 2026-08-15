@@ -1,5 +1,4 @@
-import { ChamberLayout, getChamberIcon } from "@congress/exhibit-ui";
-import { FileText } from "lucide-react";
+import { ChamberLayout, ChamberMark, getChamberIcon } from "@congress/exhibit-ui";
 
 const NAV_LINKS = [
   { to: "/", label: "All Documents" },
@@ -10,7 +9,7 @@ const NAV_LINKS = [
 export function Layout() {
   return (
     <ChamberLayout
-      icon={<FileText className="h-8 w-8 text-ink" strokeWidth={1.5} />}
+      icon={<ChamberMark name="documents" className="h-8 w-8 text-ink" />}
       title="Documents"
       navLinks={NAV_LINKS}
       ownChamber="documents"
