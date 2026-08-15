@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { useCapitolSettings, ChamberMark, fetchRegistry } from "@congress/exhibit-ui";
 
 export function WidgetGrid() {
@@ -50,12 +51,12 @@ export function WidgetGrid() {
                     className={`h-5 w-5 ${active ? "text-ink" : "text-dust"}`}
                   />
                   {active ? (
-                    <a
-                      href={chamber.routes.home}
+                    <Link
+                      to={chamber.routes.home}
                       className="font-display text-base text-ink hover:text-accent"
                     >
                       {chamber.displayName}
-                    </a>
+                    </Link>
                   ) : (
                     <span className="font-display text-base text-dust">{chamber.displayName}</span>
                   )}

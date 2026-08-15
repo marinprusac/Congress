@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { fetchEvent, updateEvent, deleteEvent } from "@/lib/api";
 import { getBrowserTimeZone, toDatetimeLocalInput } from "@/lib/datetime";
@@ -25,6 +26,7 @@ export function EditEventPage() {
     eventId: string;
   }>();
   const navigate = useNavigate();
+  const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const [values, setValues] = useState<EventFormValues | null>(null);
 
@@ -53,7 +55,7 @@ export function EditEventPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      navigate("/");
+      navigate(resolveChamberPath("/", "calendar", shellHosted));
     },
   });
 
@@ -61,7 +63,7 @@ export function EditEventPage() {
     mutationFn: () => deleteEvent(Number(accountId), calendarId!, eventId!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      navigate("/");
+      navigate(resolveChamberPath("/", "calendar", shellHosted));
     },
   });
 

@@ -2,9 +2,16 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { markShellHosted } from "@congress/exhibit-ui";
 import { queryClient } from "@/lib/queryClient";
 import { App } from "@/App";
 import "./index.css";
+
+// Capitol always acts as the shell (see ChamberHost) - this is what tells
+// ChamberPicker/ChamberHeader it's safe to use <Link> for cross-app jumps
+// here, not just for Capitol's own internal routes. Must run before the
+// first render, and before any Chamber's remote entry could possibly mount.
+markShellHosted();
 
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Root element not found");

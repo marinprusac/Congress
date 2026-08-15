@@ -24,6 +24,8 @@ pnpm install                                   # once, from repo root
 pnpm --filter <service> dev:server             # backend, watch mode (tsx watch)
 pnpm --filter <service> dev:web                # frontend, Vite dev server
 pnpm --filter <service> build:web              # frontend production build -> frontend/dist
+pnpm --filter <service> build:remote           # every Chamber: remote-entry.js/.css for shell-hosting, run after build:web
+pnpm --filter capitol build:vendor             # Capitol only: shared React/router/query-client build the above resolves against
 pnpm --filter <service> typecheck              # tsc --noEmit, server + frontend tsconfig
 
 pnpm -r typecheck                              # typecheck every package/service — run this after any change
@@ -47,7 +49,7 @@ A Chamber's frontend dev server proxies `/api`, `/manifest`, `/health`, `/mcp` t
 - `services/<name>/frontend` — frontend (React + Vite + Tailwind v4 + TanStack Query), built to `frontend/dist` and served by that service's own Hono app in production.
 - `infra/` — systemd unit templates, Caddy site block, the VPS sync script. See `infra/README.md` for the full deployment story.
 
-**Per-frontend duplication is intentional in a few specific places**, not an oversight: `Layout.tsx`, `main.tsx`, `App.tsx`, and `WidgetPreviewPage.tsx` are deliberately small per-Chamber files (routing/nav/copy is genuinely Chamber-specific) rather than another shared abstraction — don't try to collapse these into `chamber-kit`/`exhibit-ui` further. Everything that *was* pure copy-paste (icons, DB/env/MCP/registration boilerplate, the exhibits/settings/route-mounting pattern) has already been factored out; if you find yourself copying a whole file between two Chambers unchanged, that's a signal something belongs in one of the shared packages instead.
+**Per-frontend duplication is intentional in a few specific places**, not an oversight: `Layout.tsx`, `main.tsx`, `App.tsx`, `remote.tsx`, and `WidgetPreviewPage.tsx` are deliberately small per-Chamber files (routing/nav/copy is genuinely Chamber-specific) rather than another shared abstraction — don't try to collapse these into `chamber-kit`/`exhibit-ui` further. Everything that *was* pure copy-paste (icons, DB/env/MCP/registration boilerplate, the exhibits/settings/route-mounting pattern) has already been factored out; if you find yourself copying a whole file between two Chambers unchanged, that's a signal something belongs in one of the shared packages instead.
 
 ### The Chamber contract
 
@@ -66,6 +68,16 @@ Each service owns exactly one SQLite file, opened only by its own process. Cross
 ### Gateway
 
 Capitol is the only service Caddy ever points at. Its `gateway.ts` proxies `/api/:chamber/*` (session-gated) to that Chamber's registered `apiBase`, and proxies each Chamber's frontend through at `/<chamberName>/*`. No Chamber port is reachable from outside Capitol's own process — a Chamber is only ever hit directly in dev, or by Capitol itself in production.
+
+### Shell-hosted Chamber navigation
+
+Capitol's frontend is a persistent shell: navigating to a Chamber, or between Chambers, never does a full page load — Capitol's `ChamberHost` (`services/capitol/frontend/src/components/ChamberHost.tsx`) dynamically `import()`s that Chamber's own build as a real ES module and mounts it directly into Capitol's existing React tree and Router, instead of the browser following a link to `/<chamberName>/*`. This layers on top of the "fully separate process" independence above, not a replacement for it — a Chamber still owns its build/port/DB/backend entirely; the only new coupling is Chamber → Capitol (each Chamber emits one extra build artifact and agrees to a few shared conventions), which is deliberately looser than Chamber ↔ Chamber independence.
+
+- Each Chamber's `frontend/vite.remote.config.ts` (`build:remote`) builds `frontend/src/remote.tsx` — mirrors `main.tsx` minus `StrictMode`/`createRoot`/`BrowserRouter` — into `remote-entry.js`/`remote-entry.css`, with `react`/`react-dom`/`react-router-dom`/`@tanstack/react-query` left external. Additive to `build:web`'s output (same `dist/`, run after it), not a replacement — standalone/dev access is unaffected.
+- Capitol's `frontend/vite.vendor.config.ts` (`build:vendor`) builds the one shared copy of those externalized packages, served at `/vendor/*.js` and wired into `index.html` via an import map — required so a dynamically-mounted Chamber shares React's live module state with the shell instead of crashing with "invalid hook call" from two separate copies of "the same" React.
+- A Chamber's own components can't always tell whether they're rendered standalone (under their own `BrowserRouter basename="/<chamber>"`) or shell-hosted (nested under Capitol's basename-less Router at `/:chamber/*`) — `useShellHosted()`/`resolveChamberPath()` (`packages/exhibit-ui/src/ShellHostContext.tsx`) is the one signal that tells them apart, used anywhere a Chamber writes an absolute-looking path (`ChamberPicker`, `ChamberHeader`'s `titleHref`, `navigateToExhibit`'s same-Chamber branch). It's a plain `window` flag, not React Context — `exhibit-ui` is source-only and recompiled independently into every bundle, so a Context object created in one bundle isn't recognized by `useContext` in another.
+- A registered-but-actually-unreachable Chamber (stale heartbeat, a genuine bug in that Chamber's own code) is caught by an error boundary in `ChamberHost`, not left to blank the whole shell.
+- `infra/deploy/sync.sh` runs `build:vendor`/`build:remote` alongside `build:web` for every service — both artifacts have to exist for shell-hosting to work in production.
 
 ### Exhibits: the cross-Chamber reference/search system
 

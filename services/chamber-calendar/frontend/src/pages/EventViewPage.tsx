@@ -8,6 +8,8 @@ import {
   ShareControl,
   navigateToExhibit,
   getChamberIcon,
+  useShellHosted,
+  resolveChamberPath,
 } from "@congress/exhibit-ui";
 import { fetchEvent } from "@/lib/api";
 import { formatEventFullRange } from "@/lib/datetime";
@@ -20,6 +22,7 @@ export function EventViewPage() {
     eventId: string;
   }>();
   const navigate = useNavigate();
+  const shellHosted = useShellHosted();
 
   const { data: event, isLoading, isError } = useQuery({
     queryKey: ["events", accountId, calendarId, eventId],
@@ -48,7 +51,7 @@ export function EventViewPage() {
         emptyBacklinksLabel="Nothing references this event"
         emptyFrontlinksLabel="This event references nothing"
         renderIcon={(chamber) => getChamberIcon(chamber)}
-        onNavigate={(r) => navigateToExhibit("calendar", r, navigate)}
+        onNavigate={(r) => navigateToExhibit("calendar", r, navigate, shellHosted)}
       >
         <dl className="space-y-4 font-mono text-sm">
           <div>
@@ -72,7 +75,7 @@ export function EventViewPage() {
                 <ExhibitAnnotatedText
                   text={event.description}
                   renderIcon={(chamber) => getChamberIcon(chamber)}
-                  onNavigate={(r) => navigateToExhibit("calendar", r, navigate)}
+                  onNavigate={(r) => navigateToExhibit("calendar", r, navigate, shellHosted)}
                   className="whitespace-pre-wrap"
                 />
               </dd>
@@ -94,7 +97,11 @@ export function EventViewPage() {
         <ExhibitActionBar>
           <ShareControl chamber="calendar" exhibitId={exhibitId} exhibitName={event.title} />
           <Link
-            to={`/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}/edit`}
+            to={resolveChamberPath(
+              `/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}/edit`,
+              "calendar",
+              shellHosted
+            )}
             className="tap-target text-accent hover:underline"
           >
             Edit

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
 import { fetchDocuments, fetchDocument } from "@/lib/api";
 
 function formatTimestamp(value: string): string {
@@ -15,6 +16,7 @@ function formatBytes(bytes: number): string {
 
 export function DocumentsListPage() {
   const [query, setQuery] = useState("");
+  const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
 
   const { data, isLoading, isError } = useQuery({
@@ -57,7 +59,7 @@ export function DocumentsListPage() {
           documents?.map((doc) => (
             <Link
               key={doc.id}
-              to={`/d/${doc.id}`}
+              to={resolveChamberPath(`/d/${doc.id}`, "documents", shellHosted)}
               onMouseEnter={() => prefetchDocument(doc.id)}
               onFocus={() => prefetchDocument(doc.id)}
               className="block border-b border-dust px-1 py-3 hover:bg-ink/[0.03]"

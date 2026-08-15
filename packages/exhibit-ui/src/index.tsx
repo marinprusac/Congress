@@ -36,3 +36,4 @@ export { ChamberMark, CapitolMark, getChamberIcon } from "./ChamberMarks.js";
 export { WidgetPreviewShell } from "./WidgetPreviewShell.js";
 export { fetchRegistry } from "./registry.js";
 export { ChamberPicker } from "./ChamberPicker.js";
+export { markShellHosted, useShellHosted, resolveChamberPath } from "./ShellHostContext.js";

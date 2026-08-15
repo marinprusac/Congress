@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { createEvent } from "@/lib/api";
 import { getBrowserTimeZone } from "@/lib/datetime";
@@ -24,6 +25,7 @@ function defaultValues(): EventFormValues {
 
 export function NewEventPage() {
   const navigate = useNavigate();
+  const shellHosted = useShellHosted();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [values, setValues] = useState<EventFormValues>(() => ({
@@ -48,7 +50,7 @@ export function NewEventPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      navigate("/");
+      navigate(resolveChamberPath("/", "calendar", shellHosted));
     },
   });
 

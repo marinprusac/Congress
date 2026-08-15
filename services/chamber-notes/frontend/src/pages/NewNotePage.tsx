@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ExhibitTextarea, getChamberIcon } from "@congress/exhibit-ui";
+import { ExhibitTextarea, getChamberIcon, useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
 import { createNote } from "@/lib/api";
 
 export function NewNotePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState(searchParams.get("title") ?? "");
   const [content, setContent] = useState("");
@@ -15,7 +16,7 @@ export function NewNotePage() {
     mutationFn: () => createNote({ title, content }),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["notes"] });
-      navigate(`/n/${created.id}`);
+      navigate(resolveChamberPath(`/n/${created.id}`, "notes", shellHosted));
     },
   });
 

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 import { fetchRegistry } from "./registry.js";
 import { ChamberMark, CapitolMark } from "./ChamberMarks.js";
+import { useShellHosted, resolveChamberPath } from "./ShellHostContext.js";
 
 export interface ChamberNavLink {
   to: string;
@@ -53,32 +54,117 @@ function buildChamberList(
   return [{ name: current, displayName: currentLabel ?? current, href: `/${current}` }, ...fromRegistry];
 }
 
-function Subnav({ links, pathname }: { links: ChamberNavLink[]; pathname: string }) {
+function Subnav({
+  links,
+  pathname,
+  current,
+  shellHosted,
+}: {
+  links: ChamberNavLink[];
+  pathname: string;
+  current: string;
+  shellHosted: boolean;
+}) {
   if (links.length === 0) return null;
   return (
     <div className="chamber-picker-subnav">
-      {links.map((link) => (
-        <Link
-          key={link.to}
-          to={link.to}
-          className={pathname === link.to ? "chamber-picker-subnav-link active" : "chamber-picker-subnav-link"}
-        >
-          {link.label}
-        </Link>
-      ))}
+      {links.map((link) => {
+        // Always same-Chamber navigation (this entry's own nav links), so a
+        // <Link> is safe in both hosting modes - only the resolved target
+        // (and so the active-state comparison) differs. See
+        // resolveChamberPath's comment for why.
+        const to = resolveChamberPath(link.to, current, shellHosted);
+        return (
+          <Link
+            key={link.to}
+            to={to}
+            className={pathname === to ? "chamber-picker-subnav-link active" : "chamber-picker-subnav-link"}
+          >
+            {link.label}
+          </Link>
+        );
+      })}
     </div>
   );
 }
 
-function ChamberIcon({ chamber, current, mobile }: { chamber: PickerChamber; current: string; mobile: boolean }) {
+function ChamberIcon({
+  chamber,
+  current,
+  mobile,
+  shellHosted,
+}: {
+  chamber: PickerChamber;
+  current: string;
+  mobile: boolean;
+  shellHosted: boolean;
+}) {
   const isCurrent = current === chamber.name;
   const linkClass = mobile ? "chamber-picker-mobile-link" : "chamber-picker-link";
-  return (
-    <a href={chamber.href} className={isCurrent ? `${linkClass} active` : linkClass}>
+  const className = isCurrent ? `${linkClass} active` : linkClass;
+  const content = (
+    <>
       <ChamberMark name={chamber.name} className="chamber-picker-icon" />
       {(!mobile || isCurrent) && (
         <span className={mobile ? "chamber-picker-mobile-label" : "chamber-picker-label"}>{chamber.displayName}</span>
       )}
+    </>
+  );
+  // chamber.href is a genuinely different top-level app, not this one's own
+  // space - only safe as a <Link> when this tree is shell-hosted (no
+  // basename in the way; see ShellHostContext's comment). Standalone, a
+  // Chamber's own `BrowserRouter basename="/<chamber>"` would re-prefix any
+  // <Link> target, including ones that already look fully-qualified, so it
+  // has to stay a real navigation via a plain <a>, same as before Capitol
+  // could host Chambers in-page at all.
+  return shellHosted ? (
+    <Link to={chamber.href} className={className}>
+      {content}
+    </Link>
+  ) : (
+    <a href={chamber.href} className={className}>
+      {content}
+    </a>
+  );
+}
+
+function CapitolLink({
+  current,
+  shellHosted,
+  mobile,
+}: {
+  current: string;
+  shellHosted: boolean;
+  mobile: boolean;
+}) {
+  const isCurrent = current === "capitol";
+  const className = mobile
+    ? isCurrent
+      ? "chamber-picker-mobile-link active"
+      : "chamber-picker-mobile-link"
+    : isCurrent
+      ? "chamber-picker-capitol-link active"
+      : "chamber-picker-capitol-link";
+  const content = mobile ? (
+    <>
+      <CapitolMark className="chamber-picker-icon chamber-picker-icon-capitol" />
+      {isCurrent && <span className="chamber-picker-mobile-label">Capitol</span>}
+    </>
+  ) : (
+    <>
+      <CapitolMark className="chamber-picker-capitol-icon" />
+      <span className="chamber-picker-label">Capitol</span>
+    </>
+  );
+  // Same reasoning as ChamberIcon: jumping to Capitol from a Chamber is a
+  // cross-app jump too, only safe as a <Link> when shell-hosted.
+  return shellHosted ? (
+    <Link to="/" className={className}>
+      {content}
+    </Link>
+  ) : (
+    <a href="/" className={className}>
+      {content}
     </a>
   );
 }
@@ -90,12 +176,10 @@ function ChamberIcon({ chamber, current, mobile }: { chamber: PickerChamber; cur
 // The currently-open entry's own sub-navigation nests directly under it
 // (desktop) or sits in a bar directly above the icon row (mobile) - see
 // .chamber-picker-subnav / .chamber-picker-mobile-subnav in styles.css.
-// Top-level entries use plain <a> links, not <Link>, since every Chamber
-// (and Capitol) is a fully separate app instance; the current entry's own
-// sub-links use <Link> since those stay within that same app.
 export function ChamberPicker({ current, currentNavLinks, currentLabel }: ChamberPickerProps) {
   const { data } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
   const { pathname } = useLocation();
+  const shellHosted = useShellHosted();
 
   const registryChambers = (data ?? []).filter((c) => c.status === "active");
   const chambers = buildChamberList(registryChambers, current, currentLabel);
@@ -109,48 +193,43 @@ export function ChamberPicker({ current, currentNavLinks, currentLabel }: Chambe
   return (
     <>
       <nav className="chamber-picker-desktop" aria-label="Chambers">
-        <a
-          href="/"
-          className={current === "capitol" ? "chamber-picker-capitol-link active" : "chamber-picker-capitol-link"}
-        >
-          <CapitolMark className="chamber-picker-capitol-icon" />
-          <span className="chamber-picker-label">Capitol</span>
-        </a>
-        {current === "capitol" && <Subnav links={currentNavLinks} pathname={pathname} />}
+        <CapitolLink current={current} shellHosted={shellHosted} mobile={false} />
+        {current === "capitol" && (
+          <Subnav links={currentNavLinks} pathname={pathname} current={current} shellHosted={shellHosted} />
+        )}
         <div className="chamber-picker-divider" />
         {chambers.map((chamber) => (
           <Fragment key={chamber.name}>
-            <ChamberIcon chamber={chamber} current={current} mobile={false} />
-            {current === chamber.name && <Subnav links={currentNavLinks} pathname={pathname} />}
+            <ChamberIcon chamber={chamber} current={current} mobile={false} shellHosted={shellHosted} />
+            {current === chamber.name && (
+              <Subnav links={currentNavLinks} pathname={pathname} current={current} shellHosted={shellHosted} />
+            )}
           </Fragment>
         ))}
       </nav>
 
       <nav className="chamber-picker-mobile-subnav" aria-label="Current section">
-        {currentNavLinks.map((link) => (
-          <Link
-            key={link.to}
-            to={link.to}
-            className={pathname === link.to ? "chamber-picker-mobile-subnav-link active" : "chamber-picker-mobile-subnav-link"}
-          >
-            {link.label}
-          </Link>
-        ))}
+        {currentNavLinks.map((link) => {
+          const to = resolveChamberPath(link.to, current, shellHosted);
+          return (
+            <Link
+              key={link.to}
+              to={to}
+              className={pathname === to ? "chamber-picker-mobile-subnav-link active" : "chamber-picker-mobile-subnav-link"}
+            >
+              {link.label}
+            </Link>
+          );
+        })}
       </nav>
 
       <nav className="chamber-picker-mobile" aria-label="Chambers">
         {beforeCapitol.map((chamber) => (
-          <ChamberIcon key={chamber.name} chamber={chamber} current={current} mobile />
+          <ChamberIcon key={chamber.name} chamber={chamber} current={current} mobile shellHosted={shellHosted} />
         ))}
-        <a
-          href="/"
-          className={current === "capitol" ? "chamber-picker-mobile-link active" : "chamber-picker-mobile-link"}
-        >
-          <CapitolMark className="chamber-picker-icon chamber-picker-icon-capitol" />
-          {current === "capitol" && <span className="chamber-picker-mobile-label">Capitol</span>}
-        </a>
+        <CapitolLink current={current} shellHosted={shellHosted} mobile />
         {afterCapitol.map((chamber) => (
-          <ChamberIcon key={chamber.name} chamber={chamber} current={current} mobile />
+          <ChamberIcon key={chamber.name} chamber={chamber} current={current} mobile shellHosted={shellHosted} />
         ))}
       </nav>
     </>

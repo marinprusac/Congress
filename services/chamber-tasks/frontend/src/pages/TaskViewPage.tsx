@@ -10,6 +10,8 @@ import {
   ShareControl,
   navigateToExhibit,
   getChamberIcon,
+  useShellHosted,
+  resolveChamberPath,
 } from "@congress/exhibit-ui";
 import { fetchTask, updateTask, deleteTask } from "@/lib/api";
 
@@ -21,6 +23,7 @@ export function TaskViewPage() {
   const { id } = useParams<{ id: string }>();
   const taskId = Number(id);
   const navigate = useNavigate();
+  const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -53,7 +56,7 @@ export function TaskViewPage() {
     mutationFn: () => deleteTask(taskId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      navigate("/");
+      navigate(resolveChamberPath("/", "tasks", shellHosted));
     },
   });
 
@@ -120,7 +123,7 @@ export function TaskViewPage() {
         emptyBacklinksLabel="Nothing references this task"
         emptyFrontlinksLabel="This task references nothing"
         renderIcon={(chamber) => getChamberIcon(chamber)}
-        onNavigate={(r) => navigateToExhibit("tasks", r, navigate)}
+        onNavigate={(r) => navigateToExhibit("tasks", r, navigate, shellHosted)}
       >
         {editing ? (
           <ExhibitTextarea
@@ -134,7 +137,7 @@ export function TaskViewPage() {
           <ExhibitAnnotatedText
             text={task.description}
             renderIcon={(chamber) => getChamberIcon(chamber)}
-            onNavigate={(r) => navigateToExhibit("tasks", r, navigate)}
+            onNavigate={(r) => navigateToExhibit("tasks", r, navigate, shellHosted)}
             className="whitespace-pre-wrap text-base text-ink"
           />
         ) : (

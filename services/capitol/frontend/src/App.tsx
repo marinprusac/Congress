@@ -3,6 +3,7 @@ import { useAppliedTheme, ChamberPicker, type ChamberNavLink } from "@congress/e
 import { WidgetGrid } from "@/components/WidgetGrid";
 import { LoginGate } from "@/components/LoginGate";
 import { CapitolHeader } from "@/components/CapitolHeader";
+import { ChamberHost } from "@/components/ChamberHost";
 import { SharesPage } from "@/pages/SharesPage";
 import { SharedViewPage } from "@/pages/SharedViewPage";
 import { SettingsPage } from "@/pages/SettingsPage";
@@ -23,12 +24,21 @@ function Home() {
   );
 }
 
+const CAPITOL_ONLY_PATHS = new Set(["/", "/shares", "/settings"]);
+
 export function App() {
   useAppliedTheme();
   const location = useLocation();
   // The public shared view has no Congress login and must not expose
-  // internal navigation to a recipient without one.
-  const showPicker = !location.pathname.startsWith("/shared/");
+  // internal navigation to a recipient without one. A hosted Chamber
+  // (matched by ChamberHost's own "/:chamber/*" route) renders its own
+  // ChamberPicker (current=that chamber) via its own ChamberLayout - same
+  // component, same registry fetch, so it's already a complete substitute
+  // for this one, just correctly reflecting the actual current entry and
+  // that entry's own subnav instead of Capitol's. Rendering both at once
+  // would show two nav bars, the outer one permanently stuck on "capitol".
+  const isHostedChamberRoute = !CAPITOL_ONLY_PATHS.has(location.pathname) && !location.pathname.startsWith("/shared/");
+  const showPicker = !location.pathname.startsWith("/shared/") && !isHostedChamberRoute;
 
   return (
     <>
@@ -58,6 +68,18 @@ export function App() {
           element={
             <LoginGate>
               <Home />
+            </LoginGate>
+          }
+        />
+        {/* Catch-all, so it never shadows the static routes above - renders
+            whichever Chamber the first path segment names, hosted directly
+            in this shell instead of navigating away to it. See
+            ChamberHost's own comment for how that works. */}
+        <Route
+          path="/:chamber/*"
+          element={
+            <LoginGate>
+              <ChamberHost />
             </LoginGate>
           }
         />

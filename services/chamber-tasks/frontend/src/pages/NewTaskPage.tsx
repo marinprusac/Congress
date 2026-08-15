@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ExhibitTextarea, getChamberIcon } from "@congress/exhibit-ui";
+import { ExhibitTextarea, getChamberIcon, useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
 import { createTask } from "@/lib/api";
 
 export function NewTaskPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const [name, setName] = useState(searchParams.get("name") ?? "");
   const [description, setDescription] = useState("");
@@ -16,7 +17,7 @@ export function NewTaskPage() {
     mutationFn: () => createTask({ name, description, dueDate: dueDate || null }),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      navigate(`/t/${created.id}`);
+      navigate(resolveChamberPath(`/t/${created.id}`, "tasks", shellHosted));
     },
   });
 

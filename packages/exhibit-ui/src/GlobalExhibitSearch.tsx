@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { useExhibitSearch } from "./useExhibitSearch.js";
 import { navigateToExhibit } from "./navigateToExhibit.js";
+import { useShellHosted } from "./ShellHostContext.js";
 
 interface GlobalExhibitSearchProps {
   // Passed to navigateToExhibit - the chamber this search bar is mounted
@@ -30,6 +31,7 @@ function isEditableElement(el: Element | null): boolean {
 // it, mirroring the "[[" picker's own type-ahead/arrow-key/enter
 // interaction (see useExhibitPicker) so the pattern is already familiar.
 export function GlobalExhibitSearch({ ownChamber, navigate, renderIcon, className }: GlobalExhibitSearchProps) {
+  const shellHosted = useShellHosted();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -51,7 +53,7 @@ export function GlobalExhibitSearch({ ownChamber, navigate, renderIcon, classNam
   }, []);
 
   function select(result: CapitolExhibitSearchResult) {
-    navigateToExhibit(ownChamber, result, navigate);
+    navigateToExhibit(ownChamber, result, navigate, shellHosted);
     setQuery("");
     setOpen(false);
     inputRef.current?.blur();

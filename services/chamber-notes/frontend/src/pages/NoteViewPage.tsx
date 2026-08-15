@@ -11,6 +11,8 @@ import {
   navigateToExhibit,
   getChamberIcon,
   stripFrontmatter,
+  useShellHosted,
+  resolveChamberPath,
 } from "@congress/exhibit-ui";
 import { fetchNote, updateNote, deleteNote, setPinned, fetchSettings } from "@/lib/api";
 
@@ -18,6 +20,7 @@ export function NoteViewPage() {
   const { id } = useParams<{ id: string }>();
   const noteId = Number(id);
   const navigate = useNavigate();
+  const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
@@ -50,7 +53,7 @@ export function NoteViewPage() {
     mutationFn: () => deleteNote(noteId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notes"] });
-      navigate("/");
+      navigate(resolveChamberPath("/", "notes", shellHosted));
     },
   });
 
@@ -197,12 +200,12 @@ export function NoteViewPage() {
           emptyBacklinksLabel="Nothing references this note"
           emptyFrontlinksLabel="This note references nothing"
           renderIcon={(chamber) => getChamberIcon(chamber)}
-          onNavigate={(r) => navigateToExhibit("notes", r, navigate)}
+          onNavigate={(r) => navigateToExhibit("notes", r, navigate, shellHosted)}
         >
           <ExhibitMarkdown
             body={body}
             onDoubleClick={editAtFraction}
-            onNavigate={(r) => navigateToExhibit("notes", r, navigate)}
+            onNavigate={(r) => navigateToExhibit("notes", r, navigate, shellHosted)}
           />
           <ExhibitActionBar>
             <button

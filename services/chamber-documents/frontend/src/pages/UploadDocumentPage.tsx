@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ExhibitTextarea, getChamberIcon } from "@congress/exhibit-ui";
+import { ExhibitTextarea, getChamberIcon, useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
 import { uploadDocument } from "@/lib/api";
 
 export function UploadDocumentPage() {
   const navigate = useNavigate();
+  const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -15,7 +16,7 @@ export function UploadDocumentPage() {
     mutationFn: () => uploadDocument({ title, description, file: file! }),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
-      navigate(`/d/${created.id}`);
+      navigate(resolveChamberPath(`/d/${created.id}`, "documents", shellHosted));
     },
   });
 

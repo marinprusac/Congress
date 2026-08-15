@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
 import { fetchNotes, fetchNote, searchNotes, setPinned } from "@/lib/api";
 import type { NoteSummary } from "@congress/shared-types";
 
@@ -14,6 +15,7 @@ function sortPinnedFirst(notes: NoteSummary[]): NoteSummary[] {
 
 export function NotesListPage() {
   const [query, setQuery] = useState("");
+  const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
 
   const { data, isLoading, isError } = useQuery({
@@ -60,7 +62,7 @@ export function NotesListPage() {
           notes?.map((note) => (
             <div key={note.id} className="flex items-baseline gap-3 border-b border-dust px-1 py-3">
               <Link
-                to={`/n/${note.id}`}
+                to={resolveChamberPath(`/n/${note.id}`, "notes", shellHosted)}
                 onMouseEnter={() => prefetchNote(note.id)}
                 onFocus={() => prefetchNote(note.id)}
                 className="min-w-0 flex-1 hover:bg-ink/[0.03]"

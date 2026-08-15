@@ -10,6 +10,8 @@ import {
   ShareControl,
   navigateToExhibit,
   getChamberIcon,
+  useShellHosted,
+  resolveChamberPath,
 } from "@congress/exhibit-ui";
 import { fetchDocument, updateDocument, deleteDocument, downloadUrl } from "@/lib/api";
 
@@ -23,6 +25,7 @@ export function DocumentViewPage() {
   const { id } = useParams<{ id: string }>();
   const documentId = Number(id);
   const navigate = useNavigate();
+  const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
@@ -48,7 +51,7 @@ export function DocumentViewPage() {
     mutationFn: () => deleteDocument(documentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
-      navigate("/");
+      navigate(resolveChamberPath("/", "documents", shellHosted));
     },
   });
 
@@ -141,13 +144,13 @@ export function DocumentViewPage() {
           emptyBacklinksLabel="Nothing references this document"
           emptyFrontlinksLabel="This document references nothing"
           renderIcon={(chamber) => getChamberIcon(chamber)}
-          onNavigate={(r) => navigateToExhibit("documents", r, navigate)}
+          onNavigate={(r) => navigateToExhibit("documents", r, navigate, shellHosted)}
         >
           {doc.description ? (
             <ExhibitAnnotatedText
               text={doc.description}
               renderIcon={(chamber) => getChamberIcon(chamber)}
-              onNavigate={(r) => navigateToExhibit("documents", r, navigate)}
+              onNavigate={(r) => navigateToExhibit("documents", r, navigate, shellHosted)}
               className="whitespace-pre-wrap font-mono text-sm text-ink"
             />
           ) : (

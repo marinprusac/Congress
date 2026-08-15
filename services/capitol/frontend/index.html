@@ -27,6 +27,25 @@
     <title>Congress — Capitol</title>
     <link rel="icon" type="image/png" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <!-- Points every module in this document - this app's own bundle and
+         every dynamically-loaded Chamber remote entry alike - at the one
+         shared React/router/query-client build from vite.vendor.config.ts,
+         so a Chamber mounted into this shell shares live module state with
+         it instead of crashing with "invalid hook call" from two copies of
+         React. No effect in `dev:web` - Vite's dev server resolves bare
+         imports itself and ignores this. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "/vendor/react.js",
+          "react-dom": "/vendor/react-dom.js",
+          "react-dom/client": "/vendor/react-dom-client.js",
+          "react-router-dom": "/vendor/react-router-dom.js",
+          "@tanstack/react-query": "/vendor/react-query.js",
+          "react/jsx-runtime": "/vendor/jsx-runtime.js"
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

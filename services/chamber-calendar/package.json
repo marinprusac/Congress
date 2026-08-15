@@ -7,6 +7,7 @@
     "dev:server": "tsx watch src/index.ts",
     "dev:web": "vite --config frontend/vite.config.ts",
     "build:web": "vite build --config frontend/vite.config.ts",
+    "build:remote": "vite build --config frontend/vite.remote.config.ts",
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p frontend/tsconfig.json",
     "db:generate": "drizzle-kit generate",

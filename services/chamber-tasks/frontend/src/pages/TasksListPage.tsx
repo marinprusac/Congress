@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
 import { fetchTasks, fetchTask, searchTasks, setCompleted } from "@/lib/api";
 import type { TaskSummary } from "@congress/shared-types";
 
@@ -15,6 +16,7 @@ function sortOpenFirst(tasks: TaskSummary[]): TaskSummary[] {
 
 export function TasksListPage() {
   const [query, setQuery] = useState("");
+  const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
 
   const { data, isLoading, isError } = useQuery({
@@ -66,7 +68,7 @@ export function TasksListPage() {
                 {task.completed ? "Reopen" : "Done"}
               </button>
               <Link
-                to={`/t/${task.id}`}
+                to={resolveChamberPath(`/t/${task.id}`, "tasks", shellHosted)}
                 onMouseEnter={() => prefetchTask(task.id)}
                 onFocus={() => prefetchTask(task.id)}
                 className="min-w-0 flex-1 hover:bg-ink/[0.03]"

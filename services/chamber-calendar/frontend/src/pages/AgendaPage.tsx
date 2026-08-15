@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
 import { fetchEvents, fetchEvent } from "@/lib/api";
 import { groupEventsByDay, formatEventTime, formatDateRange } from "@/lib/datetime";
 
@@ -21,6 +22,7 @@ function startOfToday(): Date {
 
 export function AgendaPage() {
   const [anchor, setAnchor] = useState(startOfToday);
+  const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
 
   const windowEnd = addDays(anchor, WINDOW_DAYS);
@@ -68,7 +70,7 @@ export function AgendaPage() {
       {data?.accountErrors.map((err) => (
         <div key={err.accountId} className="mb-4 border border-alert px-3 py-2 font-mono text-sm text-alert">
           "{err.label}" needs to be reconnected —{" "}
-          <Link to="/settings" className="underline">
+          <Link to={resolveChamberPath("/settings", "calendar", shellHosted)} className="underline">
             reconnect in Settings
           </Link>
         </div>
@@ -90,7 +92,11 @@ export function AgendaPage() {
           {group.events.map((event) => (
             <Link
               key={event.id}
-              to={`/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}`}
+              to={resolveChamberPath(
+                `/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}`,
+                "calendar",
+                shellHosted
+              )}
               onMouseEnter={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
               onFocus={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
               className="flex items-baseline gap-4 border-b border-dust px-1 py-3 hover:bg-ink/[0.03]"

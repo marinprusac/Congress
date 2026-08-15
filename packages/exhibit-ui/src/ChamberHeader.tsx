@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
 import { MobileSearchReveal } from "./MobileSearchReveal.js";
+import { useShellHosted, resolveChamberPath } from "./ShellHostContext.js";
 
 interface ChamberHeaderProps {
   icon: ReactNode;
@@ -37,6 +38,8 @@ export function ChamberHeader({
   showSearch = true,
   titleHref = "/",
 }: ChamberHeaderProps) {
+  const shellHosted = useShellHosted();
+  const resolvedTitleHref = titleHref ? resolveChamberPath(titleHref, ownChamber, shellHosted) : titleHref;
   const titleContent = (
     <>
       {icon}
@@ -49,8 +52,8 @@ export function ChamberHeader({
       <div className="chamber-header-row">
         <div>
           <p className="chamber-eyebrow">Congress</p>
-          {titleHref ? (
-            <Link to={titleHref} className="chamber-title-link">
+          {resolvedTitleHref ? (
+            <Link to={resolvedTitleHref} className="chamber-title-link">
               {titleContent}
             </Link>
           ) : (
