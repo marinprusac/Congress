@@ -1,9 +1,11 @@
+import { useEffect } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { useAppliedTheme, ChamberPicker, type ChamberNavLink } from "@congress/exhibit-ui";
+import { useQuery } from "@tanstack/react-query";
+import { useAppliedTheme, ChamberPicker, fetchRegistry, type ChamberNavLink } from "@congress/exhibit-ui";
 import { WidgetGrid } from "@/components/WidgetGrid";
 import { LoginGate } from "@/components/LoginGate";
 import { CapitolHeader } from "@/components/CapitolHeader";
-import { ChamberHost } from "@/components/ChamberHost";
+import { ChamberHost, preloadChamber } from "@/components/ChamberHost";
 import { SharesPage } from "@/pages/SharesPage";
 import { SharedViewPage } from "@/pages/SharedViewPage";
 import { SettingsPage } from "@/pages/SettingsPage";
@@ -29,6 +31,19 @@ const CAPITOL_ONLY_PATHS = new Set(["/", "/shares", "/settings"]);
 export function App() {
   useAppliedTheme();
   const location = useLocation();
+
+  // Warms every active Chamber's remote-entry.js/.css as soon as the
+  // registry is known, regardless of which route this tab actually landed
+  // on first - so ChamberHost's lazy import later resolves an
+  // already-settled promise instead of a fresh fetch, and no Chamber ever
+  // shows its loading bar on a first-ever visit within this tab.
+  const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
+  useEffect(() => {
+    for (const chamber of registry ?? []) {
+      if (chamber.status === "active") preloadChamber(chamber.name);
+    }
+  }, [registry]);
+
   // The public shared view has no Congress login and must not expose
   // internal navigation to a recipient without one. A hosted Chamber
   // (matched by ChamberHost's own "/:chamber/*" route) renders its own

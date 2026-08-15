@@ -3,12 +3,20 @@ import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchRegistry } from "@congress/exhibit-ui";
 
-// Both caches are keyed by Chamber name and live for the tab's lifetime -
-// once a Chamber has been visited once, switching back to it is instant
-// (no re-fetch of its JS or CSS), which is the whole point of hosting it in
-// this shell instead of a full navigation.
+// All three caches are keyed by Chamber name and live for the tab's
+// lifetime - once a Chamber has been visited once, switching back to it is
+// instant (no re-fetch of its JS or CSS), which is the whole point of
+// hosting it in this shell instead of a full navigation.
 const componentCache = new Map<string, LazyExoticComponent<ComponentType>>();
 const stylesheetReady = new Map<string, Promise<void>>();
+// The actual module-fetch promise, kept separate from componentCache's
+// lazy() wrappers - lazy()'s loader function isn't invoked until React
+// first renders that component, so building the wrapper alone can't be used
+// to prefetch. Starting (and caching) this promise directly is what lets
+// preloadChamber warm the network fetch well before the Chamber is ever
+// rendered, so by the time it is, getChamberComponent's lazy() loader just
+// resolves an already-settled promise instead of triggering a fresh one.
+const modulePromises = new Map<string, Promise<{ default: ComponentType }>>();
 
 function loadChamberStylesheet(chamberName: string): Promise<void> {
   const href = `/${chamberName}/remote-entry.css`;
@@ -29,19 +37,35 @@ function loadChamberStylesheet(chamberName: string): Promise<void> {
   return ready;
 }
 
+function loadChamberModule(chamberName: string): Promise<{ default: ComponentType }> {
+  let modulePromise = modulePromises.get(chamberName);
+  if (!modulePromise) {
+    // Waiting on the stylesheet alongside the JS module, both kicked off
+    // together, means the Chamber is only ever revealed once it can render
+    // fully styled - the one place a first-ever visit could otherwise flash
+    // unstyled content even though there's no document reload.
+    modulePromise = Promise.all([
+      import(/* @vite-ignore */ `/${chamberName}/remote-entry.js`) as Promise<{ default: ComponentType }>,
+      loadChamberStylesheet(chamberName),
+    ]).then(([mod]) => mod);
+    modulePromises.set(chamberName, modulePromise);
+  }
+  return modulePromise;
+}
+
+// Kicks off (or reuses) a Chamber's module+stylesheet fetch without waiting
+// on it. Called for every active Chamber as soon as the registry loads (see
+// App.tsx), so navigating to any Chamber - from Capitol or from another
+// Chamber - never shows ChamberHost's loading bar for a fetch that's already
+// well underway or finished.
+export function preloadChamber(chamberName: string): void {
+  void loadChamberModule(chamberName);
+}
+
 function getChamberComponent(chamberName: string): LazyExoticComponent<ComponentType> {
   let component = componentCache.get(chamberName);
   if (!component) {
-    // Waiting on the stylesheet alongside the JS module, both kicked off
-    // together, means Suspense only reveals the Chamber once it can render
-    // fully styled - the one place a first-ever visit could otherwise flash
-    // unstyled content even though there's no document reload.
-    component = lazy(() =>
-      Promise.all([
-        import(/* @vite-ignore */ `/${chamberName}/remote-entry.js`) as Promise<{ default: ComponentType }>,
-        loadChamberStylesheet(chamberName),
-      ]).then(([mod]) => mod)
-    );
+    component = lazy(() => loadChamberModule(chamberName));
     componentCache.set(chamberName, component);
   }
   return component;
@@ -98,6 +122,7 @@ class ChamberErrorBoundary extends Component<ChamberErrorBoundaryProps, ChamberE
     // replaying the same rejected import() promise forever.
     componentCache.delete(this.props.chamberName);
     stylesheetReady.delete(this.props.chamberName);
+    modulePromises.delete(this.props.chamberName);
   }
 
   render() {
