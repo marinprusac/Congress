@@ -114,6 +114,64 @@ function getChamberComponent(chamberName: string): LazyExoticComponent<Component
   return component;
 }
 
+// Force-resolves the given Chamber's lazy() component by actually rendering
+// it once, off-screen. Network-preloading the module (preloadChamber) alone
+// isn't enough to make the first real navigation instant: a thenable's
+// .then() callback can never fire synchronously, even for an
+// already-settled promise, so React's lazy() unavoidably suspends on the
+// very first render it's ever given - no matter how far in advance the
+// underlying promise resolved - and only a *later* render of that same
+// lazy() object can render synchronously. Doing that first, throwaway
+// render here means it happens invisibly, well before the user ever clicks
+// into this Chamber, instead of during ChamberHost's real Suspense
+// boundary - which is what was still showing the loading bar (and briefly
+// unmounting the whole shell, nav included, since it all lives inside that
+// one boundary) even once everything was fully preloaded.
+//
+// Mounted (not "rendered and discarded") because the resolution has to
+// stick - a component that unmounts before its lazy import resolves throws
+// the warm-up away with it. Kept in a `display: none` container rather than
+// never rendered at all. The target Chamber's own <Routes> won't match
+// the shell's actual current URL unless this happens to be the active
+// Chamber, so nothing beyond its top-level App() (a cheap, idempotent
+// settings fetch - see useAppliedTheme) actually does anything.
+function ChamberWarmup({ chamberName }: { chamberName: string }) {
+  const Component = getChamberComponent(chamberName);
+  return (
+    <Suspense fallback={null}>
+      <Component />
+    </Suspense>
+  );
+}
+
+// Renders one hidden, error-isolated ChamberWarmup per active Chamber other
+// than whichever one (if any) is genuinely on-screen right now - that one's
+// already being rendered for real by ChamberHost, so warming it again here
+// would just be a redundant full mount. Each gets its own
+// ChamberErrorBoundary for the same reason ChamberHost's real render does:
+// an uncaught error from a failed import doesn't care that its subtree is
+// invisible, it still propagates up and would otherwise take down the
+// entire shell.
+export function ChamberWarmups({
+  activeChamberNames,
+  currentChamberName,
+}: {
+  activeChamberNames: string[];
+  currentChamberName: string | undefined;
+}) {
+  return (
+    <div style={{ display: "none" }} aria-hidden="true">
+      {activeChamberNames
+        .filter((name) => name !== currentChamberName)
+        .map((name) => (
+          <ChamberErrorBoundary key={name} chamberName={name}>
+            <ChamberWarmup chamberName={name} />
+          </ChamberErrorBoundary>
+        ))}
+    </div>
+  );
+}
+
 function ChamberLoadingBar() {
   return <div className="chamber-host-loading-bar" aria-hidden="true" />;
 }

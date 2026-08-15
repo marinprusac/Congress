@@ -5,7 +5,7 @@ import { useAppliedTheme, ChamberPicker, fetchRegistry, type ChamberNavLink } fr
 import { WidgetGrid } from "@/components/WidgetGrid";
 import { LoginGate } from "@/components/LoginGate";
 import { CapitolHeader } from "@/components/CapitolHeader";
-import { ChamberHost, preloadChamber } from "@/components/ChamberHost";
+import { ChamberHost, preloadChamber, ChamberWarmups } from "@/components/ChamberHost";
 import { SharesPage } from "@/pages/SharesPage";
 import { SharedViewPage } from "@/pages/SharedViewPage";
 import { SettingsPage } from "@/pages/SettingsPage";
@@ -54,10 +54,15 @@ export function App() {
   // would show two nav bars, the outer one permanently stuck on "capitol".
   const isHostedChamberRoute = !CAPITOL_ONLY_PATHS.has(location.pathname) && !location.pathname.startsWith("/shared/");
   const showPicker = !location.pathname.startsWith("/shared/") && !isHostedChamberRoute;
+  const currentChamberName = isHostedChamberRoute ? location.pathname.split("/")[1] : undefined;
 
   return (
     <>
       {showPicker && <ChamberPicker current="capitol" currentNavLinks={CAPITOL_NAV_LINKS} />}
+      <ChamberWarmups
+        activeChamberNames={(registry ?? []).filter((c) => c.status === "active").map((c) => c.name)}
+        currentChamberName={currentChamberName}
+      />
       <Routes>
         {/* Deliberately outside LoginGate - a share recipient has no Congress
             login at all, and never should need one to reach this page. */}
