@@ -22,11 +22,30 @@ async function requestRefChange(
   return res.json();
 }
 
-export function addExhibitRef(exhibitId: string, targetExhibitId: string): Promise<ManualRefsResponse> {
-  return requestRefChange(exhibitId, "/refs", {
+// `targetChamber` lets Capitol eagerly cache the target if it's never been
+// created/edited within Congress before (see manualRefRequestSchema's own
+// comment) - always pass it when known (any CapitolExhibitSearchResult
+// already carries `.chamber`).
+//
+// `sourceChamber` covers the mirror case: `exhibitId` itself (not the
+// target) is the one that might be uncached - e.g. adding a task from a
+// never-touched Google Calendar event's own "Referenced by" panel, where
+// `exhibitId` here is that event's id. Capitol's routing normally resolves
+// which Chamber owns `:id` from its cache alone; with nothing cached yet
+// it has no way to route the proxy call at all, so this is passed as a
+// query param (readable before/without the request body) rather than
+// folded into `targetChamber` above.
+export function addExhibitRef(
+  exhibitId: string,
+  targetExhibitId: string,
+  targetChamber?: string,
+  sourceChamber?: string
+): Promise<ManualRefsResponse> {
+  const qs = sourceChamber ? `?chamber=${encodeURIComponent(sourceChamber)}` : "";
+  return requestRefChange(exhibitId, `/refs${qs}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ targetExhibitId }),
+    body: JSON.stringify({ targetExhibitId, targetChamber }),
   });
 }
 

@@ -118,6 +118,17 @@ export type ExhibitFrontlinksResponse = z.infer<typeof exhibitFrontlinksResponse
 // POST/DELETE /capitol/exhibits/:id/refs in services/capitol/src/server.ts).
 export const manualRefRequestSchema = z.object({
   targetExhibitId: z.string().min(1),
+  // Optional hint the frontend already has whenever the target came from a
+  // search result (CapitolExhibitSearchResult always carries `chamber`) -
+  // lets Capitol's proxy eagerly resolveOneLive() the target so it gets an
+  // exhibit_cache row immediately. Without this, an exhibit that's never
+  // been created/edited within Congress (a pre-existing Google Calendar
+  // event is the common case) has no cache row yet, and
+  // getFrontlinks/getBacklinks silently skip any ref whose target isn't
+  // cached - the reference would save successfully but never appear
+  // anywhere in either panel. A Chamber's own "/api/exhibits/:id/refs"
+  // ignores this field; it's read only by Capitol's proxy.
+  targetChamber: z.string().optional(),
 });
 export type ManualRefRequest = z.infer<typeof manualRefRequestSchema>;
 

@@ -30,6 +30,7 @@ import {
   syncExhibit,
   searchExhibits,
   resolveExhibits,
+  resolveOneLive,
   getBacklinks,
   getFrontlinks,
   getCachedChamber,
@@ -137,8 +138,34 @@ app.get("/capitol/exhibits/:id/frontlinks", requireSession, async (c) => {
 // route yet, or if `:id` has never synced to Capitol at all.
 app.post("/capitol/exhibits/:id/refs", requireSession, async (c) => {
   const id = c.req.param("id");
-  const chamber = getCachedChamber(id);
+  // `:id` itself can be uncached too (adding a reference from a
+  // never-touched Exhibit's own "Referenced by" panel - e.g. a pre-existing
+  // Google Calendar event) - the frontend passes the Chamber it already
+  // knows from the search result as a fallback routing hint, since a cache
+  // lookup alone would have nothing to go on and 404 before ever reaching
+  // the target Chamber. See addExhibitRef's own comment on `sourceChamber`.
+  const chamber = getCachedChamber(id) ?? c.req.query("chamber") ?? null;
   if (!chamber) return c.json({ error: "not_found" }, 404);
+
+  // Best-effort eager cache of the target, using the clone so the body
+  // stream proxyToChamberPath forwards below is untouched - see
+  // manualRefRequestSchema's own comment on `targetChamber` for why this
+  // matters: without it, a ref pointing at something never created/edited
+  // within Congress (e.g. a pre-existing Google Calendar event) saves fine
+  // but never shows up in either panel, since getFrontlinks/getBacklinks
+  // silently skip an uncached target.
+  try {
+    const body: unknown = await c.req.raw.clone().json();
+    const targetExhibitId = (body as { targetExhibitId?: unknown })?.targetExhibitId;
+    const targetChamber = (body as { targetChamber?: unknown })?.targetChamber;
+    if (typeof targetExhibitId === "string" && typeof targetChamber === "string") {
+      await resolveOneLive(targetExhibitId, targetChamber);
+    }
+  } catch {
+    // Malformed body - the owning Chamber's own parse (after proxying)
+    // is what should surface a 400 for this request, not this step.
+  }
+
   return proxyToChamberPath(c, chamber, `/exhibits/${encodeURIComponent(id)}/refs`);
 });
 

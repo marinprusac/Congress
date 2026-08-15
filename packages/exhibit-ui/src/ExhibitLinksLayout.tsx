@@ -278,9 +278,12 @@ export function ExhibitLinksLayout({
     queryClient.invalidateQueries({ queryKey: ["exhibit-frontlinks", exhibitId] });
   }
 
-  // Front (References/outgoing): this Exhibit -> the picked one.
+  // Front (References/outgoing): this Exhibit -> the picked one. The
+  // picked result's chamber is passed through so Capitol can eagerly cache
+  // it if it's never been created/edited within Congress before (e.g. a
+  // pre-existing Google Calendar event) - see addExhibitRef's own comment.
   async function addFrontReference(result: CapitolExhibitSearchResult) {
-    await addExhibitRef(exhibitId, result.id);
+    await addExhibitRef(exhibitId, result.id, result.chamber);
     refresh();
   }
   async function removeFrontReference(entry: ExhibitRefEntry) {
@@ -289,9 +292,12 @@ export function ExhibitLinksLayout({
   }
   // Back (Referenced by/incoming): the picked Exhibit -> this one - the
   // mirror image of the front panel's add, written on the *other*
-  // Exhibit's own outgoing refs.
+  // Exhibit's own outgoing refs. No targetChamber needed here - the target
+  // is *this* Exhibit, which is already cached (its own page is what's on
+  // screen right now). `result.chamber` is passed as sourceChamber instead,
+  // since here it's `result.id` (possibly uncached) being written to.
   async function addBackReference(result: CapitolExhibitSearchResult) {
-    await addExhibitRef(result.id, exhibitId);
+    await addExhibitRef(result.id, exhibitId, undefined, result.chamber);
     refresh();
   }
   async function removeBackReference(entry: ExhibitRefEntry) {
