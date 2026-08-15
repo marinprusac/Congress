@@ -954,6 +954,12 @@ html[data-theme="dark"] {
   padding: 1rem;
   padding-bottom: calc(1rem + env(safe-area-inset-bottom));
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
+  /* Anchored to the root size, not inherited - .share-control mounts inside
+     wildly different ambient font-sizes (a small uppercase action bar for
+     ShareControl's own trigger, a 3xl title for ExhibitSharingBadge's), and
+     every rule below is em-based. Without this, the same popover renders at
+     a different scale depending on which trigger opened it. */
+  font-size: 1rem;
   /* Resets whatever text-transform the trigger button's own row applies
      (e.g. a "uppercase tracking-wide" action bar) - only field labels
      inside the form should be uppercase, not the whole popover. */
