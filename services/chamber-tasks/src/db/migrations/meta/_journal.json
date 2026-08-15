@@ -8,6 +8,13 @@
       "when": 1786747269398,
       "tag": "0000_lovely_nebula",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1786810187599,
+      "tag": "0001_sleepy_roulette",
+      "breakpoints": true
     }
   ]
 }

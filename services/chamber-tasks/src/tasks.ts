@@ -3,7 +3,8 @@ import type { TaskSummary, TaskDetail, CreateTaskRequest, UpdateTaskRequest } fr
 import { parseExhibitToken } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { tasks } from "./db/schema.js";
-import { toExhibitId, pushExhibitSync } from "./exhibits.js";
+import { toExhibitId, parseTaskId, pushExhibitSync } from "./exhibits.js";
+import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForTask } from "./refs.js";
 
 // Same regex+parseExhibitToken-filter shape as chamber-notes/src/notes.ts,
 // chamber-documents/src/documents.ts, and chamber-calendar/src/exhibits.ts's
@@ -19,6 +20,59 @@ function extractOutgoingExhibitRefs(text: string): string[] {
     if (parsed) ids.add(parsed.id);
   }
   return [...ids];
+}
+
+// The set of Exhibits this task points at is the union of what's embedded
+// in its description ("[[" tokens) and what was added explicitly via the
+// References side panel - pushed to Capitol as one outgoingRefs list
+// either way. Same shape as chamber-notes/src/notes.ts's syncNoteExhibit.
+async function syncTaskExhibit(id: number, name: string, description: string): Promise<void> {
+  const manual = listManualRefs(id);
+  const outgoingRefs = new Set([...extractOutgoingExhibitRefs(description), ...manual]);
+  await pushExhibitSync({
+    id: toExhibitId(id),
+    type: "task",
+    name,
+    url: `/t/${id}`,
+    outgoingRefs: [...outgoingRefs],
+    manualRefs: manual,
+  });
+}
+
+// Re-syncs a task whose description didn't change but whose manual refs
+// did (see the /api/exhibits/:id/refs routes in server.ts).
+export async function resyncTaskExhibit(id: number): Promise<void> {
+  const row = db.select().from(tasks).where(eq(tasks.id, id)).get();
+  if (!row) return;
+  await syncTaskExhibit(id, row.name, row.description);
+}
+
+// Thin exhibit-id-keyed wrappers for mountManualRefsRoutes
+// (@congress/chamber-kit), which only ever sees full Exhibit ids
+// ("task-3"), not this Chamber's own row ids - same shape as
+// chamber-notes/src/notes.ts's listManualRefsByExhibitId and friends.
+export function listManualRefsByExhibitId(exhibitId: string): string[] | null {
+  const id = parseTaskId(exhibitId);
+  return id === null ? null : listManualRefs(id);
+}
+
+export function addManualRefByExhibitId(exhibitId: string, targetExhibitId: string): boolean {
+  const id = parseTaskId(exhibitId);
+  if (id === null) return false;
+  addManualRef(id, targetExhibitId);
+  return true;
+}
+
+export function removeManualRefByExhibitId(exhibitId: string, targetExhibitId: string): boolean {
+  const id = parseTaskId(exhibitId);
+  if (id === null) return false;
+  removeManualRef(id, targetExhibitId);
+  return true;
+}
+
+export async function resyncTaskExhibitByExhibitId(exhibitId: string): Promise<void> {
+  const id = parseTaskId(exhibitId);
+  if (id !== null) await resyncTaskExhibit(id);
 }
 
 function toSummary(row: typeof tasks.$inferSelect): TaskSummary {
@@ -82,13 +136,7 @@ export async function createTask(input: CreateTaskRequest): Promise<TaskDetail> 
     .returning()
     .get();
 
-  await pushExhibitSync({
-    id: toExhibitId(inserted.id),
-    type: "task",
-    name: inserted.name,
-    url: `/t/${inserted.id}`,
-    outgoingRefs: extractOutgoingExhibitRefs(inserted.description),
-  });
+  await syncTaskExhibit(inserted.id, inserted.name, inserted.description);
 
   return toSummary(inserted);
 }
@@ -107,13 +155,7 @@ export async function updateTask(id: number, input: UpdateTaskRequest): Promise<
 
   db.update(tasks).set(next).where(eq(tasks.id, id)).run();
 
-  await pushExhibitSync({
-    id: toExhibitId(id),
-    type: "task",
-    name: next.name,
-    url: `/t/${id}`,
-    outgoingRefs: extractOutgoingExhibitRefs(next.description),
-  });
+  await syncTaskExhibit(id, next.name, next.description);
 
   return getTask(id);
 }
@@ -122,6 +164,7 @@ export async function deleteTask(id: number): Promise<boolean> {
   const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
   const result = db.delete(tasks).where(eq(tasks.id, id)).run();
   if (result.changes > 0 && existing) {
+    deleteManualRefsForTask(id);
     await pushExhibitSync({
       id: toExhibitId(id),
       type: "task",

@@ -1,4 +1,10 @@
-import type { TaskSummary, TaskDetail, CreateTaskRequest, UpdateTaskRequest } from "@congress/shared-types";
+import type {
+  TaskSummary,
+  TaskDetail,
+  CreateTaskRequest,
+  UpdateTaskRequest,
+  CapitolExhibitSearchResult,
+} from "@congress/shared-types";
 
 // In production this Chamber's frontend is proxied through Capitol at
 // "/tasks/*", but its API calls still need to reach Capitol's gateway at
@@ -52,6 +58,16 @@ export async function deleteTask(id: number): Promise<void> {
   if (!res.ok && res.status !== 204) {
     throw new Error(`Failed to delete task: ${res.status}`);
   }
+}
+
+// Quick-create a task from a "[[" picker or the References panel's "+
+// Create" option, without leaving the field the user was in - mirrors
+// Obsidian's "create note from link", scoped to Tasks the same way
+// chamber-notes/frontend/src/lib/api.ts's quickCreateNoteExhibit is scoped
+// to Notes: each Chamber can only quick-create its own Exhibit type.
+export async function quickCreateTaskExhibit(title: string): Promise<CapitolExhibitSearchResult> {
+  const task = await createTask({ name: title, description: "", dueDate: null });
+  return { chamber: "tasks", id: `task-${task.id}`, type: "task", name: task.name, url: `/t/${task.id}` };
 }
 
 export function setCompleted(id: number, completed: boolean): Promise<TaskDetail> {

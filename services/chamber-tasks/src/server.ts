@@ -6,10 +6,23 @@ import {
   mountExhibitSearchRoutes,
   mountExhibitContentRoutes,
   mountSettingsRoutes,
+  mountManualRefsRoutes,
   mountStaticFrontend,
 } from "@congress/chamber-kit";
 import { tasksManifest } from "./manifest.js";
-import { listTasks, listOpenTasks, searchTasks, getTask, createTask, updateTask, deleteTask } from "./tasks.js";
+import {
+  listTasks,
+  listOpenTasks,
+  searchTasks,
+  getTask,
+  createTask,
+  updateTask,
+  deleteTask,
+  listManualRefsByExhibitId,
+  addManualRefByExhibitId,
+  removeManualRefByExhibitId,
+  resyncTaskExhibitByExhibitId,
+} from "./tasks.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { searchTaskExhibits, resolveTaskExhibits, getTaskExhibitContent, updateTaskExhibitContent } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
@@ -74,6 +87,12 @@ app.delete("/api/tasks/:id", async (c) => {
 mountExhibitSearchRoutes(app, { search: searchTaskExhibits, resolve: resolveTaskExhibits });
 
 mountExhibitContentRoutes(app, { getContent: getTaskExhibitContent, updateContent: updateTaskExhibitContent });
+
+mountManualRefsRoutes(
+  app,
+  { list: listManualRefsByExhibitId, add: addManualRefByExhibitId, remove: removeManualRefByExhibitId },
+  resyncTaskExhibitByExhibitId
+);
 
 mountSettingsRoutes(app, { getSettings, updateSettings }, updateTasksSettingsRequestSchema);
 

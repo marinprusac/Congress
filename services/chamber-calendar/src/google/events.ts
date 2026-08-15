@@ -15,6 +15,7 @@ import { getAccountRow } from "./accounts.js";
 import { listSelectedCalendarsInternal } from "./calendars.js";
 import { AccountNeedsReconnectError } from "./accounts.js";
 import { toExhibitId, extractOutgoingExhibitRefs, pushExhibitSync, parseExhibitId } from "../exhibits.js";
+import { listManualRefs, deleteManualRefsForEvent } from "../refs.js";
 
 interface GoogleEventTime {
   date?: string;
@@ -181,14 +182,40 @@ export async function getEvent(accountId: number, calendarId: string, eventId: s
   return normalizeGoogleEvent(raw, accountId, calendarId, summary, colorHex);
 }
 
+// The set of Exhibits this event points at is the union of what's embedded
+// in its description ("[[" tokens) and what was added explicitly via the
+// References side panel - pushed to Capitol as one outgoingRefs list
+// either way. Same shape as chamber-notes/src/notes.ts's syncNoteExhibit.
 async function syncEventExhibit(result: CalendarEvent): Promise<void> {
+  const exhibitId = toExhibitId(result.accountId, result.calendarId, result.id);
+  const manual = listManualRefs(exhibitId) ?? [];
+  const outgoingRefs = new Set([...extractOutgoingExhibitRefs(result.description ?? ""), ...manual]);
   await pushExhibitSync({
-    id: toExhibitId(result.accountId, result.calendarId, result.id),
+    id: exhibitId,
     type: "event",
     name: result.title,
     url: `/e/${result.accountId}/${encodeURIComponent(result.calendarId)}/${encodeURIComponent(result.id)}`,
-    outgoingRefs: extractOutgoingExhibitRefs(result.description ?? ""),
+    outgoingRefs: [...outgoingRefs],
+    manualRefs: manual,
   });
+}
+
+// Re-syncs an event whose description didn't change but whose manual refs
+// did (see the /api/exhibits/:id/refs routes in server.ts) - unlike the
+// table-backed Chambers' resync helpers, this has to re-fetch from Google
+// first since there's no local row to read the current name/description
+// back from.
+export async function resyncEventExhibit(exhibitId: string): Promise<void> {
+  const parsed = parseExhibitId(exhibitId);
+  if (!parsed || !getAccountRow(parsed.accountId)) return;
+  try {
+    const event = await getEvent(parsed.accountId, parsed.calendarId, parsed.eventId);
+    await syncEventExhibit(event);
+  } catch {
+    // Same "can't confirm, don't crash the request" tolerance as
+    // getEventExhibitContent below - a transient Google error shouldn't
+    // fail the manual-ref add/remove that triggered this resync.
+  }
 }
 
 export async function createEvent(input: CreateEventRequest): Promise<CalendarEvent> {
@@ -290,8 +317,10 @@ export async function deleteEvent(accountId: number, calendarId: string, eventId
     `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
     { method: "DELETE" }
   );
+  const exhibitId = toExhibitId(accountId, calendarId, eventId);
+  deleteManualRefsForEvent(exhibitId);
   await pushExhibitSync({
-    id: toExhibitId(accountId, calendarId, eventId),
+    id: exhibitId,
     type: "event",
     name: existing.title,
     url: `/e/${accountId}/${encodeURIComponent(calendarId)}/${encodeURIComponent(eventId)}`,

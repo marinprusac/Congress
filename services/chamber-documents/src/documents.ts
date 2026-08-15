@@ -7,7 +7,8 @@ import { parseExhibitToken } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { documents } from "./db/schema.js";
 import { env } from "./env.js";
-import { toExhibitId, pushExhibitSync } from "./exhibits.js";
+import { toExhibitId, parseDocumentId, pushExhibitSync } from "./exhibits.js";
+import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForDocument } from "./refs.js";
 
 export const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // "modest documents," not a config knob
 
@@ -32,6 +33,60 @@ function extractOutgoingExhibitRefs(text: string): string[] {
     if (parsed) ids.add(parsed.id);
   }
   return [...ids];
+}
+
+// The set of Exhibits this document points at is the union of what's
+// embedded in its description ("[[" tokens) and what was added explicitly
+// via the References side panel - pushed to Capitol as one outgoingRefs
+// list either way. Same shape as chamber-notes/src/notes.ts's
+// syncNoteExhibit.
+async function syncDocumentExhibit(id: number, title: string, description: string): Promise<void> {
+  const manual = listManualRefs(id);
+  const outgoingRefs = new Set([...extractOutgoingExhibitRefs(description), ...manual]);
+  await pushExhibitSync({
+    id: toExhibitId(id),
+    type: "document",
+    name: title,
+    url: `/d/${id}`,
+    outgoingRefs: [...outgoingRefs],
+    manualRefs: manual,
+  });
+}
+
+// Re-syncs a document whose description didn't change but whose manual
+// refs did (see the /api/exhibits/:id/refs routes in server.ts).
+export async function resyncDocumentExhibit(id: number): Promise<void> {
+  const row = db.select().from(documents).where(eq(documents.id, id)).get();
+  if (!row) return;
+  await syncDocumentExhibit(id, row.title, row.description);
+}
+
+// Thin exhibit-id-keyed wrappers for mountManualRefsRoutes
+// (@congress/chamber-kit), which only ever sees full Exhibit ids
+// ("document-3"), not this Chamber's own row ids - same shape as
+// chamber-notes/src/notes.ts's listManualRefsByExhibitId and friends.
+export function listManualRefsByExhibitId(exhibitId: string): string[] | null {
+  const id = parseDocumentId(exhibitId);
+  return id === null ? null : listManualRefs(id);
+}
+
+export function addManualRefByExhibitId(exhibitId: string, targetExhibitId: string): boolean {
+  const id = parseDocumentId(exhibitId);
+  if (id === null) return false;
+  addManualRef(id, targetExhibitId);
+  return true;
+}
+
+export function removeManualRefByExhibitId(exhibitId: string, targetExhibitId: string): boolean {
+  const id = parseDocumentId(exhibitId);
+  if (id === null) return false;
+  removeManualRef(id, targetExhibitId);
+  return true;
+}
+
+export async function resyncDocumentExhibitByExhibitId(exhibitId: string): Promise<void> {
+  const id = parseDocumentId(exhibitId);
+  if (id !== null) await resyncDocumentExhibit(id);
 }
 
 function toSummary(row: typeof documents.$inferSelect): DocumentSummary {
@@ -90,13 +145,7 @@ export async function createDocument(input: CreateDocumentInput): Promise<Docume
     .returning()
     .get();
 
-  await pushExhibitSync({
-    id: toExhibitId(inserted.id),
-    type: "document",
-    name: inserted.title,
-    url: `/d/${inserted.id}`,
-    outgoingRefs: extractOutgoingExhibitRefs(inserted.description),
-  });
+  await syncDocumentExhibit(inserted.id, inserted.title, inserted.description);
 
   return toDetail(inserted);
 }
@@ -113,13 +162,7 @@ export async function updateDocument(id: number, input: UpdateDocumentRequest): 
     .where(eq(documents.id, id))
     .run();
 
-  await pushExhibitSync({
-    id: toExhibitId(id),
-    type: "document",
-    name: title,
-    url: `/d/${id}`,
-    outgoingRefs: extractOutgoingExhibitRefs(description),
-  });
+  await syncDocumentExhibit(id, title, description);
 
   return getDocument(id);
 }
@@ -133,6 +176,7 @@ export async function deleteDocument(id: number): Promise<boolean> {
     await unlink(join(env.FILES_DIR, existing.storageKey)).catch((err) => {
       console.warn(`Failed to remove stored file for document ${id}: ${(err as Error).message}`);
     });
+    deleteManualRefsForDocument(id);
     await pushExhibitSync({
       id: toExhibitId(id),
       type: "document",

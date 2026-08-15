@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const documents = sqliteTable("documents", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -15,3 +15,19 @@ export const documents = sqliteTable("documents", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
+
+// Explicit references added from the document's "References" side panel,
+// kept separate from the wikilinks parsed out of `documents.description` -
+// see extractOutgoingExhibitRefs/syncDocumentExhibit in documents.ts, which
+// unions both into the set actually pushed to Capitol. Same shape as
+// chamber-notes/src/db/schema.ts's noteRefs.
+export const documentRefs = sqliteTable(
+  "document_refs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    documentId: integer("document_id").notNull(),
+    targetExhibitId: text("target_exhibit_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [uniqueIndex("document_refs_document_target_idx").on(table.documentId, table.targetExhibitId)]
+);

@@ -52,6 +52,7 @@ export function EventViewPage() {
         emptyFrontlinksLabel="This event references nothing"
         renderIcon={(chamber) => getChamberIcon(chamber)}
         onNavigate={(r) => navigateToExhibit("calendar", r, navigate, shellHosted)}
+        editable
       >
         <dl className="space-y-4 font-mono text-sm">
           <div>

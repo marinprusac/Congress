@@ -6,6 +6,7 @@ import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,
   mountExhibitContentRoutes,
+  mountManualRefsRoutes,
   mountStaticFrontend,
 } from "@congress/chamber-kit";
 import { documentsManifest } from "./manifest.js";
@@ -18,6 +19,10 @@ import {
   getDocumentFile,
   FileTooLargeError,
   MAX_FILE_SIZE_BYTES,
+  listManualRefsByExhibitId,
+  addManualRefByExhibitId,
+  removeManualRefByExhibitId,
+  resyncDocumentExhibitByExhibitId,
 } from "./documents.js";
 import {
   searchDocumentExhibits,
@@ -122,6 +127,12 @@ app.get("/api/documents/:id/download", async (c) => {
 mountExhibitSearchRoutes(app, { search: searchDocumentExhibits, resolve: resolveDocumentExhibits });
 
 mountExhibitContentRoutes(app, { getContent: getDocumentExhibitContent, updateContent: updateDocumentExhibitContent });
+
+mountManualRefsRoutes(
+  app,
+  { list: listManualRefsByExhibitId, add: addManualRefByExhibitId, remove: removeManualRefByExhibitId },
+  resyncDocumentExhibitByExhibitId
+);
 
 app.get("/api/exhibits/:id/content/download", async (c) => {
   const documentId = parseDocumentId(c.req.param("id"));

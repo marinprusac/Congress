@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ExhibitTextarea, getChamberIcon, useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
-import { createTask } from "@/lib/api";
+import { createTask, quickCreateTaskExhibit } from "@/lib/api";
 
 export function NewTaskPage() {
   const [searchParams] = useSearchParams();
@@ -20,6 +20,12 @@ export function NewTaskPage() {
       navigate(resolveChamberPath(`/t/${created.id}`, "tasks", shellHosted));
     },
   });
+
+  async function onCreateExhibit(title: string) {
+    const result = await quickCreateTaskExhibit(title);
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    return result;
+  }
 
   return (
     <section>
@@ -57,6 +63,7 @@ export function NewTaskPage() {
           className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           wrapperClassName="exhibit-field mb-4"
           renderIcon={(chamber) => getChamberIcon(chamber)}
+          onCreate={onCreateExhibit}
         />
 
         {mutation.isError && <p className="mb-4 font-mono text-sm text-alert">{(mutation.error as Error).message}</p>}

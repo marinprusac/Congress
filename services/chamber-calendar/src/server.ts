@@ -10,6 +10,7 @@ import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,
   mountExhibitContentRoutes,
+  mountManualRefsRoutes,
   mountStaticFrontend,
 } from "@congress/chamber-kit";
 import { calendarManifest } from "./manifest.js";
@@ -30,10 +31,12 @@ import {
   deleteEvent,
   getEventExhibitContent,
   updateEventExhibitContent,
+  resyncEventExhibit,
   EventNotEditableError,
 } from "./google/events.js";
 import { GoogleApiError } from "./google/client.js";
 import { searchEventExhibits, resolveEventExhibits } from "./exhibits.js";
+import { listManualRefs, addManualRef, removeManualRef } from "./refs.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -188,6 +191,8 @@ app.delete("/api/events/:accountId/:calendarId/:eventId", async (c) => {
 mountExhibitSearchRoutes(app, { search: searchEventExhibits, resolve: resolveEventExhibits });
 
 mountExhibitContentRoutes(app, { getContent: getEventExhibitContent, updateContent: updateEventExhibitContent });
+
+mountManualRefsRoutes(app, { list: listManualRefs, add: addManualRef, remove: removeManualRef }, resyncEventExhibit);
 
 app.route("/mcp", mcpApp);
 

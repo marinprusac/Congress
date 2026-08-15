@@ -13,7 +13,7 @@ import {
   useShellHosted,
   resolveChamberPath,
 } from "@congress/exhibit-ui";
-import { fetchTask, updateTask, deleteTask } from "@/lib/api";
+import { fetchTask, updateTask, deleteTask, quickCreateTaskExhibit } from "@/lib/api";
 
 function toDateInputValue(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
@@ -74,6 +74,12 @@ export function TaskViewPage() {
 
   const task = taskQuery.data;
 
+  async function onCreateExhibit(title: string) {
+    const result = await quickCreateTaskExhibit(title);
+    queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    return result;
+  }
+
   function save() {
     updateMutation.mutate(
       { name: draftName, description: draftDescription, dueDate: draftDueDate || null },
@@ -124,6 +130,8 @@ export function TaskViewPage() {
         emptyFrontlinksLabel="This task references nothing"
         renderIcon={(chamber) => getChamberIcon(chamber)}
         onNavigate={(r) => navigateToExhibit("tasks", r, navigate, shellHosted)}
+        editable
+        onCreateReference={onCreateExhibit}
       >
         {editing ? (
           <ExhibitTextarea
@@ -132,6 +140,7 @@ export function TaskViewPage() {
             rows={12}
             className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
             renderIcon={(chamber) => getChamberIcon(chamber)}
+            onCreate={onCreateExhibit}
           />
         ) : task.description ? (
           <ExhibitAnnotatedText
