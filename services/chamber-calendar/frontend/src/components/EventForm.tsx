@@ -23,6 +23,12 @@ interface EventFormProps {
   onDelete?: () => void;
   deleting?: boolean;
   error?: string | null;
+  // Set for an event this account can't modify (e.g. an auto-added Gmail
+  // reservation whose organizer is a Google service) - every field becomes
+  // read-only and the save action disappears, but onDelete still works:
+  // removing such an event from the calendar is always allowed even when
+  // editing its content isn't.
+  readOnly?: boolean;
 }
 
 export function EventForm({
@@ -35,6 +41,7 @@ export function EventForm({
   onDelete,
   deleting,
   error,
+  readOnly,
 }: EventFormProps) {
   const { data: calendars } = useQuery({
     queryKey: ["calendars", "selected"],
@@ -66,12 +73,19 @@ export function EventForm({
     >
       {error && <div className="border border-alert px-3 py-2 font-mono text-sm text-alert">{error}</div>}
 
+      {readOnly && (
+        <div className="border border-dust px-3 py-2 font-mono text-sm text-slate">
+          This event is managed by its organizer, not this account, so it can't be edited here — it can still be
+          removed from the calendar.
+        </div>
+      )}
+
       <div>
         <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Calendar</label>
         <select
           value={values.calendarKey}
           onChange={(e) => set("calendarKey", e.target.value)}
-          disabled={calendarLocked}
+          disabled={calendarLocked || readOnly}
           required
           className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink disabled:text-dust"
         >
@@ -97,12 +111,18 @@ export function EventForm({
           value={values.title}
           onChange={(e) => set("title", e.target.value)}
           required
+          readOnly={readOnly}
           className="w-full border border-dust bg-parchment px-3 py-2 font-display text-lg text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
         />
       </div>
 
       <label className="flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-slate">
-        <input type="checkbox" checked={values.allDay} onChange={(e) => set("allDay", e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={values.allDay}
+          onChange={(e) => set("allDay", e.target.checked)}
+          disabled={readOnly}
+        />
         All day
       </label>
 
@@ -114,6 +134,7 @@ export function EventForm({
             value={values.start}
             onChange={(e) => set("start", e.target.value)}
             required
+            readOnly={readOnly}
             className="w-full min-w-0 border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
           />
         </div>
@@ -124,6 +145,7 @@ export function EventForm({
             value={values.end}
             onChange={(e) => set("end", e.target.value)}
             required
+            readOnly={readOnly}
             className="w-full min-w-0 border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
           />
         </div>
@@ -135,29 +157,43 @@ export function EventForm({
           type="text"
           value={values.location}
           onChange={(e) => set("location", e.target.value)}
+          readOnly={readOnly}
           className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
         />
       </div>
 
       <div>
         <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Description</label>
-        <ExhibitTextarea
-          value={values.description}
-          onChange={(newValue) => set("description", newValue)}
-          rows={4}
-          className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
-          renderIcon={(chamber) => getChamberIcon(chamber)}
-        />
+        {readOnly ? (
+          <textarea
+            value={values.description}
+            readOnly
+            rows={4}
+            className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
+          />
+        ) : (
+          <ExhibitTextarea
+            value={values.description}
+            onChange={(newValue) => set("description", newValue)}
+            rows={4}
+            className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
+            renderIcon={(chamber) => getChamberIcon(chamber)}
+          />
+        )}
       </div>
 
       <div className="flex items-center justify-between border-t border-dust pt-4">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="border border-ink px-4 py-2 font-mono text-xs uppercase tracking-wide text-ink hover:bg-ink hover:text-parchment disabled:opacity-50"
-        >
-          {submitting ? "Saving —" : submitLabel}
-        </button>
+        {readOnly ? (
+          <span />
+        ) : (
+          <button
+            type="submit"
+            disabled={submitting}
+            className="border border-ink px-4 py-2 font-mono text-xs uppercase tracking-wide text-ink hover:bg-ink hover:text-parchment disabled:opacity-50"
+          >
+            {submitting ? "Saving —" : submitLabel}
+          </button>
+        )}
         {onDelete && (
           <button
             type="button"

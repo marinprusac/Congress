@@ -1,4 +1,5 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
 import { usePullGesture } from "./usePullGesture.js";
 
@@ -41,11 +42,29 @@ export function MobileSearchReveal({ ownChamber, navigate, renderIcon }: MobileS
       if (released === "refresh") {
         window.location.reload();
       } else if (released === "search") {
-        setExpanded(true);
-        requestAnimationFrame(() => expandedRef.current?.querySelector("input")?.focus());
+        // flushSync + an immediate (not rAF-deferred) focus() call keeps
+        // the whole thing inside the touchend handler's own call stack -
+        // mobile browsers only raise the on-screen keyboard for a focus()
+        // that happens synchronously within a trusted user gesture, and a
+        // requestAnimationFrame callback runs a task too late to still
+        // count as one.
+        flushSync(() => setExpanded(true));
+        expandedRef.current?.querySelector("input")?.focus();
       }
     },
   });
+
+  // Tapping anywhere outside the expanded search bar dismisses it, same as
+  // SharePopover/ExhibitPickerDropdown's own click-away handling.
+  useEffect(() => {
+    if (!expanded) return;
+    function onOutsideDown(e: MouseEvent) {
+      if (!(e.target instanceof Node) || expandedRef.current?.contains(e.target)) return;
+      setExpanded(false);
+    }
+    document.addEventListener("mousedown", onOutsideDown);
+    return () => document.removeEventListener("mousedown", onOutsideDown);
+  }, [expanded]);
 
   if (expanded) {
     return (

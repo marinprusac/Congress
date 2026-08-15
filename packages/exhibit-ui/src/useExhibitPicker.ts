@@ -3,6 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { useExhibitSearch } from "./useExhibitSearch.js";
 import { buildExhibitToken } from "./token.js";
+import { getCaretCoordinates } from "./caretCoordinates.js";
 
 type PickerElement = HTMLTextAreaElement | HTMLInputElement;
 
@@ -21,6 +22,13 @@ export interface ExhibitPickerState {
   setActiveIndex: (index: number) => void;
   select: (result: CapitolExhibitSearchResult) => void;
   close: () => void;
+  // Pixel offset of the "[[" trigger within the field, relative to its own
+  // top-left corner - null for an <input> (single line, caret math doesn't
+  // matter) or before the first measurement. Lets the dropdown anchor next
+  // to where the user is actually typing instead of the bottom of the
+  // field, which can be many screens away from the caret once the field
+  // has auto-resized to a long note's full height.
+  caretPosition: { top: number; left: number } | null;
   // Spread onto the target <textarea>/<input>. Deliberately does NOT include
   // value/onChange - the field stays owned by the consumer's own state.
   fieldProps: {
@@ -57,6 +65,7 @@ export function useExhibitPicker({ value, onChange }: UseExhibitPickerOptions): 
   const attachRef = useCallback((el: PickerElement | null) => setElement(el), []);
 
   const [trigger, setTrigger] = useState<TriggerState | null>(null);
+  const [caretPosition, setCaretPosition] = useState<{ top: number; left: number } | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   // Bumped by caret-only movements (click / arrow keys / selection changes),
   // which don't alter `value` but can still open or close the picker.
@@ -98,6 +107,16 @@ export function useExhibitPicker({ value, onChange }: UseExhibitPickerOptions): 
       return;
     }
     setTrigger({ triggerStart, query: between, cursor });
+
+    if (element instanceof HTMLTextAreaElement) {
+      // Anchored to where "[[" was typed, not the live cursor - keeps the
+      // dropdown still while the query after it keeps changing.
+      const coords = getCaretCoordinates(element, triggerStart);
+      const lineHeight = parseFloat(window.getComputedStyle(element).lineHeight);
+      setCaretPosition({ top: coords.top + (Number.isFinite(lineHeight) ? lineHeight : 20), left: coords.left });
+    } else {
+      setCaretPosition(null);
+    }
   }, [element, value, caretTick]);
 
   const select = useCallback(
@@ -162,6 +181,7 @@ export function useExhibitPicker({ value, onChange }: UseExhibitPickerOptions): 
     setActiveIndex,
     select,
     close,
+    caretPosition,
     fieldProps: { ref: attachRef, onKeyDown, onSelect: bumpCaret, onClick: bumpCaret },
   };
 }

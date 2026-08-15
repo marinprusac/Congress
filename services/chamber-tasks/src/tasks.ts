@@ -1,8 +1,25 @@
 import { desc, eq, like, or } from "drizzle-orm";
 import type { TaskSummary, TaskDetail, CreateTaskRequest, UpdateTaskRequest } from "@congress/shared-types";
+import { parseExhibitToken } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { tasks } from "./db/schema.js";
 import { toExhibitId, pushExhibitSync } from "./exhibits.js";
+
+// Same regex+parseExhibitToken-filter shape as chamber-notes/src/notes.ts,
+// chamber-documents/src/documents.ts, and chamber-calendar/src/exhibits.ts's
+// extractOutgoingExhibitRefs - kept as its own small per-chamber copy rather
+// than shared, per established precedent.
+const WIKILINK_PATTERN = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+function extractOutgoingExhibitRefs(text: string): string[] {
+  const ids = new Set<string>();
+  for (const match of text.matchAll(WIKILINK_PATTERN)) {
+    const target = match[1]?.trim();
+    if (!target) continue;
+    const parsed = parseExhibitToken(target);
+    if (parsed) ids.add(parsed.id);
+  }
+  return [...ids];
+}
 
 function toSummary(row: typeof tasks.$inferSelect): TaskSummary {
   return {
@@ -70,7 +87,7 @@ export async function createTask(input: CreateTaskRequest): Promise<TaskDetail> 
     type: "task",
     name: inserted.name,
     url: `/t/${inserted.id}`,
-    outgoingRefs: [],
+    outgoingRefs: extractOutgoingExhibitRefs(inserted.description),
   });
 
   return toSummary(inserted);
@@ -95,7 +112,7 @@ export async function updateTask(id: number, input: UpdateTaskRequest): Promise<
     type: "task",
     name: next.name,
     url: `/t/${id}`,
-    outgoingRefs: [],
+    outgoingRefs: extractOutgoingExhibitRefs(next.description),
   });
 
   return getTask(id);

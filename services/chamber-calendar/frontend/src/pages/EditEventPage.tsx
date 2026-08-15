@@ -81,6 +81,7 @@ export function EditEventPage() {
         values={values}
         onChange={setValues}
         calendarLocked
+        readOnly={data ? !data.editable : false}
         onSubmit={() => updateMutation.mutate()}
         submitting={updateMutation.isPending}
         submitLabel="Save Changes"

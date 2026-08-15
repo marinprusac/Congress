@@ -10,7 +10,7 @@ import type {
 import { googleAccounts, selectedCalendars } from "../db/schema.js";
 import { db } from "../db/client.js";
 import { eq, and } from "drizzle-orm";
-import { googleCalendarFetch } from "./client.js";
+import { googleCalendarFetch, GoogleApiError } from "./client.js";
 import { getAccountRow } from "./accounts.js";
 import { listSelectedCalendarsInternal } from "./calendars.js";
 import { AccountNeedsReconnectError } from "./accounts.js";
@@ -30,6 +30,25 @@ interface GoogleEvent {
   htmlLink?: string;
   start: GoogleEventTime;
   end: GoogleEventTime;
+  organizer?: { self?: boolean };
+  guestsCanModify?: boolean;
+}
+
+export class EventNotEditableError extends Error {
+  constructor(title: string) {
+    super(`"${title}" can't be edited - it's managed by its organizer, not this account.`);
+    this.name = "EventNotEditableError";
+  }
+}
+
+// True unless this account is neither the organizer nor granted modify
+// rights - the case for e.g. an auto-added Gmail reservation/reminder event
+// (organizer is a Google service, guestsCanModify unset). Matches what a
+// PATCH to this event would actually be allowed to do; not enforced by
+// Google Calendar's own event resource as a single flag.
+function isEventEditable(raw: GoogleEvent): boolean {
+  const isOrganizer = raw.organizer ? raw.organizer.self === true : true;
+  return isOrganizer || raw.guestsCanModify === true;
 }
 
 function normalizeGoogleEvent(
@@ -53,6 +72,7 @@ function normalizeGoogleEvent(
     start: allDay ? raw.start.date! : raw.start.dateTime!,
     end: allDay ? raw.end.date! : raw.end.dateTime!,
     htmlLink: raw.htmlLink ?? null,
+    editable: isEventEditable(raw),
   };
 }
 
@@ -190,14 +210,28 @@ export async function updateEvent(
   input: UpdateEventRequest
 ): Promise<CalendarEvent> {
   const account = requireAccount(accountId);
-  const raw = (await googleCalendarFetch(
-    account,
-    `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
-    {
-      method: "PATCH",
-      body: JSON.stringify(toGoogleEventBody(input)),
+  let raw: GoogleEvent;
+  try {
+    raw = (await googleCalendarFetch(
+      account,
+      `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(toGoogleEventBody(input)),
+      }
+    )) as GoogleEvent;
+  } catch (err) {
+    // Google itself is the source of truth for whether this PATCH was
+    // allowed - a 403 here (not just a non-editable read we predicted
+    // client-side) is what actually confirms it, so this is the one place
+    // that turns it into a clear error rather than the generic 502
+    // GoogleApiError mapping.
+    if (err instanceof GoogleApiError && err.status === 403) {
+      const current = await getEvent(accountId, calendarId, eventId);
+      throw new EventNotEditableError(current.title);
     }
-  )) as GoogleEvent;
+    throw err;
+  }
   const { summary, colorHex } = calendarMeta(accountId, calendarId);
   const result = normalizeGoogleEvent(raw, accountId, calendarId, summary, colorHex);
   await syncEventExhibit(result);

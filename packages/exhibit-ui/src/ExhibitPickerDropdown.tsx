@@ -22,12 +22,22 @@ interface ExhibitPickerDropdownProps {
 export function ExhibitPickerDropdown({ picker, renderIcon, className }: ExhibitPickerDropdownProps) {
   const keyboardInset = useKeyboardInset();
 
+  const style: Record<string, string> = {};
+  if (keyboardInset > 0) style.bottom = `calc(0.5rem + ${keyboardInset}px)`;
+  // Consumed only by the desktop rule (see styles.css) - the mobile rule
+  // stays fixed-to-viewport and ignores these, since a caret-relative
+  // position makes no sense once the picker sits above the keyboard.
+  if (picker.caretPosition) {
+    style["--picker-caret-top"] = `${picker.caretPosition.top}px`;
+    style["--picker-caret-left"] = `${picker.caretPosition.left}px`;
+  }
+
   return (
     <div
       className={className}
       role="listbox"
       hidden={!picker.open}
-      style={keyboardInset > 0 ? { bottom: `calc(0.5rem + ${keyboardInset}px)` } : undefined}
+      style={Object.keys(style).length > 0 ? style : undefined}
     >
       {picker.loading && picker.results.length === 0 && (
         <div className="exhibit-picker-empty">Searching —</div>

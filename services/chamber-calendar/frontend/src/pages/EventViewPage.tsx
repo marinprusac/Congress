@@ -104,8 +104,13 @@ export function EventViewPage() {
             )}
             className="tap-target text-accent hover:underline"
           >
-            Edit
+            {event.editable ? "Edit" : "View / Delete"}
           </Link>
+          {!event.editable && (
+            <span className="font-mono text-xs uppercase tracking-wide text-dust">
+              Managed by its organizer — not editable
+            </span>
+          )}
         </ExhibitActionBar>
       </ExhibitLinksLayout>
     </section>

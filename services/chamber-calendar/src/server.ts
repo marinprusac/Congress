@@ -30,6 +30,7 @@ import {
   deleteEvent,
   getEventExhibitContent,
   updateEventExhibitContent,
+  EventNotEditableError,
 } from "./google/events.js";
 import { GoogleApiError } from "./google/client.js";
 import { searchEventExhibits, resolveEventExhibits } from "./exhibits.js";
@@ -40,6 +41,9 @@ export const app = new Hono<{ Bindings: HttpBindings }>();
 function mapError(c: Context, err: unknown): Response {
   if (err instanceof AccountNeedsReconnectError) {
     return c.json({ error: "account_needs_reconnect", accountId: err.accountId, label: err.label }, 409);
+  }
+  if (err instanceof EventNotEditableError) {
+    return c.json({ error: "event_not_editable", message: err.message }, 403);
   }
   if (err instanceof GoogleApiError) {
     return c.json({ error: "google_api_error", status: err.status, message: err.message }, 502);

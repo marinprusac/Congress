@@ -54,6 +54,11 @@ export const calendarEventSchema = z.object({
   start: z.string(),
   end: z.string(),
   htmlLink: z.string().url().nullable(),
+  // False for events this account can't modify - e.g. an auto-added Gmail
+  // reservation/reminder event whose organizer is a Google service, not the
+  // account itself. Such an event can still be removed from the calendar
+  // (deleteEvent), just not edited in place.
+  editable: z.boolean(),
 });
 export type CalendarEvent = z.infer<typeof calendarEventSchema>;
 
