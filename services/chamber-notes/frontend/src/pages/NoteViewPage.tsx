@@ -14,7 +14,16 @@ import {
   useShellHosted,
   resolveChamberPath,
 } from "@congress/exhibit-ui";
-import { fetchNote, updateNote, deleteNote, setPinned, fetchSettings } from "@/lib/api";
+import {
+  fetchNote,
+  updateNote,
+  deleteNote,
+  setPinned,
+  fetchSettings,
+  addNoteRef,
+  removeNoteRef,
+  quickCreateNoteExhibit,
+} from "@/lib/api";
 
 export function NoteViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -65,6 +74,20 @@ export function NoteViewPage() {
     },
   });
 
+  const exhibitId = `note-${noteId}`;
+  function onRefsChanged() {
+    queryClient.invalidateQueries({ queryKey: ["note", noteId] });
+    queryClient.invalidateQueries({ queryKey: ["exhibit-frontlinks", exhibitId] });
+  }
+  const addRefMutation = useMutation({
+    mutationFn: (result: { id: string }) => addNoteRef(noteId, result.id),
+    onSuccess: onRefsChanged,
+  });
+  const removeRefMutation = useMutation({
+    mutationFn: (targetExhibitId: string) => removeNoteRef(noteId, targetExhibitId),
+    onSuccess: onRefsChanged,
+  });
+
   useEffect(() => {
     if (noteQuery.data && !editing) {
       setDraftTitle(noteQuery.data.title);
@@ -106,6 +129,12 @@ export function NoteViewPage() {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [editing, draftTitle, draftContent]);
+
+  async function onCreateExhibit(title: string) {
+    const result = await quickCreateNoteExhibit(title);
+    queryClient.invalidateQueries({ queryKey: ["notes"] });
+    return result;
+  }
 
   if (!Number.isInteger(noteId)) return <p className="font-mono text-sm text-alert">Invalid note id.</p>;
   if (noteQuery.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
@@ -182,6 +211,7 @@ export function NoteViewPage() {
             rows={20}
             className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
             renderIcon={(chamber) => getChamberIcon(chamber)}
+            onCreate={onCreateExhibit}
           />
           <ExhibitActionBar>
             {!settingsQuery.data?.autoSave && (
@@ -196,11 +226,15 @@ export function NoteViewPage() {
         </>
       ) : (
         <ExhibitLinksLayout
-          exhibitId={`note-${noteId}`}
+          exhibitId={exhibitId}
           emptyBacklinksLabel="Nothing references this note"
           emptyFrontlinksLabel="This note references nothing"
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onNavigate={(r) => navigateToExhibit("notes", r, navigate, shellHosted)}
+          manualRefs={note.manualRefs}
+          onAddReference={(result) => addRefMutation.mutate(result)}
+          onRemoveReference={(targetId) => removeRefMutation.mutate(targetId)}
+          onCreateReference={onCreateExhibit}
         >
           <ExhibitMarkdown
             body={body}

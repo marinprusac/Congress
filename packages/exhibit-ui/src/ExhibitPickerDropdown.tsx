@@ -42,7 +42,7 @@ export function ExhibitPickerDropdown({ picker, renderIcon, className }: Exhibit
       {picker.loading && picker.results.length === 0 && (
         <div className="exhibit-picker-empty">Searching —</div>
       )}
-      {!picker.loading && picker.results.length === 0 && (
+      {!picker.loading && picker.results.length === 0 && !picker.showCreate && (
         <div className="exhibit-picker-empty">
           {picker.query.trim() ? "No matches" : "— Nothing to reference yet —"}
         </div>
@@ -65,6 +65,27 @@ export function ExhibitPickerDropdown({ picker, renderIcon, className }: Exhibit
           <span className="exhibit-picker-name">{result.name}</span>
         </div>
       ))}
+      {picker.showCreate && (
+        <div
+          role="option"
+          aria-selected={picker.activeIndex === picker.results.length}
+          className={
+            picker.activeIndex === picker.results.length
+              ? "exhibit-picker-option exhibit-picker-create active"
+              : "exhibit-picker-option exhibit-picker-create"
+          }
+          onMouseEnter={() => picker.setActiveIndex(picker.results.length)}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            picker.createNew();
+          }}
+        >
+          <span className="exhibit-picker-name">
+            {picker.creating ? "Creating —" : `+ Create "${picker.query.trim()}"`}
+          </span>
+        </div>
+      )}
+      {picker.createError && <div className="exhibit-picker-error">{picker.createError}</div>}
     </div>
   );
 }

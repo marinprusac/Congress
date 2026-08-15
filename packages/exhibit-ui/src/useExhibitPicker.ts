@@ -22,6 +22,15 @@ export interface ExhibitPickerState {
   setActiveIndex: (index: number) => void;
   select: (result: CapitolExhibitSearchResult) => void;
   close: () => void;
+  // Whether a "Create <query>" row should render after `results` - true
+  // only when the consumer opted in via `onCreate` and no existing result's
+  // name already matches the query exactly (case-insensitive).
+  showCreate: boolean;
+  creating: boolean;
+  // Non-null after a failed createNew() call; cleared on the next query
+  // change or successful create.
+  createError: string | null;
+  createNew: () => void;
   // Pixel offset of the "[[" trigger within the field, relative to its own
   // top-left corner - null for an <input> (single line, caret math doesn't
   // matter) or before the first measurement. Lets the dropdown anchor next
@@ -44,6 +53,12 @@ interface UseExhibitPickerOptions {
   value: string;
   // Called when a selection replaces the "[[query" span with a real token.
   onChange: (newValue: string, newCursor: number) => void;
+  // Opt-in "Create <query>" affordance for a Chamber whose own exhibits can
+  // be quick-created from here (only Notes, today) - resolves to the newly
+  // created Exhibit (inserted exactly like a picked search result) or
+  // rejects with a message to surface as `createError` (e.g. a title
+  // conflict).
+  onCreate?: (title: string) => Promise<CapitolExhibitSearchResult>;
 }
 
 // Detects "[[" typed immediately before the cursor (with no "]]" or newline
@@ -60,13 +75,15 @@ interface UseExhibitPickerOptions {
 // i.e. exactly the keystroke that first produces a trigger. Reading
 // selection in an effect (after React has committed the new value) avoids
 // racing the controlled value entirely.
-export function useExhibitPicker({ value, onChange }: UseExhibitPickerOptions): ExhibitPickerState {
+export function useExhibitPicker({ value, onChange, onCreate }: UseExhibitPickerOptions): ExhibitPickerState {
   const [element, setElement] = useState<PickerElement | null>(null);
   const attachRef = useCallback((el: PickerElement | null) => setElement(el), []);
 
   const [trigger, setTrigger] = useState<TriggerState | null>(null);
   const [caretPosition, setCaretPosition] = useState<{ top: number; left: number } | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   // Bumped by caret-only movements (click / arrow keys / selection changes),
   // which don't alter `value` but can still open or close the picker.
   const [caretTick, setCaretTick] = useState(0);
@@ -74,14 +91,26 @@ export function useExhibitPicker({ value, onChange }: UseExhibitPickerOptions): 
 
   const { results, loading } = useExhibitSearch(trigger?.query ?? "", trigger !== null);
 
+  const query = trigger?.query ?? "";
+  const trimmedQuery = query.trim();
+  const showCreate =
+    Boolean(onCreate) &&
+    trimmedQuery.length > 0 &&
+    !results.some((r) => r.name.toLowerCase() === trimmedQuery.toLowerCase());
+
   const triggerRef = useRef(trigger);
   triggerRef.current = trigger;
   const resultsRef = useRef(results);
   resultsRef.current = results;
   const activeIndexRef = useRef(activeIndex);
   activeIndexRef.current = activeIndex;
+  const showCreateRef = useRef(showCreate);
+  showCreateRef.current = showCreate;
 
-  useEffect(() => setActiveIndex(0), [trigger?.query]);
+  useEffect(() => {
+    setActiveIndex(0);
+    setCreateError(null);
+  }, [trigger?.query]);
 
   const close = useCallback(() => setTrigger(null), []);
 
@@ -142,6 +171,21 @@ export function useExhibitPicker({ value, onChange }: UseExhibitPickerOptions): 
   const selectRef = useRef(select);
   selectRef.current = select;
 
+  const createNew = useCallback(() => {
+    const current = triggerRef.current;
+    if (!onCreate || !current) return;
+    const title = current.query.trim();
+    if (!title) return;
+    setCreating(true);
+    setCreateError(null);
+    onCreate(title)
+      .then((result) => selectRef.current(result))
+      .catch((err) => setCreateError(err instanceof Error ? err.message : "Failed to create"))
+      .finally(() => setCreating(false));
+  }, [onCreate]);
+  const createNewRef = useRef(createNew);
+  createNewRef.current = createNew;
+
   const onKeyDown = useCallback(
     (e: ReactKeyboardEvent<PickerElement>) => {
       if (!triggerRef.current) return;
@@ -153,19 +197,26 @@ export function useExhibitPicker({ value, onChange }: UseExhibitPickerOptions): 
       }
 
       const currentResults = resultsRef.current;
-      if (currentResults.length === 0) return;
+      const total = currentResults.length + (showCreateRef.current ? 1 : 0);
+      if (total === 0) return;
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setActiveIndex((i) => (i + 1) % currentResults.length);
+        setActiveIndex((i) => (i + 1) % total);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setActiveIndex((i) => (i - 1 + currentResults.length) % currentResults.length);
+        setActiveIndex((i) => (i - 1 + total) % total);
       } else if (e.key === "Enter") {
-        const active = currentResults[activeIndexRef.current];
-        if (active) {
+        const index = activeIndexRef.current;
+        if (index < currentResults.length) {
+          const active = currentResults[index];
+          if (active) {
+            e.preventDefault();
+            selectRef.current(active);
+          }
+        } else if (showCreateRef.current) {
           e.preventDefault();
-          selectRef.current(active);
+          createNewRef.current();
         }
       }
     },
@@ -181,6 +232,10 @@ export function useExhibitPicker({ value, onChange }: UseExhibitPickerOptions): 
     setActiveIndex,
     select,
     close,
+    showCreate,
+    creating,
+    createError,
+    createNew,
     caretPosition,
     fieldProps: { ref: attachRef, onKeyDown, onSelect: bumpCaret, onClick: bumpCaret },
   };

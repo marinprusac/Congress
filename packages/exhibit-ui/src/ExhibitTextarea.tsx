@@ -1,4 +1,5 @@
 import { forwardRef, useLayoutEffect, useRef, type ChangeEvent, type ReactNode } from "react";
+import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { useExhibitPicker } from "./useExhibitPicker.js";
 import { ExhibitPickerDropdown } from "./ExhibitPickerDropdown.js";
 
@@ -18,6 +19,10 @@ interface ExhibitTextareaProps {
   // note/description is exactly the kind of thing that should be a shared
   // feature once there's one shared component to put it in.
   autoResize?: boolean;
+  // Lets "[[query" offer "+ Create query" when nothing matches, creating the
+  // Exhibit inline and inserting a reference to it without leaving this
+  // field - see useExhibitPicker's onCreate.
+  onCreate?: (title: string) => Promise<CapitolExhibitSearchResult>;
 }
 
 function mergeRefs<T>(refs: Array<React.Ref<T> | undefined>) {
@@ -35,10 +40,20 @@ function mergeRefs<T>(refs: Array<React.Ref<T> | undefined>) {
 // dropdown in one component instead of each page re-wiring the same three
 // pieces (some previously skipped the picker entirely, e.g. Tasks).
 export const ExhibitTextarea = forwardRef<HTMLTextAreaElement, ExhibitTextareaProps>(function ExhibitTextarea(
-  { value, onChange, rows = 6, placeholder, className, wrapperClassName = "exhibit-field", renderIcon, autoResize = true },
+  {
+    value,
+    onChange,
+    rows = 6,
+    placeholder,
+    className,
+    wrapperClassName = "exhibit-field",
+    renderIcon,
+    autoResize = true,
+    onCreate,
+  },
   forwardedRef
 ) {
-  const picker = useExhibitPicker({ value, onChange: (newValue) => onChange(newValue) });
+  const picker = useExhibitPicker({ value, onChange: (newValue) => onChange(newValue), onCreate });
   const elementRef = useRef<HTMLTextAreaElement | null>(null);
 
   useLayoutEffect(() => {

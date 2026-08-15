@@ -17,6 +17,11 @@ export type NoteSummary = z.infer<typeof noteSummarySchema>;
 export const noteDetailSchema = noteSummarySchema.extend({
   // Full raw markdown, including the frontmatter fence if present - what an editor should load.
   content: z.string(),
+  // Exhibit ids explicitly added via the references side panel, as opposed
+  // to ones parsed out of "[[" tokens in the body - a subset of the
+  // Chamber's own outgoingRefs sync to Capitol, kept here so the frontend
+  // can tell which entries in the "References" panel it's allowed to remove.
+  manualRefs: z.array(z.string()),
 });
 export type NoteDetail = z.infer<typeof noteDetailSchema>;
 

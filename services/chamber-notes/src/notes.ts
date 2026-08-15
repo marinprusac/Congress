@@ -6,6 +6,7 @@ import { db } from "./db/client.js";
 import { notes } from "./db/schema.js";
 import { extractWikiLinks, makeExcerpt } from "./wikilinks.js";
 import { toExhibitId, pushExhibitSync } from "./exhibits.js";
+import { listManualRefs, deleteManualRefsForNote } from "./refs.js";
 
 // Outgoing refs are bare Exhibit ids (e.g. "note-3"), matching the id space
 // used by exhibit_cache/exhibit_refs - not the "exhibit:chamber:id" token
@@ -17,6 +18,30 @@ function extractOutgoingExhibitRefs(body: string): string[] {
     if (parsed) ids.add(parsed.id);
   }
   return [...ids];
+}
+
+// The set of Exhibits this note points at is the union of what's embedded
+// in its body ("[[" tokens) and what was added explicitly via the
+// References side panel (packages/exhibit-ui's ExhibitLinksLayout) - pushed
+// to Capitol as one outgoingRefs list either way, so backlinks/frontlinks
+// don't need to know which source produced a given ref.
+async function syncNoteExhibit(id: number, title: string, body: string): Promise<void> {
+  const outgoingRefs = new Set([...extractOutgoingExhibitRefs(body), ...listManualRefs(id)]);
+  await pushExhibitSync({
+    id: toExhibitId(id),
+    type: "note",
+    name: title,
+    url: `/n/${id}`,
+    outgoingRefs: [...outgoingRefs],
+  });
+}
+
+// Re-syncs a note whose body didn't change but whose manual refs did (see
+// the /refs routes in server.ts).
+export async function resyncNoteExhibit(id: number): Promise<void> {
+  const row = db.select().from(notes).where(eq(notes.id, id)).get();
+  if (!row) return;
+  await syncNoteExhibit(id, row.title, row.body);
 }
 
 export class TitleConflictError extends Error {
@@ -95,6 +120,7 @@ export async function getNote(id: number): Promise<NoteDetail | null> {
   return {
     ...toSummary(row),
     content: reconstructContent(frontmatter, row.body),
+    manualRefs: listManualRefs(id),
   };
 }
 
@@ -116,13 +142,7 @@ export async function createNote(input: CreateNoteRequest): Promise<NoteDetail> 
     .returning()
     .get();
 
-  await pushExhibitSync({
-    id: toExhibitId(inserted.id),
-    type: "note",
-    name: inserted.title,
-    url: `/n/${inserted.id}`,
-    outgoingRefs: extractOutgoingExhibitRefs(body),
-  });
+  await syncNoteExhibit(inserted.id, inserted.title, body);
 
   const created = await getNote(inserted.id);
   if (!created) throw new Error("Failed to read back created note");
@@ -157,13 +177,7 @@ export async function updateNote(id: number, input: UpdateNoteRequest): Promise<
     .run();
 
   const finalTitle = input.title ?? existing.title;
-  await pushExhibitSync({
-    id: toExhibitId(id),
-    type: "note",
-    name: finalTitle,
-    url: `/n/${id}`,
-    outgoingRefs: extractOutgoingExhibitRefs(body),
-  });
+  await syncNoteExhibit(id, finalTitle, body);
 
   return getNote(id);
 }
@@ -172,6 +186,7 @@ export async function deleteNote(id: number): Promise<boolean> {
   const existing = db.select().from(notes).where(eq(notes.id, id)).get();
   const result = db.delete(notes).where(eq(notes.id, id)).run();
   if (result.changes > 0 && existing) {
+    deleteManualRefsForNote(id);
     await pushExhibitSync({
       id: toExhibitId(id),
       type: "note",

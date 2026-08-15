@@ -4,6 +4,7 @@ import type { HttpBindings } from "@hono/node-server";
 import {
   exhibitResolveRequestSchema,
   updateSharedExhibitContentRequestSchema,
+  manualRefRequestSchema,
   type ExhibitSearchResult,
   type ExhibitResolveResult,
   type SharedExhibitContent,
@@ -109,6 +110,52 @@ export function mountSettingsRoutes<TSettings>(
       return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
     }
     return c.json(await settingsApi.updateSettings(parsed.data as Partial<TSettings>));
+  });
+}
+
+export interface ManualRefsApi {
+  list: (sourceId: number) => string[];
+  add: (sourceId: number, targetExhibitId: string) => void;
+  remove: (sourceId: number, targetExhibitId: string) => void;
+}
+
+// Explicit references added from a side panel instead of embedded "[[" text
+// (see docs/congress-project-brief.md's Exhibits section) - mounted at
+// "<basePath>/:id/refs". `onChange` is the owning Chamber's hook for
+// recomputing its outgoingRefs and pushing an updated sync to Capitol, since
+// a manual add/remove changes that set exactly like an edit to body text
+// would.
+export function mountManualRefsRoutes(
+  app: ChamberApp,
+  basePath: string,
+  refs: ManualRefsApi,
+  onChange: (sourceId: number) => Promise<void>
+): void {
+  app.get(`${basePath}/:id/refs`, (c) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
+    return c.json({ refs: refs.list(id) });
+  });
+
+  app.post(`${basePath}/:id/refs`, async (c) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
+    const body = await c.req.json().catch(() => null);
+    const parsed = manualRefRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+    }
+    refs.add(id, parsed.data.targetExhibitId);
+    await onChange(id);
+    return c.json({ refs: refs.list(id) });
+  });
+
+  app.delete(`${basePath}/:id/refs/:targetExhibitId`, async (c) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
+    refs.remove(id, c.req.param("targetExhibitId"));
+    await onChange(id);
+    return c.json({ refs: refs.list(id) });
   });
 }
 

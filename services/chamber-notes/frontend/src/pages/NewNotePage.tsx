@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ExhibitTextarea, getChamberIcon, useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
-import { createNote } from "@/lib/api";
+import { createNote, quickCreateNoteExhibit } from "@/lib/api";
 
 export function NewNotePage() {
   const [searchParams] = useSearchParams();
@@ -19,6 +19,12 @@ export function NewNotePage() {
       navigate(resolveChamberPath(`/n/${created.id}`, "notes", shellHosted));
     },
   });
+
+  async function onCreateExhibit(refTitle: string) {
+    const result = await quickCreateNoteExhibit(refTitle);
+    queryClient.invalidateQueries({ queryKey: ["notes"] });
+    return result;
+  }
 
   return (
     <section>
@@ -49,6 +55,7 @@ export function NewNotePage() {
           className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           wrapperClassName="exhibit-field mb-4"
           renderIcon={(chamber) => getChamberIcon(chamber)}
+          onCreate={onCreateExhibit}
         />
 
         {mutation.isError && (

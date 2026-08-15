@@ -6,6 +6,7 @@ import {
   mountExhibitSearchRoutes,
   mountExhibitContentRoutes,
   mountSettingsRoutes,
+  mountManualRefsRoutes,
   mountStaticFrontend,
 } from "@congress/chamber-kit";
 import { notesManifest } from "./manifest.js";
@@ -17,8 +18,10 @@ import {
   createNote,
   updateNote,
   deleteNote,
+  resyncNoteExhibit,
   TitleConflictError,
 } from "./notes.js";
+import { listManualRefs, addManualRef, removeManualRef } from "./refs.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { searchNoteExhibits, resolveNoteExhibits, getNoteExhibitContent, updateNoteExhibitContent } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
@@ -103,6 +106,13 @@ mountExhibitContentRoutes(
     onUpdateError: (c, err) =>
       err instanceof TitleConflictError ? c.json({ error: "title_conflict", message: err.message }, 409) : undefined,
   }
+);
+
+mountManualRefsRoutes(
+  app,
+  "/api/notes",
+  { list: listManualRefs, add: addManualRef, remove: removeManualRef },
+  resyncNoteExhibit
 );
 
 mountSettingsRoutes(app, { getSettings, updateSettings }, updateNotesSettingsRequestSchema);

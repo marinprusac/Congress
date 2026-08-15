@@ -83,3 +83,17 @@ export const exhibitBacklinksResponseSchema = z.object({
   backlinks: z.array(capitolExhibitResolveResultSchema),
 });
 export type ExhibitBacklinksResponse = z.infer<typeof exhibitBacklinksResponseSchema>;
+
+// A source Exhibit's explicit references, added from a side panel rather
+// than embedded in body text (e.g. "[[" wikilinks) - merged with any
+// text-derived refs by the owning Chamber before it pushes outgoingRefs to
+// Capitol, so they show up in the same frontlinks/backlinks graph.
+export const manualRefRequestSchema = z.object({
+  targetExhibitId: z.string().min(1),
+});
+export type ManualRefRequest = z.infer<typeof manualRefRequestSchema>;
+
+export const manualRefsResponseSchema = z.object({
+  refs: z.array(z.string()),
+});
+export type ManualRefsResponse = z.infer<typeof manualRefsResponseSchema>;
