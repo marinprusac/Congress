@@ -2,7 +2,7 @@ import { parseExhibitToken } from "@congress/shared-types";
 
 const WIKILINK_PATTERN = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 
-// Internal marker scheme (not a real URL scheme) - lets NoteMarkdown's
+// Internal marker scheme (not a real URL scheme) - lets ExhibitMarkdown's
 // urlTransform bypass and `a` component override tell an Exhibit reference
 // apart from a genuine external link.
 export const EXHIBIT_LINK_SCHEME = "exhibit-ref:";

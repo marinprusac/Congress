@@ -1,0 +1,73 @@
+import { useRef, useState, type ReactNode } from "react";
+import { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
+import { usePullGesture } from "./usePullGesture.js";
+
+interface MobileSearchRevealProps {
+  ownChamber: string;
+  navigate: (path: string) => void;
+  renderIcon?: (chamber: string) => ReactNode;
+}
+
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1.1em" height="1.1em">
+      <circle cx="11" cy="11" r="7" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1.1em" height="1.1em">
+      <path d="M21 12a9 9 0 1 1-3-6.7" />
+      <polyline points="21 3 21 9 15 9" />
+    </svg>
+  );
+}
+
+// Mobile-only stand-in for the global search bar (hidden below 641px, see
+// .global-search) - a phone screen has no room for a search field in the
+// header, so this reclaims the pull-down gesture space a standalone PWA's
+// missing native pull-to-refresh leaves unused instead: a short pull down
+// from the top of the page reveals a search icon (release opens the
+// field), a longer pull swaps it to a refresh icon (release reloads).
+export function MobileSearchReveal({ ownChamber, navigate, renderIcon }: MobileSearchRevealProps) {
+  const [expanded, setExpanded] = useState(false);
+  const expandedRef = useRef<HTMLDivElement>(null);
+
+  const { zone, progress } = usePullGesture({
+    onRelease: (released) => {
+      if (released === "refresh") {
+        window.location.reload();
+      } else if (released === "search") {
+        setExpanded(true);
+        requestAnimationFrame(() => expandedRef.current?.querySelector("input")?.focus());
+      }
+    },
+  });
+
+  if (expanded) {
+    return (
+      <div className="mobile-search-reveal-expanded" ref={expandedRef}>
+        <GlobalExhibitSearch ownChamber={ownChamber} navigate={navigate} renderIcon={renderIcon} />
+        <button
+          type="button"
+          className="mobile-search-reveal-close tap-target"
+          onClick={() => setExpanded(false)}
+          aria-label="Close search"
+        >
+          ×
+        </button>
+      </div>
+    );
+  }
+
+  if (zone === "idle") return null;
+
+  return (
+    <div className="mobile-pull-indicator" data-zone={zone} style={{ opacity: Math.min(1, progress * 2) }} aria-hidden="true">
+      {zone === "refresh" ? <RefreshIcon /> : <SearchIcon />}
+    </div>
+  );
+}

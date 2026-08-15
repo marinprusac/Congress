@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useExhibitPicker, ExhibitPickerDropdown, getChamberIcon } from "@congress/exhibit-ui";
+import { ExhibitTextarea, getChamberIcon } from "@congress/exhibit-ui";
 import { createNote } from "@/lib/api";
 
 export function NewNotePage() {
@@ -10,7 +10,6 @@ export function NewNotePage() {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState(searchParams.get("title") ?? "");
   const [content, setContent] = useState("");
-  const picker = useExhibitPicker({ value: content, onChange: setContent });
 
   const mutation = useMutation({
     mutationFn: () => createNote({ title, content }),
@@ -41,21 +40,15 @@ export function NewNotePage() {
         <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">
           Content (Markdown, optional YAML frontmatter, [[ to reference an Exhibit)
         </label>
-        <div className="exhibit-field mb-4">
-          <textarea
-            {...picker.fieldProps}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={16}
-            placeholder={"---\ntags: []\n---\nStart writing. Type [[ to reference a note, event, or other Exhibit."}
-            className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-          />
-          <ExhibitPickerDropdown
-            picker={picker}
-            renderIcon={(chamber) => getChamberIcon(chamber)}
-            className="exhibit-picker-dropdown"
-          />
-        </div>
+        <ExhibitTextarea
+          value={content}
+          onChange={setContent}
+          rows={16}
+          placeholder={"---\ntags: []\n---\nStart writing. Type [[ to reference a note, event, or other Exhibit."}
+          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          wrapperClassName="exhibit-field mb-4"
+          renderIcon={(chamber) => getChamberIcon(chamber)}
+        />
 
         {mutation.isError && (
           <p className="mb-4 font-mono text-sm text-alert">{(mutation.error as Error).message}</p>

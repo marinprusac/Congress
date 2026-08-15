@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  useExhibitPicker,
-  ExhibitPickerDropdown,
+  ExhibitTextarea,
+  ExhibitActionBar,
   ExhibitAnnotatedText,
   ExhibitSharingBadge,
   ExhibitLinksLayout,
@@ -34,8 +34,6 @@ export function DocumentViewPage() {
     queryFn: () => fetchDocument(documentId),
     enabled: Number.isInteger(documentId),
   });
-
-  const picker = useExhibitPicker({ value: draftDescription, onChange: setDraftDescription });
 
   const updateMutation = useMutation({
     mutationFn: (input: { title: string; description: string }) => updateDocument(documentId, input),
@@ -78,17 +76,17 @@ export function DocumentViewPage() {
 
   return (
     <article>
-      <div className="mb-6 flex flex-col gap-3 border-b border-dust pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <div className="mb-6 border-b border-dust pb-4">
         {editing ? (
           <input
             ref={titleFieldRef}
             value={draftTitle}
             onChange={(e) => setDraftTitle(e.target.value)}
-            className="min-w-0 flex-1 font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+            className="w-full font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           />
         ) : (
           <h2
-            className="flex min-w-0 flex-1 items-center gap-3 font-display text-3xl text-ink"
+            className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink"
             onDoubleClick={editTitle}
             title="Double-click to edit"
           >
@@ -96,38 +94,6 @@ export function DocumentViewPage() {
             <ExhibitSharingBadge exhibitId={`document-${doc.id}`} className="exhibit-sharing-badge" />
           </h2>
         )}
-        <div className="flex shrink-0 gap-5 font-mono text-xs uppercase tracking-wide">
-          {editing ? (
-            <>
-              <button
-                onClick={() => updateMutation.mutate({ title: draftTitle, description: draftDescription })}
-                className="tap-target text-accent hover:underline"
-              >
-                Save
-              </button>
-              <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <ShareControl chamber="documents" exhibitId={`document-${doc.id}`} exhibitName={doc.title} />
-              <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
-                Edit
-              </button>
-              <button
-                onClick={() => {
-                  if (confirm(`Delete "${doc.title}"? This cannot be undone.`)) {
-                    deleteMutation.mutate();
-                  }
-                }}
-                className="tap-target text-alert hover:underline"
-              >
-                Delete
-              </button>
-            </>
-          )}
-        </div>
       </div>
 
       {updateMutation.isError && (
@@ -149,20 +115,26 @@ export function DocumentViewPage() {
       </dl>
 
       {editing ? (
-        <div className="exhibit-field">
-          <textarea
-            {...picker.fieldProps}
+        <>
+          <ExhibitTextarea
             value={draftDescription}
-            onChange={(e) => setDraftDescription(e.target.value)}
+            onChange={setDraftDescription}
             rows={10}
             className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-          />
-          <ExhibitPickerDropdown
-            picker={picker}
             renderIcon={(chamber) => getChamberIcon(chamber)}
-            className="exhibit-picker-dropdown"
           />
-        </div>
+          <ExhibitActionBar>
+            <button
+              onClick={() => updateMutation.mutate({ title: draftTitle, description: draftDescription })}
+              className="tap-target text-accent hover:underline"
+            >
+              Save
+            </button>
+            <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
+              Cancel
+            </button>
+          </ExhibitActionBar>
+        </>
       ) : (
         <ExhibitLinksLayout
           exhibitId={`document-${doc.id}`}
@@ -181,6 +153,22 @@ export function DocumentViewPage() {
           ) : (
             <p className="font-mono text-sm text-dust">— No description —</p>
           )}
+          <ExhibitActionBar>
+            <ShareControl chamber="documents" exhibitId={`document-${doc.id}`} exhibitName={doc.title} />
+            <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
+              Edit
+            </button>
+            <button
+              onClick={() => {
+                if (confirm(`Delete "${doc.title}"? This cannot be undone.`)) {
+                  deleteMutation.mutate();
+                }
+              }}
+              className="tap-target text-alert hover:underline"
+            >
+              Delete
+            </button>
+          </ExhibitActionBar>
         </ExhibitLinksLayout>
       )}
     </article>

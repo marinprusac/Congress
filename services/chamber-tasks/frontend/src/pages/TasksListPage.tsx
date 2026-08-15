@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchTasks, searchTasks, setCompleted } from "@/lib/api";
+import { fetchTasks, fetchTask, searchTasks, setCompleted } from "@/lib/api";
 import type { TaskSummary } from "@congress/shared-types";
 
 function formatDueDate(value: string | null): string | null {
@@ -32,6 +32,10 @@ export function TasksListPage() {
 
   const tasks = data ? sortOpenFirst(data) : data;
 
+  function prefetchTask(id: number) {
+    queryClient.prefetchQuery({ queryKey: ["task", id], queryFn: () => fetchTask(id) });
+  }
+
   return (
     <section>
       <input
@@ -61,7 +65,12 @@ export function TasksListPage() {
               >
                 {task.completed ? "Reopen" : "Done"}
               </button>
-              <Link to={`/t/${task.id}`} className="min-w-0 flex-1 hover:bg-ink/[0.03]">
+              <Link
+                to={`/t/${task.id}`}
+                onMouseEnter={() => prefetchTask(task.id)}
+                onFocus={() => prefetchTask(task.id)}
+                className="min-w-0 flex-1 hover:bg-ink/[0.03]"
+              >
                 <div className="flex items-baseline justify-between gap-4">
                   <span className={task.completed ? "font-display text-lg text-dust line-through" : "font-display text-lg text-ink"}>
                     {task.name}

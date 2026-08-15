@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { Link, Outlet, useNavigate } from "react-router-dom";
-import { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
+import { Outlet, useNavigate } from "react-router-dom";
+import { ChamberHeader } from "./ChamberHeader.js";
 import { ChamberPicker, type ChamberNavLink } from "./ChamberPicker.js";
 
 export type { ChamberNavLink };
@@ -26,20 +26,7 @@ export function ChamberLayout({ icon, title, navLinks, ownChamber, renderIcon }:
   return (
     <div className="chamber-shell">
       <ChamberPicker current={ownChamber} currentNavLinks={navLinks} currentLabel={title} />
-      <header className="chamber-header">
-        <div className="chamber-header-row">
-          <div>
-            <p className="chamber-eyebrow">Congress</p>
-            <Link to="/" className="chamber-title-link">
-              {icon}
-              <h1 className="chamber-title">{title}</h1>
-            </Link>
-          </div>
-          <div className="chamber-header-actions">
-            <GlobalExhibitSearch ownChamber={ownChamber} navigate={navigate} renderIcon={renderIcon} />
-          </div>
-        </div>
-      </header>
+      <ChamberHeader icon={icon} title={title} ownChamber={ownChamber} renderIcon={renderIcon} navigate={navigate} />
       <main className="chamber-main">
         <Outlet />
       </main>

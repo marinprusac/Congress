@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ExhibitTextarea, getChamberIcon } from "@congress/exhibit-ui";
 import { createTask } from "@/lib/api";
 
 export function NewTaskPage() {
@@ -45,12 +46,16 @@ export function NewTaskPage() {
           className="mb-4 border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
         />
 
-        <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Description (optional)</label>
-        <textarea
+        <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">
+          Description (optional, [[ to reference an Exhibit)
+        </label>
+        <ExhibitTextarea
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={setDescription}
           rows={10}
-          className="mb-4 w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          wrapperClassName="exhibit-field mb-4"
+          renderIcon={(chamber) => getChamberIcon(chamber)}
         />
 
         {mutation.isError && <p className="mb-4 font-mono text-sm text-alert">{(mutation.error as Error).message}</p>}

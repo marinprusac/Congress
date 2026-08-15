@@ -1,17 +1,18 @@
-import { useNavigate } from "react-router-dom";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import {
-  extractExhibitTokens,
-  useResolvedExhibits,
-  ExhibitChip,
-  navigateToExhibit,
-  getChamberIcon,
-} from "@congress/exhibit-ui";
-import { toMarkdownWithExhibitLinks, decodeExhibitLinkHref } from "@/lib/wikilinks";
+import type { CapitolExhibitResolveResult } from "@congress/shared-types";
+import { extractExhibitTokens } from "./textSegments.js";
+import { useResolvedExhibits } from "./useResolvedExhibits.js";
+import { ExhibitChip } from "./ExhibitChip.js";
+import { getChamberIcon } from "./ChamberMarks.js";
+import { toMarkdownWithExhibitLinks, decodeExhibitLinkHref } from "./wikilinks.js";
 
-interface NoteMarkdownProps {
+interface ExhibitMarkdownProps {
   body: string;
+  onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
+  // See useResolvedExhibits - defaults to Capitol's own-session resolve
+  // endpoint; SharedViewPage passes the token-scoped one instead.
+  resolveUrl?: string;
   // Called with how far through the rendered text (0 = start, 1 = end) the
   // double-click landed, so the caller can place the editor's caret roughly
   // where the reader was looking instead of always at the top.
@@ -53,11 +54,14 @@ function estimateTextFraction(container: HTMLElement, x: number, y: number): num
   return total === 0 ? 0 : Math.min(1, Math.max(0, before / total));
 }
 
-export function NoteMarkdown({ body, onDoubleClick }: NoteMarkdownProps) {
-  const navigate = useNavigate();
+// Renders a Chamber's Markdown body (Notes, and any shared-view rendering of
+// a Note) through react-markdown, resolving `[[exhibit:...]]` tokens into
+// <ExhibitChip>s inline. Chambers whose content is plain text, not Markdown
+// (e.g. Calendar's event description), use ExhibitAnnotatedText instead.
+export function ExhibitMarkdown({ body, onNavigate, resolveUrl, onDoubleClick }: ExhibitMarkdownProps) {
   const transformed = toMarkdownWithExhibitLinks(body);
   const tokens = extractExhibitTokens(body);
-  const { resultsByToken } = useResolvedExhibits(tokens);
+  const { resultsByToken } = useResolvedExhibits(tokens, resolveUrl);
 
   return (
     <div
@@ -94,7 +98,7 @@ export function NoteMarkdown({ body, onDoubleClick }: NoteMarkdownProps) {
                   result={result}
                   fallbackLabel={fallbackLabel}
                   renderIcon={(chamber) => getChamberIcon(chamber)}
-                  onNavigate={(r) => navigateToExhibit("notes", r, navigate)}
+                  onNavigate={onNavigate}
                   className="exhibit-chip"
                 />
               );

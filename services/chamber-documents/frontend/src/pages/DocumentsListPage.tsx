@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { fetchDocuments } from "@/lib/api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchDocuments, fetchDocument } from "@/lib/api";
 
 function formatTimestamp(value: string): string {
   return new Date(value).toISOString().replace("T", " ").slice(0, 16);
@@ -15,11 +15,16 @@ function formatBytes(bytes: number): string {
 
 export function DocumentsListPage() {
   const [query, setQuery] = useState("");
+  const queryClient = useQueryClient();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["documents"],
     queryFn: fetchDocuments,
   });
+
+  function prefetchDocument(id: number) {
+    queryClient.prefetchQuery({ queryKey: ["document", id], queryFn: () => fetchDocument(id) });
+  }
 
   const documents = data?.filter((doc) => {
     const q = query.trim().toLowerCase();
@@ -53,6 +58,8 @@ export function DocumentsListPage() {
             <Link
               key={doc.id}
               to={`/d/${doc.id}`}
+              onMouseEnter={() => prefetchDocument(doc.id)}
+              onFocus={() => prefetchDocument(doc.id)}
               className="block border-b border-dust px-1 py-3 hover:bg-ink/[0.03]"
             >
               <div className="flex items-baseline justify-between gap-4">

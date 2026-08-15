@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useExhibitPicker, ExhibitPickerDropdown, getChamberIcon } from "@congress/exhibit-ui";
+import { ExhibitTextarea, getChamberIcon } from "@congress/exhibit-ui";
 import { fetchSelectedCalendars } from "@/lib/api";
 
 export interface EventFormValues {
@@ -55,11 +55,6 @@ export function EventForm({
   function set<K extends keyof EventFormValues>(key: K, value: EventFormValues[K]) {
     onChange({ ...values, [key]: value });
   }
-
-  const picker = useExhibitPicker({
-    value: values.description,
-    onChange: (newValue) => set("description", newValue),
-  });
 
   return (
     <form
@@ -144,19 +139,14 @@ export function EventForm({
         />
       </div>
 
-      <div className="exhibit-field">
+      <div>
         <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Description</label>
-        <textarea
-          {...picker.fieldProps}
+        <ExhibitTextarea
           value={values.description}
-          onChange={(e) => set("description", e.target.value)}
+          onChange={(newValue) => set("description", newValue)}
           rows={4}
           className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
-        />
-        <ExhibitPickerDropdown
-          picker={picker}
           renderIcon={(chamber) => getChamberIcon(chamber)}
-          className="exhibit-picker-dropdown"
         />
       </div>
 

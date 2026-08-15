@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchNotes, searchNotes, setPinned } from "@/lib/api";
+import { fetchNotes, fetchNote, searchNotes, setPinned } from "@/lib/api";
 import type { NoteSummary } from "@congress/shared-types";
 
 function formatTimestamp(value: string): string {
@@ -31,6 +31,10 @@ export function NotesListPage() {
 
   const notes = data ? sortPinnedFirst(data) : data;
 
+  function prefetchNote(id: number) {
+    queryClient.prefetchQuery({ queryKey: ["note", id], queryFn: () => fetchNote(id) });
+  }
+
   return (
     <section>
       <input
@@ -55,7 +59,12 @@ export function NotesListPage() {
           !isError &&
           notes?.map((note) => (
             <div key={note.id} className="flex items-baseline gap-3 border-b border-dust px-1 py-3">
-              <Link to={`/n/${note.id}`} className="min-w-0 flex-1 hover:bg-ink/[0.03]">
+              <Link
+                to={`/n/${note.id}`}
+                onMouseEnter={() => prefetchNote(note.id)}
+                onFocus={() => prefetchNote(note.id)}
+                className="min-w-0 flex-1 hover:bg-ink/[0.03]"
+              >
                 <div className="flex items-baseline justify-between gap-4">
                   <span className="font-display text-lg text-ink">
                     {note.pinned && <span className="mr-1.5 text-accent">*</span>}

@@ -2,9 +2,8 @@
    tokens, base reset, and every component style this package's React
    components rely on (exhibit chips, the [[ picker, sharing badges/forms,
    the Chamber shell). A consuming app's own index.css should only need
-   `@import "@congress/exhibit-ui/styles.css";` plus genuine exceptions -
-   e.g. Notes' .note-prose markdown rendering has no equivalent anywhere
-   else, so it stays local. */
+   `@import "@congress/exhibit-ui/styles.css";` - there are no remaining
+   per-Chamber exceptions. */
 
 @import "tailwindcss";
 
@@ -167,6 +166,51 @@ html[data-theme="dark"] {
   margin: 0 auto;
   max-width: 56rem;
   padding: 2.5rem 1.5rem;
+}
+
+/* SharedViewPage's nav (the share's Contents list) + main content. Mobile
+   default: main content first (what a recipient actually clicked the link
+   for), Contents stacked below as secondary browsing - same "children
+   first, side panels after" order .exhibit-links-layout already uses.
+   Desktop widens into a sidebar-flanks-content layout instead. */
+.shared-view-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.shared-view-nav {
+  order: 2;
+}
+
+.shared-view-main {
+  order: 1;
+  min-width: 0;
+}
+
+@media (min-width: 641px) {
+  .shared-view-layout {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 2rem;
+    padding: 2.5rem 1.5rem;
+  }
+
+  .shared-view-nav {
+    order: 0;
+    width: 16rem;
+    flex-shrink: 0;
+    border-right: 1px solid var(--color-dust);
+    padding-right: 1rem;
+  }
+
+  .shared-view-main {
+    order: 0;
+    flex: 1;
+  }
 }
 
 /* ChamberPicker - persistent nav between Capitol and every Chamber, mounted
@@ -415,6 +459,111 @@ html[data-theme="dark"] {
   text-decoration-color: var(--color-accent);
 }
 
+/* ExhibitMarkdown's react-markdown output styling - used by Notes' own
+   view/edit page and, for a shared Note, SharedViewPage. */
+.note-prose h1,
+.note-prose h2,
+.note-prose h3,
+.note-prose h4,
+.note-prose h5,
+.note-prose h6 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.25;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.note-prose h1 {
+  font-size: 2em;
+}
+
+.note-prose h2 {
+  font-size: 1.6em;
+}
+
+.note-prose h3 {
+  font-size: 1.3em;
+}
+
+.note-prose h4 {
+  font-size: 1.15em;
+}
+
+.note-prose h5 {
+  font-size: 1em;
+}
+
+.note-prose h6 {
+  font-size: 0.9em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-slate);
+}
+
+.note-prose p {
+  margin: 0.75em 0;
+  line-height: 1.65;
+}
+
+.note-prose ul,
+.note-prose ol {
+  margin: 0.75em 0;
+  padding-left: 1.5em;
+}
+
+.note-prose ul {
+  list-style: disc;
+}
+
+.note-prose ol {
+  list-style: decimal;
+}
+
+.note-prose code {
+  font-family: var(--font-mono);
+  background-color: color-mix(in srgb, var(--color-dust) 15%, transparent);
+  padding: 0.1em 0.3em;
+  font-size: 0.9em;
+}
+
+.note-prose pre {
+  font-family: var(--font-mono);
+  background-color: color-mix(in srgb, var(--color-dust) 15%, transparent);
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+
+.note-prose pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.note-prose blockquote {
+  border-left: 2px solid var(--color-dust);
+  padding-left: 1em;
+  margin: 0.75em 0;
+  color: var(--color-slate);
+}
+
+.note-table-wrapper {
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+
+.note-prose table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.note-prose th,
+.note-prose td {
+  border: 1px solid var(--color-dust);
+  padding: 0.4em 0.6em;
+  text-align: left;
+}
+
 .exhibit-chip[data-exhibit-state="resolved"] {
   display: inline-flex;
   align-items: center;
@@ -465,25 +614,16 @@ html[data-theme="dark"] {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.15em 0.6em;
-  border-radius: 999px;
   white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
-}
-
-.exhibit-sharing-badge:hover {
-  opacity: 0.75;
-}
-
-.exhibit-sharing-badge[data-sharing-state="direct"] {
   color: var(--color-accent);
   border: 1px solid var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
-.exhibit-sharing-badge[data-sharing-state="inherited"] {
-  color: var(--color-slate);
-  border: 1px dashed var(--color-dust);
+.exhibit-sharing-badge:hover {
+  opacity: 0.75;
 }
 
 /* Mobile default: content on top, backlinks/frontlinks stacked as a
@@ -554,6 +694,20 @@ html[data-theme="dark"] {
    to the viewport. */
 .exhibit-field {
   position: relative;
+}
+
+.exhibit-action-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-dust);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* Mobile default: fixed to the viewport, not positioned relative to the
@@ -629,10 +783,82 @@ html[data-theme="dark"] {
   min-width: 0;
 }
 
+/* The header's own search slot is desktop-only - a phone screen has no room
+   for it next to a 2.25rem title, and MobileSearchReveal's pull gesture is
+   the mobile entry point instead. Scoped to .chamber-header-actions so it
+   doesn't also hide the copy MobileSearchReveal itself mounts when its
+   pulled-open overlay renders a <GlobalExhibitSearch> of its own. */
+.chamber-header-actions .global-search {
+  display: none;
+}
+
 @media (min-width: 641px) {
   .global-search {
     flex: none;
     width: 16rem;
+  }
+
+  .chamber-header-actions .global-search {
+    display: block;
+  }
+}
+
+.mobile-pull-indicator {
+  position: fixed;
+  top: calc(0.75rem + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--color-dust);
+  background: var(--color-parchment);
+  color: var(--color-ink);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+}
+
+.mobile-pull-indicator[data-zone="refresh"] {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.mobile-search-reveal-expanded {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  padding-top: calc(0.75rem + env(safe-area-inset-top));
+  background: var(--color-parchment);
+  border-bottom: 1px solid var(--color-dust);
+}
+
+.mobile-search-reveal-expanded .global-search {
+  flex: 1;
+}
+
+.mobile-search-reveal-close {
+  color: var(--color-slate);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.mobile-search-reveal-close:hover {
+  color: var(--color-accent);
+}
+
+@media (min-width: 641px) {
+  .mobile-pull-indicator,
+  .mobile-search-reveal-expanded {
+    display: none;
   }
 }
 
@@ -695,7 +921,8 @@ html[data-theme="dark"] {
   font-size: 0.7em;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 0.3em 0.8em;
+  /* Sized for a comfortable thumb tap, not just a readable label. */
+  padding: 0.55em 0.9em;
   border: 1px solid var(--color-dust);
   color: var(--color-ink);
   background: var(--color-parchment);
@@ -706,17 +933,27 @@ html[data-theme="dark"] {
   color: var(--color-accent);
 }
 
+/* Mobile-first: a bottom sheet is the default, not a fallback. A 320px
+   dropdown anchored under a small trigger is unreachable/unusable on a
+   phone - full-width, thumb-reachable at the bottom of the screen, with
+   its own scroll for a tall form, is the actual common case here. Desktop
+   gets the anchored-dropdown treatment below as the enhancement. */
 .share-control-popover {
-  position: absolute;
-  top: calc(100% + 0.5rem);
-  right: 0;
+  position: fixed;
   z-index: 20;
-  width: 320px;
-  max-width: calc(100vw - 2rem);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-width: none;
+  max-height: min(80vh, calc(100vh - 2rem));
+  overflow-y: auto;
   border: 1px solid var(--color-dust);
+  border-bottom: none;
   background: var(--color-parchment);
   padding: 1rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
   /* Resets whatever text-transform the trigger button's own row applies
      (e.g. a "uppercase tracking-wide" action bar) - only field labels
      inside the form should be uppercase, not the whole popover. */
@@ -724,25 +961,16 @@ html[data-theme="dark"] {
   letter-spacing: normal;
 }
 
-/* Below `sm`, .share-control-popover's `right: 0` is relative to the
-   trigger button, not the viewport - on an action bar that isn't flush
-   against the screen's right edge (e.g. Share sitting between Pin and
-   Edit), the 320px-wide popover overshoots the left edge of the screen
-   and is unreachable. Anchoring it to the viewport as a fixed sheet
-   guarantees it stays fully on-screen regardless of where the trigger
-   sits, and caps its height so a tall share list scrolls instead of
-   running off the bottom. */
-@media (max-width: 640px) {
+@media (min-width: 641px) {
   .share-control-popover {
-    position: fixed;
-    top: auto;
-    right: 1rem;
-    bottom: 1rem;
-    left: 1rem;
-    width: auto;
-    max-width: none;
-    max-height: calc(100vh - 2rem);
-    overflow-y: auto;
+    position: absolute;
+    inset: calc(100% + 0.5rem) 0 auto auto;
+    width: 320px;
+    max-width: calc(100vw - 2rem);
+    max-height: none;
+    border-bottom: 1px solid var(--color-dust);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    padding-bottom: 1rem;
   }
 }
 
@@ -938,17 +1166,5 @@ html[data-theme="dark"] {
 .share-copy-button:hover {
   border-color: var(--color-accent);
   color: var(--color-accent);
-}
-
-/* EditShareModal reuses .share-control-popover directly (see
-   ExhibitSharingBadge, which wraps its trigger in .share-control the same
-   way ShareControl does) - editing a share should look and behave exactly
-   like creating one, not a heavier, different kind of interaction. Only
-   its own small header row (title + close) is unique to it. */
-.share-edit-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
 }
 

@@ -2,17 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  useExhibitPicker,
-  ExhibitPickerDropdown,
+  ExhibitTextarea,
+  ExhibitActionBar,
+  ExhibitMarkdown,
   ExhibitSharingBadge,
   ExhibitLinksLayout,
   ShareControl,
   navigateToExhibit,
   getChamberIcon,
+  stripFrontmatter,
 } from "@congress/exhibit-ui";
 import { fetchNote, updateNote, deleteNote, setPinned, fetchSettings } from "@/lib/api";
-import { NoteMarkdown } from "@/components/NoteMarkdown";
-import { stripFrontmatter } from "@/lib/frontmatter";
 
 export function NoteViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,11 +33,6 @@ export function NoteViewPage() {
   });
 
   const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
-
-  const picker = useExhibitPicker({
-    value: draftContent,
-    onChange: (newValue) => setDraftContent(newValue),
-  });
 
   const updateMutation = useMutation({
     mutationFn: (input: { title: string; content: string }) => updateNote(noteId, input),
@@ -140,17 +135,17 @@ export function NoteViewPage() {
 
   return (
     <article ref={articleRef}>
-      <div className="mb-6 flex flex-col gap-3 border-b border-dust pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <div className="mb-6 border-b border-dust pb-4">
         {editing ? (
           <input
             ref={titleFieldRef}
             value={draftTitle}
             onChange={(e) => setDraftTitle(e.target.value)}
-            className="min-w-0 flex-1 font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+            className="w-full font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           />
         ) : (
           <h2
-            className="flex min-w-0 flex-1 items-center gap-3 font-display text-3xl text-ink"
+            className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink"
             onDoubleClick={editTitle}
             title="Double-click to edit"
           >
@@ -158,43 +153,6 @@ export function NoteViewPage() {
             <ExhibitSharingBadge exhibitId={`note-${noteId}`} className="exhibit-sharing-badge" />
           </h2>
         )}
-        <div className="flex shrink-0 items-center gap-5 font-mono text-xs uppercase tracking-wide">
-          {editing ? (
-            <>
-              {!settingsQuery.data?.autoSave && (
-                <button onClick={saveExplicit} className="tap-target text-accent hover:underline">
-                  Save
-                </button>
-              )}
-              <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
-                {settingsQuery.data?.autoSave ? "Close" : "Cancel"}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => pinMutation.mutate(!note.pinned)}
-                className="tap-target text-accent hover:underline"
-              >
-                {note.pinned ? "Unpin" : "Pin"}
-              </button>
-              <ShareControl chamber="notes" exhibitId={`note-${noteId}`} exhibitName={note.title} />
-              <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
-                Edit
-              </button>
-              <button
-                onClick={() => {
-                  if (confirm(`Delete "${note.title}"? This cannot be undone.`)) {
-                    deleteMutation.mutate();
-                  }
-                }}
-                className="tap-target text-alert hover:underline"
-              >
-                Delete
-              </button>
-            </>
-          )}
-        </div>
       </div>
 
       {updateMutation.isError && (
@@ -213,24 +171,26 @@ export function NoteViewPage() {
       )}
 
       {editing ? (
-        <div className="exhibit-field">
-          <textarea
-            {...picker.fieldProps}
-            ref={(el) => {
-              picker.fieldProps.ref(el);
-              contentFieldRef.current = el;
-            }}
+        <>
+          <ExhibitTextarea
+            ref={contentFieldRef}
             value={draftContent}
-            onChange={(e) => setDraftContent(e.target.value)}
+            onChange={setDraftContent}
             rows={20}
             className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-          />
-          <ExhibitPickerDropdown
-            picker={picker}
             renderIcon={(chamber) => getChamberIcon(chamber)}
-            className="exhibit-picker-dropdown"
           />
-        </div>
+          <ExhibitActionBar>
+            {!settingsQuery.data?.autoSave && (
+              <button onClick={saveExplicit} className="tap-target text-accent hover:underline">
+                Save
+              </button>
+            )}
+            <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
+              {settingsQuery.data?.autoSave ? "Close" : "Cancel"}
+            </button>
+          </ExhibitActionBar>
+        </>
       ) : (
         <ExhibitLinksLayout
           exhibitId={`note-${noteId}`}
@@ -239,7 +199,33 @@ export function NoteViewPage() {
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onNavigate={(r) => navigateToExhibit("notes", r, navigate)}
         >
-          <NoteMarkdown body={body} onDoubleClick={editAtFraction} />
+          <ExhibitMarkdown
+            body={body}
+            onDoubleClick={editAtFraction}
+            onNavigate={(r) => navigateToExhibit("notes", r, navigate)}
+          />
+          <ExhibitActionBar>
+            <button
+              onClick={() => pinMutation.mutate(!note.pinned)}
+              className="tap-target text-accent hover:underline"
+            >
+              {note.pinned ? "Unpin" : "Pin"}
+            </button>
+            <ShareControl chamber="notes" exhibitId={`note-${noteId}`} exhibitName={note.title} />
+            <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
+              Edit
+            </button>
+            <button
+              onClick={() => {
+                if (confirm(`Delete "${note.title}"? This cannot be undone.`)) {
+                  deleteMutation.mutate();
+                }
+              }}
+              className="tap-target text-alert hover:underline"
+            >
+              Delete
+            </button>
+          </ExhibitActionBar>
         </ExhibitLinksLayout>
       )}
     </article>

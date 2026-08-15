@@ -36,10 +36,9 @@ async function patchUpdateShare(token: string, input: UpdateShareRequest): Promi
 // the full ShareSummary (maxDepth/expiresAt/rootId/rootChamber) needed to
 // prefill ShareFieldsEditor is fetched here, scoped to this exhibit.
 //
-// Reuses ShareControl's own .share-control-popover anchored-dropdown look
-// (its parent renders the .share-control positioning context) rather than
-// a fixed-backdrop dialog, so editing a share reads the same as creating
-// one instead of a heavier, unrelated interaction.
+// Rendered inside the same SharePopover ShareControl uses, so editing a
+// share reads and dismisses exactly the same way as creating one - no
+// title bar or close button of its own, just the form.
 export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProps) {
   const queryClient = useQueryClient();
   const { data: shares, isLoading } = useQuery({
@@ -69,14 +68,6 @@ export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProp
     setSeeded(true);
   }, [share, seeded]);
 
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (pending) return;
@@ -100,14 +91,7 @@ export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProp
   }
 
   return (
-    <div className="share-control-popover">
-      <div className="share-edit-header">
-        <span className="share-field-label">Edit share</span>
-        <button type="button" className="share-picker-clear" onClick={onClose} aria-label="Close">
-          ×
-        </button>
-      </div>
-
+    <>
       {isLoading && <p className="font-mono text-sm">Loading —</p>}
       {!isLoading && !share && <p className="share-error">Share not found.</p>}
 
@@ -135,6 +119,6 @@ export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProp
           </button>
         </form>
       )}
-    </div>
+    </>
   );
 }

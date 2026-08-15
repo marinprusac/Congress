@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CreateShareForm } from "./CreateShareForm.js";
+import { SharePopover } from "./SharePopover.js";
 import { exhibitSharingQueryKey } from "./useExhibitSharing.js";
 
 interface ShareControlProps {
@@ -25,13 +26,13 @@ export function ShareControl({ chamber, exhibitId, exhibitName, className }: Sha
       <button type="button" className="share-control-trigger" onClick={() => setOpen((o) => !o)}>
         Share
       </button>
-      <div className="share-control-popover" hidden={!open}>
+      <SharePopover open={open} onClose={() => setOpen(false)}>
         <CreateShareForm
           fixedRoot={{ chamber, id: exhibitId, name: exhibitName }}
           className="share-form"
           onCreated={() => queryClient.invalidateQueries({ queryKey: exhibitSharingQueryKey(exhibitId) })}
         />
-      </div>
+      </SharePopover>
     </div>
   );
 }
