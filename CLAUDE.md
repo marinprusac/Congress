@@ -103,6 +103,6 @@ Chamber-wide (not per-device) preferences use a single-row settings table — `i
 
 Full details in `infra/README.md`. Key points to know before pushing to `main`:
 
-- The VPS (`178.105.180.7`) polls `origin/main` every 90s (`infra/deploy/sync.sh` via a systemd timer) and fast-forwards, reinstalls, rebuilds, and restarts automatically — **there is no separate deploy step**, pushing to `main` is the deploy.
+- The VPS (`178.105.180.7`) polls `origin/main` every 30s (`infra/deploy/sync.sh` via a systemd timer) and fast-forwards, reinstalls, rebuilds, and restarts automatically — **there is no separate deploy step**, pushing to `main` is the deploy.
 - Production ports differ from dev defaults: Capitol `8000` (not `3000`, since that VPS runs other unrelated projects too), Notes `8011`, Calendar `8012`, Documents `8013`, Tasks `8014` — same as dev for the Chambers, different for Capitol. Don't assume Capitol is on `3000` when checking anything server-side.
 - If you're running as an on-server AI (not the case in normal laptop-driven sessions), a `pre-push` hook blocks pushing to `main`/`master` directly — server-side work must go to a `server-ai/*` branch for review.

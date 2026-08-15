@@ -92,7 +92,7 @@ polls instead:
   takes effect on the very deploy that introduces it. Keep new build steps
   in `sync-deploy.sh`, not `sync.sh`.
 - `infra/systemd/congress-sync.service` (oneshot) + `congress-sync.timer`
-  (every 90s) run it on a loop.
+  (every 30s) run it on a loop.
 
 Installed once with:
 
