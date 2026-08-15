@@ -1,0 +1,15 @@
+{
+  "projectId": "51e61124-dc51-422a-a681-a24d08aedc2b",
+  "pkg": "@congress/exhibit-ui",
+  "shape": "package",
+  "cssEntry": ".design-sync-compiled/styles.css",
+  "provider": { "component": "PreviewProviders" },
+  "readmeHeader": ".design-sync/conventions.md",
+  "extraEntries": ["../../../../../.design-sync/preview-support.tsx"],
+  "overrides": {
+    "ChamberPicker": { "cardMode": "single", "primaryStory": "InNotes", "viewport": "1280x800" },
+    "ChamberLayout": { "cardMode": "single", "primaryStory": "NotesChamber", "viewport": "1280x800" },
+    "ExhibitLinksLayout": { "cardMode": "column" },
+    "ExhibitPickerDropdown": { "cardMode": "column" }
+  }
+}
