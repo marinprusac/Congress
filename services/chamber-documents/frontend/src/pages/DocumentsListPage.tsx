@@ -10,7 +10,7 @@ import {
   ListErrorState,
   ListEmptyState,
   formatTimestamp,
-} from "@congress/exhibit-ui";
+} from "@congress/congress-ui";
 import { fetchDocuments, fetchDocument } from "@/lib/api";
 import type { DocumentSummary } from "../../../src/types";
 

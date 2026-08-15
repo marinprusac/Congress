@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useShellHosted, resolveChamberPath, PageHeader } from "@congress/exhibit-ui";
+import { useShellHosted, resolveChamberPath, PageHeader } from "@congress/congress-ui";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { createEvent } from "@/lib/api";
 import { getBrowserTimeZone } from "@/lib/datetime";

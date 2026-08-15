@@ -13,7 +13,7 @@ import {
   useShellHosted,
   resolveChamberPath,
   confirmDelete,
-} from "@congress/exhibit-ui";
+} from "@congress/congress-ui";
 import { fetchTask, updateTask, deleteTask, quickCreateTaskExhibit } from "@/lib/api";
 
 function toDateInputValue(iso: string | null): string {

@@ -13,7 +13,7 @@ import {
   useShellHosted,
   resolveChamberPath,
   confirmDelete,
-} from "@congress/exhibit-ui";
+} from "@congress/congress-ui";
 import { fetchDocument, updateDocument, deleteDocument, downloadUrl } from "@/lib/api";
 
 function formatBytes(bytes: number): string {

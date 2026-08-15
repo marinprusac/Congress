@@ -1,6 +1,6 @@
 import type { TaskSummary, TaskDetail, CreateTaskRequest, UpdateTaskRequest } from "../../../src/types";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
-import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/exhibit-ui";
+import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
 const API_BASE = resolveApiBase("tasks", import.meta.env.PROD);
 

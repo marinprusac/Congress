@@ -6,6 +6,7 @@ import { sharePermissionSchema } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { shares, exhibitCache, exhibitRefs } from "./db/schema.js";
 import { resolveOneLive } from "./exhibits.js";
+import { getChamber } from "./registry.js";
 
 const MAX_DEPTH_CEILING = 10;
 const MAX_CLOSURE_NODES = 500;
@@ -33,6 +34,12 @@ export const shareClosureEntrySchema = z.object({
   type: z.string(),
   name: z.string(),
   depth: z.number().int(),
+  // From the owning Chamber's manifest (see @congress/shared-types'
+  // manifestSchema) - lets the public viewer (SharedViewPage.tsx) decide
+  // Markdown vs. plain rendering per Chamber instead of a hardcoded name
+  // check. Optional because a Chamber that's currently offline has no live
+  // registry entry to read it from.
+  contentFormat: z.enum(["markdown", "plain"]).optional(),
 });
 export type ShareClosureEntry = z.infer<typeof shareClosureEntrySchema>;
 
@@ -182,13 +189,32 @@ async function resolveRootMeta(id: string, chamber: string): Promise<ClosureNode
 // can't have its owning chamber inferred and is skipped - in practice this
 // doesn't arise, since a chamber syncs on every create and a [[ reference
 // can only target something that already exists.
+// Memoized per computeShareClosure call - a closure can carry up to
+// MAX_CLOSURE_NODES entries, often clustered in a handful of Chambers, so
+// this avoids re-querying the registry once per entry.
+function contentFormatMemo(): (chamber: string) => "markdown" | "plain" | undefined {
+  const cache = new Map<string, "markdown" | "plain" | undefined>();
+  return (chamber) => {
+    if (!cache.has(chamber)) cache.set(chamber, getChamber(chamber)?.contentFormat);
+    return cache.get(chamber);
+  };
+}
+
 export async function computeShareClosure(share: ShareRow): Promise<ShareClosureEntry[]> {
   const rootMeta = await resolveRootMeta(share.rootId, share.rootChamber);
   if (!rootMeta) return [];
 
+  const contentFormatFor = contentFormatMemo();
   const depthById = new Map<string, number>([[share.rootId, 0]]);
   const entries: ShareClosureEntry[] = [
-    { id: share.rootId, chamber: rootMeta.chamber, type: rootMeta.type, name: rootMeta.name, depth: 0 },
+    {
+      id: share.rootId,
+      chamber: rootMeta.chamber,
+      type: rootMeta.type,
+      name: rootMeta.name,
+      depth: 0,
+      contentFormat: contentFormatFor(rootMeta.chamber),
+    },
   ];
 
   let frontier = [share.rootId];
@@ -211,7 +237,14 @@ export async function computeShareClosure(share: ShareRow): Promise<ShareClosure
         if (!meta) continue;
 
         depthById.set(targetId, depth + 1);
-        entries.push({ id: targetId, chamber: meta.chamber, type: meta.type, name: meta.name, depth: depth + 1 });
+        entries.push({
+          id: targetId,
+          chamber: meta.chamber,
+          type: meta.type,
+          name: meta.name,
+          depth: depth + 1,
+          contentFormat: contentFormatFor(meta.chamber),
+        });
         nextFrontier.push(targetId);
       }
     }

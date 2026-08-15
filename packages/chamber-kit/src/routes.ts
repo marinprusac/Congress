@@ -170,5 +170,17 @@ export function mountStaticFrontend(app: ChamberApp): void {
       root: "./frontend/dist",
     })
   );
+  // Falls through to frontend/public directly (Hono's serveStatic calls
+  // next() on a miss) so assets that live there unchanged by the build -
+  // notably icons/mark.svg, fetched by Capitol's gateway at runtime, see
+  // proxyToChamberIcon - resolve even before `build:web` has ever run.
+  // frontend/dist always wins once it exists: Vite's build copies public/
+  // into dist/ verbatim, so this mount is dev-only in practice.
+  app.use(
+    "/*",
+    serveStatic({
+      root: "./frontend/public",
+    })
+  );
   app.get("*", serveStatic({ path: "./frontend/dist/index.html" }));
 }

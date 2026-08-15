@@ -10,7 +10,7 @@ import {
   CapitolMark,
   getChamberIcon,
   stripFrontmatter,
-} from "@congress/exhibit-ui";
+} from "@congress/congress-ui";
 import { fetchSharedDetail, fetchSharedContent, sharedDownloadUrl, updateSharedContent } from "@/lib/sharedApi";
 
 function formatDepthLabel(depth: number): string {
@@ -86,7 +86,7 @@ export function SharedViewPage() {
   const share = detailQuery.data;
   const content = contentQuery.data;
   const resolveUrl = `/capitol/shared/${token}/exhibits/resolve`;
-  const isNote = activeEntry?.chamber === "notes";
+  const isMarkdown = activeEntry?.contentFormat === "markdown";
 
   function selectExhibit(id: string) {
     setSelectedId(id);
@@ -184,7 +184,7 @@ export function SharedViewPage() {
                 </>
               ) : (
                 <>
-                  {isNote ? (
+                  {isMarkdown ? (
                     <ExhibitMarkdown
                       body={stripFrontmatter(content.body)}
                       resolveUrl={resolveUrl}

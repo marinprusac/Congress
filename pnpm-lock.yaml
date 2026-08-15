@@ -45,7 +45,7 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  packages/exhibit-ui:
+  packages/congress-ui:
     dependencies:
       '@congress/shared-types':
         specifier: workspace:*
@@ -103,9 +103,9 @@ importers:
       '@congress/chamber-kit':
         specifier: workspace:*
         version: link:../../packages/chamber-kit
-      '@congress/exhibit-ui':
+      '@congress/congress-ui':
         specifier: workspace:*
-        version: link:../../packages/exhibit-ui
+        version: link:../../packages/congress-ui
       '@congress/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
@@ -206,9 +206,9 @@ importers:
       '@congress/chamber-kit':
         specifier: workspace:*
         version: link:../../packages/chamber-kit
-      '@congress/exhibit-ui':
+      '@congress/congress-ui':
         specifier: workspace:*
-        version: link:../../packages/exhibit-ui
+        version: link:../../packages/congress-ui
       '@congress/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
@@ -306,9 +306,9 @@ importers:
       '@congress/chamber-kit':
         specifier: workspace:*
         version: link:../../packages/chamber-kit
-      '@congress/exhibit-ui':
+      '@congress/congress-ui':
         specifier: workspace:*
-        version: link:../../packages/exhibit-ui
+        version: link:../../packages/congress-ui
       '@congress/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
@@ -406,9 +406,9 @@ importers:
       '@congress/chamber-kit':
         specifier: workspace:*
         version: link:../../packages/chamber-kit
-      '@congress/exhibit-ui':
+      '@congress/congress-ui':
         specifier: workspace:*
-        version: link:../../packages/exhibit-ui
+        version: link:../../packages/congress-ui
       '@congress/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
@@ -509,9 +509,9 @@ importers:
       '@congress/chamber-kit':
         specifier: workspace:*
         version: link:../../packages/chamber-kit
-      '@congress/exhibit-ui':
+      '@congress/congress-ui':
         specifier: workspace:*
-        version: link:../../packages/exhibit-ui
+        version: link:../../packages/congress-ui
       '@congress/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types

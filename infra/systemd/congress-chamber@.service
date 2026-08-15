@@ -1,0 +1,34 @@
+# Optional systemd instance-unit template, an alternative to hand-copying a
+# discrete congress-chamber-<name>.service per Chamber (which is still what
+# `pnpm create-chamber` generates, and what the discrete units in this
+# directory use today - see infra/README.md for why this template is opt-in
+# rather than the default).
+#
+# Usage per Chamber, instance name %i = the chamber directory suffix (e.g.
+# "notes" for services/chamber-notes):
+#   sudo cp infra/systemd/congress-chamber@.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now congress-chamber@notes.service
+#
+# Adopting this on an already-running server means migrating away from the
+# discrete congress-chamber-<name>.service units first (stop + disable each,
+# then enable the corresponding congress-chamber@<name>.service) - a manual,
+# one-time step infra/README.md walks through. `infra/deploy/sync-deploy.sh`
+# restarts services by their unit name either way, so it needs the
+# discrete-vs-templated naming decided consistently, not a mix of both.
+
+[Unit]
+Description=Congress - Chamber %i
+After=network.target congress-capitol.service
+
+[Service]
+Type=simple
+User=marin
+WorkingDirectory=/srv/congress/services/chamber-%i
+ExecStart=/usr/bin/pnpm run start
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChamberPicker } from "@congress/exhibit-ui";
+import { ChamberPicker } from "@congress/congress-ui";
 
 // Real usage: mounted once per app, fixed-position (sidebar on desktop,
 // bottom bar on mobile) — see ChamberLayout.tsx (`current` = that Chamber's

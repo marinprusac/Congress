@@ -1,4 +1,4 @@
-import { ExhibitLinksLayout, getChamberIcon } from "@congress/exhibit-ui";
+import { ExhibitLinksLayout, getChamberIcon } from "@congress/congress-ui";
 
 export function NoteWithLinks() {
   return (

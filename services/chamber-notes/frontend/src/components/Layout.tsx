@@ -1,4 +1,4 @@
-import { ChamberLayout, ChamberMark, getChamberIcon } from "@congress/exhibit-ui";
+import { ChamberLayout, ChamberMark, getChamberIcon } from "@congress/congress-ui";
 
 const NAV_LINKS = [
   { to: "/", label: "All Notes" },

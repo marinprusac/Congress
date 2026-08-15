@@ -15,4 +15,7 @@ export const notesManifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
+  // Note bodies use [[wikilink]]/Markdown syntax - see
+  // services/capitol/frontend/src/pages/SharedViewPage.tsx.
+  contentFormat: "markdown",
 };

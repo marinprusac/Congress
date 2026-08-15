@@ -16,7 +16,7 @@ import {
   sweepStaleChambers,
   getChamber,
 } from "./registry.js";
-import { forwardToChamber, forwardToChamberFrontend, proxyToChamberPath } from "./gateway.js";
+import { forwardToChamber, forwardToChamberFrontend, proxyToChamberIcon, proxyToChamberPath } from "./gateway.js";
 import { hasValidSession } from "./sessionAuth.js";
 import {
   syncExhibit,
@@ -51,6 +51,9 @@ mountManifestAndHealth(app, capitolManifest);
 app.route("/auth", authRoutes);
 
 app.get("/capitol/registry", requireSession, (c) => c.json(listChambers()));
+
+// Public/unauthenticated - see proxyToChamberIcon's own comment for why.
+app.get("/capitol/chambers/:name/icon", (c) => proxyToChamberIcon(c, c.req.param("name")));
 
 app.get("/capitol/settings", requireSession, async (c) => c.json(await getSettings()));
 

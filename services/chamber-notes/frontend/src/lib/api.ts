@@ -7,7 +7,7 @@ import type {
   UpdateNotesSettingsRequest,
 } from "../../../src/types";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
-import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/exhibit-ui";
+import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
 const API_BASE = resolveApiBase("notes", import.meta.env.PROD);
 
@@ -59,7 +59,7 @@ export function setPinned(id: number, pinned: boolean): Promise<NoteDetail> {
 // Quick-create a note from a "[[" picker or the References panel's "+
 // Create" option, without leaving the field the user was in - mirrors
 // Obsidian's "create note from link". Kept in this Chamber's own API layer
-// (not exhibit-ui) since only Notes can quick-create its own Exhibit type.
+// (not congress-ui) since only Notes can quick-create its own Exhibit type.
 export async function quickCreateNoteExhibit(title: string): Promise<CapitolExhibitSearchResult> {
   const note = await createNote({ title, content: "" });
   return { chamber: "notes", id: `note-${note.id}`, type: "note", name: note.title, url: `/n/${note.id}` };

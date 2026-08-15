@@ -16,8 +16,9 @@ interface ExhibitChipProps<T extends CapitolExhibitResolveResult> {
 }
 
 // Icon comes solely from the owning Chamber, resolved by the caller's
-// `renderIcon`; when omitted (or the Chamber is unrecognized), falls back to
-// a text prefix ("Notes — Meeting with Johan") per the Exhibits spec.
+// `renderIcon` (getChamberIcon - always resolves to something, a generic
+// mark at worst); when `renderIcon` itself is omitted, falls back to a text
+// prefix ("Notes — Meeting with Johan") per the Exhibits spec.
 export function ExhibitChip<T extends CapitolExhibitResolveResult = CapitolExhibitResolveResult>({
   result,
   renderIcon,

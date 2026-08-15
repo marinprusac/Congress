@@ -8,7 +8,7 @@ import {
   setCalendarSelection,
 } from "@/lib/api";
 import type { GoogleAccount } from "../../../src/types";
-import { PageHeader } from "@congress/exhibit-ui";
+import { PageHeader } from "@congress/congress-ui";
 
 function AccountCalendars({ account }: { account: GoogleAccount }) {
   const queryClient = useQueryClient();

@@ -101,6 +101,32 @@ export async function proxyToChamberPath(c: Context, chamberName: string, path: 
   }
 }
 
+// Proxies a Chamber's own served icon (frontend/public/icons/mark.svg in
+// that Chamber's own source tree, built into its dist/ root like every
+// other public/ asset regardless of Vite `base`) - the mechanism that lets
+// every Chamber own its icon instead of a shared package hardcoding one SVG
+// per Chamber name. Public/unauthenticated: exhibit chips render this on
+// the logged-out Exhibit Sharing viewer too (SharedViewPage.tsx), and an
+// icon carries nothing sensitive - same openness as /health and /manifest.
+// A missing/offline Chamber or a Chamber that never shipped an icon both
+// resolve to a non-2xx response; callers fall back to a generic mark
+// locally rather than treating this as an error worth surfacing.
+export async function proxyToChamberIcon(c: Context, chamberName: string): Promise<Response> {
+  const chamber = getChamber(chamberName);
+
+  if (!chamber || chamber.status !== "active") {
+    return c.json({ error: "chamber_not_found", chamber: chamberName }, 404);
+  }
+
+  const frontendBase = chamber.apiBase.replace(/\/api$/, "");
+
+  try {
+    return await proxyRequest(c, `${frontendBase}/icons/mark.svg`);
+  } catch {
+    return c.json({ error: "chamber_unreachable", chamber: chamberName }, 404);
+  }
+}
+
 // Proxies a Chamber's own built frontend (its static assets + SPA shell)
 // through Capitol at "/<chamberName>/*", so each Chamber's UI is reachable
 // without exposing its port directly. The Chamber's frontend build must set

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { WidgetPreviewShell } from "@congress/exhibit-ui";
+import { WidgetPreviewShell } from "@congress/congress-ui";
 import { fetchEvents } from "@/lib/api";
 import { formatWidgetEventTime } from "@/lib/datetime";
 

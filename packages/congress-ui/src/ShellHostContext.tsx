@@ -1,4 +1,4 @@
-// A plain global flag, deliberately not React Context: exhibit-ui is a
+// A plain global flag, deliberately not React Context: congress-ui is a
 // source-only workspace package, recompiled independently into Capitol's
 // own bundle *and* every Chamber's remote entry (see chamber-kit's build
 // docs) - each bundle's own `createContext()` call would produce a

@@ -10,7 +10,7 @@ import {
   getChamberIcon,
   useShellHosted,
   resolveChamberPath,
-} from "@congress/exhibit-ui";
+} from "@congress/congress-ui";
 import { fetchEvent } from "@/lib/api";
 import { formatEventFullRange } from "@/lib/datetime";
 import { toExhibitId } from "@/lib/exhibits";

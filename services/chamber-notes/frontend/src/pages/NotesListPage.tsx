@@ -11,7 +11,7 @@ import {
   ListErrorState,
   ListEmptyState,
   formatTimestamp,
-} from "@congress/exhibit-ui";
+} from "@congress/congress-ui";
 import { fetchNotes, fetchNote, searchNotes, setPinned } from "@/lib/api";
 import type { NoteSummary } from "../../../src/types";
 

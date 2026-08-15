@@ -61,7 +61,7 @@ Read `styles.css` (and its `@import` closure, including `_ds_bundle.css`) before
 ### Example: a Chamber page
 
 ```tsx
-import { ChamberLayout, ChamberMark, getChamberIcon, ExhibitSharingBadge, ShareControl } from "@congress/exhibit-ui";
+import { ChamberLayout, ChamberMark, getChamberIcon, ExhibitSharingBadge, ShareControl } from "@congress/congress-ui";
 
 function NotesChamber() {
   return (

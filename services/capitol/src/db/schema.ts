@@ -9,6 +9,7 @@ export const chambers = sqliteTable("chambers", {
   apiBase: text("api_base").notNull(),
   mcpUrl: text("mcp_url"),
   healthUrl: text("health_url").notNull(),
+  contentFormat: text("content_format", { enum: ["markdown", "plain"] }),
   status: text("status", { enum: ["active", "offline"] }).notNull().default("active"),
   lastHeartbeatAt: integer("last_heartbeat_at", { mode: "timestamp_ms" }),
   registeredAt: integer("registered_at", { mode: "timestamp_ms" }).notNull(),

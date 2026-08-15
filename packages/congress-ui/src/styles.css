@@ -2,7 +2,7 @@
    tokens, base reset, and every component style this package's React
    components rely on (exhibit chips, the [[ picker, sharing badges/forms,
    the Chamber shell). A consuming app's own index.css should only need
-   `@import "@congress/exhibit-ui/styles.css";` - there are no remaining
+   `@import "@congress/congress-ui/styles.css";` - there are no remaining
    per-Chamber exceptions. */
 
 @import "tailwindcss";

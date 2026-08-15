@@ -11,7 +11,7 @@ import {
   FormTextInput,
   FormErrorMessage,
   FormSubmitButton,
-} from "@congress/exhibit-ui";
+} from "@congress/congress-ui";
 import { uploadDocument } from "@/lib/api";
 
 export function UploadDocumentPage() {

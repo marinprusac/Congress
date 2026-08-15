@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useAppliedTheme, ChamberPicker, fetchRegistry, type ChamberNavLink } from "@congress/exhibit-ui";
+import { useAppliedTheme, ChamberPicker, fetchRegistry, type ChamberNavLink } from "@congress/congress-ui";
 import { WidgetGrid } from "@/components/WidgetGrid";
 import { LoginGate } from "@/components/LoginGate";
 import { CapitolHeader } from "@/components/CapitolHeader";

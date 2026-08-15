@@ -4,6 +4,7 @@
   "scripts": {
     "typecheck": "pnpm -r typecheck",
     "dev:capitol": "pnpm --filter capitol dev:server",
-    "dev:capitol:web": "pnpm --filter capitol dev:web"
+    "dev:capitol:web": "pnpm --filter capitol dev:web",
+    "create-chamber": "node scripts/create-chamber.mjs"
   }
 }

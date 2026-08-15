@@ -10,7 +10,7 @@ import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForNote 
 
 // The set of Exhibits this note points at is the union of what's embedded
 // in its body ("[[" tokens) and what was added explicitly via the
-// References side panel (packages/exhibit-ui's ExhibitLinksLayout) - pushed
+// References side panel (packages/congress-ui's ExhibitLinksLayout) - pushed
 // to Capitol as one outgoingRefs list either way, so backlinks/frontlinks
 // don't need to know which source produced a given ref.
 async function syncNoteExhibit(id: number, title: string, body: string): Promise<void> {

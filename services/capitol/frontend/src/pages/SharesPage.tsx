@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CreateShareForm, formatTimestamp } from "@congress/exhibit-ui";
+import { CreateShareForm, formatTimestamp } from "@congress/congress-ui";
 import { fetchShares, revokeShare } from "@/lib/api";
 import { CapitolHeader } from "@/components/CapitolHeader";
 

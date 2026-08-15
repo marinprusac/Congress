@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
+import { useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchEvents, fetchEvent } from "@/lib/api";
 import { groupEventsByDay, formatEventTime, formatDateRange } from "@/lib/datetime";
 

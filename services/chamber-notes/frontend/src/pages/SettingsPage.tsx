@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PageHeader } from "@congress/exhibit-ui";
+import { PageHeader } from "@congress/congress-ui";
 import { fetchSettings, updateSettings } from "@/lib/api";
 
 export function SettingsPage() {

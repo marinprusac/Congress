@@ -1,4 +1,4 @@
-import { WidgetPreviewShell } from "@congress/exhibit-ui";
+import { WidgetPreviewShell } from "@congress/congress-ui";
 
 // Real usage: embedded as a Chamber's homepage widget via an iframe (see
 // WidgetGrid.tsx) — each Chamber's own WidgetPreviewPage.tsx supplies

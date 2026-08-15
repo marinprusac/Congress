@@ -10,7 +10,7 @@ import {
   ListLoadingState,
   ListErrorState,
   ListEmptyState,
-} from "@congress/exhibit-ui";
+} from "@congress/congress-ui";
 import { fetchTasks, fetchTask, searchTasks, setCompleted } from "@/lib/api";
 import type { TaskSummary } from "../../../src/types";
 

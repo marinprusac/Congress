@@ -3,7 +3,7 @@
 // "/api/<chamber>/*" (Capitol forwards "/api/<chamber>/<rest>" to that
 // Chamber's own "/api/<rest>"). In dev, Vite proxies "/api" straight to that
 // Chamber's own server, so no "/<chamber>" segment is needed there. `isProd`
-// is passed in rather than read from import.meta.env here, since exhibit-ui
+// is passed in rather than read from import.meta.env here, since congress-ui
 // isn't built with vite/client types.
 export function resolveApiBase(chamberName: string, isProd: boolean): string {
   return isProd ? `/api/${chamberName}` : "/api";

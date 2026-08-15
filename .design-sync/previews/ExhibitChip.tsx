@@ -1,4 +1,4 @@
-import { ExhibitChip, getChamberIcon } from "@congress/exhibit-ui";
+import { ExhibitChip, getChamberIcon } from "@congress/congress-ui";
 
 export function ResolvedWithIcon() {
   return (

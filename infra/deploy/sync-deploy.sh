@@ -8,12 +8,12 @@ set -euo pipefail
 # introduces it, unlike sync.sh itself.
 
 REPO_DIR="/srv/congress"
-SERVICES=(congress-capitol congress-chamber-notes congress-chamber-calendar congress-chamber-documents congress-chamber-tasks)
 remote_sha="$1"
 
 cd "$REPO_DIR"
 
 pnpm install --frozen-lockfile
+
 # build:web must run before build:vendor/build:remote for every service -
 # they share one dist/ and only build:web empties it (build:vendor/
 # build:remote add their extra artifacts alongside with emptyOutDir:
@@ -21,16 +21,23 @@ pnpm install --frozen-lockfile
 # build every Chamber's remote entry (and Capitol's own build:web output)
 # resolves at runtime via the importmap in Capitol's index.html - see
 # services/capitol/frontend/vite.vendor.config.ts.
+#
+# Chambers are discovered from services/chamber-*/ rather than hardcoded, so
+# a new Chamber (e.g. via `pnpm create-chamber`) is picked up here with zero
+# edits to this file - it just needs to exist as services/chamber-<name>/
+# with the standard build:web/build:remote scripts and a matching
+# infra/systemd/congress-chamber-<name>.service unit already installed on
+# the server (see docs/creating-a-chamber.md).
+SERVICES=(congress-capitol)
 pnpm --filter capitol build:web
 pnpm --filter capitol build:vendor
-pnpm --filter chamber-notes build:web
-pnpm --filter chamber-notes build:remote
-pnpm --filter chamber-calendar build:web
-pnpm --filter chamber-calendar build:remote
-pnpm --filter chamber-documents build:web
-pnpm --filter chamber-documents build:remote
-pnpm --filter chamber-tasks build:web
-pnpm --filter chamber-tasks build:remote
+
+for dir in "$REPO_DIR"/services/chamber-*/; do
+  name="$(basename "$dir")"
+  pnpm --filter "$name" build:web
+  pnpm --filter "$name" build:remote
+  SERVICES+=("congress-$name")
+done
 
 for svc in "${SERVICES[@]}"; do
   sudo /usr/bin/systemctl restart "$svc"

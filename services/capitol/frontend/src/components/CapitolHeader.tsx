@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ChamberHeader, CapitolMark, ChamberMark } from "@congress/exhibit-ui";
+import { ChamberHeader, CapitolMark, ChamberMark } from "@congress/congress-ui";
 
 export function CapitolHeader() {
   const navigate = useNavigate();

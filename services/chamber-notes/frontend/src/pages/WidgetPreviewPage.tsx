@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { WidgetPreviewShell } from "@congress/exhibit-ui";
+import { WidgetPreviewShell } from "@congress/congress-ui";
 import { fetchPinnedNotes } from "@/lib/api";
 
 export function WidgetPreviewPage() {

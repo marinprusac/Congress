@@ -1,4 +1,4 @@
-import { GlobalExhibitSearch, ChamberMark, getChamberIcon } from "@congress/exhibit-ui";
+import { GlobalExhibitSearch, ChamberMark, getChamberIcon } from "@congress/congress-ui";
 
 // Real usage: mounted once in every Chamber's ChamberLayout header, and
 // once in CapitolHeader.tsx. `open`/dropdown visibility is internal state

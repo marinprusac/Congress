@@ -1,4 +1,4 @@
-import { ExhibitSharingBadge } from "@congress/exhibit-ui";
+import { ExhibitSharingBadge } from "@congress/congress-ui";
 
 // Renders nothing when the exhibit has no shares - the mock backend always
 // returns one direct share for any exhibitId, which is what makes the badge

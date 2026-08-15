@@ -1,5 +1,5 @@
 import type { DocumentSummary, DocumentDetail, UpdateDocumentRequest } from "../../../src/types";
-import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/exhibit-ui";
+import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
 const API_BASE = resolveApiBase("documents", import.meta.env.PROD);
 

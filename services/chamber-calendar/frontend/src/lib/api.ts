@@ -8,7 +8,7 @@ import type {
   CreateEventRequest,
   UpdateEventRequest,
 } from "../../../src/types";
-import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/exhibit-ui";
+import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
 const API_BASE = resolveApiBase("calendar", import.meta.env.PROD);
 

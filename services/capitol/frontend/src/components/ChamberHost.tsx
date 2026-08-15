@@ -1,7 +1,7 @@
 import { Component, Suspense, lazy, useMemo, type ComponentType, type LazyExoticComponent, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { fetchRegistry } from "@congress/exhibit-ui";
+import { fetchRegistry } from "@congress/congress-ui";
 
 // All three caches are keyed by Chamber name and live for the tab's
 // lifetime - once a Chamber has been visited once, switching back to it is

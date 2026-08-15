@@ -30,11 +30,66 @@ decision. See "Access control" below for what that means in practice.
 
 ## Process management
 
-`infra/systemd/congress-capitol.service` and `congress-chamber-notes.service`
-are installed at `/etc/systemd/system/` and enabled (`systemctl enable --now`).
-Each Chamber added later gets its own unit following the same template:
-`User=marin`, `WorkingDirectory=` the service dir, `ExecStart=/usr/bin/pnpm run start`,
+Every service (`congress-capitol`, `congress-chamber-notes`,
+`congress-chamber-calendar`, `congress-chamber-documents`,
+`congress-chamber-tasks`) has its own discrete unit under
+`infra/systemd/`, installed at `/etc/systemd/system/` and enabled
+(`systemctl enable --now`). All five share the same body: `User=marin`,
+`WorkingDirectory=` the service dir, `ExecStart=/usr/bin/pnpm run start`,
 `Restart=on-failure`.
+
+Running `pnpm create-chamber <name> "<Display Name>" <port>` (see
+`docs/creating-a-chamber.md`) generates a new Chamber's unit file
+automatically, following this same pattern — copy it to the server the same
+way as any other and `systemctl enable --now` it (see "Adding a new
+Chamber's infra" below).
+
+`infra/systemd/congress-chamber@.service` is an optional systemd
+*instance*-unit template (`%i` = the chamber directory suffix, e.g.
+`systemctl enable --now congress-chamber@notes.service`) if you'd rather
+manage one templated unit than N discrete files. Adopting it on an
+already-running server is a manual, one-time migration (stop/disable each
+discrete unit, enable the corresponding `congress-chamber@<name>` instance
+instead) — not something to mix with the discrete units, since
+`infra/deploy/sync-deploy.sh` restarts services by exact unit name.
+
+`sync-deploy.sh`'s restart/build step requires **passwordless `sudo` for
+`systemctl restart` and `systemctl reload`** for the `marin` user (it calls
+`sudo /usr/bin/systemctl restart <service>` non-interactively on every
+sync). This isn't set up by any script here — add it by hand once, e.g. via
+`sudo visudo -f /etc/sudoers.d/congress-sync`:
+
+```
+marin ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart congress-*, /usr/bin/systemctl reload caddy
+```
+
+## Adding a new Chamber's infra
+
+Registering a new Chamber with Capitol itself is automatic and requires no
+code change on Capitol's side at all — see `docs/creating-a-chamber.md`. The
+only genuinely manual, per-Chamber steps are on the infra side, and running
+`pnpm create-chamber` already does the first of them for you:
+
+1. **Systemd unit** — generated for you at `infra/systemd/congress-chamber-<name>.service`
+   by the scaffold script. On the server: `sudo cp infra/systemd/congress-chamber-<name>.service /etc/systemd/system/ && sudo systemctl daemon-reload`.
+2. **`infra/deploy/sync-deploy.sh`** — nothing to edit. It discovers Chambers
+   by globbing `services/chamber-*/`, so a new Chamber directory is picked
+   up on the very next sync with zero changes to that script.
+3. **Caddy** — nothing to edit. Caddy only ever proxies to Capitol
+   (`127.0.0.1:8000`); Chamber ports are never referenced there, since
+   path-based routing to each Chamber happens inside Capitol's own gateway.
+4. **On the server, by hand:**
+   - Pick a port that doesn't collide with an existing Chamber (`pnpm
+     create-chamber` already checks this locally against every
+     `.env.example` in the repo, but a port only reserved on the server —
+     e.g. by another, unrelated project — won't be caught).
+   - Create `services/chamber-<name>/.env` on the server (untracked, same
+     as every other service) from the generated `.env.example`, with
+     `NODE_ENV=production`, the real production `PORT`, the shared
+     `CONGRESS_INTERNAL_TOKEN`, and — important, easy to miss — `CAPITOL_URL`
+     corrected to `http://127.0.0.1:8000` (every `.env.example` defaults to
+     the dev value `:3000`, which is wrong in production).
+   - `sudo systemctl enable --now congress-chamber-<name>`.
 
 ## Access control
 
@@ -115,7 +170,14 @@ machine. Server-side AI work must go to a `server-ai/*` branch and get
 reviewed/merged from the laptop — `main` is the only branch the sync timer
 trusts, and it should only ever move via a reviewed merge.
 
-## First-time server bootstrap (reference, already done for this VPS)
+## First-time server bootstrap
+
+This is what setting up a fresh VPS from scratch looks like today, for all
+five current services. (The very first VPS setup only had Capitol + Notes
+live at this stage and the reference block here used to reflect that
+snapshot rather than the current system — since corrected. If you're adding
+a *new* Chamber to an already-running server rather than bootstrapping from
+zero, see "Adding a new Chamber's infra" above instead.)
 
 ```
 sudo mkdir -p /srv/congress && sudo chown marin:marin /srv/congress
@@ -129,12 +191,36 @@ cp infra/deploy/pre-push-hook .git/hooks/pre-push && chmod +x .git/hooks/pre-pus
 sudo corepack enable && corepack prepare pnpm@11.3.0 --activate
 sudo apt-get install -y build-essential python3   # better-sqlite3 native build
 pnpm install
-pnpm --filter capitol build:web && pnpm --filter chamber-notes build:web
-# create services/capitol/.env and services/chamber-notes/.env by hand (see above)
+
+# build:web must run before build:vendor/build:remote (shared dist/, see
+# sync-deploy.sh's comment); build:vendor is Capitol-only.
+pnpm --filter capitol build:web
+pnpm --filter capitol build:vendor
+for name in chamber-notes chamber-calendar chamber-documents chamber-tasks; do
+  pnpm --filter "$name" build:web
+  pnpm --filter "$name" build:remote
+done
+
+# Create every service's .env by hand (untracked) from its .env.example:
+# services/capitol/.env, services/chamber-notes/.env, .../chamber-calendar/.env,
+# .../chamber-documents/.env, .../chamber-tasks/.env. Set NODE_ENV=production,
+# the real production PORT (8000/8011/8012/8013/8014), one shared
+# CONGRESS_INTERNAL_TOKEN across all five files, and - for every Chamber -
+# CAPITOL_URL=http://127.0.0.1:8000 (the .env.example default of :3000 is
+# the dev value and is wrong here). Capitol's .env additionally needs
+# CONGRESS_MASTER_PASSWORD_HASH and SESSION_SECRET (see .env.example).
+
 sudo cp infra/systemd/congress-*.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now congress-capitol congress-chamber-notes
-sudo cp infra/systemd/congress-sync.timer /etc/systemd/system/
+sudo systemctl enable --now congress-capitol congress-chamber-notes \
+  congress-chamber-calendar congress-chamber-documents congress-chamber-tasks
+
+# Passwordless sudo for the sync timer's restarts - see "Process management"
+# above for the exact sudoers line; sync-deploy.sh will fail at the restart
+# step without it.
+
+sudo cp infra/systemd/congress-sync.* /etc/systemd/system/
+sudo systemctl daemon-reload
 sudo systemctl enable --now congress-sync.timer
 # add congress.marinprusac.com A record -> this VPS's public IP in Hetzner DNS
 sudo cp infra/caddy/congress.caddy /etc/caddy/

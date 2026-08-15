@@ -14,7 +14,7 @@ import {
   useShellHosted,
   resolveChamberPath,
   confirmDelete,
-} from "@congress/exhibit-ui";
+} from "@congress/congress-ui";
 import { fetchNote, updateNote, deleteNote, setPinned, fetchSettings, quickCreateNoteExhibit } from "@/lib/api";
 
 export function NoteViewPage() {

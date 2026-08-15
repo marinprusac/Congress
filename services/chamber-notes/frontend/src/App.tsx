@@ -1,5 +1,5 @@
 import { Route, Routes } from "react-router-dom";
-import { useAppliedTheme } from "@congress/exhibit-ui";
+import { useAppliedTheme } from "@congress/congress-ui";
 import { Layout } from "@/components/Layout";
 import { NotesListPage } from "@/pages/NotesListPage";
 import { NoteViewPage } from "@/pages/NoteViewPage";

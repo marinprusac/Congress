@@ -1,6 +1,6 @@
 {
   "projectId": "51e61124-dc51-422a-a681-a24d08aedc2b",
-  "pkg": "@congress/exhibit-ui",
+  "pkg": "@congress/congress-ui",
   "shape": "package",
   "cssEntry": ".design-sync-compiled/styles.css",
   "provider": { "component": "PreviewProviders" },

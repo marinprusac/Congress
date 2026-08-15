@@ -3,7 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Design-sync preview support only - never imported by the real app.
-// Every exhibit-ui component that talks to Capitol does so via plain
+// Every congress-ui component that talks to Capitol does so via plain
 // `fetch()` against relative "/capitol/*" and "/api/*" paths, since in the
 // real app that's proxied to a live backend. An isolated Claude Design
 // preview has no backend to hit, so this installs a realistic canned
@@ -136,7 +136,7 @@ const previewQueryClient = new QueryClient({
 // Single provider every preview card wraps with - covers both the Router
 // context (Link/useNavigate/useLocation, used by ChamberLayout/ChamberPicker)
 // and the QueryClient context (useQuery, used by nearly every other
-// exhibit-ui component) so no card needs to know which one it requires.
+// congress-ui component) so no card needs to know which one it requires.
 export function PreviewProviders({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={previewQueryClient}>

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCapitolSettings, capitolSettingsQueryKey, fetchRegistry } from "@congress/exhibit-ui";
+import { useCapitolSettings, capitolSettingsQueryKey, fetchRegistry } from "@congress/congress-ui";
 import { updateCapitolSettings } from "@/lib/settingsApi";
 import { CapitolHeader } from "@/components/CapitolHeader";
 import { SignOutControl } from "@/components/LoginGate";

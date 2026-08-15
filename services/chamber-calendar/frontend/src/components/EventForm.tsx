@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExhibitTextarea, getChamberIcon } from "@congress/exhibit-ui";
+import { ExhibitTextarea, getChamberIcon } from "@congress/congress-ui";
 import { fetchSelectedCalendars } from "@/lib/api";
 
 export interface EventFormValues {

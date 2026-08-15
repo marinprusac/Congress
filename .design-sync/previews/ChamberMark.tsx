@@ -1,9 +1,9 @@
-import { ChamberMark } from "@congress/exhibit-ui";
+import { ChamberMark } from "@congress/congress-ui";
 
 // Real usage: each Chamber's Layout.tsx renders its own mark exactly this
 // way — "h-8 w-8 text-ink" — next to the Chamber name in the sidebar header
 // (see chamber-notes/chamber-calendar/chamber-tasks Layout.tsx). Only
-// classes confirmed present in the compiled exhibit-ui stylesheet are used
+// classes confirmed present in the compiled congress-ui stylesheet are used
 // here (h-8/w-8/text-ink/bg-parchment/flex/items-center/gap-3/p-3).
 
 export function Notes() {

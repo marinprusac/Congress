@@ -1,4 +1,4 @@
-import { CreateShareForm } from "@congress/exhibit-ui";
+import { CreateShareForm } from "@congress/congress-ui";
 
 export function FixedRoot() {
   return (

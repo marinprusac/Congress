@@ -1,4 +1,4 @@
-import { CapitolMark } from "@congress/exhibit-ui";
+import { CapitolMark } from "@congress/congress-ui";
 
 // Real usage: CapitolHeader.tsx renders the Capitol hub mark exactly this
 // way — "h-8 w-8 text-ink" inside a "flex items-center gap-3" row next to

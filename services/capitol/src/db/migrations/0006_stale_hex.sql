@@ -1,0 +1,1 @@
+ALTER TABLE `chambers` ADD `content_format` text;

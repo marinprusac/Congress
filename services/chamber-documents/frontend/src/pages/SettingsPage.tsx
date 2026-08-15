@@ -1,4 +1,4 @@
-import { PageHeader } from "@congress/exhibit-ui";
+import { PageHeader } from "@congress/congress-ui";
 
 export function SettingsPage() {
   return (

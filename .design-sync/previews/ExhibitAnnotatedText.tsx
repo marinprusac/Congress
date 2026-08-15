@@ -1,4 +1,4 @@
-import { ExhibitAnnotatedText, getChamberIcon } from "@congress/exhibit-ui";
+import { ExhibitAnnotatedText, getChamberIcon } from "@congress/congress-ui";
 
 const BODY =
   "See [[exhibit:notes:note-9|Congress Development]] for the full write-up, and " +

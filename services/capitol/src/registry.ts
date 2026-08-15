@@ -12,6 +12,7 @@ function toEntry(row: typeof chambers.$inferSelect): ChamberRegistryEntry {
     apiBase: row.apiBase,
     mcpUrl: row.mcpUrl ?? undefined,
     healthUrl: row.healthUrl,
+    contentFormat: row.contentFormat ?? undefined,
     status: row.status as ChamberStatus,
     registeredAt: row.registeredAt.toISOString(),
     lastHeartbeatAt: row.lastHeartbeatAt ? row.lastHeartbeatAt.toISOString() : null,
@@ -31,6 +32,7 @@ export function registerChamber(manifest: Manifest): ChamberRegistryEntry {
         apiBase: manifest.apiBase,
         mcpUrl: manifest.mcpUrl ?? null,
         healthUrl: manifest.healthUrl,
+        contentFormat: manifest.contentFormat ?? null,
         status: "active",
       })
       .where(eq(chambers.name, manifest.name))
@@ -45,6 +47,7 @@ export function registerChamber(manifest: Manifest): ChamberRegistryEntry {
         apiBase: manifest.apiBase,
         mcpUrl: manifest.mcpUrl ?? null,
         healthUrl: manifest.healthUrl,
+        contentFormat: manifest.contentFormat ?? null,
         status: "active",
         registeredAt: now,
       })

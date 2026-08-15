@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useExhibitPicker, ExhibitPickerDropdown, getChamberIcon } from "@congress/exhibit-ui";
+import { useExhibitPicker, ExhibitPickerDropdown, getChamberIcon } from "@congress/congress-ui";
 
 // The dropdown only opens when useExhibitPicker detects an unterminated "[["
 // immediately before the caret (see useExhibitPicker.ts's post-commit effect:

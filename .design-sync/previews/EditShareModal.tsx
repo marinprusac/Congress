@@ -1,4 +1,4 @@
-import { EditShareModal } from "@congress/exhibit-ui";
+import { EditShareModal } from "@congress/congress-ui";
 
 export function Open() {
   return (
