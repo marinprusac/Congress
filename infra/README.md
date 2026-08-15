@@ -81,8 +81,16 @@ No webhook (would need its own public endpoint and auth story); the server
 polls instead:
 
 - `infra/deploy/sync.sh` — fetches `origin/main`; if it moved, fast-forwards
-  (never rebases/force-merges), reinstalls deps (`--frozen-lockfile`),
-  rebuilds both frontends, and restarts the affected `systemd` services.
+  (never rebases/force-merges) then `exec`s into `infra/deploy/sync-deploy.sh`
+  (reinstalls deps with `--frozen-lockfile`, rebuilds every service's
+  frontend, restarts the affected `systemd` services). Split into two files
+  deliberately: `sync.sh` is tracked in git and rewrites itself via the
+  merge above, and bash can keep executing content it already buffered from
+  before that rewrite for the rest of *that* process - `exec`ing into a
+  separate file makes the actual build/restart logic a fresh process that
+  reads its file from disk for the first time, so a change to it always
+  takes effect on the very deploy that introduces it. Keep new build steps
+  in `sync-deploy.sh`, not `sync.sh`.
 - `infra/systemd/congress-sync.service` (oneshot) + `congress-sync.timer`
   (every 90s) run it on a loop.
 

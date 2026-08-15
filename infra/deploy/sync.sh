@@ -3,7 +3,6 @@ set -euo pipefail
 
 REPO_DIR="/srv/congress"
 BRANCH="main"
-SERVICES=(congress-capitol congress-chamber-notes congress-chamber-calendar congress-chamber-documents congress-chamber-tasks)
 
 cd "$REPO_DIR"
 
@@ -20,27 +19,16 @@ echo "$(date -Is) syncing $local_sha -> $remote_sha"
 
 git merge --ff-only "origin/$BRANCH"
 
-pnpm install --frozen-lockfile
-# build:web must run before build:vendor/build:remote for every service -
-# they share one dist/ and only build:web empties it (build:vendor/
-# build:remote add their extra artifacts alongside with emptyOutDir:
-# false). build:vendor is Capitol-only: the shared React/router/query-client
-# build every Chamber's remote entry (and Capitol's own build:web output)
-# resolves at runtime via the importmap in Capitol's index.html - see
-# services/capitol/frontend/vite.vendor.config.ts.
-pnpm --filter capitol build:web
-pnpm --filter capitol build:vendor
-pnpm --filter chamber-notes build:web
-pnpm --filter chamber-notes build:remote
-pnpm --filter chamber-calendar build:web
-pnpm --filter chamber-calendar build:remote
-pnpm --filter chamber-documents build:web
-pnpm --filter chamber-documents build:remote
-pnpm --filter chamber-tasks build:web
-pnpm --filter chamber-tasks build:remote
-
-for svc in "${SERVICES[@]}"; do
-  sudo /usr/bin/systemctl restart "$svc"
-done
-
-echo "$(date -Is) synced to $remote_sha, restarted: ${SERVICES[*]}"
+# This script is tracked in git, and the merge above can rewrite it
+# mid-run - bash reads a running script incrementally, not fully into
+# memory upfront, so anything after this point in *this* process can end
+# up executing stale content it had already buffered before the merge,
+# silently ignoring whatever the merge just changed here (confirmed by a
+# real incident: a build-step addition to what used to be the rest of this
+# file never ran on the deploy that pulled it in, despite the file on disk
+# being correct immediately afterward). `exec` into a separate file next -
+# a fresh process reading it from disk for the first time - sidesteps the
+# whole hazard for the part that actually needs to reflect this sync's own
+# changes. Keep this file (the poller) itself minimal and rarely-changed;
+# put anything that evolves (build steps, service list) in sync-deploy.sh.
+exec bash "$REPO_DIR/infra/deploy/sync-deploy.sh" "$remote_sha"
