@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ShareSummary, SharePermission, UpdateShareRequest } from "@congress/shared-types";
 import { ShareFieldsEditor } from "./ShareFieldsEditor.js";
+import { CopyLinkButton } from "./CopyLinkButton.js";
 import { exhibitSharingQueryKey } from "./useExhibitSharing.js";
 
 interface EditShareModalProps {
@@ -31,6 +32,11 @@ async function patchUpdateShare(token: string, input: UpdateShareRequest): Promi
   return res.json();
 }
 
+async function deleteShare(token: string): Promise<void> {
+  const res = await fetch(`/capitol/shares/${encodeURIComponent(token)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`Failed to revoke share: ${res.status}`);
+}
+
 // Lets the owner edit an existing share's terms from wherever its badge
 // appears (see ExhibitSharingBadge) - the badge only carries a token, so
 // the full ShareSummary (maxDepth/expiresAt/rootId/rootChamber) needed to
@@ -54,6 +60,7 @@ export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProp
   const [expiryEnabled, setExpiryEnabled] = useState(false);
   const [expiresAt, setExpiresAt] = useState("");
   const [pending, setPending] = useState(false);
+  const [revoking, setRevoking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [seeded, setSeeded] = useState(false);
 
@@ -68,6 +75,12 @@ export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProp
     setSeeded(true);
   }, [share, seeded]);
 
+  function invalidateShareQueries() {
+    queryClient.invalidateQueries({ queryKey: exhibitSharingQueryKey(exhibitId) });
+    queryClient.invalidateQueries({ queryKey: exhibitSharesQueryKey(exhibitId) });
+    queryClient.invalidateQueries({ queryKey: ["capitol", "shares"] });
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (pending) return;
@@ -80,8 +93,7 @@ export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProp
         label: label.trim(),
         expiresAt: expiryEnabled && expiresAt ? new Date(expiresAt).toISOString() : null,
       });
-      queryClient.invalidateQueries({ queryKey: exhibitSharingQueryKey(exhibitId) });
-      queryClient.invalidateQueries({ queryKey: exhibitSharesQueryKey(exhibitId) });
+      invalidateShareQueries();
       onClose();
     } catch {
       setError("Failed to update share.");
@@ -90,6 +102,22 @@ export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProp
     }
   }
 
+  async function handleRevoke() {
+    if (revoking || !confirm("Revoke this share? This cannot be undone.")) return;
+    setRevoking(true);
+    setError(null);
+    try {
+      await deleteShare(token);
+      invalidateShareQueries();
+      onClose();
+    } catch {
+      setError("Failed to revoke share.");
+      setRevoking(false);
+    }
+  }
+
+  const link = `${window.location.origin}/shared/${token}`;
+
   return (
     <>
       {isLoading && <p className="font-mono text-sm">Loading —</p>}
@@ -97,6 +125,16 @@ export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProp
 
       {share && (
         <form onSubmit={handleSubmit} className="share-form">
+          <div className="share-field">
+            <span className="share-field-label">Share link</span>
+            <div className="share-row-link">
+              <a href={link} className="share-result-link">
+                {link}
+              </a>
+              <CopyLinkButton link={link} />
+            </div>
+          </div>
+
           <ShareFieldsEditor
             permission={permission}
             onPermissionChange={setPermission}
@@ -114,9 +152,19 @@ export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProp
 
           {error && <p className="share-error">{error}</p>}
 
-          <button type="submit" className="share-submit" disabled={pending}>
-            {pending ? "Saving —" : "Save changes"}
-          </button>
+          <div className="share-edit-actions">
+            <button type="submit" className="share-submit" disabled={pending || revoking}>
+              {pending ? "Saving —" : "Save changes"}
+            </button>
+            <button
+              type="button"
+              onClick={handleRevoke}
+              disabled={pending || revoking}
+              className="share-revoke"
+            >
+              {revoking ? "Revoking —" : "Revoke"}
+            </button>
+          </div>
         </form>
       )}
     </>

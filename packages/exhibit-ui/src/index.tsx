@@ -17,6 +17,7 @@ export { navigateToExhibit } from "./navigateToExhibit.js";
 export { useExhibitSharing } from "./useExhibitSharing.js";
 export { ExhibitSharingBadge } from "./ExhibitSharingBadge.js";
 export { CreateShareForm } from "./CreateShareForm.js";
+export { CopyLinkButton } from "./CopyLinkButton.js";
 export { ShareControl } from "./ShareControl.js";
 export { EditShareModal } from "./EditShareModal.js";
 export { SharePopover } from "./SharePopover.js";

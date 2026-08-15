@@ -1060,6 +1060,28 @@ html[data-theme="dark"] {
   opacity: 0.5;
 }
 
+.share-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.share-revoke {
+  font-family: var(--font-mono);
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-alert);
+}
+
+.share-revoke:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.share-revoke:disabled {
+  opacity: 0.5;
+}
+
 .share-error {
   font-family: var(--font-mono);
   font-size: 0.85em;
