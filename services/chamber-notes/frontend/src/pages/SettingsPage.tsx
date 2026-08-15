@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { PageHeader } from "@congress/exhibit-ui";
 import { fetchSettings, updateSettings } from "@/lib/api";
 
 export function SettingsPage() {
@@ -13,7 +14,7 @@ export function SettingsPage() {
 
   return (
     <section>
-      <h2 className="mb-6 border-b border-dust pb-4 font-display text-3xl text-ink">Settings</h2>
+      <PageHeader title="Settings" />
 
       {isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}
       {isError && <p className="font-mono text-sm text-alert">Failed to load settings.</p>}

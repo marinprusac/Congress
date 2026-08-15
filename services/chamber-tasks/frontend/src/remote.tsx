@@ -1,7 +1,9 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { createQueryClient } from "@congress/exhibit-ui";
 import { App } from "@/App";
 import "./index.css";
+
+const queryClient = createQueryClient();
 
 // The entry Capitol's shell (ChamberHost) dynamically imports and renders
 // directly into its own React tree - see vite.remote.config.ts for how this

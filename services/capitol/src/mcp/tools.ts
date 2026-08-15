@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { mcpTextResult } from "@congress/chamber-kit";
 import { listChambers, getChamber } from "../registry.js";
 import { searchExhibits, resolveExhibits } from "../exhibits.js";
 
@@ -13,9 +14,7 @@ export function registerTools(server: McpServer) {
     },
     async () => {
       const chambers = listChambers();
-      return {
-        content: [{ type: "text", text: JSON.stringify(chambers, null, 2) }],
-      };
+      return mcpTextResult(chambers);
     }
   );
 
@@ -29,13 +28,9 @@ export function registerTools(server: McpServer) {
     async ({ name }) => {
       const chamber = getChamber(name);
       if (!chamber) {
-        return {
-          content: [{ type: "text", text: JSON.stringify({ error: "not_found", name }) }],
-        };
+        return mcpTextResult({ error: "not_found", name });
       }
-      return {
-        content: [{ type: "text", text: JSON.stringify(chamber, null, 2) }],
-      };
+      return mcpTextResult(chamber);
     }
   );
 
@@ -49,9 +44,7 @@ export function registerTools(server: McpServer) {
     },
     async ({ query }) => {
       const results = await searchExhibits(query);
-      return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
-      };
+      return mcpTextResult(results);
     }
   );
 
@@ -67,9 +60,7 @@ export function registerTools(server: McpServer) {
     },
     async ({ refs }) => {
       const results = await resolveExhibits(refs);
-      return {
-        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
-      };
+      return mcpTextResult(results);
     }
   );
 }

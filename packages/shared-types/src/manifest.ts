@@ -21,19 +21,6 @@ export const manifestSchema = z.object({
 });
 export type Manifest = z.infer<typeof manifestSchema>;
 
-export const registerRequestSchema = manifestSchema;
-export type RegisterRequest = z.infer<typeof registerRequestSchema>;
-
-export const deregisterRequestSchema = z.object({
-  name: z.string().min(1),
-});
-export type DeregisterRequest = z.infer<typeof deregisterRequestSchema>;
-
-export const heartbeatRequestSchema = z.object({
-  name: z.string().min(1),
-});
-export type HeartbeatRequest = z.infer<typeof heartbeatRequestSchema>;
-
 export const chamberRegistryEntrySchema = manifestSchema.extend({
   status: chamberStatusSchema,
   registeredAt: z.string(),

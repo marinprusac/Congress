@@ -1,7 +1,13 @@
 import type { MiddlewareHandler } from "hono";
 import type { HttpBindings } from "@hono/node-server";
-import type { ShareClosureEntry } from "@congress/shared-types";
-import { getShareRow, isShareActive, touchShareAccess, computeShareClosure, type ShareRow } from "./shares.js";
+import {
+  getShareRow,
+  isShareActive,
+  touchShareAccess,
+  computeShareClosure,
+  type ShareRow,
+  type ShareClosureEntry,
+} from "./shares.js";
 
 export type ShareVariables = {
   share: ShareRow;

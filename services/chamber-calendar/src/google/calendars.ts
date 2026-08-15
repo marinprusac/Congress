@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import type { GoogleCalendarListItem, SelectedCalendar } from "@congress/shared-types";
+import type { GoogleCalendarListItem, SelectedCalendar } from "../types.js";
 import { db } from "../db/client.js";
 import { googleAccounts, selectedCalendars } from "../db/schema.js";
 import { googleCalendarFetch } from "./client.js";

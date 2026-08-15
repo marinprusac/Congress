@@ -12,6 +12,7 @@ import {
   getChamberIcon,
   useShellHosted,
   resolveChamberPath,
+  confirmDelete,
 } from "@congress/exhibit-ui";
 import { fetchTask, updateTask, deleteTask, quickCreateTaskExhibit } from "@/lib/api";
 
@@ -177,7 +178,7 @@ export function TaskViewPage() {
               </button>
               <button
                 onClick={() => {
-                  if (confirm(`Delete "${task.name}"? This cannot be undone.`)) deleteMutation.mutate();
+                  if (confirmDelete(task.name)) deleteMutation.mutate();
                 }}
                 className="tap-target text-alert hover:underline"
               >

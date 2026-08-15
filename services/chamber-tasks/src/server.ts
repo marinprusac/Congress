@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
-import { createTaskRequestSchema, updateTaskRequestSchema, updateTasksSettingsRequestSchema } from "@congress/shared-types";
+import { createTaskRequestSchema, updateTaskRequestSchema, updateTasksSettingsRequestSchema } from "./types.js";
 import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,

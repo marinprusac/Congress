@@ -25,16 +25,6 @@ export const shareSummarySchema = z.object({
 });
 export type ShareSummary = z.infer<typeof shareSummarySchema>;
 
-export const createShareRequestSchema = z.object({
-  rootChamber: z.string().min(1),
-  rootId: z.string().min(1),
-  maxDepth: z.number().int().min(0),
-  permission: sharePermissionSchema,
-  label: z.string().optional(),
-  expiresAt: z.string().optional(),
-});
-export type CreateShareRequest = z.infer<typeof createShareRequestSchema>;
-
 // PATCH /capitol/shares/:token - same token, updated terms. expiresAt:
 // undefined = leave unchanged, null = clear it, string = set it.
 export const updateShareRequestSchema = z.object({
@@ -44,33 +34,6 @@ export const updateShareRequestSchema = z.object({
   expiresAt: z.string().nullable().optional(),
 });
 export type UpdateShareRequest = z.infer<typeof updateShareRequestSchema>;
-
-export const exhibitSharesResponseSchema = z.object({
-  shares: z.array(shareSummarySchema),
-});
-export type ExhibitSharesResponse = z.infer<typeof exhibitSharesResponseSchema>;
-
-// One exhibit reachable through a share's closure. depth 0 = the share's
-// root itself; depth > 0 = reached via that many recursive [[ references.
-export const shareClosureEntrySchema = z.object({
-  id: z.string(),
-  chamber: z.string(),
-  type: z.string(),
-  name: z.string(),
-  depth: z.number().int(),
-});
-export type ShareClosureEntry = z.infer<typeof shareClosureEntrySchema>;
-
-// GET /capitol/shared/:token
-export const shareDetailSchema = z.object({
-  token: z.string(),
-  rootId: z.string(),
-  rootChamber: z.string(),
-  permission: sharePermissionSchema,
-  label: z.string(),
-  closure: z.array(shareClosureEntrySchema),
-});
-export type ShareDetail = z.infer<typeof shareDetailSchema>;
 
 // Canonical content envelope every Chamber maps its own detail shape into,
 // for GET /exhibits/:id/content. Keeps the shared viewer + Capitol's proxy
@@ -104,7 +67,3 @@ export const exhibitSharingEntrySchema = z.object({
 });
 export type ExhibitSharingEntry = z.infer<typeof exhibitSharingEntrySchema>;
 
-export const exhibitSharingResponseSchema = z.object({
-  shares: z.array(exhibitSharingEntrySchema),
-});
-export type ExhibitSharingResponse = z.infer<typeof exhibitSharingResponseSchema>;

@@ -5,3 +5,6 @@ export * from "./mcp.js";
 export * from "./exhibits.js";
 export * from "./settings.js";
 export * from "./routes.js";
+export * from "./wikilinks.js";
+export * from "./manualRefs.js";
+export * from "./bootstrap.js";

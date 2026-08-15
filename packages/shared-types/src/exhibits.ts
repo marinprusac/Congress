@@ -9,11 +9,6 @@ export const exhibitSearchResultSchema = z.object({
 });
 export type ExhibitSearchResult = z.infer<typeof exhibitSearchResultSchema>;
 
-export const exhibitSearchResponseSchema = z.object({
-  results: z.array(exhibitSearchResultSchema),
-});
-export type ExhibitSearchResponse = z.infer<typeof exhibitSearchResponseSchema>;
-
 // Request/response for a Chamber's own POST /exhibits/resolve - ids are
 // assumed to already be owned by that Chamber (the caller groups by chamber
 // before calling).
@@ -27,11 +22,6 @@ export const exhibitResolveResultSchema = z.union([
   z.object({ id: z.string(), deleted: z.literal(true) }),
 ]);
 export type ExhibitResolveResult = z.infer<typeof exhibitResolveResultSchema>;
-
-export const exhibitResolveResponseSchema = z.object({
-  results: z.array(exhibitResolveResultSchema),
-});
-export type ExhibitResolveResponse = z.infer<typeof exhibitResolveResponseSchema>;
 
 // Pushed by a Chamber to Capitol on Exhibit create/update/delete.
 export const exhibitSyncRequestSchema = z.object({
@@ -57,18 +47,6 @@ export const capitolExhibitSearchResultSchema = exhibitSearchResultSchema.extend
 });
 export type CapitolExhibitSearchResult = z.infer<typeof capitolExhibitSearchResultSchema>;
 
-export const capitolExhibitSearchResponseSchema = z.object({
-  results: z.array(capitolExhibitSearchResultSchema),
-});
-export type CapitolExhibitSearchResponse = z.infer<typeof capitolExhibitSearchResponseSchema>;
-
-// Chamber included per-ref since an id that never synced has no cache row to
-// infer the owning chamber from.
-export const capitolExhibitResolveRequestSchema = z.object({
-  refs: z.array(z.object({ id: z.string(), chamber: z.string() })),
-});
-export type CapitolExhibitResolveRequest = z.infer<typeof capitolExhibitResolveRequestSchema>;
-
 // `deleted` = the owning Chamber confirmed this id no longer exists.
 // `unavailable` = the owning Chamber could not be reached at all - distinct
 // states per the spec, must render differently and `unavailable` should be
@@ -80,11 +58,6 @@ export const capitolExhibitResolveResultSchema = z.union([
 ]);
 export type CapitolExhibitResolveResult = z.infer<typeof capitolExhibitResolveResultSchema>;
 
-export const capitolExhibitResolveResponseSchema = z.object({
-  results: z.array(capitolExhibitResolveResultSchema),
-});
-export type CapitolExhibitResolveResponse = z.infer<typeof capitolExhibitResolveResponseSchema>;
-
 // A backlinks/frontlinks entry, same three states as
 // capitolExhibitResolveResultSchema plus whether the underlying ref is
 // removable from a References panel (added manually) or only ever
@@ -95,16 +68,6 @@ export const exhibitRefEntrySchema = z.union([
   z.object({ id: z.string(), chamber: z.string(), unavailable: z.literal(true), isManual: z.boolean() }),
 ]);
 export type ExhibitRefEntry = z.infer<typeof exhibitRefEntrySchema>;
-
-export const exhibitBacklinksResponseSchema = z.object({
-  backlinks: z.array(exhibitRefEntrySchema),
-});
-export type ExhibitBacklinksResponse = z.infer<typeof exhibitBacklinksResponseSchema>;
-
-export const exhibitFrontlinksResponseSchema = z.object({
-  frontlinks: z.array(exhibitRefEntrySchema),
-});
-export type ExhibitFrontlinksResponse = z.infer<typeof exhibitFrontlinksResponseSchema>;
 
 // A source Exhibit's explicit references, added from a side panel rather
 // than embedded in body text (e.g. "[[" wikilinks) - merged with any

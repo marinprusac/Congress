@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { Hono, type Context } from "hono";
 import type { HttpBindings } from "@hono/node-server";
-import { updateDocumentRequestSchema } from "@congress/shared-types";
+import { updateDocumentRequestSchema } from "./types.js";
 import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,

@@ -1,4 +1,5 @@
-import type { ShareDetail, SharedExhibitContent, UpdateSharedExhibitContentRequest, CapitolExhibitResolveResult } from "@congress/shared-types";
+import type { SharedExhibitContent, UpdateSharedExhibitContentRequest, CapitolExhibitResolveResult } from "@congress/shared-types";
+import type { ShareDetail } from "../../../src/types";
 
 // Token-scoped client for the "/shared/:token" viewer - deliberately never
 // touches the owner-session-gated /capitol/shares endpoints in lib/api.ts.

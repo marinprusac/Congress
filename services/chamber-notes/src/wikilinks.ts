@@ -1,4 +1,4 @@
-const WIKILINK_PATTERN = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+import { WIKILINK_PATTERN } from "@congress/chamber-kit";
 
 export interface ParsedWikiLink {
   target: string;

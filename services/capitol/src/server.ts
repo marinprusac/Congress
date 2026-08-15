@@ -1,17 +1,9 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import type { HttpBindings } from "@hono/node-server";
+import { z } from "zod";
 import { mountManifestAndHealth, mountStaticFrontend } from "@congress/chamber-kit";
-import {
-  registerRequestSchema,
-  deregisterRequestSchema,
-  heartbeatRequestSchema,
-  exhibitSyncRequestSchema,
-  capitolExhibitResolveRequestSchema,
-  createShareRequestSchema,
-  updateShareRequestSchema,
-  updateCapitolSettingsRequestSchema,
-} from "@congress/shared-types";
+import { manifestSchema, exhibitSyncRequestSchema, updateShareRequestSchema, updateCapitolSettingsRequestSchema } from "@congress/shared-types";
 import { env } from "./env.js";
 import { requireInternalToken } from "./auth.js";
 import { authRoutes, requireSession } from "./sessionAuth.js";
@@ -35,10 +27,22 @@ import {
   getFrontlinks,
   getCachedChamber,
 } from "./exhibits.js";
-import { createShare, listShares, listSharesForExhibit, updateShare, revokeShare, getExhibitSharing } from "./shares.js";
+import { createShare, createShareRequestSchema, listShares, listSharesForExhibit, updateShare, revokeShare, getExhibitSharing } from "./shares.js";
 import { requireShareToken, type ShareVariables } from "./shareAuth.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { mcpApp } from "./mcp/server.js";
+
+// Only Capitol itself validates register/deregister/heartbeat/exhibit-resolve
+// requests - no Chamber ever needs these shapes, so they live here rather
+// than in the shared-types barrel every service imports.
+const registerRequestSchema = manifestSchema;
+const deregisterRequestSchema = z.object({ name: z.string().min(1) });
+const heartbeatRequestSchema = z.object({ name: z.string().min(1) });
+// Chamber included per-ref since an id that never synced has no cache row to
+// infer the owning chamber from.
+const capitolExhibitResolveRequestSchema = z.object({
+  refs: z.array(z.object({ id: z.string(), chamber: z.string() })),
+});
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
 

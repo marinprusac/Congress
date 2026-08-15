@@ -1,12 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CreateShareForm } from "@congress/exhibit-ui";
+import { CreateShareForm, formatTimestamp } from "@congress/exhibit-ui";
 import { fetchShares, revokeShare } from "@/lib/api";
 import { CapitolHeader } from "@/components/CapitolHeader";
-
-function formatTimestamp(value: string | null): string {
-  if (!value) return "—";
-  return new Date(value).toISOString().replace("T", " ").slice(0, 16);
-}
 
 function isActive(share: { revokedAt: string | null; expiresAt: string | null }): boolean {
   if (share.revokedAt) return false;

@@ -1,16 +1,22 @@
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import type {
   ExhibitSyncRequest,
   CapitolExhibitSearchResult,
   CapitolExhibitResolveResult,
   ExhibitRefEntry,
 } from "@congress/shared-types";
-import { exhibitSearchResponseSchema, exhibitResolveResponseSchema } from "@congress/shared-types";
+import { exhibitSearchResultSchema, exhibitResolveResultSchema } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { exhibitCache, exhibitRefs } from "./db/schema.js";
 import { listChambers, getChamber } from "./registry.js";
 
 const FAN_OUT_TIMEOUT_MS = 5_000;
+
+// Only Capitol parses these - the response envelope for its own fan-out
+// calls to each Chamber's /exhibits/search and /exhibits/resolve.
+const exhibitSearchResponseSchema = z.object({ results: z.array(exhibitSearchResultSchema) });
+const exhibitResolveResponseSchema = z.object({ results: z.array(exhibitResolveResultSchema) });
 
 export function syncExhibit(push: ExhibitSyncRequest): void {
   const now = new Date();

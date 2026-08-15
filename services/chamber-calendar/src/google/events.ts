@@ -4,9 +4,8 @@ import type {
   ListEventsResponse,
   CreateEventRequest,
   UpdateEventRequest,
-  SharedExhibitContent,
-  UpdateSharedExhibitContentRequest,
-} from "@congress/shared-types";
+} from "../types.js";
+import type { SharedExhibitContent, UpdateSharedExhibitContentRequest } from "@congress/shared-types";
 import { googleAccounts, selectedCalendars } from "../db/schema.js";
 import { db } from "../db/client.js";
 import { eq, and } from "drizzle-orm";
@@ -14,7 +13,8 @@ import { googleCalendarFetch, GoogleApiError } from "./client.js";
 import { getAccountRow } from "./accounts.js";
 import { listSelectedCalendarsInternal } from "./calendars.js";
 import { AccountNeedsReconnectError } from "./accounts.js";
-import { toExhibitId, extractOutgoingExhibitRefs, pushExhibitSync, parseExhibitId } from "../exhibits.js";
+import { toExhibitId, pushExhibitSync, parseExhibitId } from "../exhibits.js";
+import { extractOutgoingExhibitRefs } from "@congress/chamber-kit";
 import { listManualRefs, deleteManualRefsForEvent } from "../refs.js";
 
 interface GoogleEventTime {

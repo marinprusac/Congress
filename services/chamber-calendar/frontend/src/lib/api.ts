@@ -7,22 +7,10 @@ import type {
   ListEventsResponse,
   CreateEventRequest,
   UpdateEventRequest,
-} from "@congress/shared-types";
+} from "../../../src/types";
+import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/exhibit-ui";
 
-// In production this Chamber's frontend is proxied through Capitol at
-// "/calendar/*", but its API calls still need to reach Capitol's gateway at
-// "/api/calendar/*" (Capitol forwards "/api/calendar/<rest>" to this
-// Chamber's own "/api/<rest>"). In dev, Vite proxies "/api" straight to this
-// Chamber's own server, so no "/calendar" segment is needed there.
-const API_BASE = import.meta.env.PROD ? "/api/calendar" : "/api";
-
-async function json<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.message ?? body.error ?? `Request failed: ${res.status}`);
-  }
-  return res.json();
-}
+const API_BASE = resolveApiBase("calendar", import.meta.env.PROD);
 
 export function fetchAccounts(): Promise<GoogleAccount[]> {
   return fetch(`${API_BASE}/accounts`).then((res) => json(res));
@@ -38,9 +26,7 @@ export function updateAccountLabel(id: number, label: string): Promise<GoogleAcc
 
 export async function disconnectAccount(id: number): Promise<void> {
   const res = await fetch(`${API_BASE}/accounts/${id}`, { method: "DELETE" });
-  if (!res.ok && res.status !== 204) {
-    throw new Error(`Failed to disconnect account: ${res.status}`);
-  }
+  assertDeleteOk(res, "disconnect account");
 }
 
 export function connectAccountUrl(): string {
@@ -110,7 +96,5 @@ export async function deleteEvent(accountId: number, calendarId: string, eventId
     `${API_BASE}/events/${accountId}/${encodeURIComponent(calendarId)}/${encodeURIComponent(eventId)}`,
     { method: "DELETE" }
   );
-  if (!res.ok && res.status !== 204) {
-    throw new Error(`Failed to delete event: ${res.status}`);
-  }
+  assertDeleteOk(res, "delete event");
 }

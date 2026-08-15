@@ -1,11 +1,8 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { mcpTextResult as textResult } from "@congress/chamber-kit";
 import { listNotes, searchNotes, getNote, createNote, updateNote } from "../notes.js";
 import { TitleConflictError } from "../notes.js";
-
-function textResult(value: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
-}
 
 export function registerTools(server: McpServer) {
   server.registerTool(

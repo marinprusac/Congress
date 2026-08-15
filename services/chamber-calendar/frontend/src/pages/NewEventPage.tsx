@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
+import { useShellHosted, resolveChamberPath, PageHeader } from "@congress/exhibit-ui";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { createEvent } from "@/lib/api";
 import { getBrowserTimeZone } from "@/lib/datetime";
@@ -56,7 +56,7 @@ export function NewEventPage() {
 
   return (
     <section>
-      <h2 className="mb-6 border-b border-dust pb-4 font-display text-3xl text-ink">New Event</h2>
+      <PageHeader title="New Event" />
       <EventForm
         values={values}
         onChange={setValues}

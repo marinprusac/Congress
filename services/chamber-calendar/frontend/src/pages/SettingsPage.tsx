@@ -7,7 +7,8 @@ import {
   fetchSelectedCalendars,
   setCalendarSelection,
 } from "@/lib/api";
-import type { GoogleAccount } from "@congress/shared-types";
+import type { GoogleAccount } from "../../../src/types";
+import { PageHeader } from "@congress/exhibit-ui";
 
 function AccountCalendars({ account }: { account: GoogleAccount }) {
   const queryClient = useQueryClient();
@@ -89,7 +90,7 @@ export function SettingsPage() {
 
   return (
     <section>
-      <h2 className="mb-6 border-b border-dust pb-4 font-display text-3xl text-ink">Settings</h2>
+      <PageHeader title="Settings" />
 
       <div className="mb-8">
         <div className="mb-3 flex items-baseline justify-between">

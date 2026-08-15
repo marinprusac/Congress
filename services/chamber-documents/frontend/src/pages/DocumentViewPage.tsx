@@ -12,6 +12,7 @@ import {
   getChamberIcon,
   useShellHosted,
   resolveChamberPath,
+  confirmDelete,
 } from "@congress/exhibit-ui";
 import { fetchDocument, updateDocument, deleteDocument, downloadUrl } from "@/lib/api";
 
@@ -164,7 +165,7 @@ export function DocumentViewPage() {
             </button>
             <button
               onClick={() => {
-                if (confirm(`Delete "${doc.title}"? This cannot be undone.`)) {
+                if (confirmDelete(doc.title)) {
                   deleteMutation.mutate();
                 }
               }}

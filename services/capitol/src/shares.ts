@@ -1,18 +1,40 @@
 import { randomUUID } from "node:crypto";
 import { eq, and, isNull, desc } from "drizzle-orm";
-import type {
-  CreateShareRequest,
-  UpdateShareRequest,
-  ShareSummary,
-  ShareClosureEntry,
-  ExhibitSharingEntry,
-} from "@congress/shared-types";
+import { z } from "zod";
+import type { UpdateShareRequest, ShareSummary, ExhibitSharingEntry } from "@congress/shared-types";
+import { sharePermissionSchema } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { shares, exhibitCache, exhibitRefs } from "./db/schema.js";
 import { resolveOneLive } from "./exhibits.js";
 
 const MAX_DEPTH_CEILING = 10;
 const MAX_CLOSURE_NODES = 500;
+
+// Only Capitol ever builds/parses a share-creation request - no Chamber
+// creates or reads a share directly, so this stays here rather than in the
+// shared-types barrel every service imports.
+export const createShareRequestSchema = z.object({
+  rootChamber: z.string().min(1),
+  rootId: z.string().min(1),
+  maxDepth: z.number().int().min(0),
+  permission: sharePermissionSchema,
+  label: z.string().optional(),
+  expiresAt: z.string().optional(),
+});
+export type CreateShareRequest = z.infer<typeof createShareRequestSchema>;
+
+// One exhibit reachable through a share's closure. depth 0 = the share's
+// root itself; depth > 0 = reached via that many recursive [[ references.
+// Backend-only - never crosses into a Chamber or the frontend directly, only
+// via shareDetailSchema (services/capitol/src/types.ts).
+export const shareClosureEntrySchema = z.object({
+  id: z.string(),
+  chamber: z.string(),
+  type: z.string(),
+  name: z.string(),
+  depth: z.number().int(),
+});
+export type ShareClosureEntry = z.infer<typeof shareClosureEntrySchema>;
 
 export type ShareRow = typeof shares.$inferSelect;
 

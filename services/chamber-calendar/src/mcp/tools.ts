@@ -1,11 +1,8 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { mcpTextResult as textResult } from "@congress/chamber-kit";
 import { listAccounts } from "../google/accounts.js";
 import { listEvents, createEvent, updateEvent, deleteEvent } from "../google/events.js";
-
-function textResult(value: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
-}
 
 export function registerTools(server: McpServer) {
   server.registerTool(

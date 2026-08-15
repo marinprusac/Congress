@@ -6,7 +6,7 @@ import type {
   UpdateSharedExhibitContentRequest,
 } from "@congress/shared-types";
 
-export function createExhibitIdCodec(prefix: string) {
+function createExhibitIdCodec(prefix: string) {
   function toExhibitId(id: number): string {
     return `${prefix}${id}`;
   }

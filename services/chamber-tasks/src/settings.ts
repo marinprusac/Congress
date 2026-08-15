@@ -1,5 +1,5 @@
 import { createSingleRowSettings } from "@congress/chamber-kit";
-import type { TasksSettings } from "@congress/shared-types";
+import type { TasksSettings } from "./types.js";
 import { db } from "./db/client.js";
 import { settings } from "./db/schema.js";
 

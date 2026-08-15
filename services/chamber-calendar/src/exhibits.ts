@@ -1,4 +1,3 @@
-import { parseExhibitToken } from "@congress/shared-types";
 import type { ExhibitSearchResult, ExhibitResolveResult } from "@congress/shared-types";
 import { createPushExhibitSync } from "@congress/chamber-kit";
 import { env } from "./env.js";
@@ -30,22 +29,6 @@ export function parseExhibitId(id: string): { accountId: number; calendarId: str
 
 function eventUrl(accountId: number, calendarId: string, eventId: string): string {
   return `/e/${accountId}/${encodeURIComponent(calendarId)}/${encodeURIComponent(eventId)}`;
-}
-
-// Outgoing refs are bare Exhibit ids (e.g. "note-3"), matching the id space
-// used by Capitol's exhibit_cache/exhibit_refs - not the "exhibit:chamber:id"
-// token syntax, which only exists for embedding a reference in text. Same
-// shape as chamber-notes/src/notes.ts's extractOutgoingExhibitRefs.
-const WIKILINK_PATTERN = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
-export function extractOutgoingExhibitRefs(text: string): string[] {
-  const ids = new Set<string>();
-  for (const match of text.matchAll(WIKILINK_PATTERN)) {
-    const target = match[1]?.trim();
-    if (!target) continue;
-    const parsed = parseExhibitToken(target);
-    if (parsed) ids.add(parsed.id);
-  }
-  return [...ids];
 }
 
 interface GoogleEventListItem {

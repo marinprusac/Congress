@@ -13,6 +13,7 @@ import {
   stripFrontmatter,
   useShellHosted,
   resolveChamberPath,
+  confirmDelete,
 } from "@congress/exhibit-ui";
 import { fetchNote, updateNote, deleteNote, setPinned, fetchSettings, quickCreateNoteExhibit } from "@/lib/api";
 
@@ -229,7 +230,7 @@ export function NoteViewPage() {
             </button>
             <button
               onClick={() => {
-                if (confirm(`Delete "${note.title}"? This cannot be undone.`)) {
+                if (confirmDelete(note.title)) {
                   deleteMutation.mutate();
                 }
               }}

@@ -1,26 +1,10 @@
 import { desc, eq, like, or } from "drizzle-orm";
-import type { TaskSummary, TaskDetail, CreateTaskRequest, UpdateTaskRequest } from "@congress/shared-types";
-import { parseExhibitToken } from "@congress/shared-types";
+import type { TaskSummary, TaskDetail, CreateTaskRequest, UpdateTaskRequest } from "./types.js";
+import { extractOutgoingExhibitRefs, createManualRefsByExhibitId } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
 import { tasks } from "./db/schema.js";
 import { toExhibitId, parseTaskId, pushExhibitSync } from "./exhibits.js";
 import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForTask } from "./refs.js";
-
-// Same regex+parseExhibitToken-filter shape as chamber-notes/src/notes.ts,
-// chamber-documents/src/documents.ts, and chamber-calendar/src/exhibits.ts's
-// extractOutgoingExhibitRefs - kept as its own small per-chamber copy rather
-// than shared, per established precedent.
-const WIKILINK_PATTERN = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
-function extractOutgoingExhibitRefs(text: string): string[] {
-  const ids = new Set<string>();
-  for (const match of text.matchAll(WIKILINK_PATTERN)) {
-    const target = match[1]?.trim();
-    if (!target) continue;
-    const parsed = parseExhibitToken(target);
-    if (parsed) ids.add(parsed.id);
-  }
-  return [...ids];
-}
 
 // The set of Exhibits this task points at is the union of what's embedded
 // in its description ("[[" tokens) and what was added explicitly via the
@@ -49,26 +33,14 @@ export async function resyncTaskExhibit(id: number): Promise<void> {
 
 // Thin exhibit-id-keyed wrappers for mountManualRefsRoutes
 // (@congress/chamber-kit), which only ever sees full Exhibit ids
-// ("task-3"), not this Chamber's own row ids - same shape as
-// chamber-notes/src/notes.ts's listManualRefsByExhibitId and friends.
-export function listManualRefsByExhibitId(exhibitId: string): string[] | null {
-  const id = parseTaskId(exhibitId);
-  return id === null ? null : listManualRefs(id);
-}
-
-export function addManualRefByExhibitId(exhibitId: string, targetExhibitId: string): boolean {
-  const id = parseTaskId(exhibitId);
-  if (id === null) return false;
-  addManualRef(id, targetExhibitId);
-  return true;
-}
-
-export function removeManualRefByExhibitId(exhibitId: string, targetExhibitId: string): boolean {
-  const id = parseTaskId(exhibitId);
-  if (id === null) return false;
-  removeManualRef(id, targetExhibitId);
-  return true;
-}
+// ("task-3"), not this Chamber's own row ids.
+const manualRefsByExhibitId = createManualRefsByExhibitId(
+  { listManualRefs, addManualRef, removeManualRef },
+  parseTaskId
+);
+export const listManualRefsByExhibitId = manualRefsByExhibitId.listManualRefsByExhibitId;
+export const addManualRefByExhibitId = manualRefsByExhibitId.addManualRefByExhibitId;
+export const removeManualRefByExhibitId = manualRefsByExhibitId.removeManualRefByExhibitId;
 
 export async function resyncTaskExhibitByExhibitId(exhibitId: string): Promise<void> {
   const id = parseTaskId(exhibitId);

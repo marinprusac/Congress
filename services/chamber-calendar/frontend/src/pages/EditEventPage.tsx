@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
+import { useShellHosted, resolveChamberPath, PageHeader } from "@congress/exhibit-ui";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { fetchEvent, updateEvent, deleteEvent } from "@/lib/api";
 import { getBrowserTimeZone, toDatetimeLocalInput } from "@/lib/datetime";
-import type { CalendarEvent } from "@congress/shared-types";
+import type { CalendarEvent } from "../../../src/types";
 
 function toFormValues(event: CalendarEvent): EventFormValues {
   return {
@@ -76,7 +76,7 @@ export function EditEventPage() {
 
   return (
     <section>
-      <h2 className="mb-6 border-b border-dust pb-4 font-display text-3xl text-ink">Edit Event</h2>
+      <PageHeader title="Edit Event" />
       <EventForm
         values={values}
         onChange={setValues}

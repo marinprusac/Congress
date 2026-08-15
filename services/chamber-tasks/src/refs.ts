@@ -1,29 +1,16 @@
-import { and, eq } from "drizzle-orm";
+import { createManualRefs } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
 import { taskRefs } from "./db/schema.js";
 
-export function listManualRefs(taskId: number): string[] {
-  return db
-    .select({ targetExhibitId: taskRefs.targetExhibitId })
-    .from(taskRefs)
-    .where(eq(taskRefs.taskId, taskId))
-    .all()
-    .map((r) => r.targetExhibitId);
-}
+const manualRefs = createManualRefs<number>({
+  db,
+  table: taskRefs,
+  ownerColumn: taskRefs.taskId,
+  ownerKey: "taskId",
+  targetColumn: taskRefs.targetExhibitId,
+});
 
-export function addManualRef(taskId: number, targetExhibitId: string): void {
-  db.insert(taskRefs)
-    .values({ taskId, targetExhibitId, createdAt: new Date() })
-    .onConflictDoNothing()
-    .run();
-}
-
-export function removeManualRef(taskId: number, targetExhibitId: string): void {
-  db.delete(taskRefs)
-    .where(and(eq(taskRefs.taskId, taskId), eq(taskRefs.targetExhibitId, targetExhibitId)))
-    .run();
-}
-
-export function deleteManualRefsForTask(taskId: number): void {
-  db.delete(taskRefs).where(eq(taskRefs.taskId, taskId)).run();
-}
+export const listManualRefs = manualRefs.listManualRefs;
+export const addManualRef = manualRefs.addManualRef;
+export const removeManualRef = manualRefs.removeManualRef;
+export const deleteManualRefsForTask = manualRefs.deleteManualRefsForOwner;

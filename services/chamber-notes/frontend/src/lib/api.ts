@@ -5,23 +5,11 @@ import type {
   UpdateNoteRequest,
   NotesSettings,
   UpdateNotesSettingsRequest,
-  CapitolExhibitSearchResult,
-} from "@congress/shared-types";
+} from "../../../src/types";
+import type { CapitolExhibitSearchResult } from "@congress/shared-types";
+import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/exhibit-ui";
 
-// In production this Chamber's frontend is proxied through Capitol at
-// "/notes/*", but its API calls still need to reach Capitol's gateway at
-// "/api/notes/*" (Capitol forwards "/api/notes/<rest>" to this Chamber's own
-// "/api/<rest>"). In dev, Vite proxies "/api" straight to this Chamber's own
-// server, so no "/notes" segment is needed there.
-const API_BASE = import.meta.env.PROD ? "/api/notes" : "/api";
-
-async function json<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.message ?? body.error ?? `Request failed: ${res.status}`);
-  }
-  return res.json();
-}
+const API_BASE = resolveApiBase("notes", import.meta.env.PROD);
 
 export function fetchNotes(): Promise<NoteSummary[]> {
   return fetch(`${API_BASE}/notes`).then((res) => json(res));
@@ -53,9 +41,7 @@ export function updateNote(id: number, input: UpdateNoteRequest): Promise<NoteDe
 
 export async function deleteNote(id: number): Promise<void> {
   const res = await fetch(`${API_BASE}/notes/${id}`, { method: "DELETE" });
-  if (!res.ok && res.status !== 204) {
-    throw new Error(`Failed to delete note: ${res.status}`);
-  }
+  assertDeleteOk(res, "delete note");
 }
 
 export function fetchPinnedNotes(): Promise<NoteSummary[]> {

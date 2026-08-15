@@ -1,4 +1,4 @@
-import type { CalendarEvent } from "@congress/shared-types";
+import type { CalendarEvent } from "../../../src/types";
 
 export function getBrowserTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;

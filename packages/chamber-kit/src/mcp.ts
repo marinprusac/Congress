@@ -4,6 +4,10 @@ import { RESPONSE_ALREADY_SENT } from "@hono/node-server/utils/response";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 
+export function mcpTextResult(value: unknown) {
+  return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
+}
+
 export function createMcpApp(name: string, registerTools: (server: McpServer) => void) {
   const mcpApp = new Hono<{ Bindings: HttpBindings }>();
 

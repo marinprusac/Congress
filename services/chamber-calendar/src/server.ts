@@ -5,7 +5,7 @@ import {
   setCalendarSelectionRequestSchema,
   createEventRequestSchema,
   updateEventRequestSchema,
-} from "@congress/shared-types";
+} from "./types.js";
 import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,

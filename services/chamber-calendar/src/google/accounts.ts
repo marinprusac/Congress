@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { GoogleAccount } from "@congress/shared-types";
+import type { GoogleAccount } from "../types.js";
 import { db } from "../db/client.js";
 import { googleAccounts } from "../db/schema.js";
 import { refreshAccessToken, revokeToken, RevokedTokenError } from "./oauth.js";

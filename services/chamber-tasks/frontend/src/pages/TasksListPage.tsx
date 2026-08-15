@@ -1,9 +1,18 @@
-import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
+import { useState } from "react";
+import {
+  useShellHosted,
+  resolveChamberPath,
+  useSearchableList,
+  useListRowPrefetch,
+  ListSearchInput,
+  ListLoadingState,
+  ListErrorState,
+  ListEmptyState,
+} from "@congress/exhibit-ui";
 import { fetchTasks, fetchTask, searchTasks, setCompleted } from "@/lib/api";
-import type { TaskSummary } from "@congress/shared-types";
+import type { TaskSummary } from "../../../src/types";
 
 function formatDueDate(value: string | null): string | null {
   if (!value) return null;
@@ -19,9 +28,11 @@ export function TasksListPage() {
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: query ? ["tasks", "search", query] : ["tasks"],
-    queryFn: () => (query ? searchTasks(query) : fetchTasks()),
+  const { data, isLoading, isError } = useSearchableList({
+    queryKeyBase: "tasks",
+    query,
+    fetchAll: fetchTasks,
+    fetchSearch: searchTasks,
   });
 
   const completeMutation = useMutation({
@@ -34,28 +45,16 @@ export function TasksListPage() {
 
   const tasks = data ? sortOpenFirst(data) : data;
 
-  function prefetchTask(id: number) {
-    queryClient.prefetchQuery({ queryKey: ["task", id], queryFn: () => fetchTask(id) });
-  }
+  const prefetchTask = useListRowPrefetch((id: number) => ["task", id], fetchTask);
 
   return (
     <section>
-      <input
-        type="search"
-        placeholder="Search tasks —"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="mb-6 w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-      />
+      <ListSearchInput value={query} onChange={setQuery} placeholder="Search tasks —" />
 
       <div className="border-t border-dust">
-        {isLoading && <div className="px-1 py-3 font-mono text-sm text-dust">Loading —</div>}
-        {isError && <div className="px-1 py-3 font-mono text-sm text-alert">Failed to reach the Tasks API.</div>}
-        {!isLoading && !isError && tasks?.length === 0 && (
-          <div className="border-b border-dust px-1 py-3 font-mono text-sm text-dust">
-            — No tasks {query ? "match your search" : "yet"} —
-          </div>
-        )}
+        {isLoading && <ListLoadingState />}
+        {isError && <ListErrorState label="Tasks" />}
+        {!isLoading && !isError && tasks?.length === 0 && <ListEmptyState label="tasks" hasQuery={!!query} />}
         {!isLoading &&
           !isError &&
           tasks?.map((task) => (

@@ -1,7 +1,17 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ExhibitTextarea, getChamberIcon, useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
+import {
+  ExhibitTextarea,
+  getChamberIcon,
+  useShellHosted,
+  resolveChamberPath,
+  PageHeader,
+  FormLabel,
+  FormTextInput,
+  FormErrorMessage,
+  FormSubmitButton,
+} from "@congress/exhibit-ui";
 import { createTask, quickCreateTaskExhibit } from "@/lib/api";
 
 export function NewTaskPage() {
@@ -29,7 +39,7 @@ export function NewTaskPage() {
 
   return (
     <section>
-      <h2 className="mb-6 border-b border-dust pb-4 font-display text-3xl text-ink">New Task</h2>
+      <PageHeader title="New Task" />
 
       <form
         onSubmit={(e) => {
@@ -37,15 +47,10 @@ export function NewTaskPage() {
           if (name.trim()) mutation.mutate();
         }}
       >
-        <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Name</label>
-        <input
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="mb-4 w-full border border-dust bg-parchment px-3 py-2 font-display text-xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-        />
+        <FormLabel>Name</FormLabel>
+        <FormTextInput autoFocus value={name} onChange={(e) => setName(e.target.value)} />
 
-        <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Due date (optional)</label>
+        <FormLabel>Due date (optional)</FormLabel>
         <input
           type="date"
           value={dueDate}
@@ -53,9 +58,7 @@ export function NewTaskPage() {
           className="mb-4 border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
         />
 
-        <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">
-          Description (optional, [[ to reference an Exhibit)
-        </label>
+        <FormLabel>Description (optional, [[ to reference an Exhibit)</FormLabel>
         <ExhibitTextarea
           value={description}
           onChange={setDescription}
@@ -66,15 +69,11 @@ export function NewTaskPage() {
           onCreate={onCreateExhibit}
         />
 
-        {mutation.isError && <p className="mb-4 font-mono text-sm text-alert">{(mutation.error as Error).message}</p>}
+        {mutation.isError && <FormErrorMessage>{(mutation.error as Error).message}</FormErrorMessage>}
 
-        <button
-          type="submit"
-          disabled={!name.trim() || mutation.isPending}
-          className="border border-accent px-4 py-2 font-mono text-xs uppercase tracking-wide text-accent hover:bg-accent hover:text-parchment disabled:opacity-50"
-        >
+        <FormSubmitButton disabled={!name.trim() || mutation.isPending}>
           {mutation.isPending ? "Creating —" : "Create Task"}
-        </button>
+        </FormSubmitButton>
       </form>
     </section>
   );

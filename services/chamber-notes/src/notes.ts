@@ -1,24 +1,12 @@
 import matter from "gray-matter";
 import { and, desc, eq, like, ne, or, sql } from "drizzle-orm";
-import type { NoteSummary, NoteDetail, CreateNoteRequest, UpdateNoteRequest } from "@congress/shared-types";
-import { parseExhibitToken } from "@congress/shared-types";
+import type { NoteSummary, NoteDetail, CreateNoteRequest, UpdateNoteRequest } from "./types.js";
+import { extractOutgoingExhibitRefs, createManualRefsByExhibitId } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
 import { notes } from "./db/schema.js";
-import { extractWikiLinks, makeExcerpt } from "./wikilinks.js";
+import { makeExcerpt } from "./wikilinks.js";
 import { toExhibitId, parseNoteId, pushExhibitSync } from "./exhibits.js";
 import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForNote } from "./refs.js";
-
-// Outgoing refs are bare Exhibit ids (e.g. "note-3"), matching the id space
-// used by exhibit_cache/exhibit_refs - not the "exhibit:chamber:id" token
-// syntax, which only exists for embedding a reference in markdown text.
-function extractOutgoingExhibitRefs(body: string): string[] {
-  const ids = new Set<string>();
-  for (const link of extractWikiLinks(body)) {
-    const parsed = parseExhibitToken(link.target);
-    if (parsed) ids.add(parsed.id);
-  }
-  return [...ids];
-}
 
 // The set of Exhibits this note points at is the union of what's embedded
 // in its body ("[[" tokens) and what was added explicitly via the
@@ -53,24 +41,13 @@ export async function resyncNoteExhibit(id: number): Promise<void> {
 // add/remove can also originate from a *different* Exhibit's "Referenced by"
 // panel (via Capitol's proxy at POST/DELETE "/capitol/exhibits/:id/refs"),
 // so these have to resync exactly like the body-text path does.
-export function listManualRefsByExhibitId(exhibitId: string): string[] | null {
-  const id = parseNoteId(exhibitId);
-  return id === null ? null : listManualRefs(id);
-}
-
-export function addManualRefByExhibitId(exhibitId: string, targetExhibitId: string): boolean {
-  const id = parseNoteId(exhibitId);
-  if (id === null) return false;
-  addManualRef(id, targetExhibitId);
-  return true;
-}
-
-export function removeManualRefByExhibitId(exhibitId: string, targetExhibitId: string): boolean {
-  const id = parseNoteId(exhibitId);
-  if (id === null) return false;
-  removeManualRef(id, targetExhibitId);
-  return true;
-}
+const manualRefsByExhibitId = createManualRefsByExhibitId(
+  { listManualRefs, addManualRef, removeManualRef },
+  parseNoteId
+);
+export const listManualRefsByExhibitId = manualRefsByExhibitId.listManualRefsByExhibitId;
+export const addManualRefByExhibitId = manualRefsByExhibitId.addManualRefByExhibitId;
+export const removeManualRefByExhibitId = manualRefsByExhibitId.removeManualRefByExhibitId;
 
 export async function resyncNoteExhibitByExhibitId(exhibitId: string): Promise<void> {
   const id = parseNoteId(exhibitId);

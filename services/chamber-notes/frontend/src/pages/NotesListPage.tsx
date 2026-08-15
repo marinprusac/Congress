@@ -1,13 +1,19 @@
-import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useShellHosted, resolveChamberPath } from "@congress/exhibit-ui";
+import { useState } from "react";
+import {
+  useShellHosted,
+  resolveChamberPath,
+  useSearchableList,
+  useListRowPrefetch,
+  ListSearchInput,
+  ListLoadingState,
+  ListErrorState,
+  ListEmptyState,
+  formatTimestamp,
+} from "@congress/exhibit-ui";
 import { fetchNotes, fetchNote, searchNotes, setPinned } from "@/lib/api";
-import type { NoteSummary } from "@congress/shared-types";
-
-function formatTimestamp(value: string): string {
-  return new Date(value).toISOString().replace("T", " ").slice(0, 16);
-}
+import type { NoteSummary } from "../../../src/types";
 
 function sortPinnedFirst(notes: NoteSummary[]): NoteSummary[] {
   return [...notes].sort((a, b) => Number(b.pinned) - Number(a.pinned));
@@ -18,9 +24,11 @@ export function NotesListPage() {
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: query ? ["notes", "search", query] : ["notes"],
-    queryFn: () => (query ? searchNotes(query) : fetchNotes()),
+  const { data, isLoading, isError } = useSearchableList({
+    queryKeyBase: "notes",
+    query,
+    fetchAll: fetchNotes,
+    fetchSearch: searchNotes,
   });
 
   const pinMutation = useMutation({
@@ -33,30 +41,16 @@ export function NotesListPage() {
 
   const notes = data ? sortPinnedFirst(data) : data;
 
-  function prefetchNote(id: number) {
-    queryClient.prefetchQuery({ queryKey: ["note", id], queryFn: () => fetchNote(id) });
-  }
+  const prefetchNote = useListRowPrefetch((id: number) => ["note", id], fetchNote);
 
   return (
     <section>
-      <input
-        type="search"
-        placeholder="Search notes —"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="mb-6 w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-      />
+      <ListSearchInput value={query} onChange={setQuery} placeholder="Search notes —" />
 
       <div className="border-t border-dust">
-        {isLoading && <div className="px-1 py-3 font-mono text-sm text-dust">Loading —</div>}
-        {isError && (
-          <div className="px-1 py-3 font-mono text-sm text-alert">Failed to reach the Notes API.</div>
-        )}
-        {!isLoading && !isError && notes?.length === 0 && (
-          <div className="border-b border-dust px-1 py-3 font-mono text-sm text-dust">
-            — No notes {query ? "match your search" : "yet"} —
-          </div>
-        )}
+        {isLoading && <ListLoadingState />}
+        {isError && <ListErrorState label="Notes" />}
+        {!isLoading && !isError && notes?.length === 0 && <ListEmptyState label="notes" hasQuery={!!query} />}
         {!isLoading &&
           !isError &&
           notes?.map((note) => (
