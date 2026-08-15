@@ -14,16 +14,7 @@ import {
   useShellHosted,
   resolveChamberPath,
 } from "@congress/exhibit-ui";
-import {
-  fetchNote,
-  updateNote,
-  deleteNote,
-  setPinned,
-  fetchSettings,
-  addNoteRef,
-  removeNoteRef,
-  quickCreateNoteExhibit,
-} from "@/lib/api";
+import { fetchNote, updateNote, deleteNote, setPinned, fetchSettings, quickCreateNoteExhibit } from "@/lib/api";
 
 export function NoteViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -72,20 +63,6 @@ export function NoteViewPage() {
       queryClient.setQueryData(["note", noteId], updated);
       queryClient.invalidateQueries({ queryKey: ["notes"] });
     },
-  });
-
-  const exhibitId = `note-${noteId}`;
-  function onRefsChanged() {
-    queryClient.invalidateQueries({ queryKey: ["note", noteId] });
-    queryClient.invalidateQueries({ queryKey: ["exhibit-frontlinks", exhibitId] });
-  }
-  const addRefMutation = useMutation({
-    mutationFn: (result: { id: string }) => addNoteRef(noteId, result.id),
-    onSuccess: onRefsChanged,
-  });
-  const removeRefMutation = useMutation({
-    mutationFn: (targetExhibitId: string) => removeNoteRef(noteId, targetExhibitId),
-    onSuccess: onRefsChanged,
   });
 
   useEffect(() => {
@@ -226,14 +203,12 @@ export function NoteViewPage() {
         </>
       ) : (
         <ExhibitLinksLayout
-          exhibitId={exhibitId}
+          exhibitId={`note-${noteId}`}
           emptyBacklinksLabel="Nothing references this note"
           emptyFrontlinksLabel="This note references nothing"
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onNavigate={(r) => navigateToExhibit("notes", r, navigate, shellHosted)}
-          manualRefs={note.manualRefs}
-          onAddReference={(result) => addRefMutation.mutate(result)}
-          onRemoveReference={(targetId) => removeRefMutation.mutate(targetId)}
+          editable
           onCreateReference={onCreateExhibit}
         >
           <ExhibitMarkdown

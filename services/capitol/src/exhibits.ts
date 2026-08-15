@@ -3,6 +3,7 @@ import type {
   ExhibitSyncRequest,
   CapitolExhibitSearchResult,
   CapitolExhibitResolveResult,
+  ExhibitRefEntry,
 } from "@congress/shared-types";
 import { exhibitSearchResponseSchema, exhibitResolveResponseSchema } from "@congress/shared-types";
 import { db } from "./db/client.js";
@@ -41,10 +42,11 @@ export function syncExhibit(push: ExhibitSyncRequest): void {
       .run();
   }
 
+  const manualRefs = new Set(push.manualRefs ?? []);
   db.delete(exhibitRefs).where(eq(exhibitRefs.sourceId, push.id)).run();
   for (const targetId of push.outgoingRefs) {
     db.insert(exhibitRefs)
-      .values({ sourceId: push.id, sourceChamber: push.chamber, targetId })
+      .values({ sourceId: push.id, sourceChamber: push.chamber, targetId, isManual: manualRefs.has(targetId) })
       .run();
   }
 }
@@ -136,10 +138,24 @@ export async function resolveExhibits(
   );
 }
 
-export async function getBacklinks(id: string): Promise<CapitolExhibitResolveResult[]> {
+// Which Chamber owns an Exhibit id, per the resolution cache - used to route
+// a manual-ref add/remove to the right Chamber's own "/api/exhibits/:id/refs"
+// regardless of which Chamber's page the request originated from. Unlike
+// resolveOneLive, this never falls back to guessing: an id with no cache row
+// has nothing to route to yet (it can only get one by syncing on create, and
+// a ref can only ever target something that already exists).
+export function getCachedChamber(id: string): string | null {
+  const cached = db.select().from(exhibitCache).where(eq(exhibitCache.id, id)).get();
+  return cached?.chamber ?? null;
+}
+
+export async function getBacklinks(id: string): Promise<ExhibitRefEntry[]> {
   const rows = db.select().from(exhibitRefs).where(eq(exhibitRefs.targetId, id)).all();
   const refs = rows.map((r) => ({ id: r.sourceId, chamber: r.sourceChamber }));
-  return resolveExhibits(refs);
+  const resolved = await resolveExhibits(refs);
+  // Promise.all (inside resolveExhibits) preserves input order, so `rows`
+  // and `resolved` line up index-for-index.
+  return resolved.map((r, i) => ({ ...r, isManual: rows[i]!.isManual }));
 }
 
 // Unlike getBacklinks, a target's chamber is never recorded in exhibit_refs
@@ -149,16 +165,16 @@ export async function getBacklinks(id: string): Promise<CapitolExhibitResolveRes
 // makes for the same reason. In practice this doesn't arise: a chamber syncs
 // on every create, and a "[[" reference can only target something that
 // already exists.
-export async function getFrontlinks(id: string): Promise<CapitolExhibitResolveResult[]> {
+export async function getFrontlinks(id: string): Promise<ExhibitRefEntry[]> {
   const rows = db.select().from(exhibitRefs).where(eq(exhibitRefs.sourceId, id)).all();
-  const results: CapitolExhibitResolveResult[] = [];
-  for (const { targetId } of rows) {
+  const results: ExhibitRefEntry[] = [];
+  for (const { targetId, isManual } of rows) {
     const cached = db.select().from(exhibitCache).where(eq(exhibitCache.id, targetId)).get();
     if (!cached) continue;
     results.push(
       cached.deleted
-        ? { id: targetId, chamber: cached.chamber, deleted: true }
-        : { id: targetId, chamber: cached.chamber, name: cached.name, url: cached.url }
+        ? { id: targetId, chamber: cached.chamber, deleted: true, isManual }
+        : { id: targetId, chamber: cached.chamber, name: cached.name, url: cached.url, isManual }
     );
   }
   return results;

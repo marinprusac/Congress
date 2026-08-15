@@ -42,6 +42,12 @@ export const exhibitSyncRequestSchema = z.object({
   url: z.string(),
   deleted: z.boolean().optional(),
   outgoingRefs: z.array(z.string()),
+  // The subset of outgoingRefs that were added explicitly (via a
+  // References-panel "+") rather than parsed out of body text - Capitol
+  // records this per exhibit_refs row so a backlinks/frontlinks entry can
+  // report whether it's safe to remove from either side, without every
+  // caller having to ask the owning Chamber.
+  manualRefs: z.array(z.string()).optional(),
 });
 export type ExhibitSyncRequest = z.infer<typeof exhibitSyncRequestSchema>;
 
@@ -79,15 +85,37 @@ export const capitolExhibitResolveResponseSchema = z.object({
 });
 export type CapitolExhibitResolveResponse = z.infer<typeof capitolExhibitResolveResponseSchema>;
 
+// A backlinks/frontlinks entry, same three states as
+// capitolExhibitResolveResultSchema plus whether the underlying ref is
+// removable from a References panel (added manually) or only ever
+// derived from body text.
+export const exhibitRefEntrySchema = z.union([
+  z.object({ id: z.string(), chamber: z.string(), name: z.string(), url: z.string(), isManual: z.boolean() }),
+  z.object({ id: z.string(), chamber: z.string(), deleted: z.literal(true), isManual: z.boolean() }),
+  z.object({ id: z.string(), chamber: z.string(), unavailable: z.literal(true), isManual: z.boolean() }),
+]);
+export type ExhibitRefEntry = z.infer<typeof exhibitRefEntrySchema>;
+
 export const exhibitBacklinksResponseSchema = z.object({
-  backlinks: z.array(capitolExhibitResolveResultSchema),
+  backlinks: z.array(exhibitRefEntrySchema),
 });
 export type ExhibitBacklinksResponse = z.infer<typeof exhibitBacklinksResponseSchema>;
+
+export const exhibitFrontlinksResponseSchema = z.object({
+  frontlinks: z.array(exhibitRefEntrySchema),
+});
+export type ExhibitFrontlinksResponse = z.infer<typeof exhibitFrontlinksResponseSchema>;
 
 // A source Exhibit's explicit references, added from a side panel rather
 // than embedded in body text (e.g. "[[" wikilinks) - merged with any
 // text-derived refs by the owning Chamber before it pushes outgoingRefs to
-// Capitol, so they show up in the same frontlinks/backlinks graph.
+// Capitol, so they show up in the same frontlinks/backlinks graph. Mounted
+// generically at "/api/exhibits/:id/refs" by every Chamber that opts in
+// (see chamber-kit's mountManualRefsRoutes), the same convention
+// mountExhibitContentRoutes uses - which is what lets Capitol proxy an add/
+// remove to whichever Chamber actually owns the target id, regardless of
+// which Chamber's page the request originated from (see
+// POST/DELETE /capitol/exhibits/:id/refs in services/capitol/src/server.ts).
 export const manualRefRequestSchema = z.object({
   targetExhibitId: z.string().min(1),
 });

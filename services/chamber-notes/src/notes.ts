@@ -5,8 +5,8 @@ import { parseExhibitToken } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { notes } from "./db/schema.js";
 import { extractWikiLinks, makeExcerpt } from "./wikilinks.js";
-import { toExhibitId, pushExhibitSync } from "./exhibits.js";
-import { listManualRefs, deleteManualRefsForNote } from "./refs.js";
+import { toExhibitId, parseNoteId, pushExhibitSync } from "./exhibits.js";
+import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForNote } from "./refs.js";
 
 // Outgoing refs are bare Exhibit ids (e.g. "note-3"), matching the id space
 // used by exhibit_cache/exhibit_refs - not the "exhibit:chamber:id" token
@@ -26,22 +26,55 @@ function extractOutgoingExhibitRefs(body: string): string[] {
 // to Capitol as one outgoingRefs list either way, so backlinks/frontlinks
 // don't need to know which source produced a given ref.
 async function syncNoteExhibit(id: number, title: string, body: string): Promise<void> {
-  const outgoingRefs = new Set([...extractOutgoingExhibitRefs(body), ...listManualRefs(id)]);
+  const manual = listManualRefs(id);
+  const outgoingRefs = new Set([...extractOutgoingExhibitRefs(body), ...manual]);
   await pushExhibitSync({
     id: toExhibitId(id),
     type: "note",
     name: title,
     url: `/n/${id}`,
     outgoingRefs: [...outgoingRefs],
+    manualRefs: manual,
   });
 }
 
 // Re-syncs a note whose body didn't change but whose manual refs did (see
-// the /refs routes in server.ts).
+// the /api/exhibits/:id/refs routes in server.ts).
 export async function resyncNoteExhibit(id: number): Promise<void> {
   const row = db.select().from(notes).where(eq(notes.id, id)).get();
   if (!row) return;
   await syncNoteExhibit(id, row.title, row.body);
+}
+
+// Thin exhibit-id-keyed wrappers around the numeric-id refs.ts functions -
+// this is what mountManualRefsRoutes (@congress/chamber-kit) actually calls,
+// since it's mounted generically at "/api/exhibits/:id/refs" and only ever
+// sees full Exhibit ids ("note-3"), not this Chamber's own row ids. A ref
+// add/remove can also originate from a *different* Exhibit's "Referenced by"
+// panel (via Capitol's proxy at POST/DELETE "/capitol/exhibits/:id/refs"),
+// so these have to resync exactly like the body-text path does.
+export function listManualRefsByExhibitId(exhibitId: string): string[] | null {
+  const id = parseNoteId(exhibitId);
+  return id === null ? null : listManualRefs(id);
+}
+
+export function addManualRefByExhibitId(exhibitId: string, targetExhibitId: string): boolean {
+  const id = parseNoteId(exhibitId);
+  if (id === null) return false;
+  addManualRef(id, targetExhibitId);
+  return true;
+}
+
+export function removeManualRefByExhibitId(exhibitId: string, targetExhibitId: string): boolean {
+  const id = parseNoteId(exhibitId);
+  if (id === null) return false;
+  removeManualRef(id, targetExhibitId);
+  return true;
+}
+
+export async function resyncNoteExhibitByExhibitId(exhibitId: string): Promise<void> {
+  const id = parseNoteId(exhibitId);
+  if (id !== null) await resyncNoteExhibit(id);
 }
 
 export class TitleConflictError extends Error {
@@ -120,7 +153,6 @@ export async function getNote(id: number): Promise<NoteDetail | null> {
   return {
     ...toSummary(row),
     content: reconstructContent(frontmatter, row.body),
-    manualRefs: listManualRefs(id),
   };
 }
 

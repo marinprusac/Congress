@@ -26,7 +26,14 @@ import {
 } from "./registry.js";
 import { forwardToChamber, forwardToChamberFrontend, proxyToChamberPath } from "./gateway.js";
 import { hasValidSession } from "./sessionAuth.js";
-import { syncExhibit, searchExhibits, resolveExhibits, getBacklinks, getFrontlinks } from "./exhibits.js";
+import {
+  syncExhibit,
+  searchExhibits,
+  resolveExhibits,
+  getBacklinks,
+  getFrontlinks,
+  getCachedChamber,
+} from "./exhibits.js";
 import { createShare, listShares, listSharesForExhibit, updateShare, revokeShare, getExhibitSharing } from "./shares.js";
 import { requireShareToken, type ShareVariables } from "./shareAuth.js";
 import { getSettings, updateSettings } from "./settings.js";
@@ -119,6 +126,28 @@ app.get("/capitol/exhibits/:id/backlinks", requireSession, async (c) => {
 app.get("/capitol/exhibits/:id/frontlinks", requireSession, async (c) => {
   const frontlinks = await getFrontlinks(c.req.param("id"));
   return c.json({ frontlinks });
+});
+
+// Lets a References panel add/remove a reference that lives on a *different*
+// Exhibit than the one currently being viewed (e.g. adding this note to
+// another exhibit's outgoing refs from this note's own "Referenced by"
+// panel) - resolves which Chamber owns `:id` from the cache and proxies to
+// that Chamber's own "/api/exhibits/:id/refs" (see mountManualRefsRoutes in
+// @congress/chamber-kit). 404s if the target Chamber hasn't adopted that
+// route yet, or if `:id` has never synced to Capitol at all.
+app.post("/capitol/exhibits/:id/refs", requireSession, async (c) => {
+  const id = c.req.param("id");
+  const chamber = getCachedChamber(id);
+  if (!chamber) return c.json({ error: "not_found" }, 404);
+  return proxyToChamberPath(c, chamber, `/exhibits/${encodeURIComponent(id)}/refs`);
+});
+
+app.delete("/capitol/exhibits/:id/refs/:targetExhibitId", requireSession, async (c) => {
+  const id = c.req.param("id");
+  const chamber = getCachedChamber(id);
+  if (!chamber) return c.json({ error: "not_found" }, 404);
+  const targetExhibitId = encodeURIComponent(c.req.param("targetExhibitId"));
+  return proxyToChamberPath(c, chamber, `/exhibits/${encodeURIComponent(id)}/refs/${targetExhibitId}`);
 });
 
 app.get("/capitol/exhibits/:id/sharing", requireSession, async (c) => {

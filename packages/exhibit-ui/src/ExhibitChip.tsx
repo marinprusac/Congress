@@ -1,10 +1,13 @@
 import type { ReactNode } from "react";
 import type { CapitolExhibitResolveResult } from "@congress/shared-types";
 
-interface ExhibitChipProps {
-  result: CapitolExhibitResolveResult;
+// Generic over T so a caller with a richer per-ref shape (e.g.
+// ExhibitLinksLayout's ExhibitRefEntry, which adds `isManual`) gets an
+// `onNavigate` typed to match instead of the plain base shape.
+interface ExhibitChipProps<T extends CapitolExhibitResolveResult> {
+  result: T;
   renderIcon?: (chamber: string) => ReactNode;
-  onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
+  onNavigate?: (result: Extract<T, { url: string }>) => void;
   className?: string;
   // Label captured at reference-insertion time (the markdown link's alias
   // text) - only used when the Exhibit can't be resolved live, since a
@@ -15,7 +18,13 @@ interface ExhibitChipProps {
 // Icon comes solely from the owning Chamber, resolved by the caller's
 // `renderIcon`; when omitted (or the Chamber is unrecognized), falls back to
 // a text prefix ("Notes — Meeting with Johan") per the Exhibits spec.
-export function ExhibitChip({ result, renderIcon, onNavigate, className, fallbackLabel }: ExhibitChipProps) {
+export function ExhibitChip<T extends CapitolExhibitResolveResult = CapitolExhibitResolveResult>({
+  result,
+  renderIcon,
+  onNavigate,
+  className,
+  fallbackLabel,
+}: ExhibitChipProps<T>) {
   if ("deleted" in result) {
     return (
       <span className={className} data-exhibit-state="deleted" title="This was deleted">
@@ -42,7 +51,7 @@ export function ExhibitChip({ result, renderIcon, onNavigate, className, fallbac
       onClick={(e) => {
         if (!onNavigate) return;
         e.preventDefault();
-        onNavigate(result as Extract<CapitolExhibitResolveResult, { url: string }>);
+        onNavigate(result as Extract<T, { url: string }>);
       }}
     >
       {icon ? (

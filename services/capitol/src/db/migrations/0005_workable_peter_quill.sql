@@ -1,0 +1,1 @@
+ALTER TABLE `exhibit_refs` ADD `is_manual` integer DEFAULT false NOT NULL;

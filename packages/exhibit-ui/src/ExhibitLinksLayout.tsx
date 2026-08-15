@@ -1,21 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import type { CapitolExhibitResolveResult, CapitolExhibitSearchResult } from "@congress/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
+import type { ExhibitRefEntry, CapitolExhibitSearchResult } from "@congress/shared-types";
 import { ExhibitChip } from "./ExhibitChip.js";
 import { useExhibitLinks } from "./useExhibitLinks.js";
 import { useExhibitSearch } from "./useExhibitSearch.js";
 import { useKeyboardInset } from "./useKeyboardInset.js";
+import { addExhibitRef, removeExhibitRef } from "./exhibitRefs.js";
 
 interface AddReferenceControlProps {
   exhibitId: string;
   existingIds: Set<string>;
-  onAdd: (result: CapitolExhibitSearchResult) => void;
+  onAdd: (result: CapitolExhibitSearchResult) => Promise<void>;
   onCreate?: (title: string) => Promise<CapitolExhibitSearchResult>;
   renderIcon?: (chamber: string) => ReactNode;
 }
 
-// The "+" trigger in the References panel header - an explicit way to
-// attach a reference to another Exhibit without writing a "[[" token in
+// The "+" trigger in a links panel header - an explicit way to attach a
+// reference to (or from) another Exhibit without writing a "[[" token in
 // body text, for Exhibits that either have no natural text area or where a
 // reference doesn't belong inline. Deliberately a separate, simpler control
 // from useExhibitPicker/ExhibitPickerDropdown (no textarea, no caret math)
@@ -24,7 +26,7 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
-  const [creating, setCreating] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const keyboardInset = useKeyboardInset();
@@ -51,19 +53,26 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
     setError(null);
   }
 
+  // Kept open on failure (e.g. the target Chamber hasn't adopted
+  // "/api/exhibits/:id/refs" yet) so the error message has somewhere to
+  // render and the query isn't lost.
   function select(result: CapitolExhibitSearchResult) {
-    onAdd(result);
-    close();
+    setBusy(true);
+    setError(null);
+    onAdd(result)
+      .then(() => close())
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to add reference"))
+      .finally(() => setBusy(false));
   }
 
   function createNew() {
     if (!onCreate || !trimmedQuery) return;
-    setCreating(true);
+    setBusy(true);
     setError(null);
     onCreate(trimmedQuery)
-      .then((result) => select(result))
+      .then((result) => onAdd(result).then(() => close()))
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to create"))
-      .finally(() => setCreating(false));
+      .finally(() => setBusy(false));
   }
 
   if (!open) {
@@ -82,8 +91,8 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
 
   const total = results.length + (showCreate ? 1 : 0);
   // The popover (input + dropdown together) is positioned as one unit,
-  // independent of the header row's flex layout - the References panel is
-  // only 12rem wide on desktop (see .exhibit-links-panel-front) and a
+  // independent of the header row's flex layout - a links panel is only
+  // 12rem wide on desktop (see .exhibit-links-panel-front/-back) and a
   // narrow stacked half-column on mobile, either of which would otherwise
   // squeeze a flex sibling <input> down to a sliver instead of giving it
   // room to be usable. Same fixed-above-keyboard treatment as
@@ -165,7 +174,7 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
                 createNew();
               }}
             >
-              <span className="exhibit-picker-name">{creating ? "Creating —" : `+ Create "${trimmedQuery}"`}</span>
+              <span className="exhibit-picker-name">{busy ? "Working —" : `+ Create "${trimmedQuery}"`}</span>
             </div>
           )}
           {error && <div className="exhibit-picker-error">{error}</div>}
@@ -177,27 +186,16 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
 
 interface LinksPanelProps {
   title: string;
-  results: CapitolExhibitResolveResult[];
+  results: ExhibitRefEntry[];
   emptyLabel: string;
   renderIcon?: (chamber: string) => ReactNode;
-  onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
+  onNavigate?: (result: Extract<ExhibitRefEntry, { url: string }>) => void;
   className: string;
   addControl?: ReactNode;
-  removableIds?: Set<string>;
-  onRemove?: (targetId: string) => void;
+  onRemove?: (entry: ExhibitRefEntry) => void;
 }
 
-function LinksPanel({
-  title,
-  results,
-  emptyLabel,
-  renderIcon,
-  onNavigate,
-  className,
-  addControl,
-  removableIds,
-  onRemove,
-}: LinksPanelProps) {
+function LinksPanel({ title, results, emptyLabel, renderIcon, onNavigate, className, addControl, onRemove }: LinksPanelProps) {
   return (
     <aside className={className}>
       <h3 className="mb-2 flex flex-wrap items-center justify-between gap-y-2 font-mono text-xs uppercase tracking-wide text-dust">
@@ -218,11 +216,11 @@ function LinksPanel({
                 onNavigate={onNavigate}
                 className="exhibit-chip min-w-0 flex-1 font-mono text-sm"
               />
-              {removableIds?.has(r.id) && onRemove && (
+              {r.isManual && onRemove && (
                 <button
                   type="button"
                   className="exhibit-ref-remove tap-target"
-                  onClick={() => onRemove(r.id)}
+                  onClick={() => onRemove(r)}
                   aria-label="Remove reference"
                   title="Remove reference"
                 >
@@ -242,15 +240,17 @@ interface ExhibitLinksLayoutProps {
   emptyBacklinksLabel: string;
   emptyFrontlinksLabel: string;
   renderIcon?: (chamber: string) => ReactNode;
-  onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
+  onNavigate?: (result: Extract<ExhibitRefEntry, { url: string }>) => void;
   children: ReactNode;
   className?: string;
-  // Explicit references, as opposed to ones embedded in body text - see
-  // ManualRefsApi in @congress/chamber-kit. Omit all three to keep the
-  // References panel purely read-only (the previous behavior).
-  manualRefs?: string[];
-  onAddReference?: (result: CapitolExhibitSearchResult) => void;
-  onRemoveReference?: (targetId: string) => void;
+  // Turns on the "+"/"×" controls on *both* panels - explicit references
+  // are a mirror: adding one from "Referenced by" writes to the picked
+  // Exhibit's own outgoing refs (via Capitol's proxy, see exhibitRefs.ts),
+  // exactly as if you'd added this Exhibit from that one's own "References"
+  // panel. Omit to keep both panels read-only (the previous behavior).
+  editable?: boolean;
+  // Only a Chamber whose own Exhibits can be quick-created (Notes, today)
+  // passes this - shows "+ Create <query>" in both panels' add popovers.
   onCreateReference?: (title: string) => Promise<CapitolExhibitSearchResult>;
 }
 
@@ -267,13 +267,37 @@ export function ExhibitLinksLayout({
   onNavigate,
   children,
   className,
-  manualRefs,
-  onAddReference,
-  onRemoveReference,
+  editable,
   onCreateReference,
 }: ExhibitLinksLayoutProps) {
+  const queryClient = useQueryClient();
   const { backlinks, frontlinks } = useExhibitLinks(exhibitId);
-  const manualIds = manualRefs ? new Set(manualRefs) : undefined;
+
+  function refresh() {
+    queryClient.invalidateQueries({ queryKey: ["exhibit-backlinks", exhibitId] });
+    queryClient.invalidateQueries({ queryKey: ["exhibit-frontlinks", exhibitId] });
+  }
+
+  // Front (References/outgoing): this Exhibit -> the picked one.
+  async function addFrontReference(result: CapitolExhibitSearchResult) {
+    await addExhibitRef(exhibitId, result.id);
+    refresh();
+  }
+  async function removeFrontReference(entry: ExhibitRefEntry) {
+    await removeExhibitRef(exhibitId, entry.id);
+    refresh();
+  }
+  // Back (Referenced by/incoming): the picked Exhibit -> this one - the
+  // mirror image of the front panel's add, written on the *other*
+  // Exhibit's own outgoing refs.
+  async function addBackReference(result: CapitolExhibitSearchResult) {
+    await addExhibitRef(result.id, exhibitId);
+    refresh();
+  }
+  async function removeBackReference(entry: ExhibitRefEntry) {
+    await removeExhibitRef(entry.id, exhibitId);
+    refresh();
+  }
 
   return (
     <div className={["exhibit-links-layout", className].filter(Boolean).join(" ")}>
@@ -284,6 +308,18 @@ export function ExhibitLinksLayout({
         renderIcon={renderIcon}
         onNavigate={onNavigate}
         className="exhibit-links-panel-back"
+        onRemove={editable ? removeBackReference : undefined}
+        addControl={
+          editable && (
+            <AddReferenceControl
+              exhibitId={exhibitId}
+              existingIds={new Set(backlinks.map((r) => r.id))}
+              onAdd={addBackReference}
+              onCreate={onCreateReference}
+              renderIcon={renderIcon}
+            />
+          )
+        }
       />
       <div className="exhibit-links-main">{children}</div>
       <LinksPanel
@@ -293,14 +329,13 @@ export function ExhibitLinksLayout({
         renderIcon={renderIcon}
         onNavigate={onNavigate}
         className="exhibit-links-panel-front"
-        removableIds={manualIds}
-        onRemove={onRemoveReference}
+        onRemove={editable ? removeFrontReference : undefined}
         addControl={
-          onAddReference && (
+          editable && (
             <AddReferenceControl
               exhibitId={exhibitId}
               existingIds={new Set(frontlinks.map((r) => r.id))}
-              onAdd={onAddReference}
+              onAdd={addFrontReference}
               onCreate={onCreateReference}
               renderIcon={renderIcon}
             />

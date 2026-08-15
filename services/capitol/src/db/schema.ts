@@ -39,6 +39,10 @@ export const exhibitRefs = sqliteTable(
     sourceId: text("source_id").notNull(),
     sourceChamber: text("source_chamber").notNull(),
     targetId: text("target_id").notNull(),
+    // Whether the source Chamber considers this ref one it added explicitly
+    // via a References-panel "+" (removable from either side) rather than
+    // one it can only re-derive by re-parsing its own body text.
+    isManual: integer("is_manual", { mode: "boolean" }).notNull().default(false),
   },
   (table) => [
     index("exhibit_refs_source_id_idx").on(table.sourceId),

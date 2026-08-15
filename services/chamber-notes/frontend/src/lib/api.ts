@@ -6,7 +6,6 @@ import type {
   NotesSettings,
   UpdateNotesSettingsRequest,
   CapitolExhibitSearchResult,
-  ManualRefsResponse,
 } from "@congress/shared-types";
 
 // In production this Chamber's frontend is proxied through Capitol at
@@ -68,20 +67,6 @@ export function setPinned(id: number, pinned: boolean): Promise<NoteDetail> {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pinned }),
-  }).then((res) => json(res));
-}
-
-export function addNoteRef(id: number, targetExhibitId: string): Promise<ManualRefsResponse> {
-  return fetch(`${API_BASE}/notes/${id}/refs`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ targetExhibitId }),
-  }).then((res) => json(res));
-}
-
-export function removeNoteRef(id: number, targetExhibitId: string): Promise<ManualRefsResponse> {
-  return fetch(`${API_BASE}/notes/${id}/refs/${encodeURIComponent(targetExhibitId)}`, {
-    method: "DELETE",
   }).then((res) => json(res));
 }
 

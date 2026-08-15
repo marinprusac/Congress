@@ -114,46 +114,50 @@ export function mountSettingsRoutes<TSettings>(
 }
 
 export interface ManualRefsApi {
-  list: (sourceId: number) => string[];
-  add: (sourceId: number, targetExhibitId: string) => void;
-  remove: (sourceId: number, targetExhibitId: string) => void;
+  // All three take the full Exhibit id (e.g. "note-3"), not a bare row id -
+  // same convention as ExhibitContentApi above, and for the same reason:
+  // this is mounted at a fixed path with no Chamber-specific prefix, and
+  // Capitol proxies to it generically (see POST/DELETE
+  // "/capitol/exhibits/:id/refs" in services/capitol/src/server.ts) without
+  // knowing any Chamber's internal id scheme. Return null/false for an id
+  // this Chamber doesn't own or can't parse.
+  list: (exhibitId: string) => string[] | null;
+  add: (exhibitId: string, targetExhibitId: string) => boolean;
+  remove: (exhibitId: string, targetExhibitId: string) => boolean;
 }
 
 // Explicit references added from a side panel instead of embedded "[[" text
 // (see docs/congress-project-brief.md's Exhibits section) - mounted at
-// "<basePath>/:id/refs". `onChange` is the owning Chamber's hook for
-// recomputing its outgoingRefs and pushing an updated sync to Capitol, since
-// a manual add/remove changes that set exactly like an edit to body text
-// would.
+// "/api/exhibits/:id/refs", alongside mountExhibitContentRoutes. `onChange`
+// is the owning Chamber's hook for recomputing its outgoingRefs and pushing
+// an updated sync to Capitol, since a manual add/remove changes that set
+// exactly like an edit to body text would.
 export function mountManualRefsRoutes(
   app: ChamberApp,
-  basePath: string,
   refs: ManualRefsApi,
-  onChange: (sourceId: number) => Promise<void>
+  onChange: (exhibitId: string) => Promise<void>
 ): void {
-  app.get(`${basePath}/:id/refs`, (c) => {
-    const id = Number(c.req.param("id"));
-    if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
-    return c.json({ refs: refs.list(id) });
+  app.get("/api/exhibits/:id/refs", (c) => {
+    const list = refs.list(c.req.param("id"));
+    if (list === null) return c.json({ error: "not_found" }, 404);
+    return c.json({ refs: list });
   });
 
-  app.post(`${basePath}/:id/refs`, async (c) => {
-    const id = Number(c.req.param("id"));
-    if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
+  app.post("/api/exhibits/:id/refs", async (c) => {
+    const id = c.req.param("id");
     const body = await c.req.json().catch(() => null);
     const parsed = manualRefRequestSchema.safeParse(body);
     if (!parsed.success) {
       return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
     }
-    refs.add(id, parsed.data.targetExhibitId);
+    if (!refs.add(id, parsed.data.targetExhibitId)) return c.json({ error: "not_found" }, 404);
     await onChange(id);
     return c.json({ refs: refs.list(id) });
   });
 
-  app.delete(`${basePath}/:id/refs/:targetExhibitId`, async (c) => {
-    const id = Number(c.req.param("id"));
-    if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
-    refs.remove(id, c.req.param("targetExhibitId"));
+  app.delete("/api/exhibits/:id/refs/:targetExhibitId", async (c) => {
+    const id = c.req.param("id");
+    if (!refs.remove(id, c.req.param("targetExhibitId"))) return c.json({ error: "not_found" }, 404);
     await onChange(id);
     return c.json({ refs: refs.list(id) });
   });

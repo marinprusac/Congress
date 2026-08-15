@@ -18,10 +18,12 @@ import {
   createNote,
   updateNote,
   deleteNote,
-  resyncNoteExhibit,
+  listManualRefsByExhibitId,
+  addManualRefByExhibitId,
+  removeManualRefByExhibitId,
+  resyncNoteExhibitByExhibitId,
   TitleConflictError,
 } from "./notes.js";
-import { listManualRefs, addManualRef, removeManualRef } from "./refs.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { searchNoteExhibits, resolveNoteExhibits, getNoteExhibitContent, updateNoteExhibitContent } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
@@ -110,9 +112,8 @@ mountExhibitContentRoutes(
 
 mountManualRefsRoutes(
   app,
-  "/api/notes",
-  { list: listManualRefs, add: addManualRef, remove: removeManualRef },
-  resyncNoteExhibit
+  { list: listManualRefsByExhibitId, add: addManualRefByExhibitId, remove: removeManualRefByExhibitId },
+  resyncNoteExhibitByExhibitId
 );
 
 mountSettingsRoutes(app, { getSettings, updateSettings }, updateNotesSettingsRequestSchema);

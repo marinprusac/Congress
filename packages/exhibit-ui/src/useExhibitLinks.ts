@@ -1,19 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
-import type { CapitolExhibitResolveResult } from "@congress/shared-types";
+import type { ExhibitRefEntry } from "@congress/shared-types";
 
 async function fetchExhibitLinks(
   exhibitId: string,
   kind: "backlinks" | "frontlinks"
-): Promise<CapitolExhibitResolveResult[]> {
+): Promise<ExhibitRefEntry[]> {
   const res = await fetch(`/capitol/exhibits/${encodeURIComponent(exhibitId)}/${kind}`);
   if (!res.ok) return [];
-  const data = (await res.json()) as Record<"backlinks" | "frontlinks", CapitolExhibitResolveResult[]>;
+  const data = (await res.json()) as Record<"backlinks" | "frontlinks", ExhibitRefEntry[]>;
   return data[kind];
 }
 
 export function useExhibitLinks(exhibitId: string): {
-  backlinks: CapitolExhibitResolveResult[];
-  frontlinks: CapitolExhibitResolveResult[];
+  backlinks: ExhibitRefEntry[];
+  frontlinks: ExhibitRefEntry[];
 } {
   const backlinksQuery = useQuery({
     queryKey: ["exhibit-backlinks", exhibitId],
