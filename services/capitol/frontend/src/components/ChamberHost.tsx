@@ -37,6 +37,10 @@ function loadChamberStylesheet(chamberName: string): Promise<void> {
   return ready;
 }
 
+// Generous above any real network RTT - only meant to catch a request that
+// never settles at all (see below), not to race a slow-but-healthy one.
+const MODULE_LOAD_TIMEOUT_MS = 15_000;
+
 function loadChamberModule(chamberName: string): Promise<{ default: ComponentType }> {
   let modulePromise = modulePromises.get(chamberName);
   if (!modulePromise) {
@@ -44,11 +48,50 @@ function loadChamberModule(chamberName: string): Promise<{ default: ComponentTyp
     // together, means the Chamber is only ever revealed once it can render
     // fully styled - the one place a first-ever visit could otherwise flash
     // unstyled content even though there's no document reload.
-    modulePromise = Promise.all([
+    const fetchPromise = Promise.all([
       import(/* @vite-ignore */ `/${chamberName}/remote-entry.js`) as Promise<{ default: ComponentType }>,
       loadChamberStylesheet(chamberName),
     ]).then(([mod]) => mod);
+
+    // A request that lands during a rolling deploy's few-second window (that
+    // Chamber's own process, or Capitol's own proxying process, mid-restart)
+    // can fail outright, or - if the connection was already open when the
+    // old process was killed - hang with no error and no response at all;
+    // plain fetch()/import() have no built-in timeout for that second case.
+    // Racing a timeout here guarantees this promise always eventually
+    // settles instead of leaving a caller (this function's own preload,
+    // ChamberHost's lazy import) suspended forever.
+    const settled: Promise<{ default: ComponentType }> = new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`Loading Chamber "${chamberName}" timed out`)),
+        MODULE_LOAD_TIMEOUT_MS
+      );
+      fetchPromise.then(
+        (mod) => {
+          clearTimeout(timer);
+          resolve(mod);
+        },
+        (err) => {
+          clearTimeout(timer);
+          reject(err);
+        }
+      );
+    });
+
+    modulePromise = settled;
     modulePromises.set(chamberName, modulePromise);
+
+    // A failed (or timed-out) attempt must not poison the cache for the rest
+    // of this tab's lifetime - evict so the next attempt (a preload retry
+    // off the registry's periodic refetch, or an actual navigation into this
+    // Chamber) starts a fresh fetch instead of replaying the same dead
+    // promise forever. Guarded so a late timeout can't evict a newer promise
+    // a subsequent retry has already installed.
+    modulePromise.catch(() => {
+      if (modulePromises.get(chamberName) === modulePromise) {
+        modulePromises.delete(chamberName);
+      }
+    });
   }
   return modulePromise;
 }
