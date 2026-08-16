@@ -71,12 +71,34 @@ html[data-theme="dark"] {
        makes text more legible and gives list rows more breathing room
        without touching every page individually. */
     font-size: 18px;
+    /* This is a standalone PWA, not a webpage - double-tap-to-zoom has no
+       affordance here and mostly just fires by accident while tapping fast
+       on a phone. Blocks that (and delays the 300ms click) everywhere;
+       pinch-zoom still needs the `gesturestart` handler in preventZoom.ts,
+       since touch-action can't stop that gesture on iOS Safari. */
+    touch-action: manipulation;
+    /* Belt-and-suspenders: if some piece of content still overflows
+       horizontally despite overflow-wrap below (a wide image, an
+       unbreakable table), this stops it from widening the whole document
+       and visually shrinking everything else to fit - one runaway element
+       can only clip itself, never distort the rest of the page. */
+    overflow-x: hidden;
+    /* A standalone PWA should feel rigid, not like a webpage - scrolling to
+       the end of the content should just stop there, not rubber-band into
+       empty space. The custom pull-to-refresh/search gesture (usePullGesture)
+       is unaffected: it's driven entirely by JS touch tracking, not by the
+       native overscroll this disables. */
+    overscroll-behavior-y: none;
   }
 
   body {
     background-color: var(--color-parchment);
     color: var(--color-ink);
     font-family: var(--font-body);
+    /* Default for all body text (note/task/document/event descriptions,
+       exhibit chip labels, ...): a long unbroken string like a URL with no
+       spaces wraps instead of pushing the layout wider than the viewport. */
+    overflow-wrap: break-word;
   }
 
   :focus-visible {
@@ -532,6 +554,7 @@ html[data-theme="dark"] {
   background-color: color-mix(in srgb, var(--color-dust) 15%, transparent);
   padding: 0.75em 1em;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   margin: 0.75em 0;
 }
 
@@ -549,6 +572,7 @@ html[data-theme="dark"] {
 
 .note-table-wrapper {
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   margin: 0.75em 0;
 }
 

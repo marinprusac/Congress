@@ -39,6 +39,7 @@ export { WidgetPreviewShell } from "./WidgetPreviewShell.js";
 export { fetchRegistry } from "./registry.js";
 export { ChamberPicker } from "./ChamberPicker.js";
 export { markShellHosted, useShellHosted, resolveChamberPath } from "./ShellHostContext.js";
+export { preventPinchZoom } from "./preventZoom.js";
 export { resolveApiBase, parseJsonResponse, assertDeleteOk } from "./api.js";
 export { createQueryClient } from "./queryClient.js";
 export { PageHeader } from "./PageHeader.js";

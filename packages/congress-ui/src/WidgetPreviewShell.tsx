@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
+import { useWidgetPullBridge } from "./useWidgetPullBridge.js";
 
 export interface WidgetPreviewShellProps {
   label: string;
@@ -31,6 +32,9 @@ export function WidgetPreviewShell({
   emptyLabel,
   children,
 }: WidgetPreviewShellProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useWidgetPullBridge(scrollRef);
+
   return (
     <div className="flex h-screen flex-col bg-parchment p-3 text-ink">
       <div className="mb-2 flex shrink-0 items-baseline justify-between">
@@ -43,7 +47,7 @@ export function WidgetPreviewShell({
           {addLabel}
         </a>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-none">
         {isLoading && <p className="font-mono text-xs text-dust">Loading —</p>}
         {isError && <p className="font-mono text-xs text-alert">{errorLabel}</p>}
         {!isLoading && !isError && isEmpty && <p className="font-mono text-xs text-dust">{emptyLabel}</p>}
