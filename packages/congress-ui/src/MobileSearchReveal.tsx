@@ -68,7 +68,24 @@ export function MobileSearchReveal({ ownChamber, navigate, renderIcon }: MobileS
 
   if (expanded) {
     return (
-      <div className="mobile-search-reveal-expanded" ref={expandedRef}>
+      <div
+        className="mobile-search-reveal-expanded"
+        ref={expandedRef}
+        onBlur={(e) => {
+          // Losing focus entirely - not just moving between the input and
+          // the close button - means the on-screen keyboard just closed
+          // (tapped its own dismiss control, swiped it away, ...). There's
+          // nothing left to type into a search field with no keyboard, so
+          // collapse back to the pull-indicator instead of leaving an inert
+          // bar open. The delay mirrors GlobalExhibitSearch's own blur
+          // handling, though it rarely matters here: a result click never
+          // blurs the input (its onMouseDown already calls preventDefault),
+          // and select() blurs explicitly once it's done navigating.
+          const next = e.relatedTarget;
+          if (next instanceof Node && e.currentTarget.contains(next)) return;
+          setTimeout(() => setExpanded(false), 150);
+        }}
+      >
         <GlobalExhibitSearch ownChamber={ownChamber} navigate={navigate} renderIcon={renderIcon} />
         <button
           type="button"
