@@ -5,8 +5,8 @@ export type PullZone = "idle" | "search" | "refresh";
 // How far (px) a downward drag from the very top of the page has to travel
 // before it counts as reaching each zone - see MobileSearchReveal for what
 // happens on release in each one.
-const SEARCH_THRESHOLD = 50;
-const REFRESH_THRESHOLD = 140;
+const SEARCH_THRESHOLD = 90;
+const REFRESH_THRESHOLD = 220;
 
 // A pull that starts over a homepage widget begins inside that widget's own
 // <iframe> document - a separate browsing context whose touch events never

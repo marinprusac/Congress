@@ -872,7 +872,10 @@ html[data-theme="dark"] {
   background: var(--color-parchment);
   color: var(--color-ink);
   font-family: var(--font-mono);
-  font-size: 0.85em;
+  /* Never below 16px: iOS Safari zooms the whole page in on focus of any
+     input/textarea whose computed font-size is smaller than that,
+     regardless of touch-action/gesturestart zoom prevention elsewhere. */
+  font-size: max(16px, 0.85em);
   padding: 0.5em 0.7em;
 }
 
@@ -999,7 +1002,11 @@ html[data-theme="dark"] {
   background: var(--color-parchment);
   color: var(--color-ink);
   font-family: var(--font-mono);
-  font-size: 0.85em;
+  /* Never below 16px: iOS Safari zooms the whole page in on focus of any
+     input/textarea whose computed font-size is smaller than that,
+     regardless of touch-action/gesturestart zoom prevention elsewhere. This
+     is also the exact input MobileSearchReveal auto-focuses on release. */
+  font-size: max(16px, 0.85em);
   /* Extra right padding clears the "/" hint badge, which sits inside the
      field rather than beside it so the input doesn't shift width when the
      hint disappears on focus. */
@@ -1341,7 +1348,8 @@ html[data-theme="dark"] {
   background: var(--color-parchment);
   color: var(--color-ink);
   font-family: var(--font-mono);
-  font-size: 0.9em;
+  /* Never below 16px - see .global-search-input's comment. */
+  font-size: max(16px, 0.9em);
   padding: 0.4em 0.6em;
 }
 

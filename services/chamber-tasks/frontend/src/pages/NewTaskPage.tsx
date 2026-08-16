@@ -55,7 +55,7 @@ export function NewTaskPage() {
           type="date"
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
-          className="mb-4 border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          className="mb-4 border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
         />
 
         <FormLabel>Description (optional, [[ to reference an Exhibit)</FormLabel>

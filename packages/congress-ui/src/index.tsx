@@ -40,6 +40,8 @@ export { fetchRegistry } from "./registry.js";
 export { ChamberPicker } from "./ChamberPicker.js";
 export { markShellHosted, useShellHosted, resolveChamberPath } from "./ShellHostContext.js";
 export { preventPinchZoom } from "./preventZoom.js";
+export { PAGE_SCROLL_TOP_MESSAGE } from "./useWidgetPullBridge.js";
+export type { PageScrollTopMessage } from "./useWidgetPullBridge.js";
 export { resolveApiBase, parseJsonResponse, assertDeleteOk } from "./api.js";
 export { createQueryClient } from "./queryClient.js";
 export { PageHeader } from "./PageHeader.js";

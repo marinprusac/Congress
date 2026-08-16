@@ -1,6 +1,13 @@
+import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { useCapitolSettings, ChamberMark, fetchRegistry } from "@congress/congress-ui";
+import {
+  useCapitolSettings,
+  ChamberMark,
+  fetchRegistry,
+  PAGE_SCROLL_TOP_MESSAGE,
+  type PageScrollTopMessage,
+} from "@congress/congress-ui";
 
 export function WidgetGrid() {
   const { data, isLoading, isError } = useQuery({
@@ -13,6 +20,25 @@ export function WidgetGrid() {
   const theme = settings?.darkMode ? "dark" : "light";
   const hiddenWidgets = settings?.hiddenWidgets ?? [];
   const visibleData = data?.filter((chamber) => !hiddenWidgets.includes(chamber.name));
+
+  const iframesRef = useRef(new Map<string, HTMLIFrameElement>());
+
+  // Each widget iframe is a separate browsing context with no visibility
+  // into this page's own scroll position (see useWidgetPullBridge) - tell
+  // every live one whenever that crosses the top boundary, so a pull
+  // started over a widget only ever gets hijacked into the search/refresh
+  // gesture while the page is actually at its top.
+  useEffect(() => {
+    function broadcastScrollTop() {
+      const message: PageScrollTopMessage = { type: PAGE_SCROLL_TOP_MESSAGE, atTop: window.scrollY === 0 };
+      for (const iframe of iframesRef.current.values()) {
+        iframe.contentWindow?.postMessage(message, "*");
+      }
+    }
+    broadcastScrollTop();
+    window.addEventListener("scroll", broadcastScrollTop, { passive: true });
+    return () => window.removeEventListener("scroll", broadcastScrollTop);
+  }, [visibleData]);
 
   return (
     <section>
@@ -65,9 +91,19 @@ export function WidgetGrid() {
                 <div className="relative z-10 min-h-0 flex-1">
                   {active && (
                     <iframe
+                      ref={(el) => {
+                        if (el) iframesRef.current.set(chamber.name, el);
+                        else iframesRef.current.delete(chamber.name);
+                      }}
                       src={`${chamber.routes.widget}?theme=${theme}`}
                       title={`${chamber.displayName} widget`}
                       className="h-full w-full border-0"
+                      onLoad={(e) =>
+                        e.currentTarget.contentWindow?.postMessage(
+                          { type: PAGE_SCROLL_TOP_MESSAGE, atTop: window.scrollY === 0 } satisfies PageScrollTopMessage,
+                          "*"
+                        )
+                      }
                     />
                   )}
                 </div>

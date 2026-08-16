@@ -1,6 +1,21 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { WIDGET_PULL_MESSAGE, type WidgetPullMessage } from "./usePullGesture.js";
 
+// Broadcast from WidgetGrid (the parent) into every widget iframe whenever
+// the homepage's own scroll position crosses the top boundary - the iframe
+// has no other way to know this (window.scrollY inside it only ever
+// describes its own, unrelated document). Without it, a widget with a short
+// list (scrollTop always 0) can't tell "page is at the top, a pull-down
+// here should become the search/refresh gesture" apart from "page is
+// scrolled down, this same drag should just scroll the page back up" - see
+// WidgetGrid.tsx's broadcastScrollTop.
+export const PAGE_SCROLL_TOP_MESSAGE = "congress:page-scroll-top";
+
+export interface PageScrollTopMessage {
+  type: typeof PAGE_SCROLL_TOP_MESSAGE;
+  atTop: boolean;
+}
+
 // WidgetPreviewShell runs inside Capitol homepage's <iframe> - a downward
 // drag starting over it lives entirely in this document's own browsing
 // context, so it never reaches the parent's usePullGesture listeners
@@ -9,9 +24,16 @@ import { WIDGET_PULL_MESSAGE, type WidgetPullMessage } from "./usePullGesture.js
 // so a pull started over a widget still drives the parent page's
 // search/refresh indicator instead of silently rubber-banding the widget's
 // own list in place.
+//
+// It only ever intercepts the gesture once the parent has confirmed (via
+// PAGE_SCROLL_TOP_MESSAGE) that the page itself is scrolled to the top -
+// otherwise a drag over the widget is left as an ordinary touch, so it can
+// still natively scroll/chain the parent page (e.g. scrolling back up after
+// reaching the bottom, dragging down over a widget along the way).
 export function useWidgetPullBridge(scrollRef: RefObject<HTMLElement | null>): void {
   const startYRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
+  const pageAtTopRef = useRef(false);
 
   useEffect(() => {
     if (window.parent === window) return; // not embedded - nothing to bridge
@@ -28,7 +50,7 @@ export function useWidgetPullBridge(scrollRef: RefObject<HTMLElement | null>): v
 
     function onTouchStart(e: TouchEvent) {
       const el = scrollRef.current;
-      if (!el || el.scrollTop > 0 || e.touches.length !== 1) return;
+      if (!pageAtTopRef.current || !el || el.scrollTop > 0 || e.touches.length !== 1) return;
       startYRef.current = e.touches[0]!.clientY;
       draggingRef.current = true;
       post({ type: WIDGET_PULL_MESSAGE, phase: "start" });
@@ -48,15 +70,23 @@ export function useWidgetPullBridge(scrollRef: RefObject<HTMLElement | null>): v
       post({ type: WIDGET_PULL_MESSAGE, phase: "move", deltaY: delta });
     }
 
+    function onScrollTopMessage(e: MessageEvent) {
+      const data = e.data as Partial<PageScrollTopMessage> | undefined;
+      if (!data || data.type !== PAGE_SCROLL_TOP_MESSAGE) return;
+      pageAtTopRef.current = Boolean(data.atTop);
+    }
+
     window.addEventListener("touchstart", onTouchStart, { passive: true });
     window.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("touchend", endBridge);
     window.addEventListener("touchcancel", endBridge);
+    window.addEventListener("message", onScrollTopMessage);
     return () => {
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", endBridge);
       window.removeEventListener("touchcancel", endBridge);
+      window.removeEventListener("message", onScrollTopMessage);
     };
   }, [scrollRef]);
 }

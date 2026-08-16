@@ -47,7 +47,7 @@ export function WidgetPreviewShell({
           {addLabel}
         </a>
       </div>
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-none">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         {isLoading && <p className="font-mono text-xs text-dust">Loading —</p>}
         {isError && <p className="font-mono text-xs text-alert">{errorLabel}</p>}
         {!isLoading && !isError && isEmpty && <p className="font-mono text-xs text-dust">{emptyLabel}</p>}
