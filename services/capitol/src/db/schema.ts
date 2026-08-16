@@ -95,6 +95,21 @@ export const notifications = sqliteTable(
   ]
 );
 
+// One row per subscribed browser/device (phone, laptop, ...) - a single-user
+// system still has multiple devices, so this is a plain list, not a
+// single-row table. `endpoint` is the push service's own per-subscription
+// URL (unique per browser+device by construction), used as the natural
+// dedupe key when the same device re-subscribes. See notifications.ts's
+// sendWebPush for how a row here gets pruned once its endpoint starts
+// coming back expired.
+export const pushSubscriptions = sqliteTable("push_subscriptions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 // Single-row table (id is always 1) - one Congress-wide settings scope, not
 // per-user or per-Chamber.
 export const settings = sqliteTable("settings", {

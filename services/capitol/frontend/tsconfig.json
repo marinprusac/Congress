@@ -13,5 +13,10 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  // sw.ts needs the "webworker" lib (ServiceWorkerGlobalScope, self.clients,
+  // ...), which conflicts with this project's own "DOM" lib if both are
+  // typechecked together - see that file's own comment. Vite/esbuild still
+  // bundles it at build time regardless of this exclusion.
+  "exclude": ["src/sw.ts"]
 }

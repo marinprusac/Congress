@@ -2,6 +2,7 @@ import { eq, and, desc, isNull, count } from "drizzle-orm";
 import type { Notification, NotificationPushRequest } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { notifications } from "./db/schema.js";
+import { sendWebPush } from "./pushSubscriptions.js";
 
 const LIST_LIMIT = 50;
 
@@ -49,6 +50,7 @@ export function pushNotification(push: NotificationPushRequest): void {
         readAt: null,
       })
       .run();
+    notifyDevices(push.title!, body, push.chamber, chamberUrl);
     return;
   }
 
@@ -57,6 +59,19 @@ export function pushNotification(push: NotificationPushRequest): void {
     .set({ title: push.title!, body, chamberUrl, readAt: changed ? null : existing.readAt })
     .where(eq(notifications.id, existing.id))
     .run();
+  // Same gate as the readAt reset above - an unchanged re-push (the same
+  // still-true condition, polled again) must not buzz every subscribed
+  // device on every poll tick, only a genuinely new or changed notification.
+  if (changed) notifyDevices(push.title!, body, push.chamber, chamberUrl);
+}
+
+// Fire-and-forget - sendWebPush already swallows per-subscription delivery
+// failures itself (see its own comment), this only guards the rare case of
+// the fan-out call itself throwing before it gets that far.
+function notifyDevices(title: string, body: string | null, chamber: string, chamberUrl: string | null): void {
+  void sendWebPush({ title, body, chamber, chamberUrl }).catch((err: unknown) => {
+    console.warn(`Web Push fan-out failed: ${(err as Error).message}`);
+  });
 }
 
 export function listNotifications(): { notifications: Notification[]; unreadCount: number } {

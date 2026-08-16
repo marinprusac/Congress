@@ -14,16 +14,29 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      workbox: {
-        // Without this, the service worker's NavigationRoute serves the
-        // cached Capitol app shell for every top-level navigation,
-        // including "/notes" and any other Chamber path proxied through
-        // server.ts's chamberFrontendProxy — silently shadowing them even
-        // though the server itself proxies correctly (curl bypasses the
-        // service worker, which is why this only shows up in a browser).
-        // Only "/" is a real Capitol route, so only "/" gets the offline
-        // app-shell fallback; everything else always hits the network.
-        navigateFallbackDenylist: [/^\/(?!$)/],
+      // injectManifest (a hand-written service worker this plugin only
+      // injects the precache manifest into), not the default generateSW -
+      // Web Push needs its own `push`/`notificationclick` listeners
+      // (src/sw.ts), which generateSW's fully-generated worker has no room
+      // for. The navigateFallbackDenylist behavior generateSW used to
+      // provide via config alone is now hand-written in src/sw.ts itself
+      // (see that file's own comment) instead of configured here.
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
+      injectManifest: {
+        // sw.ts imports from workbox-precaching/workbox-routing, which pull
+        // in more of workbox-core than the precache manifest itself needs -
+        // without raising this, esbuild's default budget check flags the
+        // bundled worker as "too large" even though it's genuinely small.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+      },
+      // Lets `dev:web` actually register/test the real service worker
+      // (Web Push needs one to subscribe through) instead of only ever
+      // getting one from a production build.
+      devOptions: {
+        enabled: true,
+        type: "module",
       },
       manifest: {
         name: "Congress",

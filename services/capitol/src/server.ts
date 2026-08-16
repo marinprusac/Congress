@@ -9,6 +9,8 @@ import {
   updateShareRequestSchema,
   updateCapitolSettingsRequestSchema,
   notificationPushRequestSchema,
+  pushSubscriptionRequestSchema,
+  pushUnsubscribeRequestSchema,
 } from "@congress/shared-types";
 import { env } from "./env.js";
 import { requireInternalToken } from "./auth.js";
@@ -43,6 +45,7 @@ import {
   markAllNotificationsRead,
   dismissNotification,
 } from "./notifications.js";
+import { publicKey, saveSubscription, removeSubscription } from "./pushSubscriptions.js";
 import { mcpApp } from "./mcp/server.js";
 
 // Only Capitol itself validates register/deregister/heartbeat/exhibit-resolve
@@ -147,6 +150,28 @@ app.post("/capitol/notifications/:id/read", requireSession, (c) => {
 app.delete("/capitol/notifications/:id", requireSession, (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || !dismissNotification(id)) return c.json({ error: "not_found" }, 404);
+  return c.json({ ok: true });
+});
+
+app.get("/capitol/push/config", requireSession, (c) => c.json({ publicKey: publicKey() }));
+
+app.post("/capitol/push/subscribe", requireSession, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = pushSubscriptionRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  saveSubscription(parsed.data);
+  return c.json({ ok: true });
+});
+
+app.post("/capitol/push/unsubscribe", requireSession, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = pushUnsubscribeRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  removeSubscription(parsed.data.endpoint);
   return c.json({ ok: true });
 });
 
