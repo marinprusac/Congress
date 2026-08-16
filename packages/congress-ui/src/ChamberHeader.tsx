@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
 import { MobileSearchReveal } from "./MobileSearchReveal.js";
-import { NotificationBell } from "./NotificationBell.js";
 import { useShellHosted, resolveChamberPath } from "./ShellHostContext.js";
 
 interface ChamberHeaderProps {
@@ -22,6 +21,11 @@ interface ChamberHeaderProps {
   // undefined: an anonymous recipient has no session, so Capitol's own home
   // route would just bounce them to a login form they can't use.
   titleHref?: string;
+  // Extra controls rendered after the search bar in the actions row - e.g.
+  // Capitol's own NotificationBell. Deliberately not baked into this shared
+  // component: Capitol-owned chrome like the notification center belongs on
+  // Capitol's page, not on every Chamber's own header.
+  extraActions?: ReactNode;
 }
 
 // Shared header markup for Capitol and every Chamber - eyebrow, icon+title
@@ -38,6 +42,7 @@ export function ChamberHeader({
   navigate,
   showSearch = true,
   titleHref = "/",
+  extraActions,
 }: ChamberHeaderProps) {
   const shellHosted = useShellHosted();
   const resolvedTitleHref = titleHref ? resolveChamberPath(titleHref, ownChamber, shellHosted) : titleHref;
@@ -64,7 +69,7 @@ export function ChamberHeader({
         {showSearch && navigate && (
           <div className="chamber-header-actions">
             {renderIcon && <GlobalExhibitSearch ownChamber={ownChamber} navigate={navigate} renderIcon={renderIcon} />}
-            <NotificationBell ownChamber={ownChamber} navigate={navigate} />
+            {extraActions}
           </div>
         )}
       </div>

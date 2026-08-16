@@ -100,6 +100,13 @@ A Capitol-owned feature for granting outside access (a person, or an AI agent vi
 
 Chamber-wide (not per-device) preferences use a single-row settings table — `id` always `1`, select-then-insert-or-update — via `chamber-kit`'s `createSingleRowSettings`. Capitol's dark mode setting is applied everywhere (including inside each Chamber's own frontend and the homepage's iframed widgets) through `useAppliedTheme`/`useCapitolSettings` in `congress-ui`, plus a pre-paint inline bootstrap script in every `frontend/index.html` that applies a cached `localStorage` theme value before first render to avoid a flash of the wrong theme.
 
+### Frontend: mobile-first, always
+
+This is a PWA used on an iPhone first (see `docs/congress-project-brief.md`) — every UI change is designed for a mobile-sized viewport first, with a `@media (min-width: 641px)` override adding desktop chrome on top, never the other way around. Concretely:
+
+- Any new floating/positioned element (a dropdown, popover, panel) defaults to `position: fixed` anchored to the viewport, not `position: absolute` anchored to whatever small trigger button opened it — a trigger near a screen edge is a bad anchor for a panel that can be taller or wider than the space next to it on a phone. `.exhibit-picker-dropdown`/`.exhibit-ref-add-popover`/`.notification-panel` in `packages/congress-ui/src/styles.css` are the reference idiom: fixed to the viewport with `left`/`right: 0.5rem` and `bottom: calc(var(--mobile-nav-height, 0px) + 0.5rem)` by default, switched to a conventional anchored dropdown only inside the desktop media query.
+- Before calling any UI change done, actually load it in a browser at a mobile viewport width (~375px) — not just skim the CSS — and check the specific thing you touched still fits and works. A change that only gets checked at desktop width has not been verified.
+
 ## Deployment
 
 Full details in `infra/README.md`. Key points to know before pushing to `main`:
