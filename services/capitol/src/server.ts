@@ -3,7 +3,13 @@ import type { Context } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import { z } from "zod";
 import { mountManifestAndHealth, mountStaticFrontend } from "@congress/chamber-kit";
-import { manifestSchema, exhibitSyncRequestSchema, updateShareRequestSchema, updateCapitolSettingsRequestSchema } from "@congress/shared-types";
+import {
+  manifestSchema,
+  exhibitSyncRequestSchema,
+  updateShareRequestSchema,
+  updateCapitolSettingsRequestSchema,
+  notificationPushRequestSchema,
+} from "@congress/shared-types";
 import { env } from "./env.js";
 import { requireInternalToken } from "./auth.js";
 import { authRoutes, requireSession } from "./sessionAuth.js";
@@ -30,6 +36,13 @@ import {
 import { createShare, createShareRequestSchema, listShares, listSharesForExhibit, updateShare, revokeShare, getExhibitSharing } from "./shares.js";
 import { requireShareToken, type ShareVariables } from "./shareAuth.js";
 import { getSettings, updateSettings } from "./settings.js";
+import {
+  pushNotification,
+  listNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  dismissNotification,
+} from "./notifications.js";
 import { mcpApp } from "./mcp/server.js";
 
 // Only Capitol itself validates register/deregister/heartbeat/exhibit-resolve
@@ -105,6 +118,35 @@ app.post("/capitol/exhibits/sync", requireInternalToken, async (c) => {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
   syncExhibit(parsed.data);
+  return c.json({ ok: true });
+});
+
+app.post("/capitol/notifications/push", requireInternalToken, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = notificationPushRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  pushNotification(parsed.data);
+  return c.json({ ok: true });
+});
+
+app.get("/capitol/notifications", requireSession, (c) => c.json(listNotifications()));
+
+app.post("/capitol/notifications/read-all", requireSession, (c) => {
+  markAllNotificationsRead();
+  return c.json({ ok: true });
+});
+
+app.post("/capitol/notifications/:id/read", requireSession, (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || !markNotificationRead(id)) return c.json({ error: "not_found" }, 404);
+  return c.json({ ok: true });
+});
+
+app.delete("/capitol/notifications/:id", requireSession, (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || !dismissNotification(id)) return c.json({ error: "not_found" }, 404);
   return c.json({ ok: true });
 });
 

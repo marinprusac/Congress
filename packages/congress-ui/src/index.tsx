@@ -30,6 +30,7 @@ export { ExhibitLinksLayout } from "./ExhibitLinksLayout.js";
 export { ExhibitActionBar } from "./ExhibitActionBar.js";
 export { useAppliedTheme, useCapitolSettings, capitolSettingsQueryKey } from "./useAppliedTheme.js";
 export { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
+export { NotificationBell } from "./NotificationBell.js";
 export { MobileSearchReveal } from "./MobileSearchReveal.js";
 export { usePullGesture } from "./usePullGesture.js";
 export type { PullZone } from "./usePullGesture.js";

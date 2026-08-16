@@ -1,0 +1,145 @@
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Notification, NotificationsListResponse } from "@congress/shared-types";
+import { useShellHosted } from "./ShellHostContext.js";
+import { navigateToExhibit } from "./navigateToExhibit.js";
+import { formatTimestamp } from "./formatTimestamp.js";
+import { getChamberIcon } from "./ChamberMarks.js";
+
+interface NotificationBellProps {
+  // Same purpose as GlobalExhibitSearch's own prop: which Chamber's app this
+  // bell is mounted in, so clicking a same-Chamber notification can use the
+  // local router instead of a full navigation - see navigateToExhibit.
+  ownChamber: string;
+  navigate: (path: string) => void;
+}
+
+const POLL_INTERVAL_MS = 60_000;
+
+function notificationsQueryKey() {
+  return ["congress", "notifications"] as const;
+}
+
+async function fetchNotifications(): Promise<NotificationsListResponse> {
+  const res = await fetch("/capitol/notifications");
+  if (!res.ok) return { notifications: [], unreadCount: 0 };
+  return res.json();
+}
+
+// Capitol-owned notification center - the one place every Chamber's "task
+// due", "event starting soon" (etc.) alerts surface, instead of each
+// Chamber inventing its own alert UI (see chamber-kit's
+// createPushNotification). Mounted once in ChamberHeader, so it's present
+// on every page regardless of which Chamber is currently open, same as
+// GlobalExhibitSearch.
+export function NotificationBell({ ownChamber, navigate }: NotificationBellProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const shellHosted = useShellHosted();
+  const queryClient = useQueryClient();
+
+  const { data } = useQuery({
+    queryKey: notificationsQueryKey(),
+    queryFn: fetchNotifications,
+    refetchInterval: POLL_INTERVAL_MS,
+  });
+
+  const notifications = data?.notifications ?? [];
+  const unreadCount = data?.unreadCount ?? 0;
+
+  useEffect(() => {
+    if (!open) return;
+    function onOutsideDown(e: MouseEvent) {
+      if (!(e.target instanceof Node) || ref.current?.contains(e.target)) return;
+      setOpen(false);
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onOutsideDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onOutsideDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: notificationsQueryKey() });
+  }
+
+  async function markRead(id: number) {
+    await fetch(`/capitol/notifications/${id}/read`, { method: "POST" });
+    invalidate();
+  }
+
+  async function markAllRead() {
+    await fetch("/capitol/notifications/read-all", { method: "POST" });
+    invalidate();
+  }
+
+  async function dismiss(e: ReactMouseEvent<HTMLButtonElement>, id: number) {
+    e.stopPropagation();
+    await fetch(`/capitol/notifications/${id}`, { method: "DELETE" });
+    invalidate();
+  }
+
+  function openNotification(n: Notification) {
+    if (!n.readAt) void markRead(n.id);
+    if (n.chamberUrl) {
+      navigateToExhibit(ownChamber, { id: String(n.id), chamber: n.chamber, name: n.title, url: n.chamberUrl }, navigate, shellHosted);
+    }
+    setOpen(false);
+  }
+
+  return (
+    <div className="notification-bell" ref={ref}>
+      <button
+        type="button"
+        className="notification-bell-trigger"
+        aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : "Notifications"}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+          <path d="M6 9a6 6 0 0 1 12 0c0 3.5 1 5 2 6H4c1-1 2-2.5 2-6Z" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M9.5 18a2.5 2.5 0 0 0 5 0" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        {unreadCount > 0 && <span className="notification-bell-badge">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+      </button>
+
+      <div className="notification-panel" role="dialog" aria-label="Notifications" hidden={!open}>
+        <div className="notification-panel-header">
+          <span>Notifications</span>
+          {unreadCount > 0 && (
+            <button type="button" className="notification-panel-mark-all" onClick={markAllRead}>
+              Mark all read
+            </button>
+          )}
+        </div>
+        {notifications.length === 0 && <div className="notification-empty">Nothing here</div>}
+        {notifications.map((n) => (
+          <div
+            key={n.id}
+            className={n.readAt ? "notification-item" : "notification-item unread"}
+            onClick={() => openNotification(n)}
+          >
+            <span className="notification-item-icon">{getChamberIcon(n.chamber)}</span>
+            <div className="notification-item-body">
+              <div className="notification-item-title">{n.title}</div>
+              {n.body && <div className="notification-item-text">{n.body}</div>}
+              <div className="notification-item-meta">{formatTimestamp(n.createdAt)}</div>
+            </div>
+            <button
+              type="button"
+              className="notification-item-dismiss"
+              aria-label="Dismiss"
+              onClick={(e) => dismiss(e, n.id)}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const chambers = sqliteTable("chambers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -67,6 +67,33 @@ export const shares = sqliteTable("shares", {
   revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
   lastAccessedAt: integer("last_accessed_at", { mode: "timestamp_ms" }),
 });
+
+// Capitol-owned notification center - a Chamber pushes here (POST
+// /capitol/notifications/push) instead of inventing its own alert UI, e.g.
+// "task due" or "event starting soon". One row per (chamber, dedupeKey):
+// re-pushing the same key upserts in place (see notifications.ts's
+// pushNotification), so a Chamber's own poller can call this on every tick
+// while a condition still holds without spamming duplicates. Dismissing a
+// notification deletes its row outright rather than soft-deleting - if the
+// underlying condition still holds, the Chamber's next push simply
+// recreates it.
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    chamber: text("chamber").notNull(),
+    dedupeKey: text("dedupe_key").notNull(),
+    title: text("title").notNull(),
+    body: text("body"),
+    chamberUrl: text("chamber_url"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    readAt: integer("read_at", { mode: "timestamp_ms" }),
+  },
+  (table) => [
+    uniqueIndex("notifications_chamber_dedupe_key_idx").on(table.chamber, table.dedupeKey),
+    index("notifications_created_at_idx").on(table.createdAt),
+  ]
+);
 
 // Single-row table (id is always 1) - one Congress-wide settings scope, not
 // per-user or per-Chamber.

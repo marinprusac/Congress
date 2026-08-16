@@ -27,7 +27,7 @@ export function parseExhibitId(id: string): { accountId: number; calendarId: str
   return { accountId, calendarId: decodeURIComponent(encCalendarId!), eventId: decodeURIComponent(encEventId!) };
 }
 
-function eventUrl(accountId: number, calendarId: string, eventId: string): string {
+export function eventUrl(accountId: number, calendarId: string, eventId: string): string {
   return `/e/${accountId}/${encodeURIComponent(calendarId)}/${encodeURIComponent(eventId)}`;
 }
 

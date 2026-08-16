@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
 import { MobileSearchReveal } from "./MobileSearchReveal.js";
+import { NotificationBell } from "./NotificationBell.js";
 import { useShellHosted, resolveChamberPath } from "./ShellHostContext.js";
 
 interface ChamberHeaderProps {
@@ -60,9 +61,10 @@ export function ChamberHeader({
             <div className="chamber-title-link">{titleContent}</div>
           )}
         </div>
-        {showSearch && renderIcon && navigate && (
+        {showSearch && navigate && (
           <div className="chamber-header-actions">
-            <GlobalExhibitSearch ownChamber={ownChamber} navigate={navigate} renderIcon={renderIcon} />
+            {renderIcon && <GlobalExhibitSearch ownChamber={ownChamber} navigate={navigate} renderIcon={renderIcon} />}
+            <NotificationBell ownChamber={ownChamber} navigate={navigate} />
           </div>
         )}
       </div>
