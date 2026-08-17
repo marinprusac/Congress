@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CreateShareForm, formatTimestamp } from "@congress/congress-ui";
+import { CreateShareForm, ConfirmSheet, formatTimestamp } from "@congress/congress-ui";
 import { fetchShares, revokeShare } from "@/lib/api";
 import { CapitolHeader } from "@/components/CapitolHeader";
 
@@ -12,6 +13,7 @@ function isActive(share: { revokedAt: string | null; expiresAt: string | null })
 function SharesList() {
   const queryClient = useQueryClient();
   const { data, isLoading, isError } = useQuery({ queryKey: ["capitol", "shares"], queryFn: fetchShares });
+  const [confirmingToken, setConfirmingToken] = useState<string | null>(null);
 
   const revokeMutation = useMutation({
     mutationFn: (token: string) => revokeShare(token),
@@ -46,9 +48,7 @@ function SharesList() {
                 Open
               </a>
               <button
-                onClick={() => {
-                  if (confirm("Revoke this share? This cannot be undone.")) revokeMutation.mutate(share.token);
-                }}
+                onClick={() => setConfirmingToken(share.token)}
                 className="tap-target text-alert hover:underline"
               >
                 Revoke
@@ -57,6 +57,17 @@ function SharesList() {
           </div>
         </div>
       ))}
+      <ConfirmSheet
+        open={confirmingToken !== null}
+        title="Revoke share"
+        message="Revoke this share? This cannot be undone."
+        confirmLabel="Revoke"
+        onConfirm={() => {
+          if (confirmingToken) revokeMutation.mutate(confirmingToken);
+          setConfirmingToken(null);
+        }}
+        onCancel={() => setConfirmingToken(null)}
+      />
     </div>
   );
 }

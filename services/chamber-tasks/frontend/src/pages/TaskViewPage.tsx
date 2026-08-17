@@ -12,7 +12,7 @@ import {
   getChamberIcon,
   useShellHosted,
   resolveChamberPath,
-  confirmDelete,
+  ConfirmSheet,
 } from "@congress/congress-ui";
 import { fetchTask, updateTask, deleteTask, quickCreateTaskExhibit } from "@/lib/api";
 
@@ -27,6 +27,7 @@ export function TaskViewPage() {
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
   const [draftDueDate, setDraftDueDate] = useState("");
@@ -177,9 +178,7 @@ export function TaskViewPage() {
                 Edit
               </button>
               <button
-                onClick={() => {
-                  if (confirmDelete(task.name)) deleteMutation.mutate();
-                }}
+                onClick={() => setConfirmingDelete(true)}
                 className="tap-target text-alert hover:underline"
               >
                 Delete
@@ -188,6 +187,17 @@ export function TaskViewPage() {
           )}
         </ExhibitActionBar>
       </ExhibitLinksLayout>
+      <ConfirmSheet
+        open={confirmingDelete}
+        title="Delete task"
+        message={`Delete "${task.name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          deleteMutation.mutate();
+        }}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </article>
   );
 }

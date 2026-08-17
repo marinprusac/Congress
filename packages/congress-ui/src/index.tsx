@@ -49,4 +49,5 @@ export { useSearchableList, useListRowPrefetch } from "./listPage.js";
 export { ListSearchInput, ListLoadingState, ListErrorState, ListEmptyState } from "./ListStates.js";
 export { FormLabel, FormTextInput, FormErrorMessage, FormSubmitButton } from "./FormPrimitives.js";
 export { formatTimestamp } from "./formatTimestamp.js";
-export { confirmDelete } from "./confirmDelete.js";
+export { ConfirmSheet } from "./ConfirmSheet.js";
+export type { ConfirmSheetProps } from "./ConfirmSheet.js";

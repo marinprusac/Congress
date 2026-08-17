@@ -39,7 +39,7 @@ export function SharePopover({ open, onClose, children }: SharePopoverProps) {
   return (
     <div
       ref={ref}
-      className="share-control-popover"
+      className="share-control-popover docked-sheet"
       style={keyboardInset > 0 ? { bottom: keyboardInset } : undefined}
     >
       {children}

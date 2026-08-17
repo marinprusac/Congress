@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ShareSummary, SharePermission, UpdateShareRequest } from "@congress/shared-types";
 import { ShareFieldsEditor } from "./ShareFieldsEditor.js";
 import { CopyLinkButton } from "./CopyLinkButton.js";
+import { ConfirmSheet } from "./ConfirmSheet.js";
 import { exhibitSharingQueryKey } from "./useExhibitSharing.js";
 
 interface EditShareModalProps {
@@ -63,6 +64,7 @@ export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProp
   const [revoking, setRevoking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [seeded, setSeeded] = useState(false);
+  const [confirmingRevoke, setConfirmingRevoke] = useState(false);
 
   useEffect(() => {
     if (!share || seeded) return;
@@ -103,7 +105,8 @@ export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProp
   }
 
   async function handleRevoke() {
-    if (revoking || !confirm("Revoke this share? This cannot be undone.")) return;
+    if (revoking) return;
+    setConfirmingRevoke(false);
     setRevoking(true);
     setError(null);
     try {
@@ -158,7 +161,7 @@ export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProp
             </button>
             <button
               type="button"
-              onClick={handleRevoke}
+              onClick={() => setConfirmingRevoke(true)}
               disabled={pending || revoking}
               className="share-revoke"
             >
@@ -167,6 +170,14 @@ export function EditShareModal({ exhibitId, token, onClose }: EditShareModalProp
           </div>
         </form>
       )}
+      <ConfirmSheet
+        open={confirmingRevoke}
+        title="Revoke share"
+        message="Revoke this share? This cannot be undone."
+        confirmLabel="Revoke"
+        onConfirm={handleRevoke}
+        onCancel={() => setConfirmingRevoke(false)}
+      />
     </>
   );
 }

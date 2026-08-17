@@ -4,6 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import { fetchRegistry } from "./registry.js";
 import { ChamberMark, CapitolMark } from "./ChamberMarks.js";
 import { useShellHosted, resolveChamberPath } from "./ShellHostContext.js";
+import { useKeyboardInset } from "./useKeyboardInset.js";
 
 export interface ChamberNavLink {
   to: string;
@@ -180,6 +181,14 @@ export function ChamberPicker({ current, currentNavLinks, currentLabel }: Chambe
   const { data } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
   const { pathname } = useLocation();
   const shellHosted = useShellHosted();
+  // iOS Safari anchors position:fixed elements to the *visual* viewport, not
+  // the full layout viewport - so a fixed bottom:0 bar rides up to sit right
+  // above the on-screen keyboard instead of staying put behind it. Nobody's
+  // switching Chambers or tapping a subnav link mid-keystroke, so it's
+  // simplest to just hide both bars outright while the keyboard is open
+  // rather than fighting iOS for the correct "pinned to the real bottom"
+  // position.
+  const keyboardOpen = useKeyboardInset() > 0;
 
   const registryChambers = (data ?? []).filter((c) => c.status === "active");
   const chambers = buildChamberList(registryChambers, current, currentLabel);
@@ -208,7 +217,7 @@ export function ChamberPicker({ current, currentNavLinks, currentLabel }: Chambe
         ))}
       </nav>
 
-      <nav className="chamber-picker-mobile-subnav" aria-label="Current section">
+      <nav className="chamber-picker-mobile-subnav" aria-label="Current section" hidden={keyboardOpen}>
         {currentNavLinks.map((link) => {
           const to = resolveChamberPath(link.to, current, shellHosted);
           return (
@@ -223,7 +232,7 @@ export function ChamberPicker({ current, currentNavLinks, currentLabel }: Chambe
         })}
       </nav>
 
-      <nav className="chamber-picker-mobile" aria-label="Chambers">
+      <nav className="chamber-picker-mobile" aria-label="Chambers" hidden={keyboardOpen}>
         {beforeCapitol.map((chamber) => (
           <ChamberIcon key={chamber.name} chamber={chamber} current={current} mobile shellHosted={shellHosted} />
         ))}

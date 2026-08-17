@@ -62,6 +62,19 @@ html[data-theme="dark"] {
 @layer base {
   * {
     border-radius: 0;
+    /* A standalone PWA has no business showing desktop-browser scrollbar
+       chrome - every scroll container (docked sheets, the notes/tasks
+       lists, wide tables/code blocks, the widget iframes) still scrolls
+       exactly the same, just without a visible track/thumb. iOS Safari's
+       own transient scroll indicator is a platform-level overlay this
+       doesn't touch, so touch scrolling still gets *a* cue, just not a
+       permanent desktop-style bar. */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
   }
 
   html {
@@ -132,6 +145,7 @@ html[data-theme="dark"] {
 }
 
 .chamber-header {
+  position: relative;
   border-bottom: 1px solid var(--color-dust);
   padding: 2rem 1.5rem;
 }
@@ -377,6 +391,17 @@ html[data-theme="dark"] {
   }
 
   .chamber-picker-desktop {
+    display: none;
+  }
+
+  /* Hidden outright (not just repositioned) while the on-screen keyboard is
+     open - see ChamberPicker's keyboardOpen comment. Needs its own [hidden]
+     rule since the plain display:flex below it otherwise outranks the
+     browser's default [hidden] styling (both are author-origin, equal
+     specificity - source order alone doesn't help against a same-file rule
+     appearing earlier), same idiom as .exhibit-picker-dropdown[hidden]. */
+  .chamber-picker-mobile-subnav[hidden],
+  .chamber-picker-mobile[hidden] {
     display: none;
   }
 
@@ -734,6 +759,33 @@ html[data-theme="dark"] {
   letter-spacing: 0.05em;
 }
 
+/* Shared by every mobile-docked sheet (this dropdown, the exhibit-ref-add
+   popover, the share popover, ConfirmSheet) - rounds only the top corners
+   (the bottom edge is the screen edge, rounding it would look like a gap)
+   and slides up on mount, so a bottom-docked panel reads as a native sheet
+   instead of a UI element that just appears mid-frame. Scoped to the mobile
+   breakpoint only - desktop keeps every sheet's existing flat, square,
+   anchored-dropdown look, since the global `border-radius: 0` reset is a
+   deliberate part of this app's design language everywhere else. */
+@media (max-width: 640px) {
+  .docked-sheet {
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+    animation: docked-sheet-in 180ms ease-out;
+  }
+}
+
+@keyframes docked-sheet-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 /* Mobile default: fixed to the viewport, not positioned relative to the
    textarea - a textarea can be far taller than the screen on mobile, which
    left an earlier textarea-relative version rendered off-screen below the
@@ -1058,13 +1110,32 @@ html[data-theme="dark"] {
   flex-shrink: 0;
 }
 
+/* On mobile, .chamber-header-actions' other occupant (the search field) is
+   display:none (see .global-search) - left in normal flex flow, the bell
+   ended up sitting alone in its own near-empty row below the title, reading
+   like a stray leftover element rather than part of the header. Lifting it
+   out of that flow and anchoring it to the header's own top-right corner
+   instead - flush with the same padding the title block sits inside -
+   matches the native iOS nav-bar convention of a single trailing bar-button
+   item beside the title, and .notification-panel is position:fixed already
+   so this doesn't affect where the dropdown itself opens. */
+@media (max-width: 640px) {
+  .notification-bell {
+    position: absolute;
+    top: 2rem;
+    right: 1.5rem;
+  }
+}
+
 .notification-bell-trigger {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  /* Apple's ~44pt tap-target guidance, in absolute px so it holds regardless
+     of root font-size - this is a hit-area size, not a type size. */
+  width: 44px;
+  height: 44px;
   color: var(--color-slate);
 }
 
@@ -1585,5 +1656,87 @@ html[data-theme="dark"] {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-accent);
+}
+
+/* ConfirmSheet - native-feeling stand-in for window.confirm(). Unlike the
+   other docked sheets (share popover, exhibit pickers) it has no trigger
+   element to anchor to or dismiss-by-tapping-outside, hence the backdrop. */
+.confirm-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background-color: color-mix(in srgb, var(--color-ink) 45%, transparent);
+}
+
+.confirm-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--mobile-nav-height, 0px);
+  border: 1px solid var(--color-dust);
+  background: var(--color-parchment);
+  padding: 1.25rem;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
+  font-size: 1rem;
+}
+
+@media (min-width: 641px) {
+  .confirm-sheet {
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(24rem, calc(100vw - 2rem));
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.confirm-sheet-title {
+  font-family: var(--font-display);
+  font-size: 1.3em;
+  color: var(--color-ink);
+  margin-bottom: 0.5rem;
+}
+
+.confirm-sheet-message {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--color-ink);
+  margin-bottom: 1.25rem;
+}
+
+.confirm-sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1.25rem;
+}
+
+.confirm-sheet-cancel {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-slate);
+}
+
+.confirm-sheet-cancel:hover {
+  color: var(--color-ink);
+}
+
+.confirm-sheet-confirm {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.5em 1em;
+  border: 1px solid var(--color-alert);
+  color: var(--color-alert);
+  background: transparent;
+}
+
+.confirm-sheet-confirm:hover {
+  background: var(--color-alert);
+  color: var(--color-parchment);
 }
 

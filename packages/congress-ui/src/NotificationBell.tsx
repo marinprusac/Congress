@@ -131,7 +131,7 @@ export function NotificationBell({ ownChamber, navigate }: NotificationBellProps
             </div>
             <button
               type="button"
-              className="notification-item-dismiss"
+              className="notification-item-dismiss tap-target"
               aria-label="Dismiss"
               onClick={(e) => dismiss(e, n.id)}
             >

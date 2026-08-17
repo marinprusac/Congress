@@ -13,7 +13,7 @@ import {
   stripFrontmatter,
   useShellHosted,
   resolveChamberPath,
-  confirmDelete,
+  ConfirmSheet,
 } from "@congress/congress-ui";
 import { fetchNote, updateNote, deleteNote, setPinned, fetchSettings, quickCreateNoteExhibit } from "@/lib/api";
 
@@ -24,6 +24,7 @@ export function NoteViewPage() {
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftContent, setDraftContent] = useState("");
   const articleRef = useRef<HTMLElement>(null);
@@ -229,11 +230,7 @@ export function NoteViewPage() {
               Edit
             </button>
             <button
-              onClick={() => {
-                if (confirmDelete(note.title)) {
-                  deleteMutation.mutate();
-                }
-              }}
+              onClick={() => setConfirmingDelete(true)}
               className="tap-target text-alert hover:underline"
             >
               Delete
@@ -241,6 +238,17 @@ export function NoteViewPage() {
           </ExhibitActionBar>
         </ExhibitLinksLayout>
       )}
+      <ConfirmSheet
+        open={confirmingDelete}
+        title="Delete note"
+        message={`Delete "${note.title}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          deleteMutation.mutate();
+        }}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </article>
   );
 }

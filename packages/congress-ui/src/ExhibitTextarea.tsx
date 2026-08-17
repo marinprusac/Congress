@@ -79,7 +79,7 @@ export const ExhibitTextarea = forwardRef<HTMLTextAreaElement, ExhibitTextareaPr
         placeholder={placeholder}
         className={className}
       />
-      <ExhibitPickerDropdown picker={picker} renderIcon={renderIcon} className="exhibit-picker-dropdown" />
+      <ExhibitPickerDropdown picker={picker} renderIcon={renderIcon} className="exhibit-picker-dropdown docked-sheet" />
     </div>
   );
 });

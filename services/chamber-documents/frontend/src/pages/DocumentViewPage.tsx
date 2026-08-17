@@ -12,7 +12,7 @@ import {
   getChamberIcon,
   useShellHosted,
   resolveChamberPath,
-  confirmDelete,
+  ConfirmSheet,
 } from "@congress/congress-ui";
 import { fetchDocument, updateDocument, deleteDocument, downloadUrl } from "@/lib/api";
 
@@ -29,6 +29,7 @@ export function DocumentViewPage() {
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
   const titleFieldRef = useRef<HTMLInputElement | null>(null);
@@ -164,11 +165,7 @@ export function DocumentViewPage() {
               Edit
             </button>
             <button
-              onClick={() => {
-                if (confirmDelete(doc.title)) {
-                  deleteMutation.mutate();
-                }
-              }}
+              onClick={() => setConfirmingDelete(true)}
               className="tap-target text-alert hover:underline"
             >
               Delete
@@ -176,6 +173,17 @@ export function DocumentViewPage() {
           </ExhibitActionBar>
         </ExhibitLinksLayout>
       )}
+      <ConfirmSheet
+        open={confirmingDelete}
+        title="Delete document"
+        message={`Delete "${doc.title}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          deleteMutation.mutate();
+        }}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </article>
   );
 }

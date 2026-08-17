@@ -102,7 +102,7 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
 
   return (
     <div className="exhibit-ref-add">
-      <div className="exhibit-ref-add-popover" style={Object.keys(popoverStyle).length > 0 ? popoverStyle : undefined}>
+      <div className="exhibit-ref-add-popover docked-sheet" style={Object.keys(popoverStyle).length > 0 ? popoverStyle : undefined}>
         <input
           ref={inputRef}
           type="search"
