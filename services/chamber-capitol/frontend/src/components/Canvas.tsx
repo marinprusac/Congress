@@ -91,8 +91,17 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
   const upsertMutation = useMutation({
     mutationFn: ({ chamber, widgetId, x, y }: { chamber: string; widgetId: string; x: number; y: number }) =>
       upsertPlacement(scope, chamber, widgetId, x, y),
+    // Returns (doesn't just fire) invalidateQueries's promise - mutateAsync
+    // callers (specifically useWidgetDrag's post-drop "settling" state)
+    // need to know once the refetched layout actually reflects the new
+    // placement, not just once the write itself succeeded. Otherwise
+    // there's a shorter version of the same double-jump drag was fixed for:
+    // the drag transform would clear the instant the upsert responds, but
+    // the refetch (a second network round-trip) hasn't landed yet, so the
+    // widget's *base* grid position would still reflect the old placement
+    // for a beat.
     onSuccess: (result) => {
-      if (result) queryClient.invalidateQueries({ queryKey: ["capitol", "layout", scope] });
+      if (result) return queryClient.invalidateQueries({ queryKey: ["capitol", "layout", scope] });
     },
   });
 
@@ -118,7 +127,10 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
     gapPx: GAP_PX,
     dims,
     occupiedExcluding: (chamber, widgetId) => occupiedCells(placedRects(widgetKey(chamber, widgetId))),
-    onCommit: (chamber, widgetId, x, y) => upsertMutation.mutate({ chamber, widgetId, x, y }),
+    // mutateAsync (not mutate) - the drag hook holds its own "settling"
+    // visual state frozen at the target cell until this promise resolves,
+    // so it needs something to actually await.
+    onCommit: (chamber, widgetId, x, y) => upsertMutation.mutateAsync({ chamber, widgetId, x, y }),
   });
 
   const isLoading = registryQuery.isLoading || layoutQuery.isLoading;

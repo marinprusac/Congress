@@ -15,6 +15,20 @@
   position: relative;
   display: block;
   min-height: 5rem;
+  /* Sized to its own title, not stretched to fill a shared grid track (see
+     .notes-flow switching to flex-wrap for this same reason) - capped so a
+     long title doesn't run away, and always re-capped against the
+     *container's* own width (min(...,100%)) so a widget's narrow column,
+     especially on mobile, shrinks the cap instead of letting the card
+     overflow and get clipped by the widget's own overflow:hidden.
+     Deliberately no min-width: CSS always lets min-width win over
+     max-width when they conflict, so any min-width floor here would
+     silently defeat the min(...,100%) cap the instant a widget got
+     narrower than that floor - exactly the clipping this is meant to
+     prevent. Long titles wrap instead of overflowing (overflow-wrap). */
+  width: fit-content;
+  max-width: min(18rem, 100%);
+  overflow-wrap: anywhere;
   padding: 0.85rem 0.9rem;
   background-color: color-mix(in srgb, var(--color-ink) 2.5%, var(--color-parchment));
   border: 1px solid var(--color-dust);
@@ -71,18 +85,22 @@
 .note-card-mini {
   --note-fold: 0.7rem;
   min-height: 4rem;
+  max-width: min(12rem, 100%);
   padding: 0.55rem 0.6rem;
 }
 
+/* flex-wrap, not a grid with stretched (1fr) tracks - each card keeps its
+   own fit-content width (see .note-card) and simply wraps to the next line
+   once a row runs out of room, rather than every card in a row being
+   force-stretched equal-width regardless of title length. */
 .notes-flow {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
 }
 
 @media (min-width: 641px) {
   .notes-flow {
-    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
     gap: 1rem;
   }
 }
