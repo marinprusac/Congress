@@ -82,6 +82,20 @@
   color: var(--color-accent);
 }
 
+/* .note-card is width: fit-content (see above) - without this, a long
+   *excerpt* line would inflate that fit-content calculation just as much
+   as the title does, so a note with a short title but a long body preview
+   would still end up with a wide card. width: 0 makes this element
+   contribute nothing to its fit-content parent's own width calculation
+   (a specified width, unlike auto, is what that calculation reads per
+   child); min-width: 100% then re-expands it to fill whatever width the
+   *title* ended up settling on, once that's resolved. Title is the only
+   thing allowed to size the card; the excerpt just wraps/clips within it. */
+.note-card-excerpt {
+  width: 0;
+  min-width: 100%;
+}
+
 .note-card-mini {
   --note-fold: 0.7rem;
   min-height: 4rem;

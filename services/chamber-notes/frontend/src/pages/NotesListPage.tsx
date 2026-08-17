@@ -60,7 +60,7 @@ export function NotesListPage() {
                 >
                   {note.title}
                 </span>
-                {note.excerpt && <p className="mt-1 line-clamp-2 text-xs text-slate">{note.excerpt}</p>}
+                {note.excerpt && <p className="note-card-excerpt mt-1 line-clamp-2 text-xs text-slate">{note.excerpt}</p>}
               </Link>
             ))}
           </div>
