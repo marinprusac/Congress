@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchRegistry } from "@congress/congress-ui";
 import { LoginGate } from "@/components/LoginGate";
@@ -19,11 +19,25 @@ export function App() {
     }
   }, [registry]);
 
+  // Every chamber-shaped route is "/:chamber/*" now that Capitol is an
+  // ordinary registered Chamber rather than living at "/" - so the current
+  // Chamber's own name is just the URL's first segment, with "/" and
+  // "/shared/*" (neither of which ChamberHost ever renders) left
+  // undefined. Without this, ChamberWarmups has no way to exclude whichever
+  // Chamber ChamberHost is already rendering for real, and ends up
+  // rendering a redundant hidden second copy of it (see ChamberWarmups' own
+  // comment for why that's wasted work, not just a harmless no-op).
+  const location = useLocation();
+  const currentChamberName =
+    location.pathname === "/" || location.pathname.startsWith("/shared/")
+      ? undefined
+      : location.pathname.split("/")[1];
+
   return (
     <>
       <ChamberWarmups
         activeChamberNames={(registry ?? []).filter((c) => c.status === "active").map((c) => c.name)}
-        currentChamberName={undefined}
+        currentChamberName={currentChamberName}
       />
       <Routes>
         {/* Deliberately outside LoginGate - a share recipient has no Congress
