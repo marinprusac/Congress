@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CreateShareForm, ConfirmSheet, formatTimestamp, showToast } from "@congress/congress-ui";
 import { fetchShares, revokeShare } from "@/lib/api";
-import { CapitolHeader } from "@/components/CapitolHeader";
 
 function isActive(share: { revokedAt: string | null; expiresAt: string | null }): boolean {
   if (share.revokedAt) return false;
@@ -80,18 +79,15 @@ export function SharesPage() {
   const queryClient = useQueryClient();
 
   return (
-    <div className="min-h-screen bg-parchment text-ink capitol-shell">
-      <CapitolHeader />
-      <main className="mx-auto max-w-4xl px-6 py-10">
-        <h2 className="mb-6 font-display text-2xl text-ink">Shares</h2>
-        <div className="mb-10 border border-dust p-4">
-          <CreateShareForm
-            className="share-form"
-            onCreated={() => queryClient.invalidateQueries({ queryKey: ["capitol", "shares"] })}
-          />
-        </div>
-        <SharesList />
-      </main>
-    </div>
+    <section>
+      <h2 className="mb-6 font-display text-2xl text-ink">Shares</h2>
+      <div className="mb-10 border border-dust p-4">
+        <CreateShareForm
+          className="share-form"
+          onCreated={() => queryClient.invalidateQueries({ queryKey: ["capitol", "shares"] })}
+        />
+      </div>
+      <SharesList />
+    </section>
   );
 }

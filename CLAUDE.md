@@ -8,9 +8,9 @@ Congress is a personal, self-hosted productivity system for a single user, deplo
 
 Three names are used consistently in code, folders, and package names:
 
-- **Congress** — the whole system; not itself a running service.
-- **Capitol** (`services/congress`) — the central orchestrator: module registry, request gateway, homepage, cross-cutting settings (dark mode), global search, Exhibit Sharing. Follows the same Chamber contract as everyone else, plus these extra duties. (Mid-migration: the package/directory has been renamed to `congress` as the first step of splitting Capitol's backbone duties from its product surface — see the approved plan at `.claude/plans/immutable-gathering-tower.md` if it still exists. This doc's "Capitol" terminology still describes the current, not-yet-split reality.)
-- **Chamber** — any individual module (`services/chamber-notes`, `services/chamber-calendar`, `services/chamber-documents`, `services/chamber-tasks`). Each is a fully separate process: own port, own SQLite file, own frontend build, own MCP server. No Chamber imports another Chamber's source, shares a database, or shares a process.
+- **Congress** — both the whole system, and (confusingly, but deliberately — see below) the one backbone service everything else depends on: `services/congress` is the chamber registry, request gateway, session auth, Exhibit cache/search/resolve fan-out, Exhibit Sharing, and the PWA shell (login gate, `ChamberHost`) — no product surface of its own beyond that. It's the one service every Chamber registers with and the only thing Caddy ever points at.
+- **Capitol** (`services/chamber-capitol`) — the homepage widget canvas, plus the owner-facing Shares/Settings UI. Despite the name, it is *not* special infrastructure: it's an ordinary Chamber, following the same Chamber contract as any other, registered with Congress the same way. It's also the one Chamber Congress's shell privileges as the "/" landing page when it's registered and active — see the Gateway section below. Because it's ordinary, it's optional: Congress runs and every other Chamber works without it, just with no homepage content.
+- **Chamber** — any individual module (`services/chamber-notes`, `services/chamber-calendar`, `services/chamber-documents`, `services/chamber-tasks`, `services/chamber-capitol`). Each is a fully separate process: own port, own SQLite file, own frontend build, own MCP server. No Chamber imports another Chamber's source, shares a database, or shares a process.
 
 Status vocabulary stays plain in UI/code: a Chamber is `active` or `offline`, never "convened"/"adjourned" — the Congress/Capitol/Chamber theme is structural, not narrated.
 
@@ -36,7 +36,7 @@ pnpm --filter <service> db:migrate             # apply migrations locally (also 
 
 There is no test suite and no lint config in this repo — `pnpm -r typecheck` is the only automated check, and it's expected to pass cleanly before committing.
 
-A Chamber's frontend dev server proxies `/api`, `/manifest`, `/health`, `/mcp` to its own backend port, and exhibit search/resolve/sharing calls to Capitol's dev port (`3000`) — see the `PROXY_TARGET`/`CAPITOL_PROXY_TARGET` constants at the top of each `frontend/vite.config.ts`. In production everything is same-origin through Capitol's proxy instead (see Gateway below), which is also why each frontend build sets `base: "/<chamber-name>/"`.
+A Chamber's frontend dev server proxies `/api`, `/manifest`, `/health`, `/mcp` to its own backend port, and exhibit search/resolve/sharing calls to Congress's dev port (`3000`) — see the `PROXY_TARGET`/`CAPITOL_PROXY_TARGET` constants at the top of each `frontend/vite.config.ts` (the constant name is a naming leftover from before the Congress/Capitol split — it still points at Congress). In production everything is same-origin through Congress's proxy instead (see Gateway below), which is also why each frontend build sets `base: "/<chamber-name>/"`.
 
 ## Architecture
 
@@ -54,29 +54,29 @@ A Chamber's frontend dev server proxies `/api`, `/manifest`, `/health`, `/mcp` t
 
 ### The Chamber contract
 
-Every service — Capitol included — implements the same contract (defined in `docs/congress-project-brief.md` section 4, scaffolded by `chamber-kit`):
+Every Chamber — Capitol included — implements the same contract (defined in `docs/congress-project-brief.md` section 4, scaffolded by `chamber-kit`):
 
 - `GET /manifest` — self-description (name, routes, apiBase, mcpUrl, healthUrl).
-- `GET /health` — liveness, used by Capitol's heartbeat sweep.
+- `GET /health` — liveness, used by Congress's heartbeat sweep.
 - Home / settings / widget frontend routes.
 - A REST API under `/api/*`.
 - An MCP server at `/mcp` (Streamable HTTP transport, official `@modelcontextprotocol/sdk`), wrapping the same REST logic rather than touching the DB directly.
 
-On boot, a Chamber calls `POST /capitol/register` with its manifest (retrying with backoff if Capitol isn't up yet — start order must never matter), then heartbeats `POST /capitol/heartbeat` on an interval; Capitol marks it `offline` in its registry if a heartbeat is missed past a threshold. Registration/heartbeat/exhibit-sync calls are authenticated with a shared `CONGRESS_INTERNAL_TOKEN` header (`requireInternalToken` in `services/congress/src/auth.ts`) — this is a "stop stray local processes" gate, not real auth.
+On boot, a Chamber calls `POST /capitol/register` with its manifest (retrying with backoff if Congress isn't up yet — start order must never matter), then heartbeats `POST /capitol/heartbeat` on an interval; Congress marks it `offline` in its registry if a heartbeat is missed past a threshold. Registration/heartbeat/exhibit-sync calls are authenticated with a shared `CONGRESS_INTERNAL_TOKEN` header (`requireInternalToken` in `services/congress/src/auth.ts`) — this is a "stop stray local processes" gate, not real auth. Congress itself is the registry owner, not a registrant — it never calls these on itself. (The route namespace is still `/capitol/*`, a naming leftover from before the split — see the note at the top of this doc's "Capitol" bullet.)
 
 Each service owns exactly one SQLite file, opened only by its own process. Cross-Chamber data access always goes over HTTP through the owning Chamber's own API — never a shared DB, never one service importing another's Drizzle schema.
 
 ### Gateway
 
-Capitol is the only service Caddy ever points at. Its `gateway.ts` proxies `/api/:chamber/*` (session-gated) to that Chamber's registered `apiBase`, and proxies each Chamber's frontend through at `/<chamberName>/*`. No Chamber port is reachable from outside Capitol's own process — a Chamber is only ever hit directly in dev, or by Capitol itself in production.
+Congress is the only service Caddy ever points at. Its `gateway.ts` proxies `/api/:chamber/*` (session-gated) to that Chamber's registered `apiBase`, and proxies each Chamber's frontend through at `/<chamberName>/*` — Capitol included, at `/capitol/*`, exactly like Notes is at `/notes/*`. No Chamber port is reachable from outside Congress's own process — a Chamber is only ever hit directly in dev, or by Congress itself in production. Congress's own frontend has one further wrinkle: its `/` route redirects to `/capitol` (rendering `ChamberUnavailable` if Capitol isn't registered) since Congress has no homepage content of its own — see `services/congress/frontend/src/App.tsx`.
 
 ### Shell-hosted Chamber navigation
 
-Capitol's frontend is a persistent shell: navigating to a Chamber, or between Chambers, never does a full page load — Capitol's `ChamberHost` (`services/congress/frontend/src/components/ChamberHost.tsx`) dynamically `import()`s that Chamber's own build as a real ES module and mounts it directly into Capitol's existing React tree and Router, instead of the browser following a link to `/<chamberName>/*`. This layers on top of the "fully separate process" independence above, not a replacement for it — a Chamber still owns its build/port/DB/backend entirely; the only new coupling is Chamber → Capitol (each Chamber emits one extra build artifact and agrees to a few shared conventions), which is deliberately looser than Chamber ↔ Chamber independence.
+Congress's frontend is a persistent shell: navigating to a Chamber, or between Chambers, never does a full page load — Congress's `ChamberHost` (`services/congress/frontend/src/components/ChamberHost.tsx`) dynamically `import()`s that Chamber's own build as a real ES module and mounts it directly into Congress's existing React tree and Router, instead of the browser following a link to `/<chamberName>/*`. This layers on top of the "fully separate process" independence above, not a replacement for it — a Chamber still owns its build/port/DB/backend entirely; the only new coupling is Chamber → Congress (each Chamber emits one extra build artifact and agrees to a few shared conventions), which is deliberately looser than Chamber ↔ Chamber independence.
 
 - Each Chamber's `frontend/vite.remote.config.ts` (`build:remote`) builds `frontend/src/remote.tsx` — mirrors `main.tsx` minus `StrictMode`/`createRoot`/`BrowserRouter` — into `remote-entry.js`/`remote-entry.css`, with `react`/`react-dom`/`react-router-dom`/`@tanstack/react-query` left external. Additive to `build:web`'s output (same `dist/`, run after it), not a replacement — standalone/dev access is unaffected.
-- Capitol's `frontend/vite.vendor.config.ts` (`build:vendor`) builds the one shared copy of those externalized packages, served at `/vendor/*.js` and wired into `index.html` via an import map — required so a dynamically-mounted Chamber shares React's live module state with the shell instead of crashing with "invalid hook call" from two separate copies of "the same" React.
-- A Chamber's own components can't always tell whether they're rendered standalone (under their own `BrowserRouter basename="/<chamber>"`) or shell-hosted (nested under Capitol's basename-less Router at `/:chamber/*`) — `useShellHosted()`/`resolveChamberPath()` (`packages/congress-ui/src/ShellHostContext.tsx`) is the one signal that tells them apart, used anywhere a Chamber writes an absolute-looking path (`ChamberPicker`, `ChamberHeader`'s `titleHref`, `navigateToExhibit`'s same-Chamber branch). It's a plain `window` flag, not React Context — `congress-ui` is source-only and recompiled independently into every bundle, so a Context object created in one bundle isn't recognized by `useContext` in another.
+- Congress's `frontend/vite.vendor.config.ts` (`build:vendor`) builds the one shared copy of those externalized packages, served at `/vendor/*.js` and wired into `index.html` via an import map — required so a dynamically-mounted Chamber shares React's live module state with the shell instead of crashing with "invalid hook call" from two separate copies of "the same" React.
+- A Chamber's own components can't always tell whether they're rendered standalone (under their own `BrowserRouter basename="/<chamber>"`) or shell-hosted (nested under Congress's basename-less Router at `/:chamber/*`) — `useShellHosted()`/`resolveChamberPath()` (`packages/congress-ui/src/ShellHostContext.tsx`) is the one signal that tells them apart, used anywhere a Chamber writes an absolute-looking path (`ChamberPicker`, `ChamberHeader`'s `titleHref`, `navigateToExhibit`'s same-Chamber branch). It's a plain `window` flag, not React Context — `congress-ui` is source-only and recompiled independently into every bundle, so a Context object created in one bundle isn't recognized by `useContext` in another. Capitol is an ordinary Chamber name here — there is no more special-cased passthrough for it, unlike before the Congress/Capitol split.
 - A registered-but-actually-unreachable Chamber (stale heartbeat, a genuine bug in that Chamber's own code) is caught by an error boundary in `ChamberHost`, not left to blank the whole shell.
 - `infra/deploy/sync.sh` runs `build:vendor`/`build:remote` alongside `build:web` for every service — both artifacts have to exist for shell-hosting to work in production.
 
@@ -85,20 +85,21 @@ Capitol's frontend is a persistent shell: navigating to a Chamber, or between Ch
 An "Exhibit" is any addressable piece of content in any Chamber (`note-42`, `document-7`, `event-3:cal:evt123`, ...). This is the one piece of real cross-cutting product logic in the system, worth understanding before touching notes/calendar/documents content code:
 
 - Every Chamber implements a small **content contract** (`GET /api/exhibits/search`, `POST /api/exhibits/resolve`, `GET`/`PATCH /api/exhibits/:id/content`) — see `packages/chamber-kit/src/exhibits.ts`'s `createTableBackedExhibits` for the pattern notes/documents both use (Calendar's exhibits are Google Calendar events, not a local table, so it implements the same contract by hand in `services/chamber-calendar/src/exhibits.ts` / `google/events.ts`).
-- Capitol's own SQLite DB (`services/congress/src/db/schema.ts`) keeps `exhibit_cache` and `exhibit_refs` — a cache of every known Exhibit's name/url and a reverse-reference graph, populated whenever a Chamber calls `POST /capitol/exhibits/sync` after a create/update/delete. `services/congress/src/exhibits.ts` fans search/resolve calls out to every active Chamber in parallel.
+- Congress's own SQLite DB (`services/congress/src/db/schema.ts`) keeps `exhibit_cache` and `exhibit_refs` — a cache of every known Exhibit's name/url and a reverse-reference graph, populated whenever a Chamber calls `POST /capitol/exhibits/sync` after a create/update/delete. `services/congress/src/exhibits.ts` fans search/resolve calls out to every active Chamber in parallel.
 - In note/document/event bodies, `[[exhibit:chamber:id|Label]]` tokens (`packages/congress-ui/src/token.ts`) render as clickable chips (`ExhibitChip`) via `ExhibitAnnotatedText`/`useResolvedExhibits`. Backlinks/frontlinks panels are computed live from `exhibit_refs`, not stored redundantly.
 
 ### Exhibit Sharing
 
-A Capitol-owned feature for granting outside access (a person, or an AI agent via plain HTTP) to one Exhibit and everything it recursively references, without a Congress login:
+A Congress-owned feature for granting outside access (a person, or an AI agent via plain HTTP) to one Exhibit and everything it recursively references, without a Congress login:
 
 - `services/congress/src/shares.ts` — a `shares` table (bearer token as PK, root exhibit, max depth, permission, expiry) plus `computeShareClosure`, a live BFS over `exhibit_refs` — inheritance is dynamic, not a snapshot, so editing a shared note to reference something new makes that new Exhibit reachable immediately.
 - `services/congress/src/shareAuth.ts` — `requireShareToken`, a third auth tier alongside the owner session cookie and the internal-token header, gating everything under `/capitol/shared/:token/*`.
-- The public viewer lives at `/shared/:token` (`services/congress/frontend/src/pages/SharedViewPage.tsx`), the one route in Capitol's frontend that intentionally sits outside `LoginGate`.
+- The public viewer lives at `/shared/:token` (`services/congress/frontend/src/pages/SharedViewPage.tsx`), the one route in Congress's frontend that intentionally sits outside `LoginGate`.
+- The owner-facing management UI (create/list/revoke) is Capitol's `SharesPage.tsx` instead — an ordinary Chamber page calling Congress's `/capitol/shares*` endpoints directly, same as any Chamber calling a Congress-owned endpoint.
 
 ### Settings & theming
 
-Chamber-wide (not per-device) preferences use a single-row settings table — `id` always `1`, select-then-insert-or-update — via `chamber-kit`'s `createSingleRowSettings`. Capitol's dark mode setting is applied everywhere (including inside each Chamber's own frontend and the homepage's iframed widgets) through `useAppliedTheme`/`useCapitolSettings` in `congress-ui`, plus a pre-paint inline bootstrap script in every `frontend/index.html` that applies a cached `localStorage` theme value before first render to avoid a flash of the wrong theme.
+Chamber-wide (not per-device) preferences use a single-row settings table — `id` always `1`, select-then-insert-or-update — via `chamber-kit`'s `createSingleRowSettings`. Congress's dark mode setting is applied everywhere (including inside each Chamber's own frontend and the homepage's iframed widgets) through `useAppliedTheme`/`useCapitolSettings` in `congress-ui`, plus a pre-paint inline bootstrap script in every `frontend/index.html` that applies a cached `localStorage` theme value before first render to avoid a flash of the wrong theme. This is a genuinely Congress-owned setting, not Capitol's — it has to hold even when Capitol isn't registered. Capitol's own "which Chamber widgets are hidden from the homepage grid" preference, by contrast, is chamber-local (its own settings table, `services/chamber-capitol/src/settings.ts`) exactly like any other Chamber's own settings.
 
 ### Frontend: mobile-first, always
 
@@ -112,5 +113,5 @@ This is a PWA used on an iPhone first (see `docs/congress-project-brief.md`) —
 Full details in `infra/README.md`. Key points to know before pushing to `main`:
 
 - The VPS (`178.105.180.7`) polls `origin/main` every 30s (`infra/deploy/sync.sh` via a systemd timer) and fast-forwards, reinstalls, rebuilds, and restarts automatically — **there is no separate deploy step**, pushing to `main` is the deploy.
-- Production ports differ from dev defaults: Capitol `8000` (not `3000`, since that VPS runs other unrelated projects too), Notes `8011`, Calendar `8012`, Documents `8013`, Tasks `8014` — same as dev for the Chambers, different for Capitol. Don't assume Capitol is on `3000` when checking anything server-side.
+- Production ports differ from dev defaults: Congress `8000` (not `3000`, since that VPS runs other unrelated projects too), Notes `8011`, Calendar `8012`, Documents `8013`, Tasks `8014`, Capitol `8015` — same as dev for the Chambers, different for Congress. Don't assume Congress is on `3000` when checking anything server-side.
 - If you're running as an on-server AI (not the case in normal laptop-driven sessions), a `pre-push` hook blocks pushing to `main`/`master` directly — server-side work must go to a `server-ai/*` branch for review.

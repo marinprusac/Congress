@@ -18,6 +18,6 @@ export const manifest: Manifest = {
   // Optional: set to "markdown" once this Chamber's exhibit bodies use
   // [[wikilink]]/Markdown syntax, so Capitol's Exhibit Sharing viewer knows
   // to render them that way for logged-out viewers - see
-  // services/capitol/frontend/src/pages/SharedViewPage.tsx.
+  // services/congress/frontend/src/pages/SharedViewPage.tsx.
   // contentFormat: "markdown",
 };

@@ -1,7 +1,7 @@
 import type { ManualRefsResponse } from "@congress/shared-types";
 
 // Always routed through Capitol's proxy (POST/DELETE
-// "/capitol/exhibits/:id/refs" in services/capitol/src/server.ts), even
+// "/capitol/exhibits/:id/refs" in services/congress/src/server.ts), even
 // when `exhibitId` is owned by the same Chamber the caller is running in -
 // this is what lets a "Referenced by" panel add/remove a reference that
 // actually lives on a *different* Exhibit than the one being viewed,

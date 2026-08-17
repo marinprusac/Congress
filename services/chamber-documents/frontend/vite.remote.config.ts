@@ -12,7 +12,7 @@ const root = fileURLToPath(new URL(".", import.meta.url));
 // use): react/react-dom/react-router-dom/@tanstack/react-query are left
 // external here and resolved at runtime against Capitol's shared vendor
 // build via the importmap in its index.html - see that file and
-// services/capitol/frontend/vite.vendor.config.ts for why. Run after
+// services/congress/frontend/vite.vendor.config.ts for why. Run after
 // build:web (emptyOutDir: false, so it doesn't wipe that output - the two
 // share one dist/).
 export default defineConfig({

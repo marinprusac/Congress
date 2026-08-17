@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { CapitolSettings } from "@congress/shared-types";
+import type { CapitolSettings, UpdateCapitolSettingsRequest } from "@congress/shared-types";
 
 async function fetchCapitolSettings(): Promise<CapitolSettings> {
   const res = await fetch("/capitol/settings");
-  if (!res.ok) return { darkMode: false, hiddenWidgets: [] };
+  if (!res.ok) return { darkMode: false };
   return res.json();
 }
 
@@ -14,6 +14,21 @@ export function capitolSettingsQueryKey() {
 
 export function useCapitolSettings(enabled: boolean = true) {
   return useQuery({ queryKey: capitolSettingsQueryKey(), queryFn: fetchCapitolSettings, enabled });
+}
+
+// The one write path for the setting above - only Capitol's own Settings
+// page calls this today, but it lives here (not in any one Chamber's own
+// lib/) since it's the write half of useCapitolSettings's read half, and
+// both hit the same Congress-owned endpoint regardless of which Chamber's
+// UI happens to expose the toggle.
+export async function updateCapitolSettings(input: UpdateCapitolSettingsRequest): Promise<CapitolSettings> {
+  const res = await fetch("/capitol/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`Failed to update settings: ${res.status}`);
+  return res.json();
 }
 
 function forcedThemeFromUrl(): "dark" | "light" | null {

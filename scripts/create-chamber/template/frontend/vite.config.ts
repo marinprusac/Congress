@@ -13,7 +13,7 @@ const root = fileURLToPath(new URL(".", import.meta.url));
 export default defineConfig(({ command }) => ({
   root,
   // In production this Chamber's frontend is proxied through Capitol at
-  // "/__CHAMBER_NAME__/*" (see services/capitol/src/gateway.ts), so built
+  // "/__CHAMBER_NAME__/*" (see services/congress/src/gateway.ts), so built
   // asset URLs must carry that prefix. The dev server still runs standalone
   // at "/".
   base: command === "build" ? "/__CHAMBER_NAME__/" : "/",

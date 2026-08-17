@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCapitolSettings, capitolSettingsQueryKey, fetchRegistry } from "@congress/congress-ui";
-import { updateCapitolSettings } from "@/lib/settingsApi";
+import { useCapitolSettings, capitolSettingsQueryKey, updateCapitolSettings, fetchRegistry } from "@congress/congress-ui";
+import { fetchSettings, updateSettings } from "@/lib/api";
 import { fetchPushConfig, getCurrentSubscription, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
-import { CapitolHeader } from "@/components/CapitolHeader";
-import { SignOutControl } from "@/components/LoginGate";
 
 // Per-device, not a Congress-wide setting like dark mode above - each
 // browser/device holds its own Web Push subscription, so "on" here means
@@ -68,12 +66,12 @@ function PushNotificationsSection() {
       <p className="font-mono text-xs uppercase tracking-wide text-dust">Push notifications</p>
       {status === "unconfigured" ? (
         <p className="mt-1 font-mono text-xs text-dust">
-          Not set up on this server yet - Capitol has no VAPID keypair configured.
+          Not set up on this server yet - Congress has no VAPID keypair configured.
         </p>
       ) : (
         <>
           <p className="mt-1 font-mono text-xs text-dust">
-            Sends new notifications from Capitol's own notification center to this device, even when Congress isn't
+            Sends new notifications from Congress's own notification center to this device, even when Congress isn't
             open. Enable separately on each phone/laptop you use.
           </p>
           <button
@@ -93,16 +91,18 @@ function PushNotificationsSection() {
 
 function WidgetVisibilitySection() {
   const queryClient = useQueryClient();
-  const { data: settings } = useCapitolSettings();
-  const { data: registry } = useQuery({ queryKey: ["capitol", "registry"], queryFn: fetchRegistry });
+  const { data: settings } = useQuery({ queryKey: ["capitol", "settings"], queryFn: fetchSettings });
+  const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
 
   const mutation = useMutation({
-    mutationFn: updateCapitolSettings,
-    onSuccess: (updated) => queryClient.setQueryData(capitolSettingsQueryKey(), updated),
+    mutationFn: updateSettings,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["capitol", "settings"] }),
   });
 
   if (!settings || !registry) return null;
   const hidden = new Set(settings.hiddenWidgets);
+  // Capitol has no widget of its own - nothing to toggle for itself.
+  const widgetChambers = registry.filter((chamber) => chamber.name !== "capitol");
 
   function toggle(name: string, visible: boolean) {
     const next = new Set(hidden);
@@ -116,7 +116,7 @@ function WidgetVisibilitySection() {
       <p className="font-mono text-xs uppercase tracking-wide text-dust">Homepage widgets</p>
       <p className="mt-1 font-mono text-xs text-dust">Choose which Chambers show a widget on the Capitol homepage.</p>
       <div className="mt-3 flex flex-col gap-2">
-        {registry.map((chamber) => (
+        {widgetChambers.map((chamber) => (
           <label key={chamber.name} className="flex items-center gap-2 font-mono text-sm text-ink">
             <input
               type="checkbox"
@@ -126,9 +126,28 @@ function WidgetVisibilitySection() {
             {chamber.displayName}
           </label>
         ))}
-        {registry.length === 0 && <p className="font-mono text-xs text-dust">— No Chambers registered —</p>}
+        {widgetChambers.length === 0 && <p className="font-mono text-xs text-dust">— No Chambers registered —</p>}
       </div>
     </div>
+  );
+}
+
+function SignOutControl() {
+  const queryClient = useQueryClient();
+
+  async function handleSignOut() {
+    await fetch("/auth/logout", { method: "POST" });
+    queryClient.setQueryData(["auth", "status"], { authenticated: false });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleSignOut}
+      className="font-mono text-xs uppercase tracking-wide text-dust hover:text-ink"
+    >
+      Sign out
+    </button>
   );
 }
 
@@ -142,38 +161,33 @@ export function SettingsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-parchment text-ink capitol-shell">
-      <CapitolHeader />
-      <main className="mx-auto max-w-4xl px-6 py-10">
-        <h2 className="mb-6 font-display text-2xl text-ink">Settings</h2>
+    <section>
+      <h2 className="mb-6 font-display text-2xl text-ink">Settings</h2>
 
-        {isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}
-        {isError && <p className="font-mono text-sm text-alert">Failed to load settings.</p>}
+      {isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}
+      {isError && <p className="font-mono text-sm text-alert">Failed to load settings.</p>}
 
-        {data && (
-          <div>
-            <label className="flex items-center gap-2 font-mono text-sm text-ink">
-              <input
-                type="checkbox"
-                checked={data.darkMode}
-                onChange={(e) => mutation.mutate({ darkMode: e.target.checked })}
-              />
-              Dark mode
-            </label>
-            <p className="mt-1 pl-6 font-mono text-xs text-dust">
-              Applies across Capitol and every Chamber, on any device.
-            </p>
-          </div>
-        )}
-
-        <WidgetVisibilitySection />
-
-        <PushNotificationsSection />
-
-        <div className="mt-10 border-t border-dust pt-6">
-          <SignOutControl />
+      {data && (
+        <div>
+          <label className="flex items-center gap-2 font-mono text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={data.darkMode}
+              onChange={(e) => mutation.mutate({ darkMode: e.target.checked })}
+            />
+            Dark mode
+          </label>
+          <p className="mt-1 pl-6 font-mono text-xs text-dust">Applies across Congress and every Chamber, on any device.</p>
         </div>
-      </main>
-    </div>
+      )}
+
+      <WidgetVisibilitySection />
+
+      <PushNotificationsSection />
+
+      <div className="mt-10 border-t border-dust pt-6">
+        <SignOutControl />
+      </div>
+    </section>
   );
 }

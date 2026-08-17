@@ -78,7 +78,7 @@ export type ExhibitRefEntry = z.infer<typeof exhibitRefEntrySchema>;
 // mountExhibitContentRoutes uses - which is what lets Capitol proxy an add/
 // remove to whichever Chamber actually owns the target id, regardless of
 // which Chamber's page the request originated from (see
-// POST/DELETE /capitol/exhibits/:id/refs in services/capitol/src/server.ts).
+// POST/DELETE /capitol/exhibits/:id/refs in services/congress/src/server.ts).
 export const manualRefRequestSchema = z.object({
   targetExhibitId: z.string().min(1),
   // Optional hint the frontend already has whenever the target came from a

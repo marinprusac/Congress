@@ -111,10 +111,10 @@ export const pushSubscriptions = sqliteTable("push_subscriptions", {
 });
 
 // Single-row table (id is always 1) - one Congress-wide settings scope, not
-// per-user or per-Chamber.
+// per-user or per-Chamber. Chamber-local preferences (e.g. Capitol's own
+// "hidden widgets" list) live in that Chamber's own settings table instead -
+// this one only holds what has to survive Capitol not being registered.
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
   darkMode: integer("dark_mode", { mode: "boolean" }).notNull().default(false),
-  // Chamber names hidden from the homepage widget grid, JSON-encoded.
-  hiddenWidgetsJson: text("hidden_widgets_json").notNull().default("[]"),
 });

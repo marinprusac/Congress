@@ -8,18 +8,28 @@ import {
   PAGE_SCROLL_TOP_MESSAGE,
   type PageScrollTopMessage,
 } from "@congress/congress-ui";
+import { fetchSettings } from "@/lib/api";
 
 export function WidgetGrid() {
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["capitol", "registry"],
+    queryKey: ["congress", "registry"],
     queryFn: fetchRegistry,
   });
-  const { data: settings } = useCapitolSettings();
+  // darkMode is Congress-owned (needed everywhere, including here for the
+  // widget iframes' ?theme= param); hiddenWidgets is this Chamber's own
+  // local preference (see lib/api.ts's fetchSettings) - two different
+  // settings scopes, deliberately not the same endpoint anymore.
+  const { data: congressSettings } = useCapitolSettings();
+  const { data: ownSettings } = useQuery({ queryKey: ["capitol", "settings"], queryFn: fetchSettings });
   // Told explicitly rather than left to fetch its own copy - see
   // useAppliedTheme's forcedThemeFromUrl for why.
-  const theme = settings?.darkMode ? "dark" : "light";
-  const hiddenWidgets = settings?.hiddenWidgets ?? [];
-  const visibleData = data?.filter((chamber) => !hiddenWidgets.includes(chamber.name));
+  const theme = congressSettings?.darkMode ? "dark" : "light";
+  const hiddenWidgets = ownSettings?.hiddenWidgets ?? [];
+  // Capitol itself is a registered Chamber now (it registers to get onto
+  // Congress's registry like everyone else), but it has no widget of its
+  // own (manifest.ts's routes.widget is "") - showing itself in its own
+  // grid would just be a broken iframe pointing nowhere.
+  const visibleData = data?.filter((chamber) => chamber.name !== "capitol" && !hiddenWidgets.includes(chamber.name));
 
   const iframesRef = useRef(new Map<string, HTMLIFrameElement>());
 
@@ -46,7 +56,7 @@ export function WidgetGrid() {
 
       {isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}
       {isError && (
-        <p className="font-mono text-sm text-alert">Failed to reach Capitol's registry.</p>
+        <p className="font-mono text-sm text-alert">Failed to reach Congress's registry.</p>
       )}
       {!isLoading && !isError && data?.length === 0 && (
         <div className="border-y border-dust px-1 py-3 font-mono text-sm text-dust">

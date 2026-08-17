@@ -198,6 +198,106 @@ importers:
         specifier: ^8.2.1
         version: 8.2.1(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.11)
 
+  services/chamber-capitol:
+    dependencies:
+      '@congress/chamber-kit':
+        specifier: workspace:*
+        version: link:../../packages/chamber-kit
+      '@congress/congress-ui':
+        specifier: workspace:*
+        version: link:../../packages/congress-ui
+      '@congress/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
+      '@fontsource/fraunces':
+        specifier: ^5.1.0
+        version: 5.3.0
+      '@fontsource/ibm-plex-mono':
+        specifier: ^5.1.0
+        version: 5.3.0
+      '@fontsource/ibm-plex-sans':
+        specifier: ^5.1.0
+        version: 5.3.0
+      '@hono/node-server':
+        specifier: ^2.1.0
+        version: 2.1.0(hono@4.13.1)
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.30.0
+        version: 1.30.0(zod@3.25.76)
+      '@tanstack/react-query':
+        specifier: ^5.101.4
+        version: 5.101.4(react@19.2.8)
+      better-sqlite3:
+        specifier: ^13.0.3
+        version: 13.0.3
+      class-variance-authority:
+        specifier: ^0.7.1
+        version: 0.7.1
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@types/better-sqlite3@9.6.0)(better-sqlite3@13.0.3)
+      hono:
+        specifier: ^4.13.1
+        version: 4.13.1
+      lucide-react:
+        specifier: ^1.30.0
+        version: 1.30.0(react@19.2.8)
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+      react-router-dom:
+        specifier: ^7.18.2
+        version: 7.18.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      tailwind-merge:
+        specifier: ^3.6.0
+        version: 3.6.0
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
+    devDependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.3.3
+        version: 4.3.3(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.11))
+      '@types/better-sqlite3':
+        specifier: ^9.6.0
+        version: 9.6.0
+      '@types/node':
+        specifier: ^26.2.0
+        version: 26.2.0
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.4
+        version: 19.2.4(@types/react@19.2.18)
+      '@vitejs/plugin-react':
+        specifier: ^6.0.5
+        version: 6.0.5(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.11))
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
+      tsx:
+        specifier: ^4.23.11
+        version: 4.23.11
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vite:
+        specifier: ^8.2.1
+        version: 8.2.1(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.11)
+
   services/chamber-documents:
     dependencies:
       '@congress/chamber-kit':

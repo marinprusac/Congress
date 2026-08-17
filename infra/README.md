@@ -17,13 +17,13 @@ decision. See "Access control" below for what that means in practice.
   on the server, configured via `core.sshCommand` in that clone's git config —
   not the user's own key, and not added to the server's default SSH agent).
 - Ports: this VPS already runs other services on `3000` and `4000`, so
-  Capitol's production port differs from its dev default: **Capitol `8000`**,
-  **Notes Chamber `8011`**, **Calendar Chamber `8012`**, **Documents Chamber
-  `8013`**, **Tasks Chamber `8014`** (each Chamber matches its dev default).
-  All bind `127.0.0.1` only — the only thing reachable from outside the box
-  at all is Caddy, on 80/443.
+  Congress's production port differs from its dev default: **Congress
+  `8000`**, **Notes Chamber `8011`**, **Calendar Chamber `8012`**, **Documents
+  Chamber `8013`**, **Tasks Chamber `8014`**, **Capitol Chamber `8015`** (each
+  Chamber matches its dev default). All bind `127.0.0.1` only — the only
+  thing reachable from outside the box at all is Caddy, on 80/443.
 - Each service's `.env` (untracked, created by hand on the server) sets
-  `NODE_ENV=production` and a shared `CONGRESS_INTERNAL_TOKEN`. Capitol's
+  `NODE_ENV=production` and a shared `CONGRESS_INTERNAL_TOKEN`. Congress's
   `.env` additionally sets `CONGRESS_MASTER_PASSWORD_HASH` and
   `SESSION_SECRET` (see `services/congress/.env.example` for how to generate
   each).
@@ -32,9 +32,9 @@ decision. See "Access control" below for what that means in practice.
 
 Every service (`congress-core`, `congress-chamber-notes`,
 `congress-chamber-calendar`, `congress-chamber-documents`,
-`congress-chamber-tasks`) has its own discrete unit under
-`infra/systemd/`, installed at `/etc/systemd/system/` and enabled
-(`systemctl enable --now`). All five share the same body: `User=marin`,
+`congress-chamber-tasks`, `congress-chamber-capitol`) has its own discrete
+unit under `infra/systemd/`, installed at `/etc/systemd/system/` and enabled
+(`systemctl enable --now`). All six share the same body: `User=marin`,
 `WorkingDirectory=` the service dir, `ExecStart=/usr/bin/pnpm run start`,
 `Restart=on-failure`.
 
@@ -193,27 +193,29 @@ sudo apt-get install -y build-essential python3   # better-sqlite3 native build
 pnpm install
 
 # build:web must run before build:vendor/build:remote (shared dist/, see
-# sync-deploy.sh's comment); build:vendor is Capitol-only.
+# sync-deploy.sh's comment); build:vendor is Congress-only.
 pnpm --filter congress build:web
 pnpm --filter congress build:vendor
-for name in chamber-notes chamber-calendar chamber-documents chamber-tasks; do
+for name in chamber-notes chamber-calendar chamber-documents chamber-tasks chamber-capitol; do
   pnpm --filter "$name" build:web
   pnpm --filter "$name" build:remote
 done
 
 # Create every service's .env by hand (untracked) from its .env.example:
 # services/congress/.env, services/chamber-notes/.env, .../chamber-calendar/.env,
-# .../chamber-documents/.env, .../chamber-tasks/.env. Set NODE_ENV=production,
-# the real production PORT (8000/8011/8012/8013/8014), one shared
-# CONGRESS_INTERNAL_TOKEN across all five files, and - for every Chamber -
-# CAPITOL_URL=http://127.0.0.1:8000 (the .env.example default of :3000 is
-# the dev value and is wrong here). Capitol's .env additionally needs
-# CONGRESS_MASTER_PASSWORD_HASH and SESSION_SECRET (see .env.example).
+# .../chamber-documents/.env, .../chamber-tasks/.env, .../chamber-capitol/.env.
+# Set NODE_ENV=production, the real production PORT
+# (8000/8011/8012/8013/8014/8015), one shared CONGRESS_INTERNAL_TOKEN across
+# all six files, and - for every Chamber - CAPITOL_URL=http://127.0.0.1:8000
+# (the .env.example default of :3000 is the dev value and is wrong here).
+# Congress's own .env additionally needs CONGRESS_MASTER_PASSWORD_HASH and
+# SESSION_SECRET (see .env.example).
 
 sudo cp infra/systemd/congress-*.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now congress-core congress-chamber-notes \
-  congress-chamber-calendar congress-chamber-documents congress-chamber-tasks
+  congress-chamber-calendar congress-chamber-documents congress-chamber-tasks \
+  congress-chamber-capitol
 
 # Passwordless sudo for the sync timer's restarts - see "Process management"
 # above for the exact sudoers line; sync-deploy.sh will fail at the restart

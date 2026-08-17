@@ -16,7 +16,7 @@ const NOTES_NAV_LINKS = [
 ];
 
 // Matches Capitol's real CAPITOL_NAV_LINKS in
-// services/capitol/frontend/src/App.tsx.
+// services/congress/frontend/src/App.tsx.
 const CAPITOL_NAV_LINKS = [
   { to: "/shares", label: "Shares" },
   { to: "/settings", label: "Settings" },

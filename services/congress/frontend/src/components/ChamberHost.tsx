@@ -176,10 +176,10 @@ function ChamberLoadingBar() {
   return <div className="chamber-host-loading-bar" aria-hidden="true" />;
 }
 
-// App.tsx hides Capitol's own ChamberPicker on every chamber-shaped route,
-// trusting the hosted Chamber's own (fully equivalent, see App.tsx's
-// comment) picker to take over - which never mounts here, so this is the
-// one chamber-route state that needs its own way back.
+// Congress's own shell never renders a ChamberPicker itself - every route is
+// some Chamber's own page, rendering its own (registry-driven) picker. A
+// Chamber that fails to load never gets that far, so this is the one
+// chamber-route state that needs its own way back.
 function ChamberUnavailable({ chamberName, reason }: { chamberName: string; reason: "not-found" | "offline" }) {
   return (
     <div className="chamber-host-unavailable">
@@ -189,7 +189,7 @@ function ChamberUnavailable({ chamberName, reason }: { chamberName: string; reas
           : `No Chamber named "${chamberName}".`}
       </p>
       <Link to="/" className="chamber-host-unavailable-link">
-        Back to Capitol
+        Back home
       </Link>
     </div>
   );

@@ -34,8 +34,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-parchment text-ink">
         <form onSubmit={handleSubmit} className="w-full max-w-sm border-t border-dust px-6 py-8">
-          <p className="font-mono text-xs uppercase tracking-widest text-dust">Congress</p>
-          <h1 className="mb-6 font-display text-3xl">Capitol</h1>
+          <h1 className="mb-6 font-display text-3xl">Congress</h1>
           <label htmlFor="password" className="mb-2 block font-mono text-xs uppercase tracking-wide text-dust">
             Passphrase
           </label>
