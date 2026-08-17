@@ -17,6 +17,7 @@ import {
 } from "@congress/congress-ui";
 import { fetchAutomation, updateAutomation, deleteAutomation, fetchAutomationRuns } from "@/lib/api";
 import { fetchEventCatalog } from "@/lib/eventCatalog";
+import { TriggerEventPicker } from "@/components/TriggerEventPicker";
 import type { UpdateAutomationRequest } from "../../../src/types";
 
 const inputClass =
@@ -77,7 +78,6 @@ export function AutomationViewPage() {
         triggerEventType: a.triggerEventType,
         conditionField: a.conditionField ?? undefined,
         conditionEquals: a.conditionEquals ?? undefined,
-        actionKind: a.actionKind,
         actionTitleTemplate: a.actionTitleTemplate ?? undefined,
         actionBodyTemplate: a.actionBodyTemplate ?? undefined,
         actionUrlTemplate: a.actionUrlTemplate ?? undefined,
@@ -124,23 +124,15 @@ export function AutomationViewPage() {
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          {fieldLabel("Trigger event type")}
+          {fieldLabel("Trigger event")}
           {editing ? (
-            <>
-              <input
-                list="event-catalog"
-                value={draft.triggerEventType ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, triggerEventType: e.target.value }))}
-                className={inputClass}
-              />
-              <datalist id="event-catalog">
-                {catalogQuery.data?.map((entry) => (
-                  <option key={`${entry.chamber}:${entry.type}`} value={entry.type}>
-                    {entry.chamber} — {entry.label}
-                  </option>
-                ))}
-              </datalist>
-            </>
+            <TriggerEventPicker
+              value={draft.triggerEventType ?? ""}
+              onChange={(triggerEventType) => setDraft((d) => ({ ...d, triggerEventType }))}
+              catalog={catalogQuery.data ?? []}
+              loading={catalogQuery.isLoading}
+              selectClassName={inputClass}
+            />
           ) : (
             <p className="font-mono text-sm text-ink">{automation.triggerEventType}</p>
           )}
@@ -171,22 +163,6 @@ export function AutomationViewPage() {
         </div>
 
         <div>
-          {fieldLabel("Action")}
-          {editing ? (
-            <select
-              value={draft.actionKind ?? "push"}
-              onChange={(e) => setDraft((d) => ({ ...d, actionKind: e.target.value as "push" | "withdraw" }))}
-              className={inputClass}
-            >
-              <option value="push">Push a notification</option>
-              <option value="withdraw">Withdraw a notification</option>
-            </select>
-          ) : (
-            <p className="font-mono text-sm text-ink">{automation.actionKind === "push" ? "Push a notification" : "Withdraw a notification"}</p>
-          )}
-        </div>
-
-        <div>
           {fieldLabel("Dedupe key")}
           {editing ? (
             <input
@@ -199,48 +175,44 @@ export function AutomationViewPage() {
           )}
         </div>
 
-        {(editing ? draft.actionKind : automation.actionKind) === "push" && (
-          <>
-            <div>
-              {fieldLabel("Notification title")}
-              {editing ? (
-                <input
-                  value={draft.actionTitleTemplate ?? ""}
-                  onChange={(e) => setDraft((d) => ({ ...d, actionTitleTemplate: e.target.value }))}
-                  className={inputClass}
-                />
-              ) : (
-                <p className="font-mono text-sm text-ink">{automation.actionTitleTemplate || "— None —"}</p>
-              )}
-            </div>
+        <div>
+          {fieldLabel("Notification title")}
+          {editing ? (
+            <input
+              value={draft.actionTitleTemplate ?? ""}
+              onChange={(e) => setDraft((d) => ({ ...d, actionTitleTemplate: e.target.value }))}
+              className={inputClass}
+            />
+          ) : (
+            <p className="font-mono text-sm text-ink">{automation.actionTitleTemplate || "— None —"}</p>
+          )}
+        </div>
 
-            <div>
-              {fieldLabel("Notification body")}
-              {editing ? (
-                <input
-                  value={draft.actionBodyTemplate ?? ""}
-                  onChange={(e) => setDraft((d) => ({ ...d, actionBodyTemplate: e.target.value }))}
-                  className={inputClass}
-                />
-              ) : (
-                <p className="font-mono text-sm text-ink">{automation.actionBodyTemplate || "— None —"}</p>
-              )}
-            </div>
+        <div>
+          {fieldLabel("Notification body")}
+          {editing ? (
+            <input
+              value={draft.actionBodyTemplate ?? ""}
+              onChange={(e) => setDraft((d) => ({ ...d, actionBodyTemplate: e.target.value }))}
+              className={inputClass}
+            />
+          ) : (
+            <p className="font-mono text-sm text-ink">{automation.actionBodyTemplate || "— None —"}</p>
+          )}
+        </div>
 
-            <div className="sm:col-span-2">
-              {fieldLabel("Link")}
-              {editing ? (
-                <input
-                  value={draft.actionUrlTemplate ?? ""}
-                  onChange={(e) => setDraft((d) => ({ ...d, actionUrlTemplate: e.target.value }))}
-                  className={inputClass}
-                />
-              ) : (
-                <p className="font-mono text-sm text-ink">{automation.actionUrlTemplate || "— None —"}</p>
-              )}
-            </div>
-          </>
-        )}
+        <div className="sm:col-span-2">
+          {fieldLabel("Link")}
+          {editing ? (
+            <input
+              value={draft.actionUrlTemplate ?? ""}
+              onChange={(e) => setDraft((d) => ({ ...d, actionUrlTemplate: e.target.value }))}
+              className={inputClass}
+            />
+          ) : (
+            <p className="font-mono text-sm text-ink">{automation.actionUrlTemplate || "— None —"}</p>
+          )}
+        </div>
       </div>
 
       <ExhibitLinksLayout

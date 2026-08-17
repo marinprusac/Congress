@@ -11,8 +11,6 @@ import {
   deleteAutomation,
 } from "../automations.js";
 
-const actionKindShape = z.enum(["push", "withdraw"]);
-
 export function registerTools(server: McpServer) {
   server.registerTool(
     "list_automations",
@@ -63,15 +61,14 @@ export function registerTools(server: McpServer) {
     {
       title: "Create Automation",
       description:
-        "Create a new automation - listens for a Congress event type and, when it fires (and the optional condition matches), pushes or withdraws a templated notification.",
+        "Create a new automation - listens for a Congress event type and, when it fires (and the optional condition matches), pushes a templated notification.",
       inputSchema: {
         title: z.string().min(1),
         body: z.string().default(""),
         triggerEventType: z.string().min(1),
         conditionField: z.string().optional(),
         conditionEquals: z.string().optional(),
-        actionKind: actionKindShape.default("push"),
-        actionTitleTemplate: z.string().optional(),
+        actionTitleTemplate: z.string().min(1),
         actionBodyTemplate: z.string().optional(),
         actionUrlTemplate: z.string().optional(),
         actionDedupeKeyTemplate: z.string().min(1),
@@ -93,7 +90,6 @@ export function registerTools(server: McpServer) {
         triggerEventType: z.string().min(1).optional(),
         conditionField: z.string().nullable().optional(),
         conditionEquals: z.string().nullable().optional(),
-        actionKind: actionKindShape.optional(),
         actionTitleTemplate: z.string().nullable().optional(),
         actionBodyTemplate: z.string().nullable().optional(),
         actionUrlTemplate: z.string().nullable().optional(),

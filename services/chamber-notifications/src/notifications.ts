@@ -30,11 +30,6 @@ export function pushNotification(push: NotificationPushRequest): void {
     .where(and(eq(notifications.chamber, push.chamber), eq(notifications.dedupeKey, push.dedupeKey)))
     .get();
 
-  if (push.withdraw) {
-    if (existing) db.delete(notifications).where(eq(notifications.id, existing.id)).run();
-    return;
-  }
-
   const body = push.body ?? null;
   const chamberUrl = push.chamberUrl ?? null;
 
@@ -43,26 +38,26 @@ export function pushNotification(push: NotificationPushRequest): void {
       .values({
         chamber: push.chamber,
         dedupeKey: push.dedupeKey,
-        title: push.title!,
+        title: push.title,
         body,
         chamberUrl,
         createdAt: new Date(),
         readAt: null,
       })
       .run();
-    notifyDevices(push.title!, body, push.chamber, chamberUrl);
+    notifyDevices(push.title, body, push.chamber, chamberUrl);
     return;
   }
 
   const changed = existing.title !== push.title || existing.body !== body || existing.chamberUrl !== chamberUrl;
   db.update(notifications)
-    .set({ title: push.title!, body, chamberUrl, readAt: changed ? null : existing.readAt })
+    .set({ title: push.title, body, chamberUrl, readAt: changed ? null : existing.readAt })
     .where(eq(notifications.id, existing.id))
     .run();
   // Same gate as the readAt reset above - an unchanged re-push (the same
   // still-true condition, polled again) must not buzz every subscribed
   // device on every poll tick, only a genuinely new or changed notification.
-  if (changed) notifyDevices(push.title!, body, push.chamber, chamberUrl);
+  if (changed) notifyDevices(push.title, body, push.chamber, chamberUrl);
 }
 
 // Fire-and-forget - sendWebPush already swallows per-subscription delivery

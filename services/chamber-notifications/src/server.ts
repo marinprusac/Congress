@@ -32,12 +32,7 @@ import {
   getAutomationExhibitContent,
   updateAutomationExhibitContent,
 } from "./exhibits.js";
-import {
-  listNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
-  dismissNotification,
-} from "./notifications.js";
+import { listNotifications, markNotificationRead, markAllNotificationsRead, dismissNotification } from "./notifications.js";
 import { publicKey, saveSubscription, removeSubscription } from "./pushSubscriptions.js";
 import { mcpApp } from "./mcp/server.js";
 

@@ -55,7 +55,6 @@ function toSummary(row: typeof automations.$inferSelect): AutomationSummary {
     triggerEventType: row.triggerEventType,
     conditionField: row.conditionField,
     conditionEquals: row.conditionEquals,
-    actionKind: row.actionKind,
     actionTitleTemplate: row.actionTitleTemplate,
     actionBodyTemplate: row.actionBodyTemplate,
     actionUrlTemplate: row.actionUrlTemplate,
@@ -116,7 +115,6 @@ export async function createAutomation(input: CreateAutomationRequest): Promise<
       triggerEventType: input.triggerEventType,
       conditionField: input.conditionField ?? null,
       conditionEquals: input.conditionEquals ?? null,
-      actionKind: input.actionKind,
       actionTitleTemplate: input.actionTitleTemplate ?? null,
       actionBodyTemplate: input.actionBodyTemplate ?? null,
       actionUrlTemplate: input.actionUrlTemplate ?? null,
@@ -143,7 +141,6 @@ export async function updateAutomation(id: number, input: UpdateAutomationReques
     triggerEventType: input.triggerEventType ?? existing.triggerEventType,
     conditionField: input.conditionField !== undefined ? input.conditionField : existing.conditionField,
     conditionEquals: input.conditionEquals !== undefined ? input.conditionEquals : existing.conditionEquals,
-    actionKind: input.actionKind ?? existing.actionKind,
     actionTitleTemplate:
       input.actionTitleTemplate !== undefined ? input.actionTitleTemplate : existing.actionTitleTemplate,
     actionBodyTemplate: input.actionBodyTemplate !== undefined ? input.actionBodyTemplate : existing.actionBodyTemplate,

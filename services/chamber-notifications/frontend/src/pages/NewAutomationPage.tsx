@@ -14,6 +14,7 @@ import {
 } from "@congress/congress-ui";
 import { createAutomation } from "@/lib/api";
 import { fetchEventCatalog } from "@/lib/eventCatalog";
+import { TriggerEventPicker } from "@/components/TriggerEventPicker";
 
 const inputClass =
   "mb-4 w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
@@ -26,7 +27,6 @@ export function NewAutomationPage() {
   const [title, setTitle] = useState(searchParams.get("name") ?? "");
   const [body, setBody] = useState("");
   const [triggerEventType, setTriggerEventType] = useState("");
-  const [actionKind, setActionKind] = useState<"push" | "withdraw">("push");
   const [actionTitleTemplate, setActionTitleTemplate] = useState("");
   const [actionBodyTemplate, setActionBodyTemplate] = useState("");
   const [actionUrlTemplate, setActionUrlTemplate] = useState("");
@@ -41,8 +41,7 @@ export function NewAutomationPage() {
         body,
         enabled: true,
         triggerEventType,
-        actionKind,
-        actionTitleTemplate: actionTitleTemplate || undefined,
+        actionTitleTemplate,
         actionBodyTemplate: actionBodyTemplate || undefined,
         actionUrlTemplate: actionUrlTemplate || undefined,
         actionDedupeKeyTemplate,
@@ -53,8 +52,7 @@ export function NewAutomationPage() {
     },
   });
 
-  const canSubmit =
-    title.trim() && triggerEventType.trim() && actionDedupeKeyTemplate.trim() && (actionKind === "withdraw" || actionTitleTemplate.trim());
+  const canSubmit = title.trim() && triggerEventType.trim() && actionDedupeKeyTemplate.trim() && actionTitleTemplate.trim();
 
   return (
     <section>
@@ -69,46 +67,25 @@ export function NewAutomationPage() {
         <FormLabel>Title</FormLabel>
         <FormTextInput autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
 
-        <FormLabel>Trigger event type</FormLabel>
-        <input
-          list="event-catalog"
+        <FormLabel>Trigger event</FormLabel>
+        <TriggerEventPicker
           value={triggerEventType}
-          onChange={(e) => setTriggerEventType(e.target.value)}
-          placeholder="e.g. tasks.due_soon"
-          className={inputClass}
+          onChange={setTriggerEventType}
+          catalog={catalogQuery.data ?? []}
+          loading={catalogQuery.isLoading}
+          selectClassName={inputClass}
         />
-        <datalist id="event-catalog">
-          {catalogQuery.data?.map((entry) => (
-            <option key={`${entry.chamber}:${entry.type}`} value={entry.type}>
-              {entry.chamber} — {entry.label}
-            </option>
-          ))}
-        </datalist>
 
-        <FormLabel>Action</FormLabel>
-        <select value={actionKind} onChange={(e) => setActionKind(e.target.value as "push" | "withdraw")} className={inputClass}>
-          <option value="push">Push a notification</option>
-          <option value="withdraw">Withdraw a notification</option>
-        </select>
+        <FormLabel>Notification title ({"{{"}payload.x{"}}"} interpolated)</FormLabel>
+        <input value={actionTitleTemplate} onChange={(e) => setActionTitleTemplate(e.target.value)} className={inputClass} />
 
-        {actionKind === "push" && (
-          <>
-            <FormLabel>Notification title ({"{{"}payload.x{"}}"} interpolated)</FormLabel>
-            <input
-              value={actionTitleTemplate}
-              onChange={(e) => setActionTitleTemplate(e.target.value)}
-              className={inputClass}
-            />
+        <FormLabel>Notification body (optional)</FormLabel>
+        <input value={actionBodyTemplate} onChange={(e) => setActionBodyTemplate(e.target.value)} className={inputClass} />
 
-            <FormLabel>Notification body (optional)</FormLabel>
-            <input value={actionBodyTemplate} onChange={(e) => setActionBodyTemplate(e.target.value)} className={inputClass} />
+        <FormLabel>Link (optional, e.g. {"{{"}payload.url{"}}"})</FormLabel>
+        <input value={actionUrlTemplate} onChange={(e) => setActionUrlTemplate(e.target.value)} className={inputClass} />
 
-            <FormLabel>Link (optional, e.g. {"{{"}payload.url{"}}"})</FormLabel>
-            <input value={actionUrlTemplate} onChange={(e) => setActionUrlTemplate(e.target.value)} className={inputClass} />
-          </>
-        )}
-
-        <FormLabel>Dedupe key ({"{{"}payload.x{"}}"} interpolated - must match the automation this withdraws, if any)</FormLabel>
+        <FormLabel>Dedupe key ({"{{"}payload.x{"}}"} interpolated - reused if this automation fires again for the same underlying thing, so it updates in place instead of piling up duplicates)</FormLabel>
         <input
           value={actionDedupeKeyTemplate}
           onChange={(e) => setActionDedupeKeyTemplate(e.target.value)}

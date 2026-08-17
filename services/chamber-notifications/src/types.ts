@@ -7,7 +7,6 @@ export const automationSummarySchema = z.object({
   triggerEventType: z.string(),
   conditionField: z.string().nullable(),
   conditionEquals: z.string().nullable(),
-  actionKind: z.enum(["push", "withdraw"]),
   actionTitleTemplate: z.string().nullable(),
   actionBodyTemplate: z.string().nullable(),
   actionUrlTemplate: z.string().nullable(),
@@ -22,26 +21,18 @@ export type AutomationSummary = z.infer<typeof automationSummarySchema>;
 export const automationDetailSchema = automationSummarySchema;
 export type AutomationDetail = z.infer<typeof automationDetailSchema>;
 
-export const createAutomationRequestSchema = z
-  .object({
-    title: z.string().min(1),
-    body: z.string().default(""),
-    triggerEventType: z.string().min(1),
-    conditionField: z.string().optional(),
-    conditionEquals: z.string().optional(),
-    actionKind: z.enum(["push", "withdraw"]).default("push"),
-    actionTitleTemplate: z.string().optional(),
-    actionBodyTemplate: z.string().optional(),
-    actionUrlTemplate: z.string().optional(),
-    actionDedupeKeyTemplate: z.string().min(1),
-    enabled: z.boolean().default(true),
-  })
-  // A "push" needs something to actually show in the notification; a
-  // "withdraw" only ever needs the dedupeKey to know what to remove.
-  .refine((v) => v.actionKind !== "push" || !!v.actionTitleTemplate, {
-    message: "actionTitleTemplate is required when actionKind is \"push\"",
-    path: ["actionTitleTemplate"],
-  });
+export const createAutomationRequestSchema = z.object({
+  title: z.string().min(1),
+  body: z.string().default(""),
+  triggerEventType: z.string().min(1),
+  conditionField: z.string().optional(),
+  conditionEquals: z.string().optional(),
+  actionTitleTemplate: z.string().min(1),
+  actionBodyTemplate: z.string().optional(),
+  actionUrlTemplate: z.string().optional(),
+  actionDedupeKeyTemplate: z.string().min(1),
+  enabled: z.boolean().default(true),
+});
 export type CreateAutomationRequest = z.infer<typeof createAutomationRequestSchema>;
 
 export const updateAutomationRequestSchema = z.object({
@@ -50,7 +41,6 @@ export const updateAutomationRequestSchema = z.object({
   triggerEventType: z.string().min(1).optional(),
   conditionField: z.string().nullable().optional(),
   conditionEquals: z.string().nullable().optional(),
-  actionKind: z.enum(["push", "withdraw"]).optional(),
   actionTitleTemplate: z.string().nullable().optional(),
   actionBodyTemplate: z.string().nullable().optional(),
   actionUrlTemplate: z.string().nullable().optional(),

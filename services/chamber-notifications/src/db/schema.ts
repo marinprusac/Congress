@@ -2,12 +2,17 @@ import { sqliteTable, text, integer, uniqueIndex, index } from "drizzle-orm/sqli
 
 // An automation: listens for one event type (from Congress's generic event
 // log, see eventPoller.ts) and, when it fires and the optional condition
-// matches, pushes or withdraws a notification with templated content. Title
-// and body are this row's Exhibit surface (searchable, [[wikilink]]-able,
-// referenceable from notes) via createTableBackedExhibits in exhibits.ts;
-// the trigger/condition/action fields are structured sidecars edited
-// through their own form, not the body text - same split chamber-tasks uses
-// for its own dueDate/completed fields.
+// matches, pushes a notification with templated content. Title and body are
+// this row's Exhibit surface (searchable, [[wikilink]]-able, referenceable
+// from notes) via createTableBackedExhibits in exhibits.ts; the
+// trigger/condition/action fields are structured sidecars edited through
+// their own form, not the body text - same split chamber-tasks uses for its
+// own dueDate/completed fields. There is deliberately no "withdraw" action
+// to programmatically retract a previous notification - the owner already
+// has a plain, always-available way to clear one (mark it read, or just
+// ignore it); requiring a second automation whose only job is to reverse
+// the first was exactly the kind of automation-authoring complexity this
+// v1 avoids.
 export const automations = sqliteTable(
   "automations",
   {
@@ -20,17 +25,15 @@ export const automations = sqliteTable(
     // design: this is the only condition shape v1 supports.
     conditionField: text("condition_field"),
     conditionEquals: text("condition_equals"),
-    actionKind: text("action_kind", { enum: ["push", "withdraw"] }).notNull().default("push"),
     // {{payload.x}} interpolated against the firing event's payload - see
-    // eventPoller.ts's interpolate(). Title is required for a "push" action
-    // (enforced at the request-schema level, not here) but the column stays
-    // nullable since a "withdraw" action never uses it.
+    // eventPoller.ts's interpolate(). Required (enforced at the
+    // request-schema level, not here) since every automation always pushes.
     actionTitleTemplate: text("action_title_template"),
     actionBodyTemplate: text("action_body_template"),
     actionUrlTemplate: text("action_url_template"),
-    // Required regardless of actionKind - a "push" needs it to upsert
-    // without duplicating on every re-fire, a "withdraw" needs the exact
-    // same value to know which existing notification to remove.
+    // Needed to upsert without duplicating a notification on every re-fire
+    // of the same still-true condition - see notifications.ts's
+    // pushNotification.
     actionDedupeKeyTemplate: text("action_dedupe_key_template").notNull(),
     enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
     lastFiredAt: integer("last_fired_at", { mode: "timestamp_ms" }),
@@ -96,11 +99,12 @@ export const pollerState = sqliteTable("poller_state", {
 // (services/congress/src/db/schema.ts), moved here so Congress has no
 // notification-specific product surface at all. One row per (chamber,
 // dedupeKey): re-pushing the same key upserts in place (see
-// notifications.ts's pushNotification), so a poller - or, eventually, an
-// automation's action - can call this on every tick while a condition still
-// holds without spamming duplicates. Dismissing a notification deletes its
-// row outright rather than soft-deleting - if the underlying condition
-// still holds, the next push simply recreates it.
+// notifications.ts's pushNotification), so a poller can call this on every
+// tick while a condition still holds without spamming duplicates. Dismissing
+// a notification deletes its row outright rather than soft-deleting - if
+// the underlying condition still holds, the next push simply recreates it.
+// (There is deliberately no automation-authored equivalent - see the
+// automations table's own comment.)
 export const notifications = sqliteTable(
   "notifications",
   {

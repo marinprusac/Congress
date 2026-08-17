@@ -96,23 +96,18 @@ async function runAutomation(automation: ReturnType<typeof listEnabledAutomation
 
   const dedupeKey = interpolate(automation.actionDedupeKeyTemplate, event.payload);
 
-  if (automation.actionKind === "withdraw") {
-    pushNotification({ chamber: event.chamber, dedupeKey, withdraw: true });
-    recordRun(automation.id, event.id, event.payload, null, null);
-  } else {
-    // Refined at the request-schema level (createAutomationRequestSchema),
-    // but that only guards creation - fall back to the automation's own
-    // title so a since-edited automation missing its template still
-    // produces a visible (if generic) notification rather than a blank one.
-    const title = automation.actionTitleTemplate ? interpolate(automation.actionTitleTemplate, event.payload) : automation.title;
-    const body = automation.actionBodyTemplate ? interpolate(automation.actionBodyTemplate, event.payload) : undefined;
-    const chamberUrl = automation.actionUrlTemplate ? interpolate(automation.actionUrlTemplate, event.payload) : undefined;
-    // Preserve the original emitting chamber's identity (e.g. "tasks") so
-    // the notification bell attributes/icons it correctly - this Chamber
-    // is just the one deciding whether/what to push, not the source.
-    pushNotification({ chamber: event.chamber, dedupeKey, title, body, chamberUrl });
-    recordRun(automation.id, event.id, event.payload, title, body ?? null);
-  }
+  // Required at the request-schema level (createAutomationRequestSchema),
+  // but that only guards creation - fall back to the automation's own title
+  // so a since-edited automation missing its template still produces a
+  // visible (if generic) notification rather than a blank one.
+  const title = automation.actionTitleTemplate ? interpolate(automation.actionTitleTemplate, event.payload) : automation.title;
+  const body = automation.actionBodyTemplate ? interpolate(automation.actionBodyTemplate, event.payload) : undefined;
+  const chamberUrl = automation.actionUrlTemplate ? interpolate(automation.actionUrlTemplate, event.payload) : undefined;
+  // Preserve the original emitting chamber's identity (e.g. "tasks") so
+  // the notification bell attributes/icons it correctly - this Chamber
+  // is just the one deciding whether/what to push, not the source.
+  pushNotification({ chamber: event.chamber, dedupeKey, title, body, chamberUrl });
+  recordRun(automation.id, event.id, event.payload, title, body ?? null);
 
   await markAutomationFired(automation.id);
 }
