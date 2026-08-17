@@ -15,7 +15,7 @@ export interface GridDims {
 // to the live viewport - tune these two constants visually against real
 // device sizes, not by measurement.
 export const GRID: Record<CanvasScope, GridDims> = {
-  mobile: { cols: 2, rows: 12 },
+  mobile: { cols: 2, rows: 8 },
   desktop: { cols: 4, rows: 6 },
 };
 

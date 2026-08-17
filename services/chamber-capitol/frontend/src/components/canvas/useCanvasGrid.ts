@@ -3,15 +3,22 @@ import { GRID } from "./grid";
 import type { CanvasScope } from "../../../../src/types";
 
 const GAP_PX = 8;
-const MIN_CELL_PX = 90;
-const MAX_CELL_PX = 260;
+// Only meant to stop a degenerate (zero/negative) size on a pathological
+// container - not a "comfortable" minimum, and there's no upper cap either:
+// cells are exactly (available space / dims.cols|rows) on whichever axis is
+// more constraining, uniformly scaled (square cells, not stretched) - the
+// grid always exactly fills the container on at least one axis, never
+// overflowing it (the container is overflow:hidden - the whole point of
+// "finite, unscrollable, whatever fits the screen is it"). dims.cols/rows
+// (grid.ts) is the one place cell *count* is chosen; this hook only ever
+// divides whatever space actually exists by that fixed count.
+const MIN_SANE_CELL_PX = 24;
 
 // Derives each cell's *pixel* size from the container's measured box and
-// the scope's *fixed* cell count (see grid.ts's GRID for why the count
-// itself is never derived from a measurement). A narrow window shows
-// smaller cells, not fewer of them.
+// the scope's *fixed* cell count. A narrow window shows smaller cells, not
+// fewer of them.
 export function useCanvasGrid(containerRef: RefObject<HTMLElement | null>, scope: CanvasScope): number {
-  const [cellPx, setCellPx] = useState(MIN_CELL_PX);
+  const [cellPx, setCellPx] = useState(MIN_SANE_CELL_PX);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -22,7 +29,7 @@ export function useCanvasGrid(containerRef: RefObject<HTMLElement | null>, scope
       const byWidth = (width + GAP_PX) / dims.cols - GAP_PX;
       const byHeight = (height + GAP_PX) / dims.rows - GAP_PX;
       const next = Math.floor(Math.min(byWidth, byHeight));
-      setCellPx(Math.max(MIN_CELL_PX, Math.min(MAX_CELL_PX, next)));
+      setCellPx(Math.max(MIN_SANE_CELL_PX, next));
     }
 
     const observer = new ResizeObserver((entries) => {

@@ -103,7 +103,7 @@ export function WidgetCell({ chamber, widget, x, y, editing, onRemove, onDragHan
       {editing && (
         <div
           onPointerDown={onDragHandlePointerDown}
-          className="absolute inset-x-0 top-0 z-10 flex touch-none items-center justify-between gap-1 bg-parchment/95 px-1.5 py-1"
+          className="absolute inset-x-0 top-0 z-10 flex touch-none select-none items-center justify-between gap-1 bg-parchment/95 px-1.5 py-1"
         >
           <span className="flex min-w-0 items-center gap-1">
             <ChamberMark name={chamber.name} className="h-3.5 w-3.5 shrink-0 text-ink" />

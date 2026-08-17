@@ -46,6 +46,12 @@ export function useWidgetDrag(options: UseWidgetDragOptions) {
     originY: number
   ) {
     e.preventDefault();
+    // Keeps receiving pointermove/up for this gesture even if the pointer
+    // strays off the (small, edge-of-cell) drag handle mid-drag - without
+    // this, a fast or imprecise drag can end up not firing pointerup on any
+    // listened element, though window-level listeners below still catch
+    // most cases regardless; capture just makes it reliable.
+    (e.target as Element).setPointerCapture(e.pointerId);
     setDrag({
       chamber,
       widgetId,

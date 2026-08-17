@@ -4,11 +4,12 @@ import { fetchRegistry, showToast } from "@congress/congress-ui";
 import type { ChamberRegistryEntry, ManifestWidget } from "@congress/shared-types";
 import type { WidgetPlacement } from "../../../src/types";
 import { fetchLayout, upsertPlacement, deletePlacement } from "@/lib/api";
-import { GRID, occupiedCells, findFirstFit, type PlacedRect } from "./canvas/grid";
+import { GRID, occupiedCells, findFirstFit, fits, type PlacedRect } from "./canvas/grid";
 import { useCanvasScope } from "./canvas/useCanvasScope";
 import { useCanvasGrid, GAP_PX } from "./canvas/useCanvasGrid";
 import { useWidgetDrag } from "./canvas/useWidgetDrag";
 import { WidgetCell } from "./canvas/WidgetCell";
+import { GridDots } from "./canvas/GridDots";
 import { AddWidgetTray, type UnplacedWidget } from "./canvas/AddWidgetTray";
 
 interface CatalogEntry {
@@ -44,13 +45,34 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
     return map;
   }, [layoutQuery.data]);
 
+  // A stored placement only counts as "placed" if it still fits the
+  // *current* grid dims - GRID's cols/rows are code constants that can
+  // change between deploys (they did: desktop went from 8 cols to 4), and a
+  // row left over from a wider/taller grid would otherwise render into a
+  // CSS Grid *implicit* track (auto-sized to content, not the fixed cellPx
+  // size) instead of the explicit grid, producing wildly-wrong-sized cards.
+  // Treated as unplaced instead - it shows back up in the tray, and
+  // re-placing it (tray tap or drag) overwrites the stale row with a
+  // same-primary-key upsert, so this self-heals with no migration needed.
+  function isWithinBounds(placement: WidgetPlacement, widget: ManifestWidget): boolean {
+    return fits({ x: placement.x, y: placement.y, width: widget.width, height: widget.height }, dims, new Set());
+  }
+
   const placed = useMemo(
-    () => catalog.filter((entry) => placementByKey.has(widgetKey(entry.chamber.name, entry.widget.id))),
-    [catalog, placementByKey]
+    () =>
+      catalog.filter((entry) => {
+        const placement = placementByKey.get(widgetKey(entry.chamber.name, entry.widget.id));
+        return placement !== undefined && isWithinBounds(placement, entry.widget);
+      }),
+    [catalog, placementByKey, dims]
   );
   const unplaced: UnplacedWidget[] = useMemo(
-    () => catalog.filter((entry) => !placementByKey.has(widgetKey(entry.chamber.name, entry.widget.id))),
-    [catalog, placementByKey]
+    () =>
+      catalog.filter((entry) => {
+        const placement = placementByKey.get(widgetKey(entry.chamber.name, entry.widget.id));
+        return placement === undefined || !isWithinBounds(placement, entry.widget);
+      }),
+    [catalog, placementByKey, dims]
   );
 
   function placedRects(excluding?: string): PlacedRect[] {
@@ -118,7 +140,8 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
       )}
 
       {!isLoading && !isError && catalog.length > 0 && (
-        <div ref={containerRef} className="min-h-0 flex-1 overflow-hidden px-3 pb-3">
+        <div ref={containerRef} className="relative min-h-0 flex-1 overflow-hidden px-3 pb-3">
+          {editing && <GridDots dims={dims} cellPx={cellPx} gapPx={GAP_PX} />}
           <div
             className="grid"
             style={{
