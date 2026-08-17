@@ -1,7 +1,7 @@
 import type { PushConfigResponse } from "@congress/shared-types";
 
 // PushManager.subscribe wants the VAPID public key as a raw Uint8Array, not
-// the base64url string Capitol hands out over /capitol/push/config.
+// the base64url string Capitol hands out over /congress/push/config.
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -10,7 +10,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export async function fetchPushConfig(): Promise<PushConfigResponse> {
-  const res = await fetch("/capitol/push/config");
+  const res = await fetch("/congress/push/config");
   if (!res.ok) return { publicKey: null };
   return res.json();
 }
@@ -41,7 +41,7 @@ export async function subscribeToPush(publicKey: string): Promise<void> {
   if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) {
     throw new Error("Browser returned an incomplete push subscription");
   }
-  await fetch("/capitol/push/subscribe", {
+  await fetch("/congress/push/subscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } }),
@@ -53,7 +53,7 @@ export async function unsubscribeFromPush(): Promise<void> {
   if (!subscription) return;
   const endpoint = subscription.endpoint;
   await subscription.unsubscribe();
-  await fetch("/capitol/push/unsubscribe", {
+  await fetch("/congress/push/unsubscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ endpoint }),

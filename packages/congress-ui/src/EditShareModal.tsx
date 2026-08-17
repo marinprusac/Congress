@@ -17,14 +17,14 @@ function exhibitSharesQueryKey(exhibitId: string) {
 }
 
 async function fetchSharesForExhibit(exhibitId: string): Promise<ShareSummary[]> {
-  const res = await fetch(`/capitol/exhibits/${encodeURIComponent(exhibitId)}/shares`);
+  const res = await fetch(`/congress/exhibits/${encodeURIComponent(exhibitId)}/shares`);
   if (!res.ok) throw new Error(`Failed to fetch shares: ${res.status}`);
   const data = (await res.json()) as { shares: ShareSummary[] };
   return data.shares;
 }
 
 async function patchUpdateShare(token: string, input: UpdateShareRequest): Promise<ShareSummary> {
-  const res = await fetch(`/capitol/shares/${encodeURIComponent(token)}`, {
+  const res = await fetch(`/congress/shares/${encodeURIComponent(token)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -34,7 +34,7 @@ async function patchUpdateShare(token: string, input: UpdateShareRequest): Promi
 }
 
 async function deleteShare(token: string): Promise<void> {
-  const res = await fetch(`/capitol/shares/${encodeURIComponent(token)}`, { method: "DELETE" });
+  const res = await fetch(`/congress/shares/${encodeURIComponent(token)}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Failed to revoke share: ${res.status}`);
 }
 

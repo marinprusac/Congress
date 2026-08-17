@@ -66,14 +66,14 @@ mountManifestAndHealth(app, capitolManifest);
 
 app.route("/auth", authRoutes);
 
-app.get("/capitol/registry", requireSession, (c) => c.json(listChambers()));
+app.get("/congress/registry", requireSession, (c) => c.json(listChambers()));
 
 // Public/unauthenticated - see proxyToChamberIcon's own comment for why.
-app.get("/capitol/chambers/:name/icon", (c) => proxyToChamberIcon(c, c.req.param("name")));
+app.get("/congress/chambers/:name/icon", (c) => proxyToChamberIcon(c, c.req.param("name")));
 
-app.get("/capitol/settings", requireSession, async (c) => c.json(await getSettings()));
+app.get("/congress/settings", requireSession, async (c) => c.json(await getSettings()));
 
-app.put("/capitol/settings", requireSession, async (c) => {
+app.put("/congress/settings", requireSession, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = updateCapitolSettingsRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -82,7 +82,7 @@ app.put("/capitol/settings", requireSession, async (c) => {
   return c.json(await updateSettings(parsed.data));
 });
 
-app.post("/capitol/register", requireInternalToken, async (c) => {
+app.post("/congress/register", requireInternalToken, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = registerRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -92,7 +92,7 @@ app.post("/capitol/register", requireInternalToken, async (c) => {
   return c.json(entry, 201);
 });
 
-app.post("/capitol/deregister", requireInternalToken, async (c) => {
+app.post("/congress/deregister", requireInternalToken, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = deregisterRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -103,7 +103,7 @@ app.post("/capitol/deregister", requireInternalToken, async (c) => {
   return c.json(entry, 200);
 });
 
-app.post("/capitol/heartbeat", requireInternalToken, async (c) => {
+app.post("/congress/heartbeat", requireInternalToken, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = heartbeatRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -114,7 +114,7 @@ app.post("/capitol/heartbeat", requireInternalToken, async (c) => {
   return c.json(entry, 200);
 });
 
-app.post("/capitol/exhibits/sync", requireInternalToken, async (c) => {
+app.post("/congress/exhibits/sync", requireInternalToken, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = exhibitSyncRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -124,7 +124,7 @@ app.post("/capitol/exhibits/sync", requireInternalToken, async (c) => {
   return c.json({ ok: true });
 });
 
-app.post("/capitol/notifications/push", requireInternalToken, async (c) => {
+app.post("/congress/notifications/push", requireInternalToken, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = notificationPushRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -134,28 +134,28 @@ app.post("/capitol/notifications/push", requireInternalToken, async (c) => {
   return c.json({ ok: true });
 });
 
-app.get("/capitol/notifications", requireSession, (c) => c.json(listNotifications()));
+app.get("/congress/notifications", requireSession, (c) => c.json(listNotifications()));
 
-app.post("/capitol/notifications/read-all", requireSession, (c) => {
+app.post("/congress/notifications/read-all", requireSession, (c) => {
   markAllNotificationsRead();
   return c.json({ ok: true });
 });
 
-app.post("/capitol/notifications/:id/read", requireSession, (c) => {
+app.post("/congress/notifications/:id/read", requireSession, (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || !markNotificationRead(id)) return c.json({ error: "not_found" }, 404);
   return c.json({ ok: true });
 });
 
-app.delete("/capitol/notifications/:id", requireSession, (c) => {
+app.delete("/congress/notifications/:id", requireSession, (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || !dismissNotification(id)) return c.json({ error: "not_found" }, 404);
   return c.json({ ok: true });
 });
 
-app.get("/capitol/push/config", requireSession, (c) => c.json({ publicKey: publicKey() }));
+app.get("/congress/push/config", requireSession, (c) => c.json({ publicKey: publicKey() }));
 
-app.post("/capitol/push/subscribe", requireSession, async (c) => {
+app.post("/congress/push/subscribe", requireSession, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = pushSubscriptionRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -165,7 +165,7 @@ app.post("/capitol/push/subscribe", requireSession, async (c) => {
   return c.json({ ok: true });
 });
 
-app.post("/capitol/push/unsubscribe", requireSession, async (c) => {
+app.post("/congress/push/unsubscribe", requireSession, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = pushUnsubscribeRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -178,12 +178,12 @@ app.post("/capitol/push/unsubscribe", requireSession, async (c) => {
 // An empty query is meaningful here - it asks each Chamber for its most
 // recent Exhibits, which is what the "[[" picker shows before anything has
 // been typed.
-app.get("/capitol/exhibits/search", requireSession, async (c) => {
+app.get("/congress/exhibits/search", requireSession, async (c) => {
   const results = await searchExhibits(c.req.query("q") ?? "");
   return c.json({ results });
 });
 
-app.post("/capitol/exhibits/resolve", requireSession, async (c) => {
+app.post("/congress/exhibits/resolve", requireSession, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = capitolExhibitResolveRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -193,12 +193,12 @@ app.post("/capitol/exhibits/resolve", requireSession, async (c) => {
   return c.json({ results });
 });
 
-app.get("/capitol/exhibits/:id/backlinks", requireSession, async (c) => {
+app.get("/congress/exhibits/:id/backlinks", requireSession, async (c) => {
   const backlinks = await getBacklinks(c.req.param("id"));
   return c.json({ backlinks });
 });
 
-app.get("/capitol/exhibits/:id/frontlinks", requireSession, async (c) => {
+app.get("/congress/exhibits/:id/frontlinks", requireSession, async (c) => {
   const frontlinks = await getFrontlinks(c.req.param("id"));
   return c.json({ frontlinks });
 });
@@ -210,7 +210,7 @@ app.get("/capitol/exhibits/:id/frontlinks", requireSession, async (c) => {
 // that Chamber's own "/api/exhibits/:id/refs" (see mountManualRefsRoutes in
 // @congress/chamber-kit). 404s if the target Chamber hasn't adopted that
 // route yet, or if `:id` has never synced to Capitol at all.
-app.post("/capitol/exhibits/:id/refs", requireSession, async (c) => {
+app.post("/congress/exhibits/:id/refs", requireSession, async (c) => {
   const id = c.req.param("id");
   // `:id` itself can be uncached too (adding a reference from a
   // never-touched Exhibit's own "Referenced by" panel - e.g. a pre-existing
@@ -243,7 +243,7 @@ app.post("/capitol/exhibits/:id/refs", requireSession, async (c) => {
   return proxyToChamberPath(c, chamber, `/exhibits/${encodeURIComponent(id)}/refs`);
 });
 
-app.delete("/capitol/exhibits/:id/refs/:targetExhibitId", requireSession, async (c) => {
+app.delete("/congress/exhibits/:id/refs/:targetExhibitId", requireSession, async (c) => {
   const id = c.req.param("id");
   const chamber = getCachedChamber(id);
   if (!chamber) return c.json({ error: "not_found" }, 404);
@@ -251,16 +251,16 @@ app.delete("/capitol/exhibits/:id/refs/:targetExhibitId", requireSession, async 
   return proxyToChamberPath(c, chamber, `/exhibits/${encodeURIComponent(id)}/refs/${targetExhibitId}`);
 });
 
-app.get("/capitol/exhibits/:id/sharing", requireSession, async (c) => {
+app.get("/congress/exhibits/:id/sharing", requireSession, async (c) => {
   const shares = await getExhibitSharing(c.req.param("id"));
   return c.json({ shares });
 });
 
-app.get("/capitol/exhibits/:id/shares", requireSession, async (c) => {
+app.get("/congress/exhibits/:id/shares", requireSession, async (c) => {
   return c.json({ shares: await listSharesForExhibit(c.req.param("id")) });
 });
 
-app.post("/capitol/shares", requireSession, async (c) => {
+app.post("/congress/shares", requireSession, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = createShareRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -269,9 +269,9 @@ app.post("/capitol/shares", requireSession, async (c) => {
   return c.json(createShare(parsed.data), 201);
 });
 
-app.get("/capitol/shares", requireSession, (c) => c.json({ shares: listShares() }));
+app.get("/congress/shares", requireSession, (c) => c.json({ shares: listShares() }));
 
-app.patch("/capitol/shares/:token", requireSession, async (c) => {
+app.patch("/congress/shares/:token", requireSession, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = updateShareRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -282,7 +282,7 @@ app.patch("/capitol/shares/:token", requireSession, async (c) => {
   return c.json(updated);
 });
 
-app.delete("/capitol/shares/:token", requireSession, (c) => {
+app.delete("/congress/shares/:token", requireSession, (c) => {
   if (!revokeShare(c.req.param("token"))) {
     return c.json({ error: "not_found" }, 404);
   }
@@ -344,7 +344,7 @@ sharedApp.patch("/:token/exhibits/:id", async (c) => {
   return proxyToChamberPath(c, entry.chamber, `/exhibits/${encodeURIComponent(id)}/content`);
 });
 
-app.route("/capitol/shared", sharedApp);
+app.route("/congress/shared", sharedApp);
 
 app.all("/api/:chamber/*", requireSession, forwardToChamber);
 

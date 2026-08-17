@@ -3,10 +3,10 @@ import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 
 const DEBOUNCE_MS = 150;
 
-// Relative path - resolves through Capitol directly, same-origin in prod
-// (each Chamber's frontend is served under Capitol's proxy) and via a dev
-// proxy rule for "/capitol" in each Chamber's vite.config.ts locally.
-const SEARCH_URL = "/capitol/exhibits/search";
+// Relative path - resolves through Congress directly, same-origin in prod
+// (each Chamber's frontend is served under Congress's proxy) and via a dev
+// proxy rule for "/congress" in each Chamber's vite.config.ts locally.
+const SEARCH_URL = "/congress/exhibits/search";
 
 // An empty query is a real query, not a no-op: it asks for the most recent
 // Exhibits, so typing "[[" immediately shows a browsable list rather than

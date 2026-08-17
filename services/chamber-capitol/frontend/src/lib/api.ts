@@ -21,13 +21,13 @@ export function updateSettings(input: UpdateSettingsRequest): Promise<Settings> 
 // just calls it directly, same as every Chamber already does for exhibit
 // search/resolve.
 export async function fetchShares(): Promise<ShareSummary[]> {
-  const res = await fetch("/capitol/shares");
+  const res = await fetch("/congress/shares");
   if (!res.ok) throw new Error(`Failed to fetch shares: ${res.status}`);
   const data = (await res.json()) as { shares: ShareSummary[] };
   return data.shares;
 }
 
 export async function revokeShare(token: string): Promise<void> {
-  const res = await fetch(`/capitol/shares/${encodeURIComponent(token)}`, { method: "DELETE" });
+  const res = await fetch(`/congress/shares/${encodeURIComponent(token)}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Failed to revoke share: ${res.status}`);
 }

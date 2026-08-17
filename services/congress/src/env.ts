@@ -16,7 +16,7 @@ const envSchema = z.object({
   // in-app notification center works fine without it), and an unset/missing
   // keypair must never crash the whole service on boot. sendWebPush no-ops
   // (with a one-time warning) when either is absent; the frontend's own
-  // GET /capitol/push/config reports null so it can hide the "Enable
+  // GET /congress/push/config reports null so it can hide the "Enable
   // notifications" control instead of offering a toggle that can't work.
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),

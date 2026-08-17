@@ -10,7 +10,7 @@ import type { NotificationPushRequest } from "@congress/shared-types";
 export function createPushNotification(opts: { chamber: string; capitolUrl: string; internalToken: string }) {
   return async function pushNotification(push: Omit<NotificationPushRequest, "chamber">): Promise<void> {
     try {
-      const res = await fetch(`${opts.capitolUrl}/capitol/notifications/push`, {
+      const res = await fetch(`${opts.capitolUrl}/congress/notifications/push`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

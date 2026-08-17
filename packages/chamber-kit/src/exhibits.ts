@@ -21,7 +21,7 @@ function createExhibitIdCodec(prefix: string) {
 export function createPushExhibitSync(opts: { chamber: string; capitolUrl: string; internalToken: string }) {
   return async function pushExhibitSync(push: Omit<ExhibitSyncRequest, "chamber">): Promise<void> {
     try {
-      const res = await fetch(`${opts.capitolUrl}/capitol/exhibits/sync`, {
+      const res = await fetch(`${opts.capitolUrl}/congress/exhibits/sync`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

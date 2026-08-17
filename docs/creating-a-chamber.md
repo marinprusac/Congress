@@ -2,7 +2,7 @@
 
 This is the practical guide to building your own Chamber — a new, fully
 independent module (own process, own port, own SQLite file, own frontend
-build, own MCP server) that plugs into Capitol. For the *why* behind this
+build, own MCP server) that plugs into Congress. For the *why* behind this
 architecture (why Chambers are genuinely separate processes rather than
 modules in one app, why Exhibits work the way they do, the full design
 intent), read `docs/congress-project-brief.md` first — this doc assumes
@@ -20,11 +20,11 @@ Every Chamber — Capitol included — implements the same small contract:
 - A REST API under `/api/*`.
 - An MCP server at `/mcp`.
 
-On boot, a Chamber `POST`s its manifest to `/capitol/register` (retrying
+On boot, a Chamber `POST`s its manifest to `/congress/register` (retrying
 with backoff so start order never matters), then heartbeats on an interval.
-Capitol marks it `offline` if a heartbeat is missed. That's the entire
+Congress marks it `offline` if a heartbeat is missed. That's the entire
 handshake — there is no second step where you register a Chamber with
-Capitol by editing Capitol's own code. See §5 for exactly what that buys
+Congress by editing Congress's own code. See §5 for exactly what that buys
 you for free.
 
 Two packages exist specifically so you almost never write this contract by
@@ -77,7 +77,7 @@ pnpm --filter chamber-budget dev:web      # frontend, separate terminal
 ```
 
 Visit `http://localhost:8015` — the generated Chamber runs standalone.
-Registration with Capitol happens automatically on backend boot as long as
+Registration with Congress happens automatically on backend boot as long as
 Congress itself is running (`pnpm dev:congress` from repo root) — see §5.
 
 ## 3. What's generated vs. what you write by hand
@@ -89,7 +89,7 @@ actually edit to turn "Budget" into your real domain:
 |---|---|
 | `src/db/schema.ts` | Replace the generic `items` table with your real columns. Keep the `<entity>Refs` table and single-row `settings` table shapes — every Chamber has both, even if settings starts empty. |
 | `src/types.ts` | Replace `ItemSummary`/`CreateItemRequest`/etc. with your entity's real request/response zod schemas. |
-| `src/items.ts` (rename it) | Your domain CRUD — the one genuinely hand-written backend file in any Chamber. Keep the `syncXExhibit` pattern (unions wikilink refs + manual refs, pushes to Capitol) if this entity should be cross-referenceable. |
+| `src/items.ts` (rename it) | Your domain CRUD — the one genuinely hand-written backend file in any Chamber. Keep the `syncXExhibit` pattern (unions wikilink refs + manual refs, pushes to Congress) if this entity should be cross-referenceable. |
 | `src/exhibits.ts` | Update `idPrefix`, `type`, `urlFor`, and the search/resolve/toContent callbacks for your real table/columns. |
 | `src/mcp/tools.ts` | Your entity's MCP tools — usually a thin wrapper around the same functions the REST routes call. |
 | `frontend/src/pages/*.tsx` | The actual UI. Keep using the shared primitives (see the table below) rather than hand-rolling list/form chrome. |
@@ -107,10 +107,10 @@ don't reimplement them:
 |---|---|
 | `createDb(dbPath, schema)` | better-sqlite3 + WAL + drizzle, migrations wired up. |
 | `loadEnv(schema)` | zod-validated env loading; extend `chamberEnvSchema` with your own `PORT`/`DB_PATH` defaults. |
-| `createChamberBootstrap({...})` | The entire boot sequence — migrate, listen, register + heartbeat with Capitol, clean shutdown on SIGINT/SIGTERM. Your `src/index.ts` is ~7 lines that call this once. |
+| `createChamberBootstrap({...})` | The entire boot sequence — migrate, listen, register + heartbeat with Congress, clean shutdown on SIGINT/SIGTERM. Your `src/index.ts` is ~7 lines that call this once. |
 | `createMcpApp(name, registerTools)` | The full MCP transport/session/error plumbing. You only write `server.registerTool(...)` calls. |
 | `createTableBackedExhibits(config)` | Implements the whole Exhibit content contract (search/resolve/get/update) for a table-backed entity from a handful of callbacks. |
-| `createPushExhibitSync(opts)` | Fire-and-forget `POST /capitol/exhibits/sync` after create/update/delete. |
+| `createPushExhibitSync(opts)` | Fire-and-forget `POST /congress/exhibits/sync` after create/update/delete. |
 | `createSingleRowSettings(config)` | The "id is always 1, select-then-upsert" settings pattern every Chamber uses. |
 | `createManualRefs`/`createManualRefsByExhibitId` | CRUD for the "References" side-panel refs, separate from wikilinks parsed out of body text. |
 | `extractOutgoingExhibitRefs(text)` | Parses `[[...]]` tokens out of body text into an exhibit-id list. |
@@ -121,8 +121,8 @@ And `congress-ui`'s frontend surface:
 | Export | What it's for |
 |---|---|
 | `ChamberLayout`, `ChamberHeader`, `ChamberMark`, `getChamberIcon` | Page shell + the Chamber icon system (see §5 for the fallback behavior). |
-| `useAppliedTheme` | Applies Capitol's dark-mode setting; call once in `App()`. |
-| `useShellHosted`, `resolveChamberPath`, `navigateToExhibit` | Tell whether you're rendered standalone or shell-hosted inside Capitol, and build correct links either way — use these instead of hand-writing absolute paths. |
+| `useAppliedTheme` | Applies Congress's dark-mode setting; call once in `App()`. |
+| `useShellHosted`, `resolveChamberPath`, `navigateToExhibit` | Tell whether you're rendered standalone or shell-hosted inside Congress, and build correct links either way — use these instead of hand-writing absolute paths. |
 | `ExhibitTextarea`, `ExhibitAnnotatedText`, `ExhibitChip`, `ExhibitMarkdown` | The `[[` picker/autocomplete, rendering body text with resolved exhibit chips, and (optionally) Markdown rendering. |
 | `ExhibitActionBar`, `ExhibitLinksLayout`, `ExhibitSharingBadge`, `ShareControl` | Detail-page chrome: edit/delete/share actions, front/backlinks panel, the "Shared" badge, the share popover. |
 | `useSearchableList`, `useListRowPrefetch`, `ListSearchInput`, `ListLoadingState`, `ListErrorState`, `ListEmptyState` | List-page search + loading/error/empty states + hover-prefetch. |
@@ -137,7 +137,7 @@ or the global search bar, wire `createTableBackedExhibits` (§3) — the
 generated scaffold already does this for the generic "Items" entity, so in
 most cases you're just updating the callbacks to match your real schema,
 not writing this from scratch. Every create/update/delete should call
-`pushExhibitSync` so Capitol's `exhibit_cache`/`exhibit_refs` stay current;
+`pushExhibitSync` so Congress's `exhibit_cache`/`exhibit_refs` stay current;
 backlinks and frontlinks panels are computed live from that graph, nothing
 is duplicated.
 
@@ -147,19 +147,19 @@ exhibits are Google Calendar events, not a local table — see
 endpoints (`GET /api/exhibits/search`, `POST /api/exhibits/resolve`, `GET`/
 `PATCH /api/exhibits/:id/content`) by hand instead of using the factory.
 
-## 5. Plugging into Capitol
+## 5. Plugging into Congress
 
 This is automatic. `gateway.ts`'s `/api/:chamber/*` and `/<chamberName>/*`
 proxying, the chamber registry, the homepage widget grid, the nav picker,
-and Capitol's shell-hosting (`ChamberHost` dynamically `import()`ing your
-Chamber's `remote-entry.js`) are all driven by the `/capitol/registry` API
+and Congress's shell-hosting (`ChamberHost` dynamically `import()`ing your
+Chamber's `remote-entry.js`) are all driven by the `/congress/registry` API
 — they pick up a new Chamber the moment it successfully registers and
-heartbeats. **There is no Capitol-side code to edit** to make a new Chamber
+heartbeats. **There is no Congress-side code to edit** to make a new Chamber
 appear.
 
 Icons work the same way: your Chamber serves its own, Congress fetches it —
 **nothing about creating or icon-branding a Chamber ever means editing a
-shared package or Capitol itself.** Drop your own artwork at
+shared package or Congress itself.** Drop your own artwork at
 `frontend/public/icons/mark.svg` (the scaffold already ships a placeholder
 there, so this "just works" from the moment you generate the Chamber,
 generic diamond and all) — a plain `<svg viewBox="0 0 256 256"
@@ -167,8 +167,8 @@ fill="currentColor">...</svg>`, the `fill="currentColor"` being what lets it
 inherit the ink/dust palette and respond to hover/dark-mode like every other
 mark. It's served as a static asset exactly like the existing
 `icons/icon-192.png` favicon beside it — no build step required for it to
-resolve locally, and no manifest field either. Capitol's gateway fetches it
-generically at `GET /capitol/chambers/:name/icon` (see `proxyToChamberIcon`
+resolve locally, and no manifest field either. Congress's gateway fetches it
+generically at `GET /congress/chambers/:name/icon` (see `proxyToChamberIcon`
 in `services/congress/src/gateway.ts`, which proxies to whatever Chamber
 `:name` resolves to in the live registry) and `congress-ui`'s `ChamberMark`/
 `getChamberIcon` fetch-and-cache it at runtime, inlining the real SVG markup
@@ -179,7 +179,7 @@ generic mark everywhere its icon would appear — never broken, just plain.
 One thing remains genuinely optional polish, since it isn't derivable from
 the manifest alone:
 
-- **Sharing render format.** Capitol's public Exhibit Sharing viewer
+- **Sharing render format.** Congress's public Exhibit Sharing viewer
   (`SharedViewPage.tsx`) renders a shared exhibit's body as either
   Markdown-with-wikilinks or plain annotated text, based on the owning
   Chamber's manifest `contentFormat` field. It defaults to plain; set
@@ -204,14 +204,14 @@ pnpm -r typecheck                           # the whole repo - run before commit
 There's no test suite in this repo — `pnpm -r typecheck` is the one
 automated check, and it's expected to pass cleanly. The dev frontend proxies
 `/api`, `/manifest`, `/health`, `/mcp` to your Chamber's own backend port,
-and exhibit search/resolve/sharing calls to Capitol's dev port (`3000`) —
+and exhibit search/resolve/sharing calls to Congress's dev port (`3000`) —
 see the `PROXY_TARGET`/`CAPITOL_PROXY_TARGET` constants at the top of
 `frontend/vite.config.ts` if you ever need to point dev at a non-default
 port.
 
 ## 7. Shipping to production
 
-Two extra build artifacts are required for shell-hosting (Capitol embedding
+Two extra build artifacts are required for shell-hosting (Congress embedding
 your Chamber's frontend directly, not just proxying to it) beyond the
 normal `build:web`:
 
@@ -249,7 +249,7 @@ server bootstrap" section is a literal, copy-pasteable script.
 
 The short version: one VPS, one `systemd` unit per service (all bound to
 `127.0.0.1`), Caddy as the only public listener (reverse-proxying to
-Capitol alone — no Chamber port is ever exposed), and a 30-second polling
+Congress alone — no Chamber port is ever exposed), and a 30-second polling
 timer that fast-forwards `origin/main`, rebuilds, and restarts affected
 services. There's no separate "deploy" step — pushing to `main` *is* the
 deploy.
@@ -258,9 +258,9 @@ deploy.
 
 | Symptom | Likely cause |
 |---|---|
-| New Chamber never appears in Capitol's nav/homepage | Check its process logs for registration errors — usually a wrong `CAPITOL_URL` or mismatched `CONGRESS_INTERNAL_TOKEN` between the Chamber's `.env` and Capitol's. |
-| Chamber shows as `offline` in the registry | Missed heartbeats — check the process is actually still running and `HEARTBEAT_INTERVAL_MS` vs. Capitol's sweep timeout haven't drifted apart. |
-| `chamber_unreachable` 503 from Capitol's gateway | The registered `apiBase` in the manifest doesn't actually resolve (typo, wrong port, or the Chamber crashed after registering but before deregistering). |
-| Exhibit chips render as a generic diamond icon everywhere | That Chamber hasn't shipped `frontend/public/icons/mark.svg` yet, is offline, or the fetch to `/capitol/chambers/<name>/icon` failed — see §5. Not a bug, just unbranded. |
+| New Chamber never appears in the nav or on Capitol's homepage | Check its process logs for registration errors — usually a wrong `CAPITOL_URL` or mismatched `CONGRESS_INTERNAL_TOKEN` between the Chamber's `.env` and Congress's. |
+| Chamber shows as `offline` in the registry | Missed heartbeats — check the process is actually still running and `HEARTBEAT_INTERVAL_MS` vs. Congress's sweep timeout haven't drifted apart. |
+| `chamber_unreachable` 503 from Congress's gateway | The registered `apiBase` in the manifest doesn't actually resolve (typo, wrong port, or the Chamber crashed after registering but before deregistering). |
+| Exhibit chips render as a generic diamond icon everywhere | That Chamber hasn't shipped `frontend/public/icons/mark.svg` yet, is offline, or the fetch to `/congress/chambers/<name>/icon` failed — see §5. Not a bug, just unbranded. |
 | 404s or empty responses only in production, not dev | Almost always a chamber-name-string mismatch somewhere production-only touches — `resolveApiBase("<name>", ...)` in `frontend/src/lib/api.ts`, the Vite `base: "/<name>/"` in both `vite.config.ts` and `vite.remote.config.ts`, or `ownChamber`/`ChamberMark name=` in `Layout.tsx`. The scaffold generator keeps these in sync automatically; if you're hand-editing an existing Chamber's name after the fact, grep for the old name across `src/`, `frontend/src/`, and `infra/`. |
 | Shared exhibit renders as plain text when you expected Markdown | Set `contentFormat: "markdown"` in that Chamber's `manifest.ts` (§5) and let it re-register (restart the process) — the registry only picks up manifest changes on the next registration call. |

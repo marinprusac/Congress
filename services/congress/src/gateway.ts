@@ -78,7 +78,7 @@ export async function forwardToChamber(c: Context): Promise<Response> {
 // Proxies to an explicit path on a named Chamber's apiBase, rather than
 // deriving the path by stripping a fixed prefix off the incoming request
 // (as forwardToChamber does for "/api/:chamber/*"). Used by the share
-// routes, whose own URL shape ("/capitol/shared/:token/exhibits/:id") has
+// routes, whose own URL shape ("/congress/shared/:token/exhibits/:id") has
 // nothing to do with the target Chamber route ("/exhibits/:id/content").
 export async function proxyToChamberPath(c: Context, chamberName: string, path: string): Promise<Response> {
   const chamber = getChamber(chamberName);

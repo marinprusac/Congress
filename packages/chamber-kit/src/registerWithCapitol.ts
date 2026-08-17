@@ -28,7 +28,7 @@ export function createCapitolRegistration(opts: CapitolRegistrationOptions) {
 
     while (!stopped) {
       try {
-        const res = await fetch(`${capitolUrl}/capitol/register`, {
+        const res = await fetch(`${capitolUrl}/congress/register`, {
           method: "POST",
           headers: authHeaders(),
           body: JSON.stringify(manifest),
@@ -50,7 +50,7 @@ export function createCapitolRegistration(opts: CapitolRegistrationOptions) {
   function startHeartbeat(): void {
     heartbeatTimer = setInterval(async () => {
       try {
-        const res = await fetch(`${capitolUrl}/capitol/heartbeat`, {
+        const res = await fetch(`${capitolUrl}/congress/heartbeat`, {
           method: "POST",
           headers: authHeaders(),
           body: JSON.stringify({ name: manifest.name }),
@@ -72,7 +72,7 @@ export function createCapitolRegistration(opts: CapitolRegistrationOptions) {
 
   async function deregisterFromCapitol(): Promise<void> {
     try {
-      await fetch(`${capitolUrl}/capitol/deregister`, {
+      await fetch(`${capitolUrl}/congress/deregister`, {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify({ name: manifest.name }),

@@ -3,8 +3,8 @@ import { z } from "zod";
 export const sharePermissionSchema = z.enum(["view", "edit"]);
 export type SharePermission = z.infer<typeof sharePermissionSchema>;
 
-// Owner-facing summary of a share, returned by GET /capitol/shares and
-// GET /capitol/exhibits/:id/shares. `direct` only carries meaning in the
+// Owner-facing summary of a share, returned by GET /congress/shares and
+// GET /congress/exhibits/:id/shares. `direct` only carries meaning in the
 // latter (exhibit-scoped) response - it's omitted (equivalent to true) for
 // endpoints not scoped to a particular exhibit. false means the share's
 // root is some other exhibit and this one is merely reached through its
@@ -25,7 +25,7 @@ export const shareSummarySchema = z.object({
 });
 export type ShareSummary = z.infer<typeof shareSummarySchema>;
 
-// PATCH /capitol/shares/:token - same token, updated terms. expiresAt:
+// PATCH /congress/shares/:token - same token, updated terms. expiresAt:
 // undefined = leave unchanged, null = clear it, string = set it.
 export const updateShareRequestSchema = z.object({
   permission: sharePermissionSchema.optional(),
@@ -57,7 +57,7 @@ export const updateSharedExhibitContentRequestSchema = z.object({
 });
 export type UpdateSharedExhibitContentRequest = z.infer<typeof updateSharedExhibitContentRequestSchema>;
 
-// GET /capitol/exhibits/:id/sharing - owner-facing, drives the "Shared" /
+// GET /congress/exhibits/:id/sharing - owner-facing, drives the "Shared" /
 // "Shared (inherited)" badge on a chamber's own view pages.
 export const exhibitSharingEntrySchema = z.object({
   token: z.string(),

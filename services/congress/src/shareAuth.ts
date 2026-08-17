@@ -14,7 +14,7 @@ export type ShareVariables = {
   closure: ShareClosureEntry[];
 };
 
-// Gates the token-scoped /capitol/shared/:token/* routes - deliberately not
+// Gates the token-scoped /congress/shared/:token/* routes - deliberately not
 // requireSession, since these are meant to be reachable by a recipient with
 // no Congress login at all. 404 (not 401/403) on any invalid token, so a
 // probe can't distinguish "wrong token" from "never existed" or "revoked".

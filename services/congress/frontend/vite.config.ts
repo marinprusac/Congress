@@ -76,6 +76,14 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      // Congress's own API (registry/settings/exhibits/sharing/...).
+      "/congress": PROXY_TARGET,
+      // Not Congress's own API - this is the gateway's chamber-frontend
+      // proxy (forwardToChamberFrontend), needed here so dev:web can reach
+      // the Capitol Chamber's static build/remote-entry the same way
+      // production does. Other Chambers have the same gap in dev (no
+      // equivalent "/notes", "/calendar", ... rule) - pre-existing, unrelated
+      // to the Congress/Capitol split.
       "/capitol": PROXY_TARGET,
       "/api": PROXY_TARGET,
       "/manifest": PROXY_TARGET,

@@ -25,7 +25,7 @@ function isEditableElement(el: Element | null): boolean {
 // A single search bar reachable from every Congress frontend (mounted once
 // in CapitolHeader and once in ChamberLayout, so it's present on every
 // page), fanning a query out to every registered Chamber via Capitol's
-// existing /capitol/exhibits/search endpoint and merging the results -
+// existing /congress/exhibits/search endpoint and merging the results -
 // letting any note, event, or document be found without knowing which
 // Chamber owns it. Pressing "/" anywhere outside an editable field focuses
 // it, mirroring the "[[" picker's own type-ahead/arrow-key/enter

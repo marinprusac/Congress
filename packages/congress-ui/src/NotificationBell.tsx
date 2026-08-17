@@ -21,7 +21,7 @@ function notificationsQueryKey() {
 }
 
 async function fetchNotifications(): Promise<NotificationsListResponse> {
-  const res = await fetch("/capitol/notifications");
+  const res = await fetch("/congress/notifications");
   if (!res.ok) return { notifications: [], unreadCount: 0 };
   return res.json();
 }
@@ -69,18 +69,18 @@ export function NotificationBell({ ownChamber, navigate }: NotificationBellProps
   }
 
   async function markRead(id: number) {
-    await fetch(`/capitol/notifications/${id}/read`, { method: "POST" });
+    await fetch(`/congress/notifications/${id}/read`, { method: "POST" });
     invalidate();
   }
 
   async function markAllRead() {
-    await fetch("/capitol/notifications/read-all", { method: "POST" });
+    await fetch("/congress/notifications/read-all", { method: "POST" });
     invalidate();
   }
 
   async function dismiss(e: ReactMouseEvent<HTMLButtonElement>, id: number) {
     e.stopPropagation();
-    await fetch(`/capitol/notifications/${id}`, { method: "DELETE" });
+    await fetch(`/congress/notifications/${id}`, { method: "DELETE" });
     invalidate();
   }
 

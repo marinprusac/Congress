@@ -36,7 +36,7 @@ pnpm --filter <service> db:migrate             # apply migrations locally (also 
 
 There is no test suite and no lint config in this repo — `pnpm -r typecheck` is the only automated check, and it's expected to pass cleanly before committing.
 
-A Chamber's frontend dev server proxies `/api`, `/manifest`, `/health`, `/mcp` to its own backend port, and exhibit search/resolve/sharing calls to Congress's dev port (`3000`) — see the `PROXY_TARGET`/`CAPITOL_PROXY_TARGET` constants at the top of each `frontend/vite.config.ts` (the constant name is a naming leftover from before the Congress/Capitol split — it still points at Congress). In production everything is same-origin through Congress's proxy instead (see Gateway below), which is also why each frontend build sets `base: "/<chamber-name>/"`.
+A Chamber's frontend dev server proxies `/api`, `/manifest`, `/health`, `/mcp` to its own backend port, and exhibit search/resolve/sharing calls (`/congress/*`) to Congress's dev port (`3000`) — see the `PROXY_TARGET`/`CONGRESS_PROXY_TARGET` constants at the top of each `frontend/vite.config.ts`. In production everything is same-origin through Congress's proxy instead (see Gateway below), which is also why each frontend build sets `base: "/<chamber-name>/"`. Congress's own dev server additionally proxies `/capitol` (not its own API — the gateway's chamber-frontend proxy, needed so `dev:web` can reach the Capitol Chamber's build the way production does).
 
 ## Architecture
 
@@ -62,7 +62,7 @@ Every Chamber — Capitol included — implements the same contract (defined in 
 - A REST API under `/api/*`.
 - An MCP server at `/mcp` (Streamable HTTP transport, official `@modelcontextprotocol/sdk`), wrapping the same REST logic rather than touching the DB directly.
 
-On boot, a Chamber calls `POST /capitol/register` with its manifest (retrying with backoff if Congress isn't up yet — start order must never matter), then heartbeats `POST /capitol/heartbeat` on an interval; Congress marks it `offline` in its registry if a heartbeat is missed past a threshold. Registration/heartbeat/exhibit-sync calls are authenticated with a shared `CONGRESS_INTERNAL_TOKEN` header (`requireInternalToken` in `services/congress/src/auth.ts`) — this is a "stop stray local processes" gate, not real auth. Congress itself is the registry owner, not a registrant — it never calls these on itself. (The route namespace is still `/capitol/*`, a naming leftover from before the split — see the note at the top of this doc's "Capitol" bullet.)
+On boot, a Chamber calls `POST /congress/register` with its manifest (retrying with backoff if Congress isn't up yet — start order must never matter), then heartbeats `POST /congress/heartbeat` on an interval; Congress marks it `offline` in its registry if a heartbeat is missed past a threshold. Registration/heartbeat/exhibit-sync calls are authenticated with a shared `CONGRESS_INTERNAL_TOKEN` header (`requireInternalToken` in `services/congress/src/auth.ts`) — this is a "stop stray local processes" gate, not real auth. Congress itself is the registry owner, not a registrant — it never calls these on itself. (Congress's own API lives under `/congress/*` — not to be confused with `/capitol/*`, which is the Capitol Chamber's own proxied frontend path, same shape as `/notes/*` for Notes. The two collided at `/capitol/settings` and `/capitol/shares` until this rename — a full-page load of Capitol's Settings/Shares page would hit Congress's API route of the same name instead of the SPA.)
 
 Each service owns exactly one SQLite file, opened only by its own process. Cross-Chamber data access always goes over HTTP through the owning Chamber's own API — never a shared DB, never one service importing another's Drizzle schema.
 
@@ -85,7 +85,7 @@ Congress's frontend is a persistent shell: navigating to a Chamber, or between C
 An "Exhibit" is any addressable piece of content in any Chamber (`note-42`, `document-7`, `event-3:cal:evt123`, ...). This is the one piece of real cross-cutting product logic in the system, worth understanding before touching notes/calendar/documents content code:
 
 - Every Chamber implements a small **content contract** (`GET /api/exhibits/search`, `POST /api/exhibits/resolve`, `GET`/`PATCH /api/exhibits/:id/content`) — see `packages/chamber-kit/src/exhibits.ts`'s `createTableBackedExhibits` for the pattern notes/documents both use (Calendar's exhibits are Google Calendar events, not a local table, so it implements the same contract by hand in `services/chamber-calendar/src/exhibits.ts` / `google/events.ts`).
-- Congress's own SQLite DB (`services/congress/src/db/schema.ts`) keeps `exhibit_cache` and `exhibit_refs` — a cache of every known Exhibit's name/url and a reverse-reference graph, populated whenever a Chamber calls `POST /capitol/exhibits/sync` after a create/update/delete. `services/congress/src/exhibits.ts` fans search/resolve calls out to every active Chamber in parallel.
+- Congress's own SQLite DB (`services/congress/src/db/schema.ts`) keeps `exhibit_cache` and `exhibit_refs` — a cache of every known Exhibit's name/url and a reverse-reference graph, populated whenever a Chamber calls `POST /congress/exhibits/sync` after a create/update/delete. `services/congress/src/exhibits.ts` fans search/resolve calls out to every active Chamber in parallel.
 - In note/document/event bodies, `[[exhibit:chamber:id|Label]]` tokens (`packages/congress-ui/src/token.ts`) render as clickable chips (`ExhibitChip`) via `ExhibitAnnotatedText`/`useResolvedExhibits`. Backlinks/frontlinks panels are computed live from `exhibit_refs`, not stored redundantly.
 
 ### Exhibit Sharing
@@ -93,9 +93,9 @@ An "Exhibit" is any addressable piece of content in any Chamber (`note-42`, `doc
 A Congress-owned feature for granting outside access (a person, or an AI agent via plain HTTP) to one Exhibit and everything it recursively references, without a Congress login:
 
 - `services/congress/src/shares.ts` — a `shares` table (bearer token as PK, root exhibit, max depth, permission, expiry) plus `computeShareClosure`, a live BFS over `exhibit_refs` — inheritance is dynamic, not a snapshot, so editing a shared note to reference something new makes that new Exhibit reachable immediately.
-- `services/congress/src/shareAuth.ts` — `requireShareToken`, a third auth tier alongside the owner session cookie and the internal-token header, gating everything under `/capitol/shared/:token/*`.
+- `services/congress/src/shareAuth.ts` — `requireShareToken`, a third auth tier alongside the owner session cookie and the internal-token header, gating everything under `/congress/shared/:token/*`.
 - The public viewer lives at `/shared/:token` (`services/congress/frontend/src/pages/SharedViewPage.tsx`), the one route in Congress's frontend that intentionally sits outside `LoginGate`.
-- The owner-facing management UI (create/list/revoke) is Capitol's `SharesPage.tsx` instead — an ordinary Chamber page calling Congress's `/capitol/shares*` endpoints directly, same as any Chamber calling a Congress-owned endpoint.
+- The owner-facing management UI (create/list/revoke) is Capitol's `SharesPage.tsx` instead — an ordinary Chamber page calling Congress's `/congress/shares*` endpoints directly, same as any Chamber calling a Congress-owned endpoint.
 
 ### Settings & theming
 

@@ -27,7 +27,7 @@ async function postCreateShare(input: {
   label?: string;
   expiresAt?: string;
 }): Promise<ShareSummary> {
-  const res = await fetch("/capitol/shares", {
+  const res = await fetch("/congress/shares", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

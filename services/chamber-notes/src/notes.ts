@@ -39,7 +39,7 @@ export async function resyncNoteExhibit(id: number): Promise<void> {
 // since it's mounted generically at "/api/exhibits/:id/refs" and only ever
 // sees full Exhibit ids ("note-3"), not this Chamber's own row ids. A ref
 // add/remove can also originate from a *different* Exhibit's "Referenced by"
-// panel (via Capitol's proxy at POST/DELETE "/capitol/exhibits/:id/refs"),
+// panel (via Capitol's proxy at POST/DELETE "/congress/exhibits/:id/refs"),
 // so these have to resync exactly like the body-text path does.
 const manualRefsByExhibitId = createManualRefsByExhibitId(
   { listManualRefs, addManualRef, removeManualRef },

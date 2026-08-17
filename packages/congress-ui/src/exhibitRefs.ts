@@ -1,7 +1,7 @@
 import type { ManualRefsResponse } from "@congress/shared-types";
 
 // Always routed through Capitol's proxy (POST/DELETE
-// "/capitol/exhibits/:id/refs" in services/congress/src/server.ts), even
+// "/congress/exhibits/:id/refs" in services/congress/src/server.ts), even
 // when `exhibitId` is owned by the same Chamber the caller is running in -
 // this is what lets a "Referenced by" panel add/remove a reference that
 // actually lives on a *different* Exhibit than the one being viewed,
@@ -11,7 +11,7 @@ async function requestRefChange(
   path: string,
   init: RequestInit
 ): Promise<ManualRefsResponse> {
-  const res = await fetch(`/capitol/exhibits/${encodeURIComponent(exhibitId)}${path}`, init);
+  const res = await fetch(`/congress/exhibits/${encodeURIComponent(exhibitId)}${path}`, init);
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     if (res.status === 404) {

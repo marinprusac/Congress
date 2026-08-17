@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { CapitolSettings, UpdateCapitolSettingsRequest } from "@congress/shared-types";
 
 async function fetchCapitolSettings(): Promise<CapitolSettings> {
-  const res = await fetch("/capitol/settings");
+  const res = await fetch("/congress/settings");
   if (!res.ok) return { darkMode: false };
   return res.json();
 }
@@ -22,7 +22,7 @@ export function useCapitolSettings(enabled: boolean = true) {
 // both hit the same Congress-owned endpoint regardless of which Chamber's
 // UI happens to expose the toggle.
 export async function updateCapitolSettings(input: UpdateCapitolSettingsRequest): Promise<CapitolSettings> {
-  const res = await fetch("/capitol/settings", {
+  const res = await fetch("/congress/settings", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

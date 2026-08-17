@@ -65,8 +65,8 @@ marin ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart congress-*, /usr/bin/system
 
 ## Adding a new Chamber's infra
 
-Registering a new Chamber with Capitol itself is automatic and requires no
-code change on Capitol's side at all — see `docs/creating-a-chamber.md`. The
+Registering a new Chamber with Congress itself is automatic and requires no
+code change on Congress's side at all — see `docs/creating-a-chamber.md`. The
 only genuinely manual, per-Chamber steps are on the infra side, and running
 `pnpm create-chamber` already does the first of them for you:
 
@@ -75,9 +75,9 @@ only genuinely manual, per-Chamber steps are on the infra side, and running
 2. **`infra/deploy/sync-deploy.sh`** — nothing to edit. It discovers Chambers
    by globbing `services/chamber-*/`, so a new Chamber directory is picked
    up on the very next sync with zero changes to that script.
-3. **Caddy** — nothing to edit. Caddy only ever proxies to Capitol
+3. **Caddy** — nothing to edit. Caddy only ever proxies to Congress
    (`127.0.0.1:8000`); Chamber ports are never referenced there, since
-   path-based routing to each Chamber happens inside Capitol's own gateway.
+   path-based routing to each Chamber happens inside Congress's own gateway.
 4. **On the server, by hand:**
    - Pick a port that doesn't collide with an existing Chamber (`pnpm
      create-chamber` already checks this locally against every
@@ -94,14 +94,14 @@ only genuinely manual, per-Chamber steps are on the infra side, and running
 ## Access control
 
 There is no network-level gate anymore — `congress.marinprusac.com` resolves
-publicly and Caddy proxies it to Capitol like any other site on this server.
+publicly and Caddy proxies it to Congress like any other site on this server.
 The **only** thing standing between the open internet and this data is the
 master-password cookie:
 
 - `POST /auth/login` checks the password (sha256'd, timing-safe compared)
   and sets a signed, `HttpOnly`, `Secure` session cookie. Rate-limited per
   source IP (5 attempts / 15 min lockout) — see `sessionAuth.ts`.
-- Everything that carries real data — `/capitol/registry`, `/api/:chamber/*`
+- Everything that carries real data — `/congress/registry`, `/api/:chamber/*`
   (the gateway to every Chamber), and the frontend — requires that cookie.
   `/health`, `/manifest`, and the static frontend shell stay open (nothing
   sensitive, and the login page itself has to load unauthenticated).

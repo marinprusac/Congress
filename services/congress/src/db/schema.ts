@@ -16,7 +16,7 @@ export const chambers = sqliteTable("chambers", {
 });
 
 // Disposable, rebuildable resolution cache - a Chamber pushes here on Exhibit
-// create/update/delete (POST /capitol/exhibits/sync). Missing/stale rows
+// create/update/delete (POST /congress/exhibits/sync). Missing/stale rows
 // always fall back to a live call to the owning Chamber, never treated as
 // authoritative on their own.
 export const exhibitCache = sqliteTable("exhibit_cache", {
@@ -69,7 +69,7 @@ export const shares = sqliteTable("shares", {
 });
 
 // Capitol-owned notification center - a Chamber pushes here (POST
-// /capitol/notifications/push) instead of inventing its own alert UI, e.g.
+// /congress/notifications/push) instead of inventing its own alert UI, e.g.
 // "task due" or "event starting soon". One row per (chamber, dedupeKey):
 // re-pushing the same key upserts in place (see notifications.ts's
 // pushNotification), so a Chamber's own poller can call this on every tick

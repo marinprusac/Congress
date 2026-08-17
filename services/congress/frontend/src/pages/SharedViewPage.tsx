@@ -85,7 +85,7 @@ export function SharedViewPage() {
 
   const share = detailQuery.data;
   const content = contentQuery.data;
-  const resolveUrl = `/capitol/shared/${token}/exhibits/resolve`;
+  const resolveUrl = `/congress/shared/${token}/exhibits/resolve`;
   const isMarkdown = activeEntry?.contentFormat === "markdown";
 
   function selectExhibit(id: string) {

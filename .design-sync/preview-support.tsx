@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Design-sync preview support only - never imported by the real app.
 // Every congress-ui component that talks to Capitol does so via plain
-// `fetch()` against relative "/capitol/*" and "/api/*" paths, since in the
+// `fetch()` against relative "/congress/*" and "/api/*" paths, since in the
 // real app that's proxied to a live backend. An isolated Claude Design
 // preview has no backend to hit, so this installs a realistic canned
 // response for every endpoint these components call, matching
@@ -134,7 +134,7 @@ function svgResponse(markup: string): Response {
 }
 
 // Each Chamber's own icons/mark.svg (ChamberMark fetches these at runtime
-// via /capitol/chambers/:name/icon rather than any lookup table living in
+// via /congress/chambers/:name/icon rather than any lookup table living in
 // this shared package - see ChamberMarks.tsx's "Fetched-from-the-owning-
 // Chamber icon system" comment). Without this mock every named chamber
 // falls through to DefaultChamberMark and every preview cell looks
@@ -176,28 +176,28 @@ function installFetchMock() {
     const method = (init?.method ?? "GET").toUpperCase();
     const path = url.split("?")[0];
 
-    if (path === "/capitol/registry") return jsonResponse(REGISTRY);
-    if (path === "/capitol/settings") return jsonResponse({ darkMode: false, hiddenWidgets: [] });
-    if (path === "/capitol/notifications" && method === "GET") {
+    if (path === "/congress/registry") return jsonResponse(REGISTRY);
+    if (path === "/congress/settings") return jsonResponse({ darkMode: false, hiddenWidgets: [] });
+    if (path === "/congress/notifications" && method === "GET") {
       const unreadCount = NOTIFICATIONS.filter((n) => !n.readAt).length;
       return jsonResponse({ notifications: NOTIFICATIONS, unreadCount });
     }
-    if (path.startsWith("/capitol/notifications/") && path.endsWith("/read") && method === "POST") return jsonResponse({ ok: true });
-    if (path === "/capitol/notifications/read-all" && method === "POST") return jsonResponse({ ok: true });
-    if (path.startsWith("/capitol/notifications/") && method === "DELETE") return jsonResponse({ ok: true });
-    if (path.startsWith("/capitol/chambers/") && path.endsWith("/icon")) {
+    if (path.startsWith("/congress/notifications/") && path.endsWith("/read") && method === "POST") return jsonResponse({ ok: true });
+    if (path === "/congress/notifications/read-all" && method === "POST") return jsonResponse({ ok: true });
+    if (path.startsWith("/congress/notifications/") && method === "DELETE") return jsonResponse({ ok: true });
+    if (path.startsWith("/congress/chambers/") && path.endsWith("/icon")) {
       const chamber = decodeURIComponent(path.split("/")[3] ?? "");
       const markup = CHAMBER_ICONS[chamber];
       return markup ? svgResponse(markup) : new Response("not found", { status: 404 });
     }
-    if (path === "/capitol/exhibits/search") return jsonResponse({ results: SEARCH_RESULTS });
-    if (path === "/capitol/exhibits/resolve" && method === "POST") return jsonResponse({ results: RESOLVE_RESULTS });
+    if (path === "/congress/exhibits/search") return jsonResponse({ results: SEARCH_RESULTS });
+    if (path === "/congress/exhibits/resolve" && method === "POST") return jsonResponse({ results: RESOLVE_RESULTS });
     if (path.endsWith("/backlinks")) return jsonResponse({ backlinks: RESOLVE_RESULTS.slice(0, 2) });
     if (path.endsWith("/frontlinks")) return jsonResponse({ frontlinks: RESOLVE_RESULTS.slice(2) });
     if (path.endsWith("/sharing")) return jsonResponse({ shares: SHARING_ENTRIES });
     if (path.endsWith("/shares") && method === "GET") return jsonResponse({ shares: [SHARE_SUMMARY] });
-    if (path === "/capitol/shares" && method === "POST") return jsonResponse(SHARE_SUMMARY);
-    if (path.startsWith("/capitol/shares/") && method === "PATCH") return jsonResponse(SHARE_SUMMARY);
+    if (path === "/congress/shares" && method === "POST") return jsonResponse(SHARE_SUMMARY);
+    if (path.startsWith("/congress/shares/") && method === "PATCH") return jsonResponse(SHARE_SUMMARY);
 
     return realFetch(url, init);
   };

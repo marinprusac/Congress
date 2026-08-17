@@ -2,11 +2,11 @@ import type { SharedExhibitContent, UpdateSharedExhibitContentRequest, CapitolEx
 import type { ShareDetail } from "../../../src/types";
 
 // Token-scoped client for the "/shared/:token" viewer - deliberately never
-// touches the owner-session-gated /capitol/shares endpoints in lib/api.ts.
+// touches the owner-session-gated /congress/shares endpoints in lib/api.ts.
 // A recipient hitting this page has no Congress login at all.
 
 function base(token: string): string {
-  return `/capitol/shared/${encodeURIComponent(token)}`;
+  return `/congress/shared/${encodeURIComponent(token)}`;
 }
 
 export async function fetchSharedDetail(token: string): Promise<ShareDetail | null> {

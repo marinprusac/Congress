@@ -93,7 +93,11 @@ function copyTemplateDir(srcDir, destDir) {
       continue;
     }
     const ext = entry.slice(entry.lastIndexOf("."));
-    if (TEXT_EXTENSIONS.has(ext)) {
+    // ".env.example" is a dotfile whose "extension" (by lastIndexOf(".")) is
+    // ".example", not in TEXT_EXTENSIONS - special-cased so its
+    // __CHAMBER_PORT__/__CHAMBER_NAME__ placeholders actually get
+    // substituted instead of being copied through verbatim.
+    if (TEXT_EXTENSIONS.has(ext) || entry === ".env.example") {
       writeFileSync(destPath, substitute(readFileSync(srcPath, "utf8")));
     } else {
       copyFileSync(srcPath, destPath);

@@ -5,7 +5,7 @@ async function fetchExhibitLinks(
   exhibitId: string,
   kind: "backlinks" | "frontlinks"
 ): Promise<ExhibitRefEntry[]> {
-  const res = await fetch(`/capitol/exhibits/${encodeURIComponent(exhibitId)}/${kind}`);
+  const res = await fetch(`/congress/exhibits/${encodeURIComponent(exhibitId)}/${kind}`);
   if (!res.ok) return [];
   const data = (await res.json()) as Record<"backlinks" | "frontlinks", ExhibitRefEntry[]>;
   return data[kind];

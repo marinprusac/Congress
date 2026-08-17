@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ExhibitSharingEntry } from "@congress/shared-types";
 
 async function fetchExhibitSharing(exhibitId: string): Promise<ExhibitSharingEntry[]> {
-  const res = await fetch(`/capitol/exhibits/${encodeURIComponent(exhibitId)}/sharing`);
+  const res = await fetch(`/congress/exhibits/${encodeURIComponent(exhibitId)}/sharing`);
   if (!res.ok) return [];
   const data = (await res.json()) as { shares: ExhibitSharingEntry[] };
   return data.shares;

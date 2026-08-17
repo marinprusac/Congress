@@ -43,7 +43,7 @@ function DefaultChamberMark(props: IconProps) {
 // anyone editing congress-ui. So a Chamber's icon is just another static
 // asset it serves itself (frontend/public/icons/mark.svg, built into
 // dist/ alongside icon-192.png), fetched at runtime through Capitol's
-// generic, registry-driven proxy (GET /capitol/chambers/:name/icon - see
+// generic, registry-driven proxy (GET /congress/chambers/:name/icon - see
 // services/congress/src/gateway.ts's proxyToChamberIcon), and inlined as
 // real SVG markup so it can still be recolored via `currentColor` and
 // respond to hover/theme like every mark always has.
@@ -76,7 +76,7 @@ function sanitizeIconMarkup(svg: string): IconCacheEntry {
 function ensureIconFetch(chamber: string): void {
   if (iconCache.has(chamber)) return;
   iconCache.set(chamber, null); // claim the slot immediately so concurrent renders don't double-fetch
-  fetch(`/capitol/chambers/${encodeURIComponent(chamber)}/icon`)
+  fetch(`/congress/chambers/${encodeURIComponent(chamber)}/icon`)
     .then((res) => (res.ok ? res.text() : Promise.reject(new Error(String(res.status)))))
     .then((svg) => {
       iconCache.set(chamber, sanitizeIconMarkup(svg));
