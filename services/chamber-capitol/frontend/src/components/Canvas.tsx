@@ -29,7 +29,7 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
   // resolve), so useCanvasGrid needs to know the *moment* the real node
   // attaches, not just once on initial mount when it may still be null.
   const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
-  const cellSize = useCanvasGrid(containerEl, scope);
+  const cellPx = useCanvasGrid(containerEl, scope);
   const dims = GRID[scope];
 
   const registryQuery = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
@@ -114,8 +114,7 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
   }
 
   const { drag, startDrag } = useWidgetDrag({
-    cellWidth: cellSize.width,
-    cellHeight: cellSize.height,
+    cellPx,
     gapPx: GAP_PX,
     dims,
     occupiedExcluding: (chamber, widgetId) => occupiedCells(placedRects(widgetKey(chamber, widgetId))),
@@ -127,8 +126,7 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
 
   return (
     <section className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center justify-between px-3 py-2">
-        <h2 className="font-display text-lg text-ink">Chambers</h2>
+      <div className="flex shrink-0 items-center justify-end px-3 py-2">
         <button
           type="button"
           onClick={onToggleEditing}
@@ -150,12 +148,12 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
           className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-6"
         >
           <div className="relative">
-            {editing && <GridDots dims={dims} cellWidth={cellSize.width} cellHeight={cellSize.height} gapPx={GAP_PX} />}
+            {editing && <GridDots dims={dims} cellPx={cellPx} gapPx={GAP_PX} />}
             <div
               className="grid"
               style={{
-                gridTemplateColumns: `repeat(${dims.cols}, ${cellSize.width}px)`,
-                gridTemplateRows: `repeat(${dims.rows}, ${cellSize.height}px)`,
+                gridTemplateColumns: `repeat(${dims.cols}, ${cellPx}px)`,
+                gridTemplateRows: `repeat(${dims.rows}, ${cellPx}px)`,
                 gap: `${GAP_PX}px`,
               }}
             >

@@ -15,8 +15,7 @@ export interface DragState {
 }
 
 export interface UseWidgetDragOptions {
-  cellWidth: number;
-  cellHeight: number;
+  cellPx: number;
   gapPx: number;
   dims: GridDims;
   // Cells occupied by every widget OTHER than the one currently being
@@ -77,9 +76,10 @@ export function useWidgetDrag(options: UseWidgetDragOptions) {
     function onUp() {
       setDrag((d) => {
         if (d) {
-          const { cellWidth, cellHeight, gapPx, dims, occupiedExcluding, onCommit } = optionsRef.current;
-          const cellDx = Math.round((d.currentX - d.pointerStartX) / (cellWidth + gapPx));
-          const cellDy = Math.round((d.currentY - d.pointerStartY) / (cellHeight + gapPx));
+          const { cellPx, gapPx, dims, occupiedExcluding, onCommit } = optionsRef.current;
+          const step = cellPx + gapPx;
+          const cellDx = Math.round((d.currentX - d.pointerStartX) / step);
+          const cellDy = Math.round((d.currentY - d.pointerStartY) / step);
           const targetX = d.originX + cellDx;
           const targetY = d.originY + cellDy;
           const occupied = occupiedExcluding(d.chamber, d.widgetId);

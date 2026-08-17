@@ -2,8 +2,7 @@ import type { GridDims } from "./grid";
 
 export interface GridDotsProps {
   dims: GridDims;
-  cellWidth: number;
-  cellHeight: number;
+  cellPx: number;
   gapPx: number;
 }
 
@@ -22,11 +21,11 @@ function linePos(n: number, cellPx: number, gapPx: number): number {
 // *look* like they are. Deliberately painted *behind* the widget grid (no
 // z-index of its own, and placed earlier in the DOM - see Canvas.tsx) so it
 // doesn't obscure widget content.
-export function GridDots({ dims, cellWidth, cellHeight, gapPx }: GridDotsProps) {
+export function GridDots({ dims, cellPx, gapPx }: GridDotsProps) {
   const dots: { x: number; y: number }[] = [];
   for (let row = 0; row <= dims.rows; row++) {
     for (let col = 0; col <= dims.cols; col++) {
-      dots.push({ x: linePos(col, cellWidth, gapPx), y: linePos(row, cellHeight, gapPx) });
+      dots.push({ x: linePos(col, cellPx, gapPx), y: linePos(row, cellPx, gapPx) });
     }
   }
 
