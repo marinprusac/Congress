@@ -15,8 +15,20 @@ export interface GridDims {
 // to the live viewport - tune these two constants visually against real
 // device sizes, not by measurement.
 export const GRID: Record<CanvasScope, GridDims> = {
-  mobile: { cols: 2, rows: 8 },
+  mobile: { cols: 4, rows: 8 },
   desktop: { cols: 8, rows: 8 },
+};
+
+// A cell's fixed width:height ratio per scope - deliberately a constant,
+// not computed from any one device's own aspect ratio, so a cell's shape
+// doesn't change as a window is resized, only its overall scale does (see
+// useCanvasGrid). Roughly each scope's own typical viewport shape: mobile
+// screens are taller than wide (~5:7), desktop windows wider than tall
+// (~9:5) - two different fixed constants, not one shared value, since the
+// two scopes' natural shapes are opposites.
+export const CELL_RATIO: Record<CanvasScope, number> = {
+  mobile: 5 / 7,
+  desktop: 9 / 5,
 };
 
 export interface PlacedRect {

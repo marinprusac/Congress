@@ -14,5 +14,5 @@ export const calendarManifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  widgets: [{ id: "upcoming", width: 2, height: 3, label: "Upcoming" }],
+  widgets: [{ id: "upcoming", width: 3, height: 2, label: "Upcoming" }],
 };

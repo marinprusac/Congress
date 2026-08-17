@@ -14,5 +14,5 @@ export const tasksManifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  widgets: [{ id: "open", width: 2, height: 3, label: "Open" }],
+  widgets: [{ id: "open", width: 3, height: 2, label: "Open" }],
 };

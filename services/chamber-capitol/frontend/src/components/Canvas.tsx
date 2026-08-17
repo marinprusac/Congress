@@ -29,7 +29,7 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
   // resolve), so useCanvasGrid needs to know the *moment* the real node
   // attaches, not just once on initial mount when it may still be null.
   const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
-  const cellPx = useCanvasGrid(containerEl, scope);
+  const cellSize = useCanvasGrid(containerEl, scope);
   const dims = GRID[scope];
 
   const registryQuery = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
@@ -114,7 +114,8 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
   }
 
   const { drag, startDrag } = useWidgetDrag({
-    cellPx,
+    cellWidth: cellSize.width,
+    cellHeight: cellSize.height,
     gapPx: GAP_PX,
     dims,
     occupiedExcluding: (chamber, widgetId) => occupiedCells(placedRects(widgetKey(chamber, widgetId))),
@@ -144,36 +145,41 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
       )}
 
       {!isLoading && !isError && catalog.length > 0 && (
-        <div ref={setContainerEl} className="relative min-h-0 flex-1 overflow-hidden px-3 pb-3">
-          {editing && <GridDots dims={dims} cellPx={cellPx} gapPx={GAP_PX} />}
-          <div
-            className="grid"
-            style={{
-              gridTemplateColumns: `repeat(${dims.cols}, ${cellPx}px)`,
-              gridTemplateRows: `repeat(${dims.rows}, ${cellPx}px)`,
-              gap: `${GAP_PX}px`,
-            }}
-          >
-            {placed.map((entry) => {
-              const placement = placementByKey.get(widgetKey(entry.chamber.name, entry.widget.id))!;
-              const key = widgetKey(entry.chamber.name, entry.widget.id);
-              const isDragging = drag?.chamber === entry.chamber.name && drag?.widgetId === entry.widget.id;
-              return (
-                <WidgetCell
-                  key={key}
-                  chamber={entry.chamber}
-                  widget={entry.widget}
-                  x={placement.x}
-                  y={placement.y}
-                  editing={editing}
-                  onRemove={() => deleteMutation.mutate({ chamber: entry.chamber.name, widgetId: entry.widget.id })}
-                  onDragHandlePointerDown={(e) =>
-                    startDrag(e, entry.chamber.name, entry.widget.id, entry.widget.width, entry.widget.height, placement.x, placement.y)
-                  }
-                  dragOffset={isDragging ? { dx: drag.currentX - drag.pointerStartX, dy: drag.currentY - drag.pointerStartY } : null}
-                />
-              );
-            })}
+        <div
+          ref={setContainerEl}
+          className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-6"
+        >
+          <div className="relative">
+            {editing && <GridDots dims={dims} cellWidth={cellSize.width} cellHeight={cellSize.height} gapPx={GAP_PX} />}
+            <div
+              className="grid"
+              style={{
+                gridTemplateColumns: `repeat(${dims.cols}, ${cellSize.width}px)`,
+                gridTemplateRows: `repeat(${dims.rows}, ${cellSize.height}px)`,
+                gap: `${GAP_PX}px`,
+              }}
+            >
+              {placed.map((entry) => {
+                const placement = placementByKey.get(widgetKey(entry.chamber.name, entry.widget.id))!;
+                const key = widgetKey(entry.chamber.name, entry.widget.id);
+                const isDragging = drag?.chamber === entry.chamber.name && drag?.widgetId === entry.widget.id;
+                return (
+                  <WidgetCell
+                    key={key}
+                    chamber={entry.chamber}
+                    widget={entry.widget}
+                    x={placement.x}
+                    y={placement.y}
+                    editing={editing}
+                    onRemove={() => deleteMutation.mutate({ chamber: entry.chamber.name, widgetId: entry.widget.id })}
+                    onDragHandlePointerDown={(e) =>
+                      startDrag(e, entry.chamber.name, entry.widget.id, entry.widget.width, entry.widget.height, placement.x, placement.y)
+                    }
+                    dragOffset={isDragging ? { dx: drag.currentX - drag.pointerStartX, dy: drag.currentY - drag.pointerStartY } : null}
+                  />
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

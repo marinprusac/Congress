@@ -2,7 +2,8 @@ import type { GridDims } from "./grid";
 
 export interface GridDotsProps {
   dims: GridDims;
-  cellPx: number;
+  cellWidth: number;
+  cellHeight: number;
   gapPx: number;
 }
 
@@ -10,25 +11,22 @@ export interface GridDotsProps {
 // axis of cells sized `cellPx` with `gapPx` between them: line 0 is at 0;
 // line n>=1 sits right where cell (n-1) ends, i.e. n*cellPx + (n-1)*gapPx
 // (NOT n*(cellPx+gapPx), which overshoots by one full gap for every line
-// past the first - the bug that made these look misaligned).
+// past the first).
 function linePos(n: number, cellPx: number, gapPx: number): number {
   return n === 0 ? 0 : n * cellPx + (n - 1) * gapPx;
 }
 
 // Edit-mode-only debugging aid: marks every grid line intersection so a
-// mismatch between the assumed cell grid and what's actually visible - a
-// stale out-of-bounds placement, a container shorter than dims.rows *
-// cellPx, drag math landing somewhere unexpected - is visible at a glance
-// instead of having to infer it from where widgets *look* like they are.
-// Deliberately painted *behind* the widget grid (no z-index of its own, and
-// placed earlier in the DOM - see Canvas.tsx) so it doesn't obscure widget
-// content; only the small sliver of each dot that isn't already covered by
-// a placed widget's cell shows through.
-export function GridDots({ dims, cellPx, gapPx }: GridDotsProps) {
+// mismatch between the assumed cell grid and what's actually visible is
+// visible at a glance instead of having to infer it from where widgets
+// *look* like they are. Deliberately painted *behind* the widget grid (no
+// z-index of its own, and placed earlier in the DOM - see Canvas.tsx) so it
+// doesn't obscure widget content.
+export function GridDots({ dims, cellWidth, cellHeight, gapPx }: GridDotsProps) {
   const dots: { x: number; y: number }[] = [];
   for (let row = 0; row <= dims.rows; row++) {
     for (let col = 0; col <= dims.cols; col++) {
-      dots.push({ x: linePos(col, cellPx, gapPx), y: linePos(row, cellPx, gapPx) });
+      dots.push({ x: linePos(col, cellWidth, gapPx), y: linePos(row, cellHeight, gapPx) });
     }
   }
 
