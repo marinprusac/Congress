@@ -18,16 +18,13 @@ export function WidgetPreviewPage() {
       isEmpty={(data?.length ?? 0) === 0}
       emptyLabel="— No pinned notes —"
     >
-      {data?.map((note) => (
-        <a
-          key={note.id}
-          href={`/notes/n/${note.id}`}
-          target="_top"
-          className="block border-b border-dust py-1.5 font-display text-sm text-ink first:pt-0 last:border-b-0 hover:text-accent"
-        >
-          {note.title}
-        </a>
-      ))}
+      <div className="notes-flow">
+        {data?.map((note) => (
+          <a key={note.id} href={`/notes/n/${note.id}`} target="_top" className="note-card note-card-mini">
+            <span className="block font-display text-sm text-ink">{note.title}</span>
+          </a>
+        ))}
+      </div>
     </WidgetPreviewShell>
   );
 }

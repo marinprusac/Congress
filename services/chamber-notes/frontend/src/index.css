@@ -1,1 +1,88 @@
 @import "@congress/congress-ui/styles.css";
+
+/* Note card: a rectangle with its top-right corner folded down, like a
+   dog-eared index card. The card itself is clipped along the fold diagonal;
+   a small triangle drawn over the cut represents the folded-back flap, with
+   a second, darker triangle underneath it standing in for the flap's own
+   cast shadow so the fold reads as raised paper rather than a flat cut. */
+:root {
+  --note-fold: 1.1rem;
+}
+
+.note-card {
+  --fold-shade: color-mix(in srgb, var(--color-dust) 45%, var(--color-parchment));
+  --fold-shadow: var(--color-dust);
+  position: relative;
+  display: block;
+  min-height: 5rem;
+  padding: 0.85rem 0.9rem;
+  background-color: color-mix(in srgb, var(--color-ink) 2.5%, var(--color-parchment));
+  border: 1px solid var(--color-dust);
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--note-fold)) 0,
+    100% var(--note-fold),
+    100% 100%,
+    0 100%
+  );
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--color-ink) 10%, transparent);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.note-card:hover,
+.note-card:focus-visible {
+  box-shadow: 0 3px 8px color-mix(in srgb, var(--color-ink) 16%, transparent);
+  transform: translateY(-1px);
+}
+
+.note-card::before,
+.note-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+/* Shadow triangle: sits a hair larger than the flap so a sliver peeks out
+   from beneath it along the fold's inner edge. */
+.note-card::before {
+  border-width: 0 var(--note-fold) var(--note-fold) 0;
+  border-color: transparent var(--fold-shadow) transparent transparent;
+}
+
+/* The flap itself, drawn slightly smaller and offset so the shadow shows. */
+.note-card::after {
+  top: 1px;
+  right: 1px;
+  border-width: 0 calc(var(--note-fold) - 3px) calc(var(--note-fold) - 3px) 0;
+  border-color: transparent var(--fold-shade) transparent transparent;
+}
+
+.note-card-pin {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.7rem;
+  color: var(--color-accent);
+}
+
+.note-card-mini {
+  --note-fold: 0.7rem;
+  min-height: 4rem;
+  padding: 0.55rem 0.6rem;
+}
+
+.notes-flow {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.75rem;
+}
+
+@media (min-width: 641px) {
+  .notes-flow {
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: 1rem;
+  }
+}

@@ -1,4 +1,3 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import {
@@ -10,9 +9,8 @@ import {
   ListLoadingState,
   ListErrorState,
   ListEmptyState,
-  formatTimestamp,
 } from "@congress/congress-ui";
-import { fetchNotes, fetchNote, searchNotes, setPinned } from "@/lib/api";
+import { fetchNotes, fetchNote, searchNotes } from "@/lib/api";
 import type { NoteSummary } from "../../../src/types";
 
 function sortPinnedFirst(notes: NoteSummary[]): NoteSummary[] {
@@ -22,21 +20,12 @@ function sortPinnedFirst(notes: NoteSummary[]): NoteSummary[] {
 export function NotesListPage() {
   const [query, setQuery] = useState("");
   const shellHosted = useShellHosted();
-  const queryClient = useQueryClient();
 
   const { data, isLoading, isError } = useSearchableList({
     queryKeyBase: "notes",
     query,
     fetchAll: fetchNotes,
     fetchSearch: searchNotes,
-  });
-
-  const pinMutation = useMutation({
-    mutationFn: ({ id, pinned }: { id: number; pinned: boolean }) => setPinned(id, pinned),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notes"] });
-      queryClient.invalidateQueries({ queryKey: ["notes", "pinned"] });
-    },
   });
 
   const notes = data ? sortPinnedFirst(data) : data;
@@ -47,40 +36,35 @@ export function NotesListPage() {
     <section>
       <ListSearchInput value={query} onChange={setQuery} placeholder="Search notes —" />
 
-      <div className="border-t border-dust">
+      <div className="mt-4 border-t border-dust pt-4">
         {isLoading && <ListLoadingState />}
         {isError && <ListErrorState label="Notes" />}
         {!isLoading && !isError && notes?.length === 0 && <ListEmptyState label="notes" hasQuery={!!query} />}
-        {!isLoading &&
-          !isError &&
-          notes?.map((note) => (
-            <div key={note.id} className="flex items-baseline gap-3 border-b border-dust px-1 py-3">
+        {!isLoading && !isError && notes && notes.length > 0 && (
+          <div className="notes-flow">
+            {notes.map((note) => (
               <Link
+                key={note.id}
                 to={resolveChamberPath(`/n/${note.id}`, "notes", shellHosted)}
                 onMouseEnter={() => prefetchNote(note.id)}
                 onFocus={() => prefetchNote(note.id)}
-                className="min-w-0 flex-1 hover:bg-ink/[0.03]"
+                className="note-card"
               >
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className="font-display text-lg text-ink">
-                    {note.pinned && <span className="mr-1.5 text-accent">*</span>}
-                    {note.title}
+                {note.pinned && (
+                  <span className="note-card-pin font-mono text-xs" aria-label="Pinned">
+                    *
                   </span>
-                  <span className="shrink-0 font-mono text-xs text-dust">
-                    {formatTimestamp(note.updatedAt)}
-                  </span>
-                </div>
-                {note.excerpt && <p className="mt-1 text-sm text-slate">{note.excerpt}</p>}
+                )}
+                <span
+                  className={`block font-display text-base text-ink ${note.pinned ? "pl-3.5" : ""}`}
+                >
+                  {note.title}
+                </span>
+                {note.excerpt && <p className="mt-1 line-clamp-2 text-xs text-slate">{note.excerpt}</p>}
               </Link>
-              <button
-                type="button"
-                onClick={() => pinMutation.mutate({ id: note.id, pinned: !note.pinned })}
-                className="tap-target shrink-0 font-mono text-xs uppercase tracking-wide text-dust hover:text-accent"
-              >
-                {note.pinned ? "Unpin" : "Pin"}
-              </button>
-            </div>
-          ))}
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
