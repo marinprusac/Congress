@@ -14,6 +14,7 @@ import {
   useShellHosted,
   resolveChamberPath,
   ConfirmSheet,
+  showToast,
 } from "@congress/congress-ui";
 import { fetchNote, updateNote, deleteNote, setPinned, fetchSettings, quickCreateNoteExhibit } from "@/lib/api";
 
@@ -56,7 +57,9 @@ export function NoteViewPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notes"] });
       navigate(resolveChamberPath("/", "notes", shellHosted));
+      showToast("Note deleted");
     },
+    onError: () => showToast("Failed to delete note.", "error"),
   });
 
   const pinMutation = useMutation({

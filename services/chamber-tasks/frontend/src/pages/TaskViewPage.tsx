@@ -13,6 +13,7 @@ import {
   useShellHosted,
   resolveChamberPath,
   ConfirmSheet,
+  showToast,
 } from "@congress/congress-ui";
 import { fetchTask, updateTask, deleteTask, quickCreateTaskExhibit } from "@/lib/api";
 
@@ -59,7 +60,9 @@ export function TaskViewPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       navigate(resolveChamberPath("/", "tasks", shellHosted));
+      showToast("Task deleted");
     },
+    onError: () => showToast("Failed to delete task.", "error"),
   });
 
   useEffect(() => {

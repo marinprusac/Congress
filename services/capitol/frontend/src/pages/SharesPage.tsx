@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CreateShareForm, ConfirmSheet, formatTimestamp } from "@congress/congress-ui";
+import { CreateShareForm, ConfirmSheet, formatTimestamp, showToast } from "@congress/congress-ui";
 import { fetchShares, revokeShare } from "@/lib/api";
 import { CapitolHeader } from "@/components/CapitolHeader";
 
@@ -17,7 +17,11 @@ function SharesList() {
 
   const revokeMutation = useMutation({
     mutationFn: (token: string) => revokeShare(token),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["capitol", "shares"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["capitol", "shares"] });
+      showToast("Share revoked");
+    },
+    onError: () => showToast("Failed to revoke share.", "error"),
   });
 
   if (isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;

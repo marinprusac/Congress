@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useShellHosted, resolveChamberPath } from "@congress/congress-ui";
+import { useShellHosted, resolveChamberPath, ListLoadingState } from "@congress/congress-ui";
 import { fetchEvents, fetchEvent } from "@/lib/api";
 import { groupEventsByDay, formatEventTime, formatDateRange } from "@/lib/datetime";
 
@@ -76,7 +76,7 @@ export function AgendaPage() {
         </div>
       ))}
 
-      {isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}
+      {isLoading && <ListLoadingState />}
       {isError && <p className="font-mono text-sm text-alert">Failed to reach the Calendar API.</p>}
       {!isLoading && !isError && groups.length === 0 && (
         <p className="border-t border-dust px-1 py-3 font-mono text-sm text-dust">

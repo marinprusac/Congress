@@ -1740,3 +1740,91 @@ html[data-theme="dark"] {
   color: var(--color-parchment);
 }
 
+/* ToastHost - brief, non-blocking confirmation/error banner after a
+   save/delete action, instead of the current silent-success/inline-only-
+   error default (see toast.ts). Mobile-first idiom, same as the docked
+   sheets: fixed to the viewport, above the mobile nav bar. */
+.toast-host {
+  position: fixed;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: calc(var(--mobile-nav-height, 0px) + 0.5rem);
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+@media (min-width: 641px) {
+  .toast-host {
+    left: auto;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    align-items: flex-end;
+  }
+}
+
+.toast {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  max-width: 24rem;
+  padding: 0.6em 1em;
+  border: 1px solid var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-parchment);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  animation: toast-in 180ms ease-out;
+}
+
+.toast-error {
+  border-color: var(--color-alert);
+  background: var(--color-alert);
+}
+
+@keyframes toast-in {
+  from {
+    transform: translateY(0.5rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ListLoadingState skeleton - see that component's own comment. */
+.list-skeleton-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--color-dust);
+  padding: 0.85rem 0.25rem;
+}
+
+.list-skeleton-bar {
+  height: 0.85em;
+  background-color: color-mix(in srgb, var(--color-dust) 35%, transparent);
+  animation: list-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.list-skeleton-title {
+  width: 45%;
+  height: 1.1em;
+}
+
+.list-skeleton-subtitle {
+  width: 75%;
+}
+
+@keyframes list-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+

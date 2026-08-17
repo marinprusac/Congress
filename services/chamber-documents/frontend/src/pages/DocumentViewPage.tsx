@@ -13,6 +13,7 @@ import {
   useShellHosted,
   resolveChamberPath,
   ConfirmSheet,
+  showToast,
 } from "@congress/congress-ui";
 import { fetchDocument, updateDocument, deleteDocument, downloadUrl } from "@/lib/api";
 
@@ -54,7 +55,9 @@ export function DocumentViewPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
       navigate(resolveChamberPath("/", "documents", shellHosted));
+      showToast("Document deleted");
     },
+    onError: () => showToast("Failed to delete document.", "error"),
   });
 
   useEffect(() => {
