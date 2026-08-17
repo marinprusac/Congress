@@ -146,8 +146,6 @@ export function DocumentViewPage() {
       ) : (
         <ExhibitLinksLayout
           exhibitId={`document-${doc.id}`}
-          emptyBacklinksLabel="Nothing references this document"
-          emptyFrontlinksLabel="This document references nothing"
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onNavigate={(r) => navigateToExhibit("documents", r, navigate, shellHosted)}
           editable

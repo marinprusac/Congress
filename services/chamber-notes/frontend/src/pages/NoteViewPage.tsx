@@ -209,8 +209,6 @@ export function NoteViewPage() {
       ) : (
         <ExhibitLinksLayout
           exhibitId={`note-${noteId}`}
-          emptyBacklinksLabel="Nothing references this note"
-          emptyFrontlinksLabel="This note references nothing"
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onNavigate={(r) => navigateToExhibit("notes", r, navigate, shellHosted)}
           editable

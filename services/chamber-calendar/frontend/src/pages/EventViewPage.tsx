@@ -48,8 +48,6 @@ export function EventViewPage() {
 
       <ExhibitLinksLayout
         exhibitId={exhibitId}
-        emptyBacklinksLabel="Nothing references this event"
-        emptyFrontlinksLabel="This event references nothing"
         renderIcon={(chamber) => getChamberIcon(chamber)}
         onNavigate={(r) => navigateToExhibit("calendar", r, navigate, shellHosted)}
         editable

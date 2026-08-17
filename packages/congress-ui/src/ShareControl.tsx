@@ -23,7 +23,7 @@ export function ShareControl({ chamber, exhibitId, exhibitName, className }: Sha
 
   return (
     <div className={className ? `${className} share-control` : "share-control"}>
-      <button type="button" className="share-control-trigger" onClick={() => setOpen((o) => !o)}>
+      <button type="button" className="share-control-trigger tap-target" onClick={() => setOpen((o) => !o)}>
         Share
       </button>
       <SharePopover open={open} onClose={() => setOpen(false)}>

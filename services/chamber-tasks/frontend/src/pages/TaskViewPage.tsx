@@ -131,8 +131,6 @@ export function TaskViewPage() {
 
       <ExhibitLinksLayout
         exhibitId={`task-${taskId}`}
-        emptyBacklinksLabel="Nothing references this task"
-        emptyFrontlinksLabel="This task references nothing"
         renderIcon={(chamber) => getChamberIcon(chamber)}
         onNavigate={(r) => navigateToExhibit("tasks", r, navigate, shellHosted)}
         editable

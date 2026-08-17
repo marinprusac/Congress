@@ -1336,21 +1336,15 @@ html[data-theme="dark"] {
   display: inline-block;
 }
 
+/* A plain text action, styled the same as every other button in the
+   action bar it lives in (Edit/Delete/Pin/...) - not a bordered box calling
+   extra attention to itself. */
 .share-control-trigger {
-  font-family: var(--font-mono);
-  font-size: 0.7em;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  /* Sized for a comfortable thumb tap, not just a readable label. */
-  padding: 0.55em 0.9em;
-  border: 1px solid var(--color-dust);
-  color: var(--color-ink);
-  background: var(--color-parchment);
+  color: var(--color-accent);
 }
 
 .share-control-trigger:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  text-decoration: underline;
 }
 
 /* Mobile-first: a bottom sheet is the default, not a fallback. A 320px

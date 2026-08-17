@@ -187,7 +187,6 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
 interface LinksPanelProps {
   title: string;
   results: ExhibitRefEntry[];
-  emptyLabel: string;
   renderIcon?: (chamber: string) => ReactNode;
   onNavigate?: (result: Extract<ExhibitRefEntry, { url: string }>) => void;
   className: string;
@@ -195,12 +194,12 @@ interface LinksPanelProps {
   onRemove?: (entry: ExhibitRefEntry) => void;
 }
 
-function LinksPanel({ title, results, emptyLabel, renderIcon, onNavigate, className, addControl, onRemove }: LinksPanelProps) {
+function LinksPanel({ title, results, renderIcon, onNavigate, className, addControl, onRemove }: LinksPanelProps) {
   return (
     <aside className={className}>
       <h3 className="mb-2 font-mono text-xs uppercase tracking-wide text-dust">{title}</h3>
       {results.length === 0 ? (
-        <p className="font-mono text-sm text-dust">— {emptyLabel} —</p>
+        <p className="font-mono text-sm text-dust">—</p>
       ) : (
         <ul className="space-y-2">
           {results.map((r) => (
@@ -233,8 +232,6 @@ function LinksPanel({ title, results, emptyLabel, renderIcon, onNavigate, classN
 
 interface ExhibitLinksLayoutProps {
   exhibitId: string;
-  emptyBacklinksLabel: string;
-  emptyFrontlinksLabel: string;
   renderIcon?: (chamber: string) => ReactNode;
   onNavigate?: (result: Extract<ExhibitRefEntry, { url: string }>) => void;
   children: ReactNode;
@@ -247,9 +244,9 @@ interface ExhibitLinksLayoutProps {
   actions?: ReactNode;
   className?: string;
   // Turns on the "+"/"×" controls on *both* panels - explicit references
-  // are a mirror: adding one from "Referenced by" writes to the picked
+  // are a mirror: adding one from "Backlinks" writes to the picked
   // Exhibit's own outgoing refs (via Capitol's proxy, see exhibitRefs.ts),
-  // exactly as if you'd added this Exhibit from that one's own "References"
+  // exactly as if you'd added this Exhibit from that one's own "Frontlinks"
   // panel. Omit to keep both panels read-only (the previous behavior).
   editable?: boolean;
   // Only a Chamber whose own Exhibits can be quick-created (Notes, today)
@@ -264,8 +261,6 @@ interface ExhibitLinksLayoutProps {
 // two-column row instead (see .exhibit-links-layout in styles.css).
 export function ExhibitLinksLayout({
   exhibitId,
-  emptyBacklinksLabel,
-  emptyFrontlinksLabel,
   renderIcon,
   onNavigate,
   children,
@@ -314,9 +309,8 @@ export function ExhibitLinksLayout({
       <div className="exhibit-links-main">{children}</div>
       <div className="exhibit-links-divider" aria-hidden="true" />
       <LinksPanel
-        title="Referenced by"
+        title="Backlinks"
         results={backlinks}
-        emptyLabel={emptyBacklinksLabel}
         renderIcon={renderIcon}
         onNavigate={onNavigate}
         className="exhibit-links-panel-back"
@@ -334,9 +328,8 @@ export function ExhibitLinksLayout({
         }
       />
       <LinksPanel
-        title="References"
+        title="Frontlinks"
         results={frontlinks}
-        emptyLabel={emptyFrontlinksLabel}
         renderIcon={renderIcon}
         onNavigate={onNavigate}
         className="exhibit-links-panel-front"
