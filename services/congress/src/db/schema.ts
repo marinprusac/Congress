@@ -74,9 +74,15 @@ export const shares = sqliteTable("shares", {
 // (POST /congress/events/publish) or poll for new entries since a cursor
 // (GET /congress/events?since=). Congress never inspects `type`/`payload`
 // or relays to a specific chamber by name - it's purely a store+fan-out,
-// same spirit as exhibit_cache. Pruned on a sweep (see events.ts) rather
-// than kept forever - a personal single-user system doesn't need unbounded
-// retention of already-fired events.
+// same spirit as exhibit_cache. `expiresAt` is computed once at publish
+// time (see events.ts's publishEvent) from the publishing chamber's own
+// declared retentionMs for that event type (manifestEventSchema), falling
+// back to a short default - copied onto the row rather than recomputed at
+// prune time so a chamber changing its declared retention later doesn't
+// retroactively change already-published rows. This is a switch, not a
+// durable record - a personal single-user system doesn't need unbounded
+// retention of already-fired events (that's Logs Chamber's own
+// event_history table's job).
 export const events = sqliteTable(
   "events",
   {
@@ -85,8 +91,9 @@ export const events = sqliteTable(
     type: text("type").notNull(),
     payloadJson: text("payload_json").notNull().default("{}"),
     occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
   },
-  (table) => [index("events_occurred_at_idx").on(table.occurredAt)]
+  (table) => [index("events_occurred_at_idx").on(table.occurredAt), index("events_expires_at_idx").on(table.expiresAt)]
 );
 
 // Single-row table (id is always 1) - one Congress-wide settings scope, not

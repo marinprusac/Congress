@@ -36,6 +36,14 @@ export const manifestEventSchema = z.object({
   type: z.string().min(1),
   label: z.string().min(1),
   description: z.string().optional(),
+  // How long Congress keeps a published instance of this event type in its
+  // own log before pruning it - Congress copies this number verbatim onto
+  // each published row (see services/congress/src/events.ts) without
+  // interpreting it, same as it never interprets `payload`. Defaults to a
+  // short window (see that file's DEFAULT_RETENTION_MS) when unset - the
+  // event log is a switch for chambers that poll on their own short
+  // interval, not a durable record (that's Logs Chamber's job).
+  retentionMs: z.number().int().positive().optional(),
 });
 export type ManifestEvent = z.infer<typeof manifestEventSchema>;
 

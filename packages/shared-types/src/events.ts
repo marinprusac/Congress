@@ -11,6 +11,19 @@ import { z } from "zod";
 // "<chamber>.<event>" (e.g. "tasks.due_soon") so it's self-namespacing
 // without a separate chamber filter downstream - see manifestEventSchema
 // (manifest.ts) for how a Chamber declares its own catalog of these.
+// A convention, not an enforced part of the request shape below - a
+// publishing Chamber may set `payload.priority` to one of these to signal
+// how much attention an instance of an event deserves (a task due in 5
+// minutes vs. one due tomorrow, say), ordered low to urgent. Congress itself
+// never reads this - it's Logs Chamber that extracts it (defaulting to
+// "normal" when a Chamber didn't set one) to drive its own rules'
+// `minPriority` threshold and its priority-filtered widget. Kept here rather
+// than chamber-local so any publishing Chamber and Logs Chamber agree on the
+// same vocabulary/ordering without importing from each other.
+export const PRIORITY_LEVELS = ["low", "normal", "high", "urgent"] as const;
+export const priorityLevelSchema = z.enum(PRIORITY_LEVELS);
+export type PriorityLevel = z.infer<typeof priorityLevelSchema>;
+
 export const eventPublishRequestSchema = z.object({
   chamber: z.string().min(1),
   type: z.string().min(1),

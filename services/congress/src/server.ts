@@ -11,7 +11,7 @@ import {
   eventPublishRequestSchema,
 } from "@congress/shared-types";
 import { env } from "./env.js";
-import { requireInternalToken } from "./auth.js";
+import { requireInternalToken, requireSessionOrInternalToken } from "./auth.js";
 import { authRoutes, requireSession } from "./sessionAuth.js";
 import { capitolManifest } from "./manifest.js";
 import {
@@ -57,7 +57,7 @@ mountManifestAndHealth(app, capitolManifest);
 
 app.route("/auth", authRoutes);
 
-app.get("/congress/registry", requireSession, (c) => c.json(listChambers()));
+app.get("/congress/registry", requireSessionOrInternalToken, (c) => c.json(listChambers()));
 
 // Public/unauthenticated - see proxyToChamberIcon's own comment for why.
 app.get("/congress/chambers/:name/icon", (c) => proxyToChamberIcon(c, c.req.param("name")));
@@ -310,11 +310,10 @@ app.route("/congress/shared", sharedApp);
 
 app.all("/api/:chamber/*", requireSession, forwardToChamber);
 
-// /mcp is called by MCP clients (Claude Code), not the browser, so it's
-// gated by the same shared-secret header Chambers use to register/heartbeat
-// rather than the browser session cookie.
-app.use("/mcp", requireInternalToken);
-app.use("/mcp/*", requireInternalToken);
+// /mcp is called by MCP clients (Claude Code), not the browser - gated by
+// the same shared-secret header Chambers use to register/heartbeat, baked
+// into createMcpApp itself (chamber-kit) rather than an extra middleware
+// layer here, same as every other Chamber's own /mcp mount.
 app.route("/mcp", mcpApp);
 
 // Each Chamber's own frontend is reachable through Capitol at
@@ -350,11 +349,11 @@ export function stopHeartbeatSweep() {
   if (sweepInterval) clearInterval(sweepInterval);
 }
 
-// Once an hour is plenty for a 7-day retention window (see events.ts) - this
-// is housekeeping, not something that needs its own env-tunable interval
-// like the heartbeat sweep (where too slow/fast actually changes observable
-// behavior).
-const EVENT_PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+// Short on purpose: retention is per-event and can be as low as a few
+// minutes (see events.ts's DEFAULT_RETENTION_MS/manifestEventSchema), so an
+// hourly sweep would let short-retention rows sit for up to an hour past
+// their own expiresAt before actually disappearing.
+const EVENT_PRUNE_INTERVAL_MS = 5 * 60 * 1000;
 
 let eventPruneInterval: ReturnType<typeof setInterval> | undefined;
 

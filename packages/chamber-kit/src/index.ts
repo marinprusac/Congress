@@ -4,6 +4,7 @@ export * from "./registerWithCapitol.js";
 export * from "./mcp.js";
 export * from "./exhibits.js";
 export * from "./events.js";
+export * from "./registry.js";
 export * from "./settings.js";
 export * from "./routes.js";
 export * from "./wikilinks.js";

@@ -109,10 +109,12 @@ don't reimplement them:
 | `createDb(dbPath, schema)` | better-sqlite3 + WAL + drizzle, migrations wired up. |
 | `loadEnv(schema)` | zod-validated env loading; extend `chamberEnvSchema` with your own `PORT`/`DB_PATH` defaults. |
 | `createChamberBootstrap({...})` | The entire boot sequence — migrate, listen, register + heartbeat with Congress, clean shutdown on SIGINT/SIGTERM. Your `src/index.ts` is ~7 lines that call this once. |
-| `createMcpApp(name, registerTools)` | The full MCP transport/session/error plumbing. You only write `server.registerTool(...)` calls. |
+| `createMcpApp(name, registerTools, internalToken)` | The full MCP transport/session/error plumbing, plus gating `/mcp` behind the same shared-secret header used for register/heartbeat/events - you only write `server.registerTool(...)` calls. |
+| `fetchRegistry(capitolUrl, internalToken)` | Server-side counterpart to congress-ui's own `fetchRegistry` - resolves another Chamber's `apiBase`/`mcpUrl` out of the live registry, e.g. before calling one of its tools. |
+| `listChamberTools(mcpUrl, internalToken)` / `callChamberTool(mcpUrl, internalToken, name, args)` | A short-lived MCP *client* against another Chamber's own `mcpUrl` - `tools/list`/`tools/call`, gated the same way. What Automation Chamber's automations use to actually do something, see §5.3. |
 | `createTableBackedExhibits(config)` | Implements the whole Exhibit content contract (search/resolve/get/update) for a table-backed entity from a handful of callbacks. |
 | `createPushExhibitSync(opts)` | Fire-and-forget `POST /congress/exhibits/sync` after create/update/delete. |
-| `createPublishEvent(opts)` | Fire-and-forget `POST /congress/events/publish` for a domain event another Chamber's automations might react to - see §5.2. |
+| `createPublishEvent(opts)` | Fire-and-forget `POST /congress/events/publish` for a domain event another Chamber's rules or automations might react to - see §5.2. |
 | `createSingleRowSettings(config)` | The "id is always 1, select-then-upsert" settings pattern every Chamber uses. |
 | `createManualRefs`/`createManualRefsByExhibitId` | CRUD for the "References" side-panel refs, separate from wikilinks parsed out of body text. |
 | `extractOutgoingExhibitRefs(text)` | Parses `[[...]]` tokens out of body text into an exhibit-id list. |
@@ -232,12 +234,14 @@ manifest is correct and the process is heartbeating.
 
 If your Chamber has a background check that decides "the owner should know
 about this" (a due date, an incoming webhook, anything else only your
-Chamber can detect), don't invent your own alert UI and don't push a
-notification directly — publish a domain event instead, and let the
-Notifications Chamber's own automations (Exhibits the owner edits) decide
-whether/what to notify. This keeps the "what does this say, should it even
-fire" decision editable without a code change, and means your Chamber has
-no idea whether anything is listening at all.
+Chamber can detect) — or that something should happen elsewhere in
+response — don't invent your own alert UI, don't push a notification
+directly, and don't call another Chamber's API yourself. Publish a domain
+event instead, and let Logs Chamber's own rules and Automation Chamber's
+own automations (both Exhibits the owner edits) decide whether/what to do
+about it. This keeps the "should this even fire, and what happens" decision
+editable without a code change, and means your Chamber has no idea whether
+anything is listening at all.
 
 ```ts
 import { createPublishEvent } from "@congress/chamber-kit";
@@ -259,12 +263,16 @@ it's self-namespacing without a separate chamber filter downstream. Congress
 itself only ever appends this to its own generic event log
 (`POST /congress/events/publish`) — it never inspects `type`/`payload` or
 relays to a specific chamber by name, so publishing works the same whether
-or not the Notifications Chamber (or anything else) happens to be
-registered.
+or not Logs Chamber, Automation Chamber, or anything else happens to be
+registered. If `payload` includes a `priority` field, set it to one of
+`PRIORITY_LEVELS` (`shared-types`: `"low" | "normal" | "high" | "urgent"`) -
+a convention, not enforced - so Logs Chamber's own rules and
+priority-filtered widget can tell an urgent firing from a routine one;
+anything else defaults to `"normal"`.
 
 Optionally declare the event types you may publish in your manifest's
 `events` array (mirrors `widgets`, but keyed by `type`/`label`/
-`description?` rather than `id`/`width`/`height`/`label`):
+`description?`/`retentionMs?` rather than `id`/`width`/`height`/`label`):
 
 ```ts
 events: [
@@ -276,11 +284,28 @@ events: [
 ],
 ```
 
-This is purely a declared catalog — it's what populates the trigger-type
-picker on the Notifications Chamber's own automation editor (read live off
+This is purely a declared catalog — it's what populates the trigger-event
+picker on Logs Chamber's and Automation Chamber's own editors (read live off
 `GET /congress/registry`, never hardcoded to a specific chamber name), not a
 subscription or a requirement to actually fire that event. Defaulted to
 `[]` like `widgets`, so most Chambers never touch this field at all.
+`retentionMs` controls how long Congress keeps a published instance of that
+event type in its own log before pruning it — an hour by default
+(`DEFAULT_RETENTION_MS`, `services/congress/src/events.ts`), which is
+already plenty for any Chamber polling on a normal interval; only set it if
+your own consumer polls unusually infrequently.
+
+### 5.3 Being called by an automation
+
+Any MCP tool your Chamber registers via `registerTools` (§4) is automatically
+callable by an Automation Chamber automation — there's nothing to opt into
+or declare separately, since Automation Chamber just resolves your
+`mcpUrl` off the registry and calls whatever `tools/list` returns. Write
+your tools the same way regardless of who's calling them (a human via
+Claude Code, or an automation reacting to an event): a clear `description`
+and per-property `description`s in your `inputSchema` are what the owner
+sees when building an automation against your Chamber in the editor, so
+they're worth the same care as your REST API's own request validation.
 
 ## 6. Local dev workflow
 
