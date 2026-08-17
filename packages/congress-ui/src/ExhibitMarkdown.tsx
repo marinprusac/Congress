@@ -10,7 +10,7 @@ import { toMarkdownWithExhibitLinks, decodeExhibitLinkHref } from "./wikilinks.j
 interface ExhibitMarkdownProps {
   body: string;
   onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
-  // See useResolvedExhibits - defaults to Capitol's own-session resolve
+  // See useResolvedExhibits - defaults to Congress's own-session resolve
   // endpoint; SharedViewPage passes the token-scoped one instead.
   resolveUrl?: string;
   // Called with how far through the rendered text (0 = start, 1 = end) the

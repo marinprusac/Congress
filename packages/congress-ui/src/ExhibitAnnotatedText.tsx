@@ -11,7 +11,7 @@ interface ExhibitAnnotatedTextProps {
   renderIcon?: (chamber: string) => ReactNode;
   onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
   className?: string;
-  // See useResolvedExhibits - defaults to Capitol's own-session resolve
+  // See useResolvedExhibits - defaults to Congress's own-session resolve
   // endpoint; SharedViewPage passes the token-scoped one instead.
   resolveUrl?: string;
 }
