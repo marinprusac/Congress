@@ -137,6 +137,39 @@ export function TaskViewPage() {
         onNavigate={(r) => navigateToExhibit("tasks", r, navigate, shellHosted)}
         editable
         onCreateReference={onCreateExhibit}
+        actions={
+          <ExhibitActionBar>
+            {editing ? (
+              <>
+                <button onClick={save} className="tap-target text-accent hover:underline">
+                  Save
+                </button>
+                <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => completeMutation.mutate(!task.completed)}
+                  className="tap-target text-accent hover:underline"
+                >
+                  {task.completed ? "Reopen" : "Complete"}
+                </button>
+                <ShareControl chamber="tasks" exhibitId={`task-${taskId}`} exhibitName={task.name} />
+                <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
+                  Edit
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(true)}
+                  className="tap-target text-alert hover:underline"
+                >
+                  Delete
+                </button>
+              </>
+            )}
+          </ExhibitActionBar>
+        }
       >
         {editing ? (
           <ExhibitTextarea
@@ -157,38 +190,6 @@ export function TaskViewPage() {
         ) : (
           <p className="whitespace-pre-wrap text-base text-dust">— No description —</p>
         )}
-
-        <ExhibitActionBar>
-          {editing ? (
-            <>
-              <button onClick={save} className="tap-target text-accent hover:underline">
-                Save
-              </button>
-              <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => completeMutation.mutate(!task.completed)}
-                className="tap-target text-accent hover:underline"
-              >
-                {task.completed ? "Reopen" : "Complete"}
-              </button>
-              <ShareControl chamber="tasks" exhibitId={`task-${taskId}`} exhibitName={task.name} />
-              <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
-                Edit
-              </button>
-              <button
-                onClick={() => setConfirmingDelete(true)}
-                className="tap-target text-alert hover:underline"
-              >
-                Delete
-              </button>
-            </>
-          )}
-        </ExhibitActionBar>
       </ExhibitLinksLayout>
       <ConfirmSheet
         open={confirmingDelete}

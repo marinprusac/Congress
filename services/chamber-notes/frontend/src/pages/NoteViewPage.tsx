@@ -215,30 +215,32 @@ export function NoteViewPage() {
           onNavigate={(r) => navigateToExhibit("notes", r, navigate, shellHosted)}
           editable
           onCreateReference={onCreateExhibit}
+          actions={
+            <ExhibitActionBar>
+              <button
+                onClick={() => pinMutation.mutate(!note.pinned)}
+                className="tap-target text-accent hover:underline"
+              >
+                {note.pinned ? "Unpin" : "Pin"}
+              </button>
+              <ShareControl chamber="notes" exhibitId={`note-${noteId}`} exhibitName={note.title} />
+              <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
+                Edit
+              </button>
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                className="tap-target text-alert hover:underline"
+              >
+                Delete
+              </button>
+            </ExhibitActionBar>
+          }
         >
           <ExhibitMarkdown
             body={body}
             onDoubleClick={editAtFraction}
             onNavigate={(r) => navigateToExhibit("notes", r, navigate, shellHosted)}
           />
-          <ExhibitActionBar>
-            <button
-              onClick={() => pinMutation.mutate(!note.pinned)}
-              className="tap-target text-accent hover:underline"
-            >
-              {note.pinned ? "Unpin" : "Pin"}
-            </button>
-            <ShareControl chamber="notes" exhibitId={`note-${noteId}`} exhibitName={note.title} />
-            <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
-              Edit
-            </button>
-            <button
-              onClick={() => setConfirmingDelete(true)}
-              className="tap-target text-alert hover:underline"
-            >
-              Delete
-            </button>
-          </ExhibitActionBar>
         </ExhibitLinksLayout>
       )}
       <ConfirmSheet

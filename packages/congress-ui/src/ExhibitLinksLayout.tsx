@@ -198,18 +198,13 @@ interface LinksPanelProps {
 function LinksPanel({ title, results, emptyLabel, renderIcon, onNavigate, className, addControl, onRemove }: LinksPanelProps) {
   return (
     <aside className={className}>
-      <h3 className="mb-2 flex flex-wrap items-center justify-between gap-y-2 font-mono text-xs uppercase tracking-wide text-dust">
-        <span>
-          {title} ({results.length})
-        </span>
-        {addControl}
-      </h3>
+      <h3 className="mb-2 font-mono text-xs uppercase tracking-wide text-dust">{title}</h3>
       {results.length === 0 ? (
         <p className="font-mono text-sm text-dust">— {emptyLabel} —</p>
       ) : (
-        <ul>
+        <ul className="space-y-2">
           {results.map((r) => (
-            <li key={`${r.chamber}:${r.id}`} className="flex items-center gap-1 border-b border-dust py-2">
+            <li key={`${r.chamber}:${r.id}`} className="flex items-center gap-1">
               <ExhibitChip
                 result={r}
                 renderIcon={renderIcon}
@@ -231,6 +226,7 @@ function LinksPanel({ title, results, emptyLabel, renderIcon, onNavigate, classN
           ))}
         </ul>
       )}
+      {addControl && <div className="mt-2">{addControl}</div>}
     </aside>
   );
 }
@@ -242,6 +238,13 @@ interface ExhibitLinksLayoutProps {
   renderIcon?: (chamber: string) => ReactNode;
   onNavigate?: (result: Extract<ExhibitRefEntry, { url: string }>) => void;
   children: ReactNode;
+  // The page's own action bar (Edit/Delete/Share/...) - kept separate from
+  // `children` rather than just the last thing rendered in them, so it can
+  // sit *after* the reference panels instead of before them (see
+  // .exhibit-links-layout's grid-template-areas: content, then references,
+  // then actions last - nobody scans past the actions of a note they
+  // haven't finished reading the references of yet).
+  actions?: ReactNode;
   className?: string;
   // Turns on the "+"/"×" controls on *both* panels - explicit references
   // are a mirror: adding one from "Referenced by" writes to the picked
@@ -266,6 +269,7 @@ export function ExhibitLinksLayout({
   renderIcon,
   onNavigate,
   children,
+  actions,
   className,
   editable,
   onCreateReference,
@@ -307,6 +311,8 @@ export function ExhibitLinksLayout({
 
   return (
     <div className={["exhibit-links-layout", className].filter(Boolean).join(" ")}>
+      <div className="exhibit-links-main">{children}</div>
+      <div className="exhibit-links-divider" aria-hidden="true" />
       <LinksPanel
         title="Referenced by"
         results={backlinks}
@@ -327,7 +333,6 @@ export function ExhibitLinksLayout({
           )
         }
       />
-      <div className="exhibit-links-main">{children}</div>
       <LinksPanel
         title="References"
         results={frontlinks}
@@ -348,6 +353,7 @@ export function ExhibitLinksLayout({
           )
         }
       />
+      {actions && <div className="exhibit-links-actions">{actions}</div>}
     </div>
   );
 }

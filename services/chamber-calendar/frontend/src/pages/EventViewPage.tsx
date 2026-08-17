@@ -53,6 +53,26 @@ export function EventViewPage() {
         renderIcon={(chamber) => getChamberIcon(chamber)}
         onNavigate={(r) => navigateToExhibit("calendar", r, navigate, shellHosted)}
         editable
+        actions={
+          <ExhibitActionBar>
+            <ShareControl chamber="calendar" exhibitId={exhibitId} exhibitName={event.title} />
+            <Link
+              to={resolveChamberPath(
+                `/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}/edit`,
+                "calendar",
+                shellHosted
+              )}
+              className="tap-target text-accent hover:underline"
+            >
+              {event.editable ? "Edit" : "View / Delete"}
+            </Link>
+            {!event.editable && (
+              <span className="font-mono text-xs uppercase tracking-wide text-dust">
+                Managed by its organizer — not editable
+              </span>
+            )}
+          </ExhibitActionBar>
+        }
       >
         <dl className="space-y-4 font-mono text-sm">
           <div>
@@ -94,25 +114,6 @@ export function EventViewPage() {
             Open in Google Calendar ↗
           </a>
         )}
-
-        <ExhibitActionBar>
-          <ShareControl chamber="calendar" exhibitId={exhibitId} exhibitName={event.title} />
-          <Link
-            to={resolveChamberPath(
-              `/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}/edit`,
-              "calendar",
-              shellHosted
-            )}
-            className="tap-target text-accent hover:underline"
-          >
-            {event.editable ? "Edit" : "View / Delete"}
-          </Link>
-          {!event.editable && (
-            <span className="font-mono text-xs uppercase tracking-wide text-dust">
-              Managed by its organizer — not editable
-            </span>
-          )}
-        </ExhibitActionBar>
       </ExhibitLinksLayout>
     </section>
   );

@@ -151,6 +151,20 @@ export function DocumentViewPage() {
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onNavigate={(r) => navigateToExhibit("documents", r, navigate, shellHosted)}
           editable
+          actions={
+            <ExhibitActionBar>
+              <ShareControl chamber="documents" exhibitId={`document-${doc.id}`} exhibitName={doc.title} />
+              <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
+                Edit
+              </button>
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                className="tap-target text-alert hover:underline"
+              >
+                Delete
+              </button>
+            </ExhibitActionBar>
+          }
         >
           {doc.description ? (
             <ExhibitAnnotatedText
@@ -162,18 +176,6 @@ export function DocumentViewPage() {
           ) : (
             <p className="font-mono text-sm text-dust">— No description —</p>
           )}
-          <ExhibitActionBar>
-            <ShareControl chamber="documents" exhibitId={`document-${doc.id}`} exhibitName={doc.title} />
-            <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
-              Edit
-            </button>
-            <button
-              onClick={() => setConfirmingDelete(true)}
-              className="tap-target text-alert hover:underline"
-            >
-              Delete
-            </button>
-          </ExhibitActionBar>
         </ExhibitLinksLayout>
       )}
       <ConfirmSheet

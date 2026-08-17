@@ -102,6 +102,14 @@ html[data-theme="dark"] {
        is unaffected: it's driven entirely by JS touch tracking, not by the
        native overscroll this disables. */
     overscroll-behavior-y: none;
+    /* Also suppresses iOS's edge-swipe-back gesture in a standalone PWA -
+       that gesture rides the same overscroll/rubber-band mechanism at the
+       document's own left/right edge this disables. Horizontal drags are
+       reserved for a future in-app gesture instead of browser-history
+       navigation; this doesn't touch nested horizontal scrollers like
+       .note-prose pre/.note-table-wrapper, which scroll within their own
+       box, not the document's. */
+    overscroll-behavior-x: none;
   }
 
   body {
@@ -675,15 +683,19 @@ html[data-theme="dark"] {
   opacity: 0.75;
 }
 
-/* Mobile default: content on top, backlinks/frontlinks stacked as a
-   two-column row below it. */
+/* Mobile default: content, then a single divider spanning both columns,
+   then backlinks/frontlinks as a two-column row, then the page's own
+   actions last - nobody needs Edit/Delete before they've even seen what
+   references this. */
 .exhibit-links-layout {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-areas:
     "main main"
-    "back front";
-  gap: 2rem 1.5rem;
+    "divider divider"
+    "back front"
+    "actions actions";
+  gap: 1.5rem 1.5rem;
 }
 
 .exhibit-links-main {
@@ -691,13 +703,20 @@ html[data-theme="dark"] {
   min-width: 0;
 }
 
+/* One boundary shared by both columns, not one each - two side-by-side
+   half-width lines read as a layout glitch, not a section break. */
+.exhibit-links-divider {
+  grid-area: divider;
+  border-top: 1px solid var(--color-dust);
+}
+
+.exhibit-links-actions {
+  grid-area: actions;
+}
+
 .exhibit-links-panel-back,
 .exhibit-links-panel-front {
   min-width: 0;
-  /* A visible boundary, not just whitespace - side-by-side panels with no
-     border read as one ambiguous block instead of two distinct lists. */
-  border-top: 1px solid var(--color-dust);
-  padding-top: 1rem;
 }
 
 .exhibit-links-panel-back {
@@ -709,19 +728,20 @@ html[data-theme="dark"] {
 }
 
 /* Desktop: backlinks and frontlinks flank the content instead of stacking
-   below it. */
+   below it - "back"/"front" span both rows so the actions row underneath
+   "main" doesn't leave a gap in either side panel's own border/padding. */
 @media (min-width: 641px) {
   .exhibit-links-layout {
     grid-template-columns: 12rem minmax(0, 1fr) 12rem;
-    grid-template-areas: "back main front";
-    gap: 0;
+    grid-template-areas:
+      "back main front"
+      "back actions front";
+    gap: 1.5rem 0;
     align-items: start;
   }
 
-  .exhibit-links-panel-back,
-  .exhibit-links-panel-front {
-    border-top: none;
-    padding-top: 0;
+  .exhibit-links-divider {
+    display: none;
   }
 
   .exhibit-links-panel-back {
