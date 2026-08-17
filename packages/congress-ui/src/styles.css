@@ -1887,10 +1887,13 @@ html[data-theme="dark"] {
    an in-flow element would, so without this the *last* row(s) of a long
    list would end up permanently hidden underneath it while scrolled to the
    bottom. Sized to roughly the search bar's own height plus its bottom
-   offset (mobile: above --mobile-nav-height; desktop: its own 1.5rem
-   inset), with a little extra breathing room. */
+   offset - NOT --mobile-nav-height too: .chamber-shell's own padding-bottom
+   (see above) already reserves that for the fixed bottom nav, and the
+   search bar's own `bottom` is already expressed *relative to* that same
+   nav clearance, so adding it again here would double-reserve it and leave
+   a large dead gap at the end of every list. */
 .list-page {
-  padding-bottom: calc(var(--mobile-nav-height, 0px) + 3.5rem);
+  padding-bottom: 3.5rem;
 }
 
 @media (min-width: 641px) {

@@ -85,15 +85,19 @@
 /* .note-card is width: fit-content (see above) - without this, a long
    *excerpt* line would inflate that fit-content calculation just as much
    as the title does, so a note with a short title but a long body preview
-   would still end up with a wide card. width: 0 makes this element
-   contribute nothing to its fit-content parent's own width calculation
-   (a specified width, unlike auto, is what that calculation reads per
-   child); min-width: 100% then re-expands it to fill whatever width the
-   *title* ended up settling on, once that's resolved. Title is the only
-   thing allowed to size the card; the excerpt just wraps/clips within it. */
+   would still end up with a wide card. contain: inline-size is the
+   spec-built-in tool for exactly this: it makes this element's inline size
+   independent of its own content, so it contributes nothing to its
+   fit-content parent's width calculation during layout - the title is the
+   only thing allowed to size the card. (A previous width: 0 / min-width:
+   100% version of this same idea relied on browsers correctly treating an
+   explicit width:0 as this element's max-content contribution; that broke
+   on iOS Safari specifically for this -webkit-line-clamp'd element, which
+   is why this uses real size containment instead of an intrinsic-size
+   hack.) Once the card's own width is resolved, this normal in-flow block
+   child just fills it (default block behavior), no width:100% needed. */
 .note-card-excerpt {
-  width: 0;
-  min-width: 100%;
+  contain: inline-size;
 }
 
 .note-card-mini {
