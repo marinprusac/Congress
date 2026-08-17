@@ -1836,6 +1836,53 @@ html[data-theme="dark"] {
   }
 }
 
+/* ListSearchInput - floats fixed to the bottom of the viewport, on top of
+   the list content instead of scrolling away with it, on every breakpoint
+   (unlike .notification-panel's mobile-fixed/desktop-anchored split, this
+   is a persistent piece of chrome, not a transient popover, so it stays
+   fixed on desktop too). Mobile: clears the fixed bottom nav via
+   --mobile-nav-height, same idiom as .notification-panel. Desktop: clears
+   the fixed left sidebar via --chamber-picker-width, then centers within
+   the remaining width up to a comfortable max (auto margins on a fixed
+   element with both left/right set center it the same way they would on an
+   absolutely-positioned one). */
+.list-search-input {
+  position: fixed;
+  z-index: 40;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: calc(var(--mobile-nav-height, 0px) + 0.5rem);
+  box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
+}
+
+@media (min-width: 641px) {
+  .list-search-input {
+    left: calc(var(--chamber-picker-width, 0px) + 1.5rem);
+    right: 1.5rem;
+    bottom: 1.5rem;
+    max-width: 26rem;
+    margin: 0 auto;
+  }
+}
+
+/* Applied to a list page's own outermost <section> (alongside
+   .list-search-input above) - since the search bar is now fixed/out of
+   flow, it no longer reserves its own space at the top of the page the way
+   an in-flow element would, so without this the *last* row(s) of a long
+   list would end up permanently hidden underneath it while scrolled to the
+   bottom. Sized to roughly the search bar's own height plus its bottom
+   offset (mobile: above --mobile-nav-height; desktop: its own 1.5rem
+   inset), with a little extra breathing room. */
+.list-page {
+  padding-bottom: calc(var(--mobile-nav-height, 0px) + 3.5rem);
+}
+
+@media (min-width: 641px) {
+  .list-page {
+    padding-bottom: 4.5rem;
+  }
+}
+
 /* ListLoadingState skeleton - see that component's own comment. */
 .list-skeleton-row {
   display: flex;

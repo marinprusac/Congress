@@ -48,7 +48,7 @@ export function TasksListPage() {
   const prefetchTask = useListRowPrefetch((id: number) => ["task", id], fetchTask);
 
   return (
-    <section>
+    <section className="list-page">
       <ListSearchInput value={query} onChange={setQuery} placeholder="Search tasks —" />
 
       <div className="border-t border-dust">

@@ -40,7 +40,7 @@ export function DocumentsListPage() {
   const documents = data;
 
   return (
-    <section>
+    <section className="list-page">
       <ListSearchInput value={query} onChange={setQuery} placeholder="Search documents —" />
 
       <div className="border-t border-dust">

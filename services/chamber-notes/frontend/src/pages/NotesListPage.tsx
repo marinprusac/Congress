@@ -33,7 +33,7 @@ export function NotesListPage() {
   const prefetchNote = useListRowPrefetch((id: number) => ["note", id], fetchNote);
 
   return (
-    <section>
+    <section className="list-page">
       <ListSearchInput value={query} onChange={setQuery} placeholder="Search notes —" />
 
       <div className="mt-4 border-t border-dust pt-4">
