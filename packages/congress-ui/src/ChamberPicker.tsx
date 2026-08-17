@@ -50,7 +50,12 @@ function buildChamberList(
   current: string,
   currentLabel: string | undefined
 ): PickerChamber[] {
-  const fromRegistry = registryChambers.map((c) => ({ name: c.name, displayName: c.displayName, href: c.routes.home }));
+  // Capitol is a normal registered Chamber since the Congress/Capitol
+  // split, but it already gets its own dedicated, always-present row via
+  // <CapitolLink> below - included here too it would show up twice.
+  const fromRegistry = registryChambers
+    .filter((c) => c.name !== "capitol")
+    .map((c) => ({ name: c.name, displayName: c.displayName, href: c.routes.home }));
   if (current === "capitol" || fromRegistry.some((c) => c.name === current)) return fromRegistry;
   return [{ name: current, displayName: currentLabel ?? current, href: `/${current}` }, ...fromRegistry];
 }
