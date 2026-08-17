@@ -6,9 +6,24 @@ export type ChamberStatus = z.infer<typeof chamberStatusSchema>;
 export const manifestRoutesSchema = z.object({
   home: z.string(),
   settings: z.string(),
-  widget: z.string(),
 });
 export type ManifestRoutes = z.infer<typeof manifestRoutesSchema>;
+
+// One entry per homepage widget a Chamber contributes to Capitol's cell-based
+// canvas. `id` is a stable identifier - the key into that Chamber's
+// remote-entry `widgets` export (see ChamberHost/remoteModule.ts) and part
+// of its canvas placement key - never shown to the user, unlike `label`.
+// `width`/`height` are the widget's fixed footprint in canvas cells,
+// declared by the Chamber and not user-resizable. No route: a widget isn't
+// a navigable URL, it's a component resolved out of the Chamber's own
+// already-built remote-entry.js.
+export const manifestWidgetSchema = z.object({
+  id: z.string().min(1),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  label: z.string().min(1),
+});
+export type ManifestWidget = z.infer<typeof manifestWidgetSchema>;
 
 export const manifestSchema = z.object({
   name: z.string().min(1),
@@ -23,6 +38,10 @@ export const manifestSchema = z.object({
   // pages/SharedViewPage.tsx). Defaults to plain annotated text; set to
   // "markdown" if bodies use [[wikilink]]/Markdown syntax (e.g. Notes).
   contentFormat: z.enum(["markdown", "plain"]).optional(),
+  // Homepage widgets this Chamber contributes to Capitol's canvas. Defaulted
+  // so a Chamber registering against an old manifest shape (or a chamber with
+  // no widgets, like Capitol itself) never has to think about this field.
+  widgets: z.array(manifestWidgetSchema).default([]),
 });
 export type Manifest = z.infer<typeof manifestSchema>;
 

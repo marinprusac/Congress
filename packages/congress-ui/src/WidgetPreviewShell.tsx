@@ -1,9 +1,16 @@
-import { useRef, type ReactNode } from "react";
-import { useWidgetPullBridge } from "./useWidgetPullBridge.js";
+import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
+import { useShellHosted, resolveChamberPath } from "./ShellHostContext.js";
 
 export interface WidgetPreviewShellProps {
   label: string;
+  // This widget's own Chamber-relative "add new" target (e.g. "/new") - see
+  // resolveChamberPath's doc comment for why it's written relative rather
+  // than a pre-resolved absolute path.
   addHref: string;
+  // Identifies this widget's own Chamber for resolveChamberPath - e.g.
+  // "notes". Always a real Chamber (Capitol renders no widgets of its own).
+  ownChamber: string;
   addLabel?: string;
   isLoading: boolean;
   isError: boolean;
@@ -16,14 +23,15 @@ export interface WidgetPreviewShellProps {
   children?: ReactNode;
 }
 
-// The chrome shared by every Chamber's widget preview - it's embedded
-// directly as Capitol's homepage widget for that Chamber (via an iframe at
-// chamber.routes.widget), not visited on its own. Links use target="_top"
-// so a click breaks out of the iframe and navigates Capitol's own tab,
-// rather than routing inside the small embedded frame.
+// The chrome shared by every Chamber's widget content - mounted directly
+// into Capitol's canvas as a real component (via each Chamber's own
+// remote-entry.js widgets export - see ChamberHost/remoteModule.ts), not an
+// iframe, so links here are ordinary same-document <Link>s through
+// resolveChamberPath rather than a target="_top" iframe-breakout.
 export function WidgetPreviewShell({
   label,
   addHref,
+  ownChamber,
   addLabel = "+ New",
   isLoading,
   isError,
@@ -32,22 +40,20 @@ export function WidgetPreviewShell({
   emptyLabel,
   children,
 }: WidgetPreviewShellProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  useWidgetPullBridge(scrollRef);
+  const shellHosted = useShellHosted();
 
   return (
-    <div className="flex h-screen flex-col bg-parchment p-3 text-ink">
+    <div className="flex h-full flex-col bg-parchment p-3 text-ink">
       <div className="mb-2 flex shrink-0 items-baseline justify-between">
         <p className="font-mono text-[10px] uppercase tracking-widest text-dust">{label}</p>
-        <a
-          href={addHref}
-          target="_top"
+        <Link
+          to={resolveChamberPath(addHref, ownChamber, shellHosted)}
           className="font-mono text-[10px] uppercase tracking-wide text-accent hover:underline"
         >
           {addLabel}
-        </a>
+        </Link>
       </div>
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading && <p className="font-mono text-xs text-dust">Loading —</p>}
         {isError && <p className="font-mono text-xs text-alert">{errorLabel}</p>}
         {!isLoading && !isError && isEmpty && <p className="font-mono text-xs text-dust">{emptyLabel}</p>}

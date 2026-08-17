@@ -1,14 +1,18 @@
 import { z } from "zod";
 
-// Capitol's own local settings - just which Chamber widgets are hidden from
-// the homepage grid. Dark mode is Congress-owned (see @congress/shared-types'
-// CapitolSettings) since it has to hold even when Capitol isn't registered.
-export const settingsSchema = z.object({
-  hiddenWidgets: z.array(z.string()),
-});
-export type Settings = z.infer<typeof settingsSchema>;
+export const canvasScopeSchema = z.enum(["mobile", "desktop"]);
+export type CanvasScope = z.infer<typeof canvasScopeSchema>;
 
-export const updateSettingsRequestSchema = z.object({
-  hiddenWidgets: z.array(z.string()).optional(),
+export const widgetPlacementSchema = z.object({
+  chamber: z.string(),
+  widgetId: z.string(),
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
 });
-export type UpdateSettingsRequest = z.infer<typeof updateSettingsRequestSchema>;
+export type WidgetPlacement = z.infer<typeof widgetPlacementSchema>;
+
+export const upsertPlacementRequestSchema = z.object({
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
+});
+export type UpsertPlacementRequest = z.infer<typeof upsertPlacementRequestSchema>;

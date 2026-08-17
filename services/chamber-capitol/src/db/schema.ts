@@ -1,11 +1,24 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core";
 
-// Single-row table (id is always 1) - Capitol's own local preferences, kept
-// separate from Congress's Congress-wide settings (e.g. dark mode) since
-// this only matters while Capitol itself is registered and rendering the
-// homepage widget grid.
-export const settings = sqliteTable("settings", {
-  id: integer("id").primaryKey().default(1),
-  // Chamber names hidden from the homepage widget grid, JSON-encoded.
-  hiddenWidgetsJson: text("hidden_widgets_json").notNull().default("[]"),
-});
+// Where each registered widget sits on Capitol's cell-based canvas, one row
+// per placed widget per viewport-class scope ("mobile" | "desktop" - see
+// components/canvas/ for why exactly two, not one per physical device).
+// (scope, chamber, widgetId) is the natural identity, so it's the primary
+// key directly rather than a separate surrogate id + unique index - a
+// placement is upserted by conflicting on this key. No width/height here:
+// those live on the Chamber's own manifest-declared widget, so a Chamber
+// changing its declared size later can't leave stale dimensions behind in
+// this table. A widget with no row here for a given scope is simply unplaced
+// (not shown) - "placed" is the only visibility mechanism now.
+export const widgetLayouts = sqliteTable(
+  "widget_layouts",
+  {
+    scope: text("scope", { enum: ["mobile", "desktop"] }).notNull(),
+    chamber: text("chamber").notNull(),
+    widgetId: text("widget_id").notNull(),
+    x: integer("x").notNull(),
+    y: integer("y").notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.scope, table.chamber, table.widgetId] })]
+);

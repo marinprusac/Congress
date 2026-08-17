@@ -10,9 +10,9 @@ export const calendarManifest: Manifest = {
   routes: {
     home: "/calendar",
     settings: "/calendar/settings",
-    widget: "/calendar/widget",
   },
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
+  widgets: [{ id: "upcoming", width: 2, height: 3, label: "Upcoming" }],
 };

@@ -1,0 +1,1 @@
+ALTER TABLE `chambers` ADD `widgets_json` text DEFAULT '[]' NOT NULL;

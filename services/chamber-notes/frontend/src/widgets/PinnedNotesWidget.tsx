@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { WidgetPreviewShell } from "@congress/congress-ui";
+import { Link } from "react-router-dom";
+import { WidgetPreviewShell, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchPinnedNotes } from "@/lib/api";
 
-export function WidgetPreviewPage() {
+export function PinnedNotesWidget() {
+  const shellHosted = useShellHosted();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["notes", "pinned"],
     queryFn: fetchPinnedNotes,
@@ -11,7 +13,8 @@ export function WidgetPreviewPage() {
   return (
     <WidgetPreviewShell
       label="Pinned"
-      addHref="/notes/new"
+      addHref="/new"
+      ownChamber="notes"
       isLoading={isLoading}
       isError={isError}
       errorLabel="Notes unavailable."
@@ -20,9 +23,13 @@ export function WidgetPreviewPage() {
     >
       <div className="notes-flow">
         {data?.map((note) => (
-          <a key={note.id} href={`/notes/n/${note.id}`} target="_top" className="note-card note-card-mini">
+          <Link
+            key={note.id}
+            to={resolveChamberPath(`/n/${note.id}`, "notes", shellHosted)}
+            className="note-card note-card-mini"
+          >
             <span className="block font-display text-sm text-ink">{note.title}</span>
-          </a>
+          </Link>
         ))}
       </div>
     </WidgetPreviewShell>

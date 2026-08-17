@@ -10,11 +10,11 @@ export const manifest: Manifest = {
   routes: {
     home: "/capitol",
     settings: "/capitol/settings",
-    // Capitol has no widget of its own to compose onto the homepage grid -
-    // it's the Chamber that renders that grid, not an entry in it.
-    widget: "",
   },
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
+  // Capitol has no widgets of its own to compose onto its own canvas - it's
+  // the Chamber that renders the canvas, not an entry on it.
+  widgets: [],
 };

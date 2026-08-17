@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { WidgetPreviewShell } from "@congress/congress-ui";
+import { Link } from "react-router-dom";
+import { WidgetPreviewShell, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchOpenTasks } from "@/lib/api";
 
 function formatDueDate(value: string | null): string | null {
@@ -7,7 +8,8 @@ function formatDueDate(value: string | null): string | null {
   return new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export function WidgetPreviewPage() {
+export function OpenTasksWidget() {
+  const shellHosted = useShellHosted();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["tasks", "open"],
     queryFn: fetchOpenTasks,
@@ -16,7 +18,8 @@ export function WidgetPreviewPage() {
   return (
     <WidgetPreviewShell
       label="Open"
-      addHref="/tasks/new"
+      addHref="/new"
+      ownChamber="tasks"
       isLoading={isLoading}
       isError={isError}
       errorLabel="Tasks unavailable."
@@ -24,17 +27,16 @@ export function WidgetPreviewPage() {
       emptyLabel="— No open tasks —"
     >
       {data?.map((task) => (
-        <a
+        <Link
           key={task.id}
-          href={`/tasks/t/${task.id}`}
-          target="_top"
+          to={resolveChamberPath(`/t/${task.id}`, "tasks", shellHosted)}
           className="flex items-baseline justify-between gap-2 border-b border-dust py-1.5 font-display text-sm text-ink first:pt-0 last:border-b-0 hover:text-accent"
         >
           <span className="min-w-0 truncate">{task.name}</span>
           {task.dueDate && (
             <span className="shrink-0 font-mono text-xs text-dust">{formatDueDate(task.dueDate)}</span>
           )}
-        </a>
+        </Link>
       ))}
     </WidgetPreviewShell>
   );

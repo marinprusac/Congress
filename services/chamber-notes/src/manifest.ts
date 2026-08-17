@@ -10,7 +10,6 @@ export const notesManifest: Manifest = {
   routes: {
     home: "/notes",
     settings: "/notes/settings",
-    widget: "/notes/widget",
   },
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
@@ -18,4 +17,5 @@ export const notesManifest: Manifest = {
   // Note bodies use [[wikilink]]/Markdown syntax - see
   // services/congress/frontend/src/pages/SharedViewPage.tsx.
   contentFormat: "markdown",
+  widgets: [{ id: "pinned", width: 2, height: 2, label: "Pinned" }],
 };

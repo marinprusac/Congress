@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCapitolSettings, capitolSettingsQueryKey, updateCapitolSettings, fetchRegistry } from "@congress/congress-ui";
-import { fetchSettings, updateSettings } from "@/lib/api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCapitolSettings, capitolSettingsQueryKey, updateCapitolSettings } from "@congress/congress-ui";
 import { fetchPushConfig, getCurrentSubscription, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 
 // Per-device, not a Congress-wide setting like dark mode above - each
@@ -89,49 +88,6 @@ function PushNotificationsSection() {
   );
 }
 
-function WidgetVisibilitySection() {
-  const queryClient = useQueryClient();
-  const { data: settings } = useQuery({ queryKey: ["capitol", "settings"], queryFn: fetchSettings });
-  const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
-
-  const mutation = useMutation({
-    mutationFn: updateSettings,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["capitol", "settings"] }),
-  });
-
-  if (!settings || !registry) return null;
-  const hidden = new Set(settings.hiddenWidgets);
-  // Capitol has no widget of its own - nothing to toggle for itself.
-  const widgetChambers = registry.filter((chamber) => chamber.name !== "capitol");
-
-  function toggle(name: string, visible: boolean) {
-    const next = new Set(hidden);
-    if (visible) next.delete(name);
-    else next.add(name);
-    mutation.mutate({ hiddenWidgets: [...next] });
-  }
-
-  return (
-    <div className="mt-6">
-      <p className="font-mono text-xs uppercase tracking-wide text-dust">Homepage widgets</p>
-      <p className="mt-1 font-mono text-xs text-dust">Choose which Chambers show a widget on the Capitol homepage.</p>
-      <div className="mt-3 flex flex-col gap-2">
-        {widgetChambers.map((chamber) => (
-          <label key={chamber.name} className="flex items-center gap-2 font-mono text-sm text-ink">
-            <input
-              type="checkbox"
-              checked={!hidden.has(chamber.name)}
-              onChange={(e) => toggle(chamber.name, e.target.checked)}
-            />
-            {chamber.displayName}
-          </label>
-        ))}
-        {widgetChambers.length === 0 && <p className="font-mono text-xs text-dust">— No Chambers registered —</p>}
-      </div>
-    </div>
-  );
-}
-
 function SignOutControl() {
   const queryClient = useQueryClient();
 
@@ -180,8 +136,6 @@ export function SettingsPage() {
           <p className="mt-1 pl-6 font-mono text-xs text-dust">Applies across Congress and every Chamber, on any device.</p>
         </div>
       )}
-
-      <WidgetVisibilitySection />
 
       <PushNotificationsSection />
 

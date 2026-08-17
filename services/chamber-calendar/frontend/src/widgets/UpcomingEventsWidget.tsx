@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { WidgetPreviewShell } from "@congress/congress-ui";
+import { Link } from "react-router-dom";
+import { WidgetPreviewShell, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchEvents } from "@/lib/api";
 import { formatWidgetEventTime } from "@/lib/datetime";
 
 const WIDGET_WINDOW_DAYS = 14;
 const MAX_EVENTS = 5;
 
-export function WidgetPreviewPage() {
+export function UpcomingEventsWidget() {
+  const shellHosted = useShellHosted();
   // Computed once per mount, not per render — recomputing from Date.now()
   // directly in the render body would change the query key on every render
   // (react-query treats it as a brand new query), and each resolved fetch
@@ -27,7 +29,8 @@ export function WidgetPreviewPage() {
   return (
     <WidgetPreviewShell
       label="Upcoming"
-      addHref="/calendar/new"
+      addHref="/new"
+      ownChamber="calendar"
       isLoading={isLoading}
       isError={isError}
       errorLabel="Calendar unavailable."
@@ -35,15 +38,18 @@ export function WidgetPreviewPage() {
       emptyLabel="— No upcoming events —"
     >
       {events.map((event) => (
-        <a
+        <Link
           key={event.id}
-          href={`/calendar/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}`}
-          target="_top"
+          to={resolveChamberPath(
+            `/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}`,
+            "calendar",
+            shellHosted
+          )}
           className="block border-b border-dust py-1.5 first:pt-0 last:border-b-0 hover:text-accent"
         >
           <div className="font-display text-sm text-ink">{event.title}</div>
           <div className="font-mono text-[10px] text-dust">{formatWidgetEventTime(event)}</div>
-        </a>
+        </Link>
       ))}
     </WidgetPreviewShell>
   );

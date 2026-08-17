@@ -10,9 +10,9 @@ export const tasksManifest: Manifest = {
   routes: {
     home: "/tasks",
     settings: "/tasks/settings",
-    widget: "/tasks/widget",
   },
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
+  widgets: [{ id: "open", width: 2, height: 2, label: "Open" }],
 };

@@ -119,7 +119,8 @@ console.log(`Created services/${chamberDirName} and ${relative(REPO_ROOT, system
 console.log("What's next:");
 console.log(`  1. pnpm install`);
 console.log(`  2. Edit services/${chamberDirName}/src/db/schema.ts, items.ts, types.ts, mcp/tools.ts, and`);
-console.log(`     frontend/src/pages/*.tsx to replace the generic "item" example with your real domain.`);
+console.log(`     frontend/src/pages/*.tsx and frontend/src/widgets/*.tsx to replace the generic "item" example`);
+console.log(`     with your real domain.`);
 console.log(`  3. pnpm --filter chamber-${rawName} db:generate   # after any schema.ts change`);
 console.log(`  4. Set a real CONGRESS_INTERNAL_TOKEN in services/${chamberDirName}/.env, matching Capitol's.`);
 console.log(`  5. pnpm --filter chamber-${rawName} dev:server   (and, separately, dev:web)`);

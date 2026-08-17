@@ -10,7 +10,6 @@ export const manifest: Manifest = {
   routes: {
     home: "/__CHAMBER_NAME__",
     settings: "/__CHAMBER_NAME__/settings",
-    widget: "/__CHAMBER_NAME__/widget",
   },
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
@@ -20,4 +19,9 @@ export const manifest: Manifest = {
   // to render them that way for logged-out viewers - see
   // services/congress/frontend/src/pages/SharedViewPage.tsx.
   // contentFormat: "markdown",
+  // One example widget for Capitol's homepage canvas - add more entries here
+  // (each with its own id/width/height/label) as this Chamber grows more
+  // than one. width/height are in canvas cells, fixed by this Chamber, not
+  // user-resizable. See frontend/src/widgets/ for the matching component.
+  widgets: [{ id: "recent", width: 2, height: 2, label: "Recent" }],
 };

@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { WidgetPreviewShell } from "@congress/congress-ui";
+import { Link } from "react-router-dom";
+import { WidgetPreviewShell, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchRecentItems } from "@/lib/api";
 
-export function WidgetPreviewPage() {
+export function RecentItemsWidget() {
+  const shellHosted = useShellHosted();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["items", "recent"],
     queryFn: fetchRecentItems,
@@ -11,7 +13,8 @@ export function WidgetPreviewPage() {
   return (
     <WidgetPreviewShell
       label="Recent"
-      addHref="/__CHAMBER_NAME__/new"
+      addHref="/new"
+      ownChamber="__CHAMBER_NAME__"
       isLoading={isLoading}
       isError={isError}
       errorLabel="__CHAMBER_DISPLAY__ unavailable."
@@ -19,14 +22,13 @@ export function WidgetPreviewPage() {
       emptyLabel="— No items yet —"
     >
       {data?.map((item) => (
-        <a
+        <Link
           key={item.id}
-          href={`/__CHAMBER_NAME__/i/${item.id}`}
-          target="_top"
+          to={resolveChamberPath(`/i/${item.id}`, "__CHAMBER_NAME__", shellHosted)}
           className="flex items-baseline justify-between gap-2 border-b border-dust py-1.5 font-display text-sm text-ink first:pt-0 last:border-b-0 hover:text-accent"
         >
           <span className="min-w-0 truncate">{item.name}</span>
-        </a>
+        </Link>
       ))}
     </WidgetPreviewShell>
   );

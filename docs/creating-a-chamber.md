@@ -14,9 +14,9 @@ If you just want to start: skip to [Quickstart](#quickstart).
 
 Every Chamber — Capitol included — implements the same small contract:
 
-- `GET /manifest` — self-description (name, routes, apiBase, mcpUrl, healthUrl).
+- `GET /manifest` — self-description (name, routes, apiBase, mcpUrl, healthUrl, widgets).
 - `GET /health` — liveness.
-- Home / settings / widget frontend routes.
+- Home / settings frontend routes, plus one or more homepage widgets.
 - A REST API under `/api/*`.
 - An MCP server at `/mcp`.
 
@@ -38,7 +38,7 @@ hand:
   search, the Chamber icon set, list/form primitives.
 
 A handful of frontend files (`Layout.tsx`, `main.tsx`, `App.tsx`,
-`remote.tsx`, `WidgetPreviewPage.tsx`) are *deliberately* kept as small,
+`remote.tsx`, `frontend/src/widgets/*.tsx`) are *deliberately* kept as small,
 per-Chamber files rather than further abstracted — routing, nav copy, and
 widget content are genuinely Chamber-specific. Everything that was ever
 pure copy-paste boilerplate (icons, DB/env/MCP/registration wiring, the
@@ -56,8 +56,8 @@ pnpm install
 
 This generates `services/chamber-budget/` — a complete, working Chamber
 with a generic single-entity example ("Items": a name + a body, searchable,
-cross-referenceable via `[[...]]`, with list/view/new/settings pages and a
-homepage widget), its own placeholder icon
+cross-referenceable via `[[...]]`, with list/view/new/settings pages and one
+example homepage widget), its own placeholder icon
 (`frontend/public/icons/mark.svg`, ready to swap for real artwork whenever
 you like — see §5) — plus `infra/systemd/congress-chamber-budget.service`
 for later production rollout. It also seeds `services/chamber-budget/.env`
@@ -93,6 +93,7 @@ actually edit to turn "Budget" into your real domain:
 | `src/exhibits.ts` | Update `idPrefix`, `type`, `urlFor`, and the search/resolve/toContent callbacks for your real table/columns. |
 | `src/mcp/tools.ts` | Your entity's MCP tools — usually a thin wrapper around the same functions the REST routes call. |
 | `frontend/src/pages/*.tsx` | The actual UI. Keep using the shared primitives (see the table below) rather than hand-rolling list/form chrome. |
+| `frontend/src/widgets/*.tsx` + `frontend/src/widgets/index.ts` | Your homepage widget(s) for Capitol's canvas — see §5.1. Add a new file + a `widgets` map entry per widget; each one needs a matching entry in `src/manifest.ts`'s `widgets` array (`id`/`width`/`height`/`label`). |
 | `frontend/src/components/Layout.tsx` | Nav links specific to your Chamber. |
 | `frontend/public/icons/mark.svg` | Optional — swap the placeholder diamond for real artwork whenever you like. Not required for anything else to work; see §5. |
 
@@ -127,7 +128,7 @@ And `congress-ui`'s frontend surface:
 | `ExhibitActionBar`, `ExhibitLinksLayout`, `ExhibitSharingBadge`, `ShareControl` | Detail-page chrome: edit/delete/share actions, front/backlinks panel, the "Shared" badge, the share popover. |
 | `useSearchableList`, `useListRowPrefetch`, `ListSearchInput`, `ListLoadingState`, `ListErrorState`, `ListEmptyState` | List-page search + loading/error/empty states + hover-prefetch. |
 | `PageHeader`, `FormLabel`, `FormTextInput`, `FormErrorMessage`, `FormSubmitButton` | Generic page/form chrome. |
-| `WidgetPreviewShell` | Chrome for the homepage-widget iframe content. |
+| `WidgetPreviewShell` | Shared chrome (label, "+ New" link, loading/error/empty states) for a homepage widget's own content — see §5.1. |
 | `createQueryClient`, `resolveApiBase`, `parseJsonResponse`, `assertDeleteOk`, `confirmDelete` | Per-Chamber isolated TanStack Query client, dev/prod API base resolution, fetch helpers. |
 
 ## 4. The Exhibit contract (cross-Chamber search & linking)
@@ -150,12 +151,46 @@ endpoints (`GET /api/exhibits/search`, `POST /api/exhibits/resolve`, `GET`/
 ## 5. Plugging into Congress
 
 This is automatic. `gateway.ts`'s `/api/:chamber/*` and `/<chamberName>/*`
-proxying, the chamber registry, the homepage widget grid, the nav picker,
+proxying, the chamber registry, Capitol's homepage canvas, the nav picker,
 and Congress's shell-hosting (`ChamberHost` dynamically `import()`ing your
 Chamber's `remote-entry.js`) are all driven by the `/congress/registry` API
 — they pick up a new Chamber the moment it successfully registers and
 heartbeats. **There is no Congress-side code to edit** to make a new Chamber
 appear.
+
+### 5.1 Homepage widgets
+
+Capitol's homepage is a cell-based canvas the owner can edit to place and
+move widgets (see `services/chamber-capitol/frontend/src/components/
+Canvas.tsx`). A Chamber can register any number of widgets, each with a
+fixed footprint in canvas cells declared in `src/manifest.ts`:
+
+```ts
+widgets: [{ id: "recent", width: 2, height: 2, label: "Recent" }],
+```
+
+`id` is a stable, never-shown identifier — it's the key into
+`frontend/src/widgets/index.ts`'s `widgets` map, and part of how Capitol
+stores this widget's canvas position. `width`/`height` are fixed by you, not
+user-resizable; the owner can only place and move whole widgets on the
+canvas, never resize them. `label` is what the owner sees in the edit-mode
+overlay and the "add widget" tray — the *only* place a widget's identity is
+ever shown, since the canvas itself draws no per-widget header (see below).
+
+A widget's content is an ordinary React component — `frontend/src/widgets/
+RecentItemsWidget.tsx` in the scaffold — exported from `frontend/src/
+widgets/index.ts` and re-exported (wrapped in this Chamber's own
+`QueryClientProvider`) from `frontend/src/remote.tsx`. Capitol's canvas
+resolves it directly out of your already-built `remote-entry.js` (the same
+artifact `build:remote` produces for full shell-hosted navigation — no
+separate build step, no URL, no iframe) via `loadRemoteModule` from
+`@congress/congress-ui`. Wrap your widget's content in `WidgetPreviewShell`
+for the standard label/"+ New"/loading/empty chrome, but beyond that its
+content is entirely your own discretion — Capitol only ever draws a plain
+border around it, never a chamber name/icon header. Any in-widget links
+should go through `resolveChamberPath`/`useShellHosted` (the widget is
+mounted directly into Capitol's own React tree, not an isolated document),
+same as any other Chamber-owned link.
 
 Icons work the same way: your Chamber serves its own, Congress fetches it —
 **nothing about creating or icon-branding a Chamber ever means editing a

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Congress is a personal, self-hosted productivity system for a single user, deployed at `congress.marinprusac.com`. It's a monorepo of **genuinely independent services** — not a single app with logical modules. The full design intent is in `docs/congress-project-brief.md`; read it for the "why" behind anything that looks unusual. Note that one thing has changed since that brief was written: the brief specifies Tailscale-only private access, but the deployed system now uses public access gated by a master-password session cookie instead (see `infra/README.md`, "Access control"). Trust `infra/README.md` over the brief on deployment/access details.
+Congress is a personal, self-hosted productivity system for a single user, deployed at `congress.marinprusac.com`. It's a monorepo of **genuinely independent services** — not a single app with logical modules. The full design intent is in `docs/congress-project-brief.md`; read it for the "why" behind anything that looks unusual. Note that two things have changed since that brief was written: the brief specifies Tailscale-only private access, but the deployed system now uses public access gated by a master-password session cookie instead (see `infra/README.md`, "Access control"); and the brief describes one widget per Chamber rendered in an iframe, but Capitol's homepage is now a cell-based canvas where each Chamber can register multiple widgets, mounted as real components (not iframes) that the owner can place and move — see "Settings & theming" and `docs/creating-a-chamber.md` §5.1 for the current model. Trust `infra/README.md` and this file over the brief on deployment/access and widget details respectively.
 
 Three names are used consistently in code, folders, and package names:
 
@@ -50,15 +50,15 @@ A Chamber's frontend dev server proxies `/api`, `/manifest`, `/health`, `/mcp` t
 - `infra/` — systemd unit templates, Caddy site block, the VPS sync script. See `infra/README.md` for the full deployment story.
 - `scripts/create-chamber.mjs` — scaffolds a new Chamber (`pnpm create-chamber <name> "<Display Name>" <port>`) from `scripts/create-chamber/template/`. See `docs/creating-a-chamber.md` for the full guide to building your own Chamber, including what the generator gives you vs. what you write by hand, and how to ship it to production.
 
-**Per-frontend duplication is intentional in a few specific places**, not an oversight: `Layout.tsx`, `main.tsx`, `App.tsx`, `remote.tsx`, and `WidgetPreviewPage.tsx` are deliberately small per-Chamber files (routing/nav/copy is genuinely Chamber-specific) rather than another shared abstraction — don't try to collapse these into `chamber-kit`/`congress-ui` further. Everything that *was* pure copy-paste (icons, DB/env/MCP/registration boilerplate, the exhibits/settings/route-mounting pattern) has already been factored out; if you find yourself copying a whole file between two Chambers unchanged, that's a signal something belongs in one of the shared packages instead.
+**Per-frontend duplication is intentional in a few specific places**, not an oversight: `Layout.tsx`, `main.tsx`, `App.tsx`, `remote.tsx`, and `frontend/src/widgets/*.tsx` are deliberately small per-Chamber files (routing/nav/copy is genuinely Chamber-specific) rather than another shared abstraction — don't try to collapse these into `chamber-kit`/`congress-ui` further. Everything that *was* pure copy-paste (icons, DB/env/MCP/registration boilerplate, the exhibits/settings/route-mounting pattern) has already been factored out; if you find yourself copying a whole file between two Chambers unchanged, that's a signal something belongs in one of the shared packages instead.
 
 ### The Chamber contract
 
 Every Chamber — Capitol included — implements the same contract (defined in `docs/congress-project-brief.md` section 4, scaffolded by `chamber-kit`):
 
-- `GET /manifest` — self-description (name, routes, apiBase, mcpUrl, healthUrl).
+- `GET /manifest` — self-description (name, routes, apiBase, mcpUrl, healthUrl, widgets).
 - `GET /health` — liveness, used by Congress's heartbeat sweep.
-- Home / settings / widget frontend routes.
+- Home / settings frontend routes, plus zero or more homepage widgets (each with a fixed size in canvas cells) for Capitol's canvas.
 - A REST API under `/api/*`.
 - An MCP server at `/mcp` (Streamable HTTP transport, official `@modelcontextprotocol/sdk`), wrapping the same REST logic rather than touching the DB directly.
 
@@ -99,7 +99,7 @@ A Congress-owned feature for granting outside access (a person, or an AI agent v
 
 ### Settings & theming
 
-Chamber-wide (not per-device) preferences use a single-row settings table — `id` always `1`, select-then-insert-or-update — via `chamber-kit`'s `createSingleRowSettings`. Congress's dark mode setting is applied everywhere (including inside each Chamber's own frontend and the homepage's iframed widgets) through `useAppliedTheme`/`useCapitolSettings` in `congress-ui`, plus a pre-paint inline bootstrap script in every `frontend/index.html` that applies a cached `localStorage` theme value before first render to avoid a flash of the wrong theme. This is a genuinely Congress-owned setting, not Capitol's — it has to hold even when Capitol isn't registered. Capitol's own "which Chamber widgets are hidden from the homepage grid" preference, by contrast, is chamber-local (its own settings table, `services/chamber-capitol/src/settings.ts`) exactly like any other Chamber's own settings.
+Chamber-wide (not per-device) preferences use a single-row settings table — `id` always `1`, select-then-insert-or-update — via `chamber-kit`'s `createSingleRowSettings`. Congress's dark mode setting is applied everywhere (including inside each Chamber's own frontend and every homepage widget, which mount as real components in the same document rather than iframes) through `useAppliedTheme`/`useCapitolSettings` in `congress-ui`, plus a pre-paint inline bootstrap script in every `frontend/index.html` that applies a cached `localStorage` theme value before first render to avoid a flash of the wrong theme. This is a genuinely Congress-owned setting, not Capitol's — it has to hold even when Capitol isn't registered. Capitol's own canvas layout, by contrast, is chamber-local: a `widget_layouts` table (`services/chamber-capitol/src/db/schema.ts`) storing each placed widget's `(scope, chamber, widgetId) -> (x, y)`, where `scope` is `"mobile" | "desktop"` — exactly two shared layouts, matching the app's existing `min-width: 641px` breakpoint, not one per physical device. A widget with no row for the current scope is simply unplaced (shown in the edit-mode "add widget" tray instead of on the canvas) — placement is the only visibility mechanism now, replacing the old per-chamber show/hide toggle.
 
 ### Frontend: mobile-first, always
 

@@ -6,6 +6,7 @@ export const chambers = sqliteTable("chambers", {
   displayName: text("display_name").notNull(),
   version: text("version").notNull(),
   routesJson: text("routes_json").notNull(),
+  widgetsJson: text("widgets_json").notNull().default("[]"),
   apiBase: text("api_base").notNull(),
   mcpUrl: text("mcp_url"),
   healthUrl: text("health_url").notNull(),

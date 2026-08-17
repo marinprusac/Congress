@@ -1,1 +1,31 @@
 @import "@congress/congress-ui/styles.css";
+
+/* Edit-mode "add widget" tray - lists registered widgets not currently
+   placed on this scope's canvas. Same mobile-first fixed-viewport idiom as
+   congress-ui's .exhibit-picker-dropdown: docked to the bottom on mobile
+   (clearing the fixed bottom nav via --mobile-nav-height), a fixed
+   bottom-right panel on desktop instead of an anchored dropdown, since
+   there's no single trigger element to anchor to here. */
+.capitol-add-widget-tray {
+  position: fixed;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: calc(var(--mobile-nav-height, 0px) + 0.5rem);
+  z-index: 50;
+  max-height: 40vh;
+  overflow-y: auto;
+  border: 1px solid var(--color-dust);
+  background-color: var(--color-parchment);
+  box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
+}
+
+@media (min-width: 641px) {
+  .capitol-add-widget-tray {
+    left: auto;
+    width: 20rem;
+    bottom: 1rem;
+    right: 1rem;
+    max-height: 24rem;
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 15%, transparent);
+  }
+}

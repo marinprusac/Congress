@@ -1,5 +1,7 @@
-import { WidgetGrid } from "@/components/WidgetGrid";
+import { useState } from "react";
+import { Canvas } from "@/components/Canvas";
 
 export function HomePage() {
-  return <WidgetGrid />;
+  const [editing, setEditing] = useState(false);
+  return <Canvas editing={editing} onToggleEditing={() => setEditing((e) => !e)} />;
 }

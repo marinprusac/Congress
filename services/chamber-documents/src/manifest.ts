@@ -10,9 +10,9 @@ export const documentsManifest: Manifest = {
   routes: {
     home: "/documents",
     settings: "/documents/settings",
-    widget: "/documents/widget",
   },
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
+  widgets: [{ id: "recent", width: 2, height: 2, label: "Recent" }],
 };

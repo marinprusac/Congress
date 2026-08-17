@@ -71,6 +71,13 @@
       "when": 1786931238539,
       "tag": "0009_bumpy_tony_stark",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1786937174426,
+      "tag": "0010_typical_namora",
+      "breakpoints": true
     }
   ]
 }

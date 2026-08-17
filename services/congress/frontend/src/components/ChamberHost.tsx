@@ -1,100 +1,16 @@
 import { Component, Suspense, lazy, useMemo, type ComponentType, type LazyExoticComponent, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { fetchRegistry } from "@congress/congress-ui";
+import { fetchRegistry, loadRemoteModule, evictRemoteModule } from "@congress/congress-ui";
 
-// All three caches are keyed by Chamber name and live for the tab's
-// lifetime - once a Chamber has been visited once, switching back to it is
-// instant (no re-fetch of its JS or CSS), which is the whole point of
-// hosting it in this shell instead of a full navigation.
+// Keyed by Chamber name and lives for the tab's lifetime - once a Chamber
+// has been visited once, switching back to it is instant (no re-fetch of
+// its JS or CSS), which is the whole point of hosting it in this shell
+// instead of a full navigation. The underlying module+stylesheet fetch
+// itself is cached in congress-ui's loadRemoteModule (shared with Capitol's
+// canvas, which resolves the same remote-entry.js's `widgets` export) -
+// this cache is just this file's own lazy()-wrapper layer on top.
 const componentCache = new Map<string, LazyExoticComponent<ComponentType>>();
-const stylesheetReady = new Map<string, Promise<void>>();
-// The actual module-fetch promise, kept separate from componentCache's
-// lazy() wrappers - lazy()'s loader function isn't invoked until React
-// first renders that component, so building the wrapper alone can't be used
-// to prefetch. Starting (and caching) this promise directly is what lets
-// preloadChamber warm the network fetch well before the Chamber is ever
-// rendered, so by the time it is, getChamberComponent's lazy() loader just
-// resolves an already-settled promise instead of triggering a fresh one.
-const modulePromises = new Map<string, Promise<{ default: ComponentType }>>();
-
-function loadChamberStylesheet(chamberName: string): Promise<void> {
-  const href = `/${chamberName}/remote-entry.css`;
-  let ready = stylesheetReady.get(chamberName);
-  if (!ready) {
-    ready = new Promise((resolve) => {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = href;
-      // A failed stylesheet load shouldn't block the Chamber from mounting
-      // (better an unstyled Chamber than a permanently stuck loading bar).
-      link.onload = () => resolve();
-      link.onerror = () => resolve();
-      document.head.appendChild(link);
-    });
-    stylesheetReady.set(chamberName, ready);
-  }
-  return ready;
-}
-
-// Generous above any real network RTT - only meant to catch a request that
-// never settles at all (see below), not to race a slow-but-healthy one.
-const MODULE_LOAD_TIMEOUT_MS = 15_000;
-
-function loadChamberModule(chamberName: string): Promise<{ default: ComponentType }> {
-  let modulePromise = modulePromises.get(chamberName);
-  if (!modulePromise) {
-    // Waiting on the stylesheet alongside the JS module, both kicked off
-    // together, means the Chamber is only ever revealed once it can render
-    // fully styled - the one place a first-ever visit could otherwise flash
-    // unstyled content even though there's no document reload.
-    const fetchPromise = Promise.all([
-      import(/* @vite-ignore */ `/${chamberName}/remote-entry.js`) as Promise<{ default: ComponentType }>,
-      loadChamberStylesheet(chamberName),
-    ]).then(([mod]) => mod);
-
-    // A request that lands during a rolling deploy's few-second window (that
-    // Chamber's own process, or Capitol's own proxying process, mid-restart)
-    // can fail outright, or - if the connection was already open when the
-    // old process was killed - hang with no error and no response at all;
-    // plain fetch()/import() have no built-in timeout for that second case.
-    // Racing a timeout here guarantees this promise always eventually
-    // settles instead of leaving a caller (this function's own preload,
-    // ChamberHost's lazy import) suspended forever.
-    const settled: Promise<{ default: ComponentType }> = new Promise((resolve, reject) => {
-      const timer = setTimeout(
-        () => reject(new Error(`Loading Chamber "${chamberName}" timed out`)),
-        MODULE_LOAD_TIMEOUT_MS
-      );
-      fetchPromise.then(
-        (mod) => {
-          clearTimeout(timer);
-          resolve(mod);
-        },
-        (err) => {
-          clearTimeout(timer);
-          reject(err);
-        }
-      );
-    });
-
-    modulePromise = settled;
-    modulePromises.set(chamberName, modulePromise);
-
-    // A failed (or timed-out) attempt must not poison the cache for the rest
-    // of this tab's lifetime - evict so the next attempt (a preload retry
-    // off the registry's periodic refetch, or an actual navigation into this
-    // Chamber) starts a fresh fetch instead of replaying the same dead
-    // promise forever. Guarded so a late timeout can't evict a newer promise
-    // a subsequent retry has already installed.
-    modulePromise.catch(() => {
-      if (modulePromises.get(chamberName) === modulePromise) {
-        modulePromises.delete(chamberName);
-      }
-    });
-  }
-  return modulePromise;
-}
 
 // Kicks off (or reuses) a Chamber's module+stylesheet fetch without waiting
 // on it. Called for every active Chamber as soon as the registry loads (see
@@ -102,13 +18,13 @@ function loadChamberModule(chamberName: string): Promise<{ default: ComponentTyp
 // Chamber - never shows ChamberHost's loading bar for a fetch that's already
 // well underway or finished.
 export function preloadChamber(chamberName: string): void {
-  void loadChamberModule(chamberName);
+  void loadRemoteModule(chamberName);
 }
 
 function getChamberComponent(chamberName: string): LazyExoticComponent<ComponentType> {
   let component = componentCache.get(chamberName);
   if (!component) {
-    component = lazy(() => loadChamberModule(chamberName));
+    component = lazy(() => loadRemoteModule(chamberName));
     componentCache.set(chamberName, component);
   }
   return component;
@@ -220,10 +136,10 @@ class ChamberErrorBoundary extends Component<ChamberErrorBoundaryProps, ChamberE
   componentDidCatch() {
     // Evict the failed attempt so a later visit in this same tab - the
     // Chamber redeploying, the network recovering - retries instead of
-    // replaying the same rejected import() promise forever.
+    // replaying the same rejected import() promise (or the same broken
+    // already-fetched component) forever.
     componentCache.delete(this.props.chamberName);
-    stylesheetReady.delete(this.props.chamberName);
-    modulePromises.delete(this.props.chamberName);
+    evictRemoteModule(this.props.chamberName);
   }
 
   render() {

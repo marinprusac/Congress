@@ -212,6 +212,34 @@ html[data-theme="dark"] {
   padding: 2.5rem 1.5rem;
 }
 
+/* Capitol's homepage canvas is the one page in the whole app that must never
+   scroll - "whatever fits the screen is it" (see Canvas.tsx). Applied by
+   Capitol's own Layout only on that route; every other page (Settings,
+   Shares, every other Chamber entirely) keeps the default scrolling
+   .chamber-shell/.chamber-main above untouched. Turns .chamber-shell into a
+   height-locked flex column instead of a normally-scrolling document -
+   ChamberHeader (in-flow) takes its own natural height, .chamber-main--canvas
+   fills the rest. .chamber-shell's own padding-bottom (reserving room for
+   the fixed mobile bottom nav, see --mobile-nav-height above) still applies
+   since this modifier only adds properties rather than replacing the rule -
+   the flex column's content box is already inset by it, so the canvas
+   naturally stops above the nav bar without any extra arithmetic here. */
+.chamber-shell--canvas {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chamber-main--canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+}
+
 /* SharedViewPage's nav (the share's Contents list) + main content. Mobile
    default: main content first (what a recipient actually clicked the link
    for), Contents stacked below as secondary browsing - same "children
