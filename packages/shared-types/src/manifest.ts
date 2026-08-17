@@ -19,7 +19,7 @@ export const manifestSchema = z.object({
   mcpUrl: z.string().url().optional(),
   healthUrl: z.string().url(),
   // Declares how this Chamber's Exhibit bodies should be rendered by
-  // Capitol's public Exhibit Sharing viewer (services/capitol/frontend/src/
+  // Capitol's public Exhibit Sharing viewer (services/congress/frontend/src/
   // pages/SharedViewPage.tsx). Defaults to plain annotated text; set to
   // "markdown" if bodies use [[wikilink]]/Markdown syntax (e.g. Notes).
   contentFormat: z.enum(["markdown", "plain"]).optional(),

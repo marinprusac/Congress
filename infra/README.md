@@ -7,7 +7,7 @@ This deviates from the project brief's original access model (Tailscale-only,
 no public listener, network membership as the sole access control — brief
 section 7). That was tried first and worked, but was abandoned in favor of
 public access at `congress.marinprusac.com` gated by a master-password
-session cookie (`services/capitol/src/sessionAuth.ts`), by explicit user
+session cookie (`services/congress/src/sessionAuth.ts`), by explicit user
 decision. See "Access control" below for what that means in practice.
 
 ## Layout on the server
@@ -25,12 +25,12 @@ decision. See "Access control" below for what that means in practice.
 - Each service's `.env` (untracked, created by hand on the server) sets
   `NODE_ENV=production` and a shared `CONGRESS_INTERNAL_TOKEN`. Capitol's
   `.env` additionally sets `CONGRESS_MASTER_PASSWORD_HASH` and
-  `SESSION_SECRET` (see `services/capitol/.env.example` for how to generate
+  `SESSION_SECRET` (see `services/congress/.env.example` for how to generate
   each).
 
 ## Process management
 
-Every service (`congress-capitol`, `congress-chamber-notes`,
+Every service (`congress-core`, `congress-chamber-notes`,
 `congress-chamber-calendar`, `congress-chamber-documents`,
 `congress-chamber-tasks`) has its own discrete unit under
 `infra/systemd/`, installed at `/etc/systemd/system/` and enabled
@@ -110,7 +110,7 @@ master-password cookie:
   browsers with cookies.
 
 Changing the password: update `CONGRESS_MASTER_PASSWORD_HASH` in
-`services/capitol/.env` on the server and `sudo systemctl restart congress-capitol`.
+`services/congress/.env` on the server and `sudo systemctl restart congress-core`.
 
 ## Exposure: Caddy + public DNS
 
@@ -194,15 +194,15 @@ pnpm install
 
 # build:web must run before build:vendor/build:remote (shared dist/, see
 # sync-deploy.sh's comment); build:vendor is Capitol-only.
-pnpm --filter capitol build:web
-pnpm --filter capitol build:vendor
+pnpm --filter congress build:web
+pnpm --filter congress build:vendor
 for name in chamber-notes chamber-calendar chamber-documents chamber-tasks; do
   pnpm --filter "$name" build:web
   pnpm --filter "$name" build:remote
 done
 
 # Create every service's .env by hand (untracked) from its .env.example:
-# services/capitol/.env, services/chamber-notes/.env, .../chamber-calendar/.env,
+# services/congress/.env, services/chamber-notes/.env, .../chamber-calendar/.env,
 # .../chamber-documents/.env, .../chamber-tasks/.env. Set NODE_ENV=production,
 # the real production PORT (8000/8011/8012/8013/8014), one shared
 # CONGRESS_INTERNAL_TOKEN across all five files, and - for every Chamber -
@@ -212,7 +212,7 @@ done
 
 sudo cp infra/systemd/congress-*.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now congress-capitol congress-chamber-notes \
+sudo systemctl enable --now congress-core congress-chamber-notes \
   congress-chamber-calendar congress-chamber-documents congress-chamber-tasks
 
 # Passwordless sudo for the sync timer's restarts - see "Process management"

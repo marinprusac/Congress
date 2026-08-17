@@ -9,14 +9,14 @@ Congress is a personal, self-hosted productivity system for a single user, deplo
 Three names are used consistently in code, folders, and package names:
 
 - **Congress** — the whole system; not itself a running service.
-- **Capitol** (`services/capitol`) — the central orchestrator: module registry, request gateway, homepage, cross-cutting settings (dark mode), global search, Exhibit Sharing. Follows the same Chamber contract as everyone else, plus these extra duties.
+- **Capitol** (`services/congress`) — the central orchestrator: module registry, request gateway, homepage, cross-cutting settings (dark mode), global search, Exhibit Sharing. Follows the same Chamber contract as everyone else, plus these extra duties. (Mid-migration: the package/directory has been renamed to `congress` as the first step of splitting Capitol's backbone duties from its product surface — see the approved plan at `.claude/plans/immutable-gathering-tower.md` if it still exists. This doc's "Capitol" terminology still describes the current, not-yet-split reality.)
 - **Chamber** — any individual module (`services/chamber-notes`, `services/chamber-calendar`, `services/chamber-documents`, `services/chamber-tasks`). Each is a fully separate process: own port, own SQLite file, own frontend build, own MCP server. No Chamber imports another Chamber's source, shares a database, or shares a process.
 
 Status vocabulary stays plain in UI/code: a Chamber is `active` or `offline`, never "convened"/"adjourned" — the Congress/Capitol/Chamber theme is structural, not narrated.
 
 ## Commands
 
-There's no root-level dev/build orchestration (no turbo/nx) — work one service at a time with `pnpm --filter <service>`, e.g. `chamber-notes`, `chamber-calendar`, `chamber-documents`, `chamber-tasks`, `capitol`.
+There's no root-level dev/build orchestration (no turbo/nx) — work one service at a time with `pnpm --filter <service>`, e.g. `chamber-notes`, `chamber-calendar`, `chamber-documents`, `chamber-tasks`, `congress`.
 
 ```bash
 pnpm install                                   # once, from repo root
@@ -25,7 +25,7 @@ pnpm --filter <service> dev:server             # backend, watch mode (tsx watch)
 pnpm --filter <service> dev:web                # frontend, Vite dev server
 pnpm --filter <service> build:web              # frontend production build -> frontend/dist
 pnpm --filter <service> build:remote           # every Chamber: remote-entry.js/.css for shell-hosting, run after build:web
-pnpm --filter capitol build:vendor             # Capitol only: shared React/router/query-client build the above resolves against
+pnpm --filter congress build:vendor            # Congress only: shared React/router/query-client build the above resolves against
 pnpm --filter <service> typecheck              # tsc --noEmit, server + frontend tsconfig
 
 pnpm -r typecheck                              # typecheck every package/service — run this after any change
@@ -62,7 +62,7 @@ Every service — Capitol included — implements the same contract (defined in 
 - A REST API under `/api/*`.
 - An MCP server at `/mcp` (Streamable HTTP transport, official `@modelcontextprotocol/sdk`), wrapping the same REST logic rather than touching the DB directly.
 
-On boot, a Chamber calls `POST /capitol/register` with its manifest (retrying with backoff if Capitol isn't up yet — start order must never matter), then heartbeats `POST /capitol/heartbeat` on an interval; Capitol marks it `offline` in its registry if a heartbeat is missed past a threshold. Registration/heartbeat/exhibit-sync calls are authenticated with a shared `CONGRESS_INTERNAL_TOKEN` header (`requireInternalToken` in `services/capitol/src/auth.ts`) — this is a "stop stray local processes" gate, not real auth.
+On boot, a Chamber calls `POST /capitol/register` with its manifest (retrying with backoff if Capitol isn't up yet — start order must never matter), then heartbeats `POST /capitol/heartbeat` on an interval; Capitol marks it `offline` in its registry if a heartbeat is missed past a threshold. Registration/heartbeat/exhibit-sync calls are authenticated with a shared `CONGRESS_INTERNAL_TOKEN` header (`requireInternalToken` in `services/congress/src/auth.ts`) — this is a "stop stray local processes" gate, not real auth.
 
 Each service owns exactly one SQLite file, opened only by its own process. Cross-Chamber data access always goes over HTTP through the owning Chamber's own API — never a shared DB, never one service importing another's Drizzle schema.
 
@@ -72,7 +72,7 @@ Capitol is the only service Caddy ever points at. Its `gateway.ts` proxies `/api
 
 ### Shell-hosted Chamber navigation
 
-Capitol's frontend is a persistent shell: navigating to a Chamber, or between Chambers, never does a full page load — Capitol's `ChamberHost` (`services/capitol/frontend/src/components/ChamberHost.tsx`) dynamically `import()`s that Chamber's own build as a real ES module and mounts it directly into Capitol's existing React tree and Router, instead of the browser following a link to `/<chamberName>/*`. This layers on top of the "fully separate process" independence above, not a replacement for it — a Chamber still owns its build/port/DB/backend entirely; the only new coupling is Chamber → Capitol (each Chamber emits one extra build artifact and agrees to a few shared conventions), which is deliberately looser than Chamber ↔ Chamber independence.
+Capitol's frontend is a persistent shell: navigating to a Chamber, or between Chambers, never does a full page load — Capitol's `ChamberHost` (`services/congress/frontend/src/components/ChamberHost.tsx`) dynamically `import()`s that Chamber's own build as a real ES module and mounts it directly into Capitol's existing React tree and Router, instead of the browser following a link to `/<chamberName>/*`. This layers on top of the "fully separate process" independence above, not a replacement for it — a Chamber still owns its build/port/DB/backend entirely; the only new coupling is Chamber → Capitol (each Chamber emits one extra build artifact and agrees to a few shared conventions), which is deliberately looser than Chamber ↔ Chamber independence.
 
 - Each Chamber's `frontend/vite.remote.config.ts` (`build:remote`) builds `frontend/src/remote.tsx` — mirrors `main.tsx` minus `StrictMode`/`createRoot`/`BrowserRouter` — into `remote-entry.js`/`remote-entry.css`, with `react`/`react-dom`/`react-router-dom`/`@tanstack/react-query` left external. Additive to `build:web`'s output (same `dist/`, run after it), not a replacement — standalone/dev access is unaffected.
 - Capitol's `frontend/vite.vendor.config.ts` (`build:vendor`) builds the one shared copy of those externalized packages, served at `/vendor/*.js` and wired into `index.html` via an import map — required so a dynamically-mounted Chamber shares React's live module state with the shell instead of crashing with "invalid hook call" from two separate copies of "the same" React.
@@ -85,16 +85,16 @@ Capitol's frontend is a persistent shell: navigating to a Chamber, or between Ch
 An "Exhibit" is any addressable piece of content in any Chamber (`note-42`, `document-7`, `event-3:cal:evt123`, ...). This is the one piece of real cross-cutting product logic in the system, worth understanding before touching notes/calendar/documents content code:
 
 - Every Chamber implements a small **content contract** (`GET /api/exhibits/search`, `POST /api/exhibits/resolve`, `GET`/`PATCH /api/exhibits/:id/content`) — see `packages/chamber-kit/src/exhibits.ts`'s `createTableBackedExhibits` for the pattern notes/documents both use (Calendar's exhibits are Google Calendar events, not a local table, so it implements the same contract by hand in `services/chamber-calendar/src/exhibits.ts` / `google/events.ts`).
-- Capitol's own SQLite DB (`services/capitol/src/db/schema.ts`) keeps `exhibit_cache` and `exhibit_refs` — a cache of every known Exhibit's name/url and a reverse-reference graph, populated whenever a Chamber calls `POST /capitol/exhibits/sync` after a create/update/delete. `services/capitol/src/exhibits.ts` fans search/resolve calls out to every active Chamber in parallel.
+- Capitol's own SQLite DB (`services/congress/src/db/schema.ts`) keeps `exhibit_cache` and `exhibit_refs` — a cache of every known Exhibit's name/url and a reverse-reference graph, populated whenever a Chamber calls `POST /capitol/exhibits/sync` after a create/update/delete. `services/congress/src/exhibits.ts` fans search/resolve calls out to every active Chamber in parallel.
 - In note/document/event bodies, `[[exhibit:chamber:id|Label]]` tokens (`packages/congress-ui/src/token.ts`) render as clickable chips (`ExhibitChip`) via `ExhibitAnnotatedText`/`useResolvedExhibits`. Backlinks/frontlinks panels are computed live from `exhibit_refs`, not stored redundantly.
 
 ### Exhibit Sharing
 
 A Capitol-owned feature for granting outside access (a person, or an AI agent via plain HTTP) to one Exhibit and everything it recursively references, without a Congress login:
 
-- `services/capitol/src/shares.ts` — a `shares` table (bearer token as PK, root exhibit, max depth, permission, expiry) plus `computeShareClosure`, a live BFS over `exhibit_refs` — inheritance is dynamic, not a snapshot, so editing a shared note to reference something new makes that new Exhibit reachable immediately.
-- `services/capitol/src/shareAuth.ts` — `requireShareToken`, a third auth tier alongside the owner session cookie and the internal-token header, gating everything under `/capitol/shared/:token/*`.
-- The public viewer lives at `/shared/:token` (`services/capitol/frontend/src/pages/SharedViewPage.tsx`), the one route in Capitol's frontend that intentionally sits outside `LoginGate`.
+- `services/congress/src/shares.ts` — a `shares` table (bearer token as PK, root exhibit, max depth, permission, expiry) plus `computeShareClosure`, a live BFS over `exhibit_refs` — inheritance is dynamic, not a snapshot, so editing a shared note to reference something new makes that new Exhibit reachable immediately.
+- `services/congress/src/shareAuth.ts` — `requireShareToken`, a third auth tier alongside the owner session cookie and the internal-token header, gating everything under `/capitol/shared/:token/*`.
+- The public viewer lives at `/shared/:token` (`services/congress/frontend/src/pages/SharedViewPage.tsx`), the one route in Capitol's frontend that intentionally sits outside `LoginGate`.
 
 ### Settings & theming
 

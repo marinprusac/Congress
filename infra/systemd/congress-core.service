@@ -1,11 +1,11 @@
 [Unit]
-Description=Congress - Capitol service
+Description=Congress - core service (registry, gateway, auth, exhibits, sharing)
 After=network.target
 
 [Service]
 Type=simple
 User=marin
-WorkingDirectory=/srv/congress/services/capitol
+WorkingDirectory=/srv/congress/services/congress
 ExecStart=/usr/bin/pnpm run start
 Restart=on-failure
 RestartSec=5

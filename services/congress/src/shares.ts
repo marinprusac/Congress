@@ -27,7 +27,7 @@ export type CreateShareRequest = z.infer<typeof createShareRequestSchema>;
 // One exhibit reachable through a share's closure. depth 0 = the share's
 // root itself; depth > 0 = reached via that many recursive [[ references.
 // Backend-only - never crosses into a Chamber or the frontend directly, only
-// via shareDetailSchema (services/capitol/src/types.ts).
+// via shareDetailSchema (services/congress/src/types.ts).
 export const shareClosureEntrySchema = z.object({
   id: z.string(),
   chamber: z.string(),

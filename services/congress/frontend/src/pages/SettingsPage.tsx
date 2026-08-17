@@ -8,7 +8,7 @@ import { SignOutControl } from "@/components/LoginGate";
 
 // Per-device, not a Congress-wide setting like dark mode above - each
 // browser/device holds its own Web Push subscription, so "on" here means
-// "this device", not "every device". See services/capitol/frontend/src/sw.ts
+// "this device", not "every device". See services/congress/frontend/src/sw.ts
 // for the service worker this subscribes through and lib/push.ts for the
 // subscribe/unsubscribe calls themselves.
 function PushNotificationsSection() {

@@ -44,7 +44,7 @@ function DefaultChamberMark(props: IconProps) {
 // asset it serves itself (frontend/public/icons/mark.svg, built into
 // dist/ alongside icon-192.png), fetched at runtime through Capitol's
 // generic, registry-driven proxy (GET /capitol/chambers/:name/icon - see
-// services/capitol/src/gateway.ts's proxyToChamberIcon), and inlined as
+// services/congress/src/gateway.ts's proxyToChamberIcon), and inlined as
 // real SVG markup so it can still be recolored via `currentColor` and
 // respond to hover/theme like every mark always has.
 //

@@ -78,7 +78,7 @@ pnpm --filter chamber-budget dev:web      # frontend, separate terminal
 
 Visit `http://localhost:8015` — the generated Chamber runs standalone.
 Registration with Capitol happens automatically on backend boot as long as
-Capitol itself is running (`pnpm dev:capitol` from repo root) — see §5.
+Congress itself is running (`pnpm dev:congress` from repo root) — see §5.
 
 ## 3. What's generated vs. what you write by hand
 
@@ -169,7 +169,7 @@ mark. It's served as a static asset exactly like the existing
 `icons/icon-192.png` favicon beside it — no build step required for it to
 resolve locally, and no manifest field either. Capitol's gateway fetches it
 generically at `GET /capitol/chambers/:name/icon` (see `proxyToChamberIcon`
-in `services/capitol/src/gateway.ts`, which proxies to whatever Chamber
+in `services/congress/src/gateway.ts`, which proxies to whatever Chamber
 `:name` resolves to in the live registry) and `congress-ui`'s `ChamberMark`/
 `getChamberIcon` fetch-and-cache it at runtime, inlining the real SVG markup
 so it keeps the `currentColor` behavior. A Chamber that's offline, or one

@@ -17,10 +17,10 @@ pnpm install --frozen-lockfile
 # build:web must run before build:vendor/build:remote for every service -
 # they share one dist/ and only build:web empties it (build:vendor/
 # build:remote add their extra artifacts alongside with emptyOutDir:
-# false). build:vendor is Capitol-only: the shared React/router/query-client
-# build every Chamber's remote entry (and Capitol's own build:web output)
-# resolves at runtime via the importmap in Capitol's index.html - see
-# services/capitol/frontend/vite.vendor.config.ts.
+# false). build:vendor is Congress-only: the shared React/router/query-client
+# build every Chamber's remote entry (and Congress's own build:web output)
+# resolves at runtime via the importmap in Congress's index.html - see
+# services/congress/frontend/vite.vendor.config.ts.
 #
 # Chambers are discovered from services/chamber-*/ rather than hardcoded, so
 # a new Chamber (e.g. via `pnpm create-chamber`) is picked up here with zero
@@ -28,9 +28,9 @@ pnpm install --frozen-lockfile
 # with the standard build:web/build:remote scripts and a matching
 # infra/systemd/congress-chamber-<name>.service unit already installed on
 # the server (see docs/creating-a-chamber.md).
-SERVICES=(congress-capitol)
-pnpm --filter capitol build:web
-pnpm --filter capitol build:vendor
+SERVICES=(congress-core)
+pnpm --filter congress build:web
+pnpm --filter congress build:vendor
 
 for dir in "$REPO_DIR"/services/chamber-*/; do
   name="$(basename "$dir")"
