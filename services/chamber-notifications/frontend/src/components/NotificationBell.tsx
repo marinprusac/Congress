@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { resolveApiBase, useShellHosted, navigateToExhibit, formatTimestamp, getChamberIcon } from "@congress/congress-ui";
 import type { Notification, NotificationsListResponse } from "@congress/shared-types";
-import { useShellHosted } from "./ShellHostContext.js";
-import { navigateToExhibit } from "./navigateToExhibit.js";
-import { formatTimestamp } from "./formatTimestamp.js";
-import { getChamberIcon } from "./ChamberMarks.js";
 
 interface NotificationBellProps {
   // Same purpose as GlobalExhibitSearch's own prop: which Chamber's app this
@@ -16,22 +13,30 @@ interface NotificationBellProps {
 
 const POLL_INTERVAL_MS = 60_000;
 
+// This Chamber's own api base - same pattern as any Chamber's own
+// lib/api.ts (e.g. chamber-tasks/frontend/src/lib/api.ts): /api in dev
+// (this Chamber's own dev proxy), /api/notifications in prod (Congress's
+// gateway prefix, stripped before forwarding to this Chamber's apiBase).
+const API_BASE = resolveApiBase("notifications", import.meta.env.PROD);
+
 function notificationsQueryKey() {
-  return ["congress", "notifications"] as const;
+  return ["notifications", "inbox"] as const;
 }
 
 async function fetchNotifications(): Promise<NotificationsListResponse> {
-  const res = await fetch("/congress/notifications");
+  const res = await fetch(`${API_BASE}/notifications`);
   if (!res.ok) return { notifications: [], unreadCount: 0 };
   return res.json();
 }
 
-// Capitol-owned notification center - the one place every Chamber's "task
-// due", "event starting soon" (etc.) alerts surface, instead of each
-// Chamber inventing its own alert UI (see chamber-kit's
-// createPushNotification). Mounted once in ChamberHeader, so it's present
-// on every page regardless of which Chamber is currently open, same as
-// GlobalExhibitSearch.
+// This Chamber's own inbox - the one place every automation's "task due",
+// "event starting soon" (etc.) alert surfaces. Lives here rather than in
+// congress-ui: it's this Chamber's own UI, not shared cross-Chamber chrome
+// (unlike GlobalExhibitSearch or ChamberHeader) - only ever used by this
+// Chamber's own NotificationsWidget. Rendered as this Chamber's 1x1
+// homepage widget rather than fixed header chrome - see that component's
+// own comment for why the panel stays position:fixed at every breakpoint
+// instead of anchoring to the trigger.
 export function NotificationBell({ ownChamber, navigate }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -69,18 +74,18 @@ export function NotificationBell({ ownChamber, navigate }: NotificationBellProps
   }
 
   async function markRead(id: number) {
-    await fetch(`/congress/notifications/${id}/read`, { method: "POST" });
+    await fetch(`${API_BASE}/notifications/${id}/read`, { method: "POST" });
     invalidate();
   }
 
   async function markAllRead() {
-    await fetch("/congress/notifications/read-all", { method: "POST" });
+    await fetch(`${API_BASE}/notifications/read-all`, { method: "POST" });
     invalidate();
   }
 
   async function dismiss(e: ReactMouseEvent<HTMLButtonElement>, id: number) {
     e.stopPropagation();
-    await fetch(`/congress/notifications/${id}`, { method: "DELETE" });
+    await fetch(`${API_BASE}/notifications/${id}`, { method: "DELETE" });
     invalidate();
   }
 

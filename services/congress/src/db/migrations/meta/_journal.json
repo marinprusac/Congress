@@ -78,6 +78,20 @@
       "when": 1786937174426,
       "tag": "0010_typical_namora",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1786979045269,
+      "tag": "0011_chemical_stature",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1786982660889,
+      "tag": "0012_minor_cloak",
+      "breakpoints": true
     }
   ]
 }

@@ -1,36 +1,34 @@
 import { and, eq, isNotNull } from "drizzle-orm";
-import { createPushNotification } from "@congress/chamber-kit";
+import { createPublishEvent } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
 import { tasks } from "./db/schema.js";
 import { env } from "./env.js";
 
-// Pushes into Capitol's own notification center rather than this Chamber
-// inventing its own alert UI - see chamber-kit's createPushNotification for
-// the upsert/withdraw contract this relies on.
-const pushNotification = createPushNotification({
+// Publishes to Congress's generic event log rather than pushing a
+// notification directly - this Chamber only knows a task is due, not
+// whether anything should happen about it or what that should say; the
+// notifications Chamber's own automations decide that. See
+// chamber-kit's createPublishEvent and this Chamber's manifest.ts for the
+// event catalog.
+const publishEvent = createPublishEvent({
   chamber: "tasks",
   capitolUrl: env.CAPITOL_URL,
   internalToken: env.CONGRESS_INTERNAL_TOKEN,
 });
 
 // A task surfaces once its due date is within a day out, and stays surfaced
-// (re-pushed, title updated to "overdue") until it's completed or its due
+// (re-published, "overdue" once past due) until it's completed or its due
 // date moves - matching a personal to-do reminder, not a hard deadline
 // alert.
 const LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
 const CHECK_INTERVAL_MS = 15 * 60 * 1000;
 
-function dedupeKeyFor(taskId: number): string {
-  return `task-due-${taskId}`;
-}
-
-// Tracks which tasks this process last pushed a "due soon" notification
-// for, so a task that's completed (or its due date pushed back) between
-// checks gets explicitly withdrawn instead of just silently going stale in
-// Capitol's own notification list. In-memory and reset on restart - a
-// notification that went stale across a restart just lingers until the
-// owner dismisses it by hand, an accepted gap for a single-user system
-// rather than a persisted table.
+// Tracks which tasks this process last published a due/overdue event for,
+// so a task that's completed (or its due date pushed back) between checks
+// gets an explicit tasks.due_cleared event instead of just silently going
+// stale. In-memory and reset on restart - same accepted gap as before this
+// Chamber moved to events (see git history), just re-detected as "newly
+// due" on the next check after a restart rather than missed entirely.
 const lastNotifiedTaskIds = new Set<number>();
 
 async function checkDueTasks(): Promise<void> {
@@ -47,16 +45,15 @@ async function checkDueTasks(): Promise<void> {
     if (!row.dueDate || row.dueDate.getTime() - now > LOOKAHEAD_MS) continue;
     currentlyDue.add(row.id);
     const overdue = row.dueDate.getTime() < now;
-    await pushNotification({
-      dedupeKey: dedupeKeyFor(row.id),
-      title: overdue ? `"${row.name}" is overdue` : `"${row.name}" is due soon`,
-      chamberUrl: `/t/${row.id}`,
+    await publishEvent({
+      type: overdue ? "tasks.overdue" : "tasks.due_soon",
+      payload: { taskId: row.id, name: row.name, url: `/t/${row.id}` },
     });
   }
 
   for (const id of lastNotifiedTaskIds) {
     if (!currentlyDue.has(id)) {
-      await pushNotification({ dedupeKey: dedupeKeyFor(id), withdraw: true });
+      await publishEvent({ type: "tasks.due_cleared", payload: { taskId: id } });
     }
   }
 

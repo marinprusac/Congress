@@ -15,4 +15,5 @@ export const documentsManifest: Manifest = {
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
   widgets: [{ id: "recent", width: 3, height: 2, label: "Recent" }],
+  events: [],
 };

@@ -25,6 +25,20 @@ export const manifestWidgetSchema = z.object({
 });
 export type ManifestWidget = z.infer<typeof manifestWidgetSchema>;
 
+// One entry per domain event a Chamber may publish (POST
+// /congress/events/publish) - purely a declared catalog for other Chambers'
+// own UI (e.g. an automation editor's event-type picker) to read off the
+// live registry; Congress itself never inspects this field beyond storing
+// and returning it; see events.ts for the actual publish/log contract.
+// `type` is conventionally "<chamber>.<event>" (e.g. "tasks.due_soon") so
+// it's self-namespacing without a separate chamber filter downstream.
+export const manifestEventSchema = z.object({
+  type: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().optional(),
+});
+export type ManifestEvent = z.infer<typeof manifestEventSchema>;
+
 export const manifestSchema = z.object({
   name: z.string().min(1),
   displayName: z.string().min(1),
@@ -42,6 +56,9 @@ export const manifestSchema = z.object({
   // so a Chamber registering against an old manifest shape (or a chamber with
   // no widgets, like Capitol itself) never has to think about this field.
   widgets: z.array(manifestWidgetSchema).default([]),
+  // Domain events this Chamber may publish. Defaulted the same way as
+  // widgets - most Chambers publish none.
+  events: z.array(manifestEventSchema).default([]),
 });
 export type Manifest = z.infer<typeof manifestSchema>;
 

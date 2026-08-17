@@ -12,7 +12,8 @@ import {
   getChamberIcon,
   useShellHosted,
   resolveChamberPath,
-  confirmDelete,
+  ConfirmSheet,
+  showToast,
 } from "@congress/congress-ui";
 import { fetchItem, updateItem, deleteItem, quickCreateItemExhibit } from "@/lib/api";
 
@@ -23,6 +24,7 @@ export function ItemViewPage() {
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftBody, setDraftBody] = useState("");
 
@@ -45,7 +47,9 @@ export function ItemViewPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["items"] });
       navigate(resolveChamberPath("/", "__CHAMBER_NAME__", shellHosted));
+      showToast("Item deleted");
     },
+    onError: () => showToast("Failed to delete item.", "error"),
   });
 
   useEffect(() => {
@@ -94,12 +98,37 @@ export function ItemViewPage() {
 
       <ExhibitLinksLayout
         exhibitId={`item-${itemId}`}
-        emptyBacklinksLabel="Nothing references this item"
-        emptyFrontlinksLabel="This item references nothing"
         renderIcon={(chamber) => getChamberIcon(chamber)}
         onNavigate={(r) => navigateToExhibit("__CHAMBER_NAME__", r, navigate, shellHosted)}
         editable
         onCreateReference={onCreateExhibit}
+        actions={
+          <ExhibitActionBar>
+            {editing ? (
+              <>
+                <button onClick={save} className="tap-target text-accent hover:underline">
+                  Save
+                </button>
+                <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <ShareControl chamber="__CHAMBER_NAME__" exhibitId={`item-${itemId}`} exhibitName={item.name} />
+                <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
+                  Edit
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(true)}
+                  className="tap-target text-alert hover:underline"
+                >
+                  Delete
+                </button>
+              </>
+            )}
+          </ExhibitActionBar>
+        }
       >
         {editing ? (
           <ExhibitTextarea
@@ -120,35 +149,18 @@ export function ItemViewPage() {
         ) : (
           <p className="whitespace-pre-wrap text-base text-dust">— No body —</p>
         )}
-
-        <ExhibitActionBar>
-          {editing ? (
-            <>
-              <button onClick={save} className="tap-target text-accent hover:underline">
-                Save
-              </button>
-              <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <ShareControl chamber="__CHAMBER_NAME__" exhibitId={`item-${itemId}`} exhibitName={item.name} />
-              <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
-                Edit
-              </button>
-              <button
-                onClick={() => {
-                  if (confirmDelete(item.name)) deleteMutation.mutate();
-                }}
-                className="tap-target text-alert hover:underline"
-              >
-                Delete
-              </button>
-            </>
-          )}
-        </ExhibitActionBar>
       </ExhibitLinksLayout>
+      <ConfirmSheet
+        open={confirmingDelete}
+        title="Delete item"
+        message={`Delete "${item.name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          deleteMutation.mutate();
+        }}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </article>
   );
 }

@@ -15,4 +15,11 @@ export const calendarManifest: Manifest = {
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
   widgets: [{ id: "upcoming", width: 3, height: 2, label: "Upcoming" }],
+  events: [
+    {
+      type: "calendar.event_starting_soon",
+      label: "Event starting soon",
+      description: "A timed event on a connected calendar starts within 30 minutes.",
+    },
+  ],
 };

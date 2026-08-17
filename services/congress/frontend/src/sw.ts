@@ -44,7 +44,8 @@ self.addEventListener("push", (event) => {
     return;
   }
   // Same "chamber + that Chamber's own relative url" shape a notification
-  // carries everywhere else (see chamber-kit's createPushNotification) -
+  // carries everywhere else (see the notifications Chamber's own
+  // pushNotification, notificationPushRequestSchema in shared-types) -
   // resolved into an absolute path here since a notification click always
   // opens a fresh tab/window, never a same-document SPA navigation the way
   // NotificationBell's own click handler can.

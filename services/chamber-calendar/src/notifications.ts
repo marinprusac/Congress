@@ -1,20 +1,23 @@
-import { createPushNotification } from "@congress/chamber-kit";
+import { createPublishEvent } from "@congress/chamber-kit";
 import { listEvents } from "./google/events.js";
 import { eventUrl } from "./exhibits.js";
 import { env } from "./env.js";
 
-// Pushes into Capitol's own notification center rather than this Chamber
-// inventing its own alert UI - see chamber-kit's createPushNotification for
-// the upsert/withdraw contract this relies on.
-const pushNotification = createPushNotification({
+// Publishes to Congress's generic event log rather than pushing a
+// notification directly - this Chamber only knows an event is starting
+// soon, not whether anything should happen about it or what that should
+// say; the notifications Chamber's own automations decide that. See
+// chamber-kit's createPublishEvent and this Chamber's manifest.ts for the
+// event catalog.
+const publishEvent = createPublishEvent({
   chamber: "calendar",
   capitolUrl: env.CAPITOL_URL,
   internalToken: env.CONGRESS_INTERNAL_TOKEN,
 });
 
-// Only timed events within this window get a "starting soon" notification -
-// an all-day event has no single meaningful "starting" moment, so it's
-// skipped entirely rather than notifying at local midnight.
+// Only timed events within this window get a "starting soon" event - an
+// all-day event has no single meaningful "starting" moment, so it's skipped
+// entirely rather than firing at local midnight.
 const LOOKAHEAD_MS = 30 * 60 * 1000;
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -22,12 +25,13 @@ function dedupeKeyFor(accountId: number, calendarId: string, eventId: string): s
   return `event-starting-soon-${accountId}:${encodeURIComponent(calendarId)}:${encodeURIComponent(eventId)}`;
 }
 
-// Unlike chamber-tasks' due-task check, this never explicitly withdraws -
-// listEvents only looks forward from `now`, so an event simply stops
-// appearing in the window once it starts, and its last-pushed "starting in
-// 1 min" title is left for the owner to dismiss by hand rather than tracked
-// across ticks for an explicit withdraw. Reasonable for a countdown-style
-// reminder: the notification content itself trails off, it doesn't nag.
+// Unlike chamber-tasks' due-task check, this never publishes a "cleared"
+// counterpart - listEvents only looks forward from `now`, so an event
+// simply stops appearing in the window once it starts, and whatever
+// automation matched this is left for the owner to dismiss by hand rather
+// than tracked across ticks for an explicit withdraw. Reasonable for a
+// countdown-style reminder: the notification content itself trails off, it
+// doesn't nag.
 async function checkUpcomingEvents(): Promise<void> {
   const now = Date.now();
   let events;
@@ -42,10 +46,14 @@ async function checkUpcomingEvents(): Promise<void> {
     if (event.allDay) continue;
     const startMs = new Date(event.start).getTime();
     const minutesUntil = Math.max(0, Math.round((startMs - now) / 60_000));
-    await pushNotification({
-      dedupeKey: dedupeKeyFor(event.accountId, event.calendarId, event.id),
-      title: minutesUntil <= 1 ? `"${event.title}" is starting now` : `"${event.title}" starts in ${minutesUntil} min`,
-      chamberUrl: eventUrl(event.accountId, event.calendarId, event.id),
+    await publishEvent({
+      type: "calendar.event_starting_soon",
+      payload: {
+        dedupeKey: dedupeKeyFor(event.accountId, event.calendarId, event.id),
+        title: event.title,
+        minutesUntil,
+        url: eventUrl(event.accountId, event.calendarId, event.id),
+      },
     });
   }
 }

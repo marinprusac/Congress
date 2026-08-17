@@ -11,7 +11,6 @@
     "ChamberLayout": { "cardMode": "single", "primaryStory": "NotesChamber", "viewport": "1280x800" },
     "ExhibitLinksLayout": { "cardMode": "column" },
     "ExhibitPickerDropdown": { "cardMode": "column" },
-    "NotificationBell": { "cardMode": "single", "primaryStory": "Open", "viewport": "1280x800" },
     "SharePopover": { "cardMode": "single", "viewport": "1280x800" },
     "ChamberHeader": { "cardMode": "column" }
   }

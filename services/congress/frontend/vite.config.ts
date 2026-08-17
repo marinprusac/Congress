@@ -88,7 +88,10 @@ export default defineConfig({
       // the Capitol Chamber's static build/remote-entry the same way
       // production does. Other Chambers have the same gap in dev (no
       // equivalent "/notes", "/calendar", ... rule) - pre-existing, unrelated
-      // to the Congress/Capitol split.
+      // to the Congress/Capitol split. Not "fixed" by hardcoding more chamber
+      // names here: a dev proxy rule naming a specific Chamber assumes that
+      // Chamber exists, which isn't true of every deployment (Capitol
+      // included - it's optional too, same as any other Chamber).
       "/capitol": PROXY_TARGET,
       "/api": PROXY_TARGET,
       "/manifest": PROXY_TARGET,

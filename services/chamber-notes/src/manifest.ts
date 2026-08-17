@@ -18,4 +18,5 @@ export const notesManifest: Manifest = {
   // services/congress/frontend/src/pages/SharedViewPage.tsx.
   contentFormat: "markdown",
   widgets: [{ id: "pinned", width: 3, height: 2, label: "Pinned" }],
+  events: [],
 };

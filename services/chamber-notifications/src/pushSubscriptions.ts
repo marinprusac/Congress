@@ -44,12 +44,11 @@ interface PushPayload {
 }
 
 // Fans a notification out to every subscribed device (phone, laptop, ...) -
-// best-effort, same as chamber-kit's own push helpers: a delivery failure
-// here must never surface as an error to whichever Chamber's poller
-// triggered the notification that led here. A 404/410 means the browser
-// itself discarded that subscription (uninstalled, permission revoked,
-// endpoint rotated) - the one case worth acting on, by pruning the row so
-// it stops being retried forever.
+// best-effort: a delivery failure here must never surface as an error to
+// whatever triggered the notification that led here. A 404/410 means the
+// browser itself discarded that subscription (uninstalled, permission
+// revoked, endpoint rotated) - the one case worth acting on, by pruning the
+// row so it stops being retried forever.
 export async function sendWebPush(payload: PushPayload): Promise<void> {
   if (!vapidConfigured) return;
 

@@ -35,7 +35,6 @@ export {
   updateCapitolSettings,
 } from "./useAppliedTheme.js";
 export { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
-export { NotificationBell } from "./NotificationBell.js";
 export { MobileSearchReveal } from "./MobileSearchReveal.js";
 export { usePullGesture } from "./usePullGesture.js";
 export type { PullZone } from "./usePullGesture.js";

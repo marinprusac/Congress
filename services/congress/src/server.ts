@@ -8,9 +8,7 @@ import {
   exhibitSyncRequestSchema,
   updateShareRequestSchema,
   updateCapitolSettingsRequestSchema,
-  notificationPushRequestSchema,
-  pushSubscriptionRequestSchema,
-  pushUnsubscribeRequestSchema,
+  eventPublishRequestSchema,
 } from "@congress/shared-types";
 import { env } from "./env.js";
 import { requireInternalToken } from "./auth.js";
@@ -38,14 +36,7 @@ import {
 import { createShare, createShareRequestSchema, listShares, listSharesForExhibit, updateShare, revokeShare, getExhibitSharing } from "./shares.js";
 import { requireShareToken, type ShareVariables } from "./shareAuth.js";
 import { getSettings, updateSettings } from "./settings.js";
-import {
-  pushNotification,
-  listNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
-  dismissNotification,
-} from "./notifications.js";
-import { publicKey, saveSubscription, removeSubscription } from "./pushSubscriptions.js";
+import { publishEvent, listEventsSince, pruneOldEvents } from "./events.js";
 import { mcpApp } from "./mcp/server.js";
 
 // Only Capitol itself validates register/deregister/heartbeat/exhibit-resolve
@@ -124,55 +115,26 @@ app.post("/congress/exhibits/sync", requireInternalToken, async (c) => {
   return c.json({ ok: true });
 });
 
-app.post("/congress/notifications/push", requireInternalToken, async (c) => {
+// Generic event log - Congress only ever appends and returns entries here,
+// never inspecting `type`/`payload` or relaying to a chamber by name. See
+// events.ts's own comment; a Chamber wanting to react to events (today,
+// only the notifications Chamber) polls the GET route on its own schedule.
+app.post("/congress/events/publish", requireInternalToken, async (c) => {
   const body = await c.req.json().catch(() => null);
-  const parsed = notificationPushRequestSchema.safeParse(body);
+  const parsed = eventPublishRequestSchema.safeParse(body);
   if (!parsed.success) {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
-  pushNotification(parsed.data);
+  publishEvent(parsed.data);
   return c.json({ ok: true });
 });
 
-app.get("/congress/notifications", requireSession, (c) => c.json(listNotifications()));
-
-app.post("/congress/notifications/read-all", requireSession, (c) => {
-  markAllNotificationsRead();
-  return c.json({ ok: true });
-});
-
-app.post("/congress/notifications/:id/read", requireSession, (c) => {
-  const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id) || !markNotificationRead(id)) return c.json({ error: "not_found" }, 404);
-  return c.json({ ok: true });
-});
-
-app.delete("/congress/notifications/:id", requireSession, (c) => {
-  const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id) || !dismissNotification(id)) return c.json({ error: "not_found" }, 404);
-  return c.json({ ok: true });
-});
-
-app.get("/congress/push/config", requireSession, (c) => c.json({ publicKey: publicKey() }));
-
-app.post("/congress/push/subscribe", requireSession, async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = pushSubscriptionRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+app.get("/congress/events", requireInternalToken, (c) => {
+  const since = Number(c.req.query("since") ?? "0");
+  if (!Number.isInteger(since) || since < 0) {
+    return c.json({ error: "invalid_since" }, 400);
   }
-  saveSubscription(parsed.data);
-  return c.json({ ok: true });
-});
-
-app.post("/congress/push/unsubscribe", requireSession, async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = pushUnsubscribeRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  removeSubscription(parsed.data.endpoint);
-  return c.json({ ok: true });
+  return c.json(listEventsSince(since));
 });
 
 // An empty query is meaningful here - it asks each Chamber for its most
@@ -386,4 +348,22 @@ export function startHeartbeatSweep() {
 
 export function stopHeartbeatSweep() {
   if (sweepInterval) clearInterval(sweepInterval);
+}
+
+// Once an hour is plenty for a 7-day retention window (see events.ts) - this
+// is housekeeping, not something that needs its own env-tunable interval
+// like the heartbeat sweep (where too slow/fast actually changes observable
+// behavior).
+const EVENT_PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+
+let eventPruneInterval: ReturnType<typeof setInterval> | undefined;
+
+export function startEventPruneSweep() {
+  eventPruneInterval = setInterval(() => {
+    pruneOldEvents();
+  }, EVENT_PRUNE_INTERVAL_MS);
+}
+
+export function stopEventPruneSweep() {
+  if (eventPruneInterval) clearInterval(eventPruneInterval);
 }

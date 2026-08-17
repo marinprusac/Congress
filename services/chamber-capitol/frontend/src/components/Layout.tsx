@@ -4,7 +4,6 @@ import {
   ChamberHeader,
   CapitolMark,
   ChamberMark,
-  NotificationBell,
   useShellHosted,
   resolveChamberPath,
 } from "@congress/congress-ui";
@@ -17,8 +16,8 @@ const NAV_LINKS = [
 
 // Composes ChamberPicker/ChamberHeader by hand instead of the shared
 // ChamberLayout wrapper (see every other Chamber's own Layout.tsx) so the
-// notification center - Capitol-owned chrome, see NotificationBell's own
-// comment - can be threaded in as ChamberHeader's extraActions.
+// canvas-only chrome below (isHome) can be threaded onto the shell/main
+// wrapper divs.
 export function Layout() {
   const navigate = useNavigate();
   const shellHosted = useShellHosted();
@@ -39,7 +38,6 @@ export function Layout() {
         ownChamber="capitol"
         renderIcon={(chamber) => <ChamberMark name={chamber} />}
         navigate={(path) => navigate(path)}
-        extraActions={<NotificationBell ownChamber="capitol" navigate={(path) => navigate(path)} />}
       />
       <main className={`chamber-main${isHome ? " chamber-main--canvas" : ""}`}>
         <Outlet />

@@ -112,6 +112,7 @@ don't reimplement them:
 | `createMcpApp(name, registerTools)` | The full MCP transport/session/error plumbing. You only write `server.registerTool(...)` calls. |
 | `createTableBackedExhibits(config)` | Implements the whole Exhibit content contract (search/resolve/get/update) for a table-backed entity from a handful of callbacks. |
 | `createPushExhibitSync(opts)` | Fire-and-forget `POST /congress/exhibits/sync` after create/update/delete. |
+| `createPublishEvent(opts)` | Fire-and-forget `POST /congress/events/publish` for a domain event another Chamber's automations might react to - see §5.2. |
 | `createSingleRowSettings(config)` | The "id is always 1, select-then-upsert" settings pattern every Chamber uses. |
 | `createManualRefs`/`createManualRefsByExhibitId` | CRUD for the "References" side-panel refs, separate from wikilinks parsed out of body text. |
 | `extractOutgoingExhibitRefs(text)` | Parses `[[...]]` tokens out of body text into an exhibit-id list. |
@@ -226,6 +227,60 @@ Everything else — including `mcpUrl`, which is what makes your Chamber's
 tools reachable at `/mcp` (gated by `CONGRESS_INTERNAL_TOKEN`, not a
 session cookie, since MCP clients are machines) — just works once the
 manifest is correct and the process is heartbeating.
+
+### 5.2 Declaring events
+
+If your Chamber has a background check that decides "the owner should know
+about this" (a due date, an incoming webhook, anything else only your
+Chamber can detect), don't invent your own alert UI and don't push a
+notification directly — publish a domain event instead, and let the
+Notifications Chamber's own automations (Exhibits the owner edits) decide
+whether/what to notify. This keeps the "what does this say, should it even
+fire" decision editable without a code change, and means your Chamber has
+no idea whether anything is listening at all.
+
+```ts
+import { createPublishEvent } from "@congress/chamber-kit";
+
+const publishEvent = createPublishEvent({
+  chamber: "budget",
+  capitolUrl: env.CAPITOL_URL,
+  internalToken: env.CONGRESS_INTERNAL_TOKEN,
+});
+
+await publishEvent({
+  type: "budget.overspent",
+  payload: { categoryId: 4, categoryName: "Groceries", url: "/c/4" },
+});
+```
+
+`type` is conventionally `"<chamber>.<event>"` (e.g. `budget.overspent`) so
+it's self-namespacing without a separate chamber filter downstream. Congress
+itself only ever appends this to its own generic event log
+(`POST /congress/events/publish`) — it never inspects `type`/`payload` or
+relays to a specific chamber by name, so publishing works the same whether
+or not the Notifications Chamber (or anything else) happens to be
+registered.
+
+Optionally declare the event types you may publish in your manifest's
+`events` array (mirrors `widgets`, but keyed by `type`/`label`/
+`description?` rather than `id`/`width`/`height`/`label`):
+
+```ts
+events: [
+  {
+    type: "budget.overspent",
+    label: "Category overspent",
+    description: "A budget category's spend exceeded its monthly limit.",
+  },
+],
+```
+
+This is purely a declared catalog — it's what populates the trigger-type
+picker on the Notifications Chamber's own automation editor (read live off
+`GET /congress/registry`, never hardcoded to a specific chamber name), not a
+subscription or a requirement to actually fire that event. Defaulted to
+`[]` like `widgets`, so most Chambers never touch this field at all.
 
 ## 6. Local dev workflow
 

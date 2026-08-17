@@ -5,3 +5,4 @@ export * from "./sharing.js";
 export * from "./settings.js";
 export * from "./notifications.js";
 export * from "./push.js";
+export * from "./events.js";

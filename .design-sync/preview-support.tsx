@@ -95,36 +95,6 @@ const SHARING_ENTRIES = [
   { token: SHARE_SUMMARY.token, label: SHARE_SUMMARY.label, permission: "view", direct: true },
 ];
 
-const NOTIFICATIONS = [
-  {
-    id: 3,
-    chamber: "tasks",
-    title: "Ship the Tasks Chamber",
-    body: "Due today at 5:00 PM",
-    chamberUrl: "/t/1",
-    createdAt: "2026-08-16T08:15:00.000Z",
-    readAt: null,
-  },
-  {
-    id: 2,
-    chamber: "calendar",
-    title: "Team Sync — Thursday",
-    body: "Starting in 15 minutes",
-    chamberUrl: "/e/3",
-    createdAt: "2026-08-16T07:45:00.000Z",
-    readAt: null,
-  },
-  {
-    id: 1,
-    chamber: "notes",
-    title: "Congress Development",
-    body: null,
-    chamberUrl: "/n/9",
-    createdAt: "2026-08-15T18:30:00.000Z",
-    readAt: "2026-08-15T19:00:00.000Z",
-  },
-];
-
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
 }
@@ -178,13 +148,6 @@ function installFetchMock() {
 
     if (path === "/congress/registry") return jsonResponse(REGISTRY);
     if (path === "/congress/settings") return jsonResponse({ darkMode: false, hiddenWidgets: [] });
-    if (path === "/congress/notifications" && method === "GET") {
-      const unreadCount = NOTIFICATIONS.filter((n) => !n.readAt).length;
-      return jsonResponse({ notifications: NOTIFICATIONS, unreadCount });
-    }
-    if (path.startsWith("/congress/notifications/") && path.endsWith("/read") && method === "POST") return jsonResponse({ ok: true });
-    if (path === "/congress/notifications/read-all" && method === "POST") return jsonResponse({ ok: true });
-    if (path.startsWith("/congress/notifications/") && method === "DELETE") return jsonResponse({ ok: true });
     if (path.startsWith("/congress/chambers/") && path.endsWith("/icon")) {
       const chamber = decodeURIComponent(path.split("/")[3] ?? "");
       const markup = CHAMBER_ICONS[chamber];

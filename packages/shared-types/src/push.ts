@@ -1,9 +1,10 @@
 import { z } from "zod";
 
 // Web Push subscription shape, straight off PushSubscription.toJSON() in the
-// browser - a Chamber never sees this (it stays entirely within Capitol,
-// which owns the one service worker every push targets), so it lives
-// alongside the notification schemas rather than exported for Chambers.
+// browser - owned by the notifications Chamber (the one place that stores
+// subscriptions and calls sendWebPush), consumed by Capitol's subscribe UI
+// and Congress's frontend service worker (the one SW every push targets,
+// since it's the installed PWA shell).
 export const pushSubscriptionRequestSchema = z.object({
   endpoint: z.string().min(1),
   keys: z.object({

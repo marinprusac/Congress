@@ -17,4 +17,5 @@ export const manifest: Manifest = {
   // Capitol has no widgets of its own to compose onto its own canvas - it's
   // the Chamber that renders the canvas, not an entry on it.
   widgets: [],
+  events: [],
 };

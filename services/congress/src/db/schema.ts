@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
 
 export const chambers = sqliteTable("chambers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -7,6 +7,7 @@ export const chambers = sqliteTable("chambers", {
   version: text("version").notNull(),
   routesJson: text("routes_json").notNull(),
   widgetsJson: text("widgets_json").notNull().default("[]"),
+  eventsJson: text("events_json").notNull().default("[]"),
   apiBase: text("api_base").notNull(),
   mcpUrl: text("mcp_url"),
   healthUrl: text("health_url").notNull(),
@@ -69,47 +70,24 @@ export const shares = sqliteTable("shares", {
   lastAccessedAt: integer("last_accessed_at", { mode: "timestamp_ms" }),
 });
 
-// Capitol-owned notification center - a Chamber pushes here (POST
-// /congress/notifications/push) instead of inventing its own alert UI, e.g.
-// "task due" or "event starting soon". One row per (chamber, dedupeKey):
-// re-pushing the same key upserts in place (see notifications.ts's
-// pushNotification), so a Chamber's own poller can call this on every tick
-// while a condition still holds without spamming duplicates. Dismissing a
-// notification deletes its row outright rather than soft-deleting - if the
-// underlying condition still holds, the Chamber's next push simply
-// recreates it.
-export const notifications = sqliteTable(
-  "notifications",
+// Generic, chamber-agnostic append-only event log - any Chamber can publish
+// (POST /congress/events/publish) or poll for new entries since a cursor
+// (GET /congress/events?since=). Congress never inspects `type`/`payload`
+// or relays to a specific chamber by name - it's purely a store+fan-out,
+// same spirit as exhibit_cache. Pruned on a sweep (see events.ts) rather
+// than kept forever - a personal single-user system doesn't need unbounded
+// retention of already-fired events.
+export const events = sqliteTable(
+  "events",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     chamber: text("chamber").notNull(),
-    dedupeKey: text("dedupe_key").notNull(),
-    title: text("title").notNull(),
-    body: text("body"),
-    chamberUrl: text("chamber_url"),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-    readAt: integer("read_at", { mode: "timestamp_ms" }),
+    type: text("type").notNull(),
+    payloadJson: text("payload_json").notNull().default("{}"),
+    occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull(),
   },
-  (table) => [
-    uniqueIndex("notifications_chamber_dedupe_key_idx").on(table.chamber, table.dedupeKey),
-    index("notifications_created_at_idx").on(table.createdAt),
-  ]
+  (table) => [index("events_occurred_at_idx").on(table.occurredAt)]
 );
-
-// One row per subscribed browser/device (phone, laptop, ...) - a single-user
-// system still has multiple devices, so this is a plain list, not a
-// single-row table. `endpoint` is the push service's own per-subscription
-// URL (unique per browser+device by construction), used as the natural
-// dedupe key when the same device re-subscribes. See notifications.ts's
-// sendWebPush for how a row here gets pruned once its endpoint starts
-// coming back expired.
-export const pushSubscriptions = sqliteTable("push_subscriptions", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  endpoint: text("endpoint").notNull().unique(),
-  p256dh: text("p256dh").notNull(),
-  auth: text("auth").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-});
 
 // Single-row table (id is always 1) - one Congress-wide settings scope, not
 // per-user or per-Chamber. Chamber-local preferences (e.g. Capitol's own

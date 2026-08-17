@@ -21,10 +21,10 @@ interface ChamberHeaderProps {
   // undefined: an anonymous recipient has no session, so Capitol's own home
   // route would just bounce them to a login form they can't use.
   titleHref?: string;
-  // Extra controls rendered after the search bar in the actions row - e.g.
-  // Capitol's own NotificationBell. Deliberately not baked into this shared
-  // component: Capitol-owned chrome like the notification center belongs on
-  // Capitol's page, not on every Chamber's own header.
+  // Extra controls rendered after the search bar in the actions row, for a
+  // Chamber's own header-specific chrome. Deliberately not baked into this
+  // shared component - kept as an escape hatch for whatever a given
+  // Chamber's own header needs beyond search.
   extraActions?: ReactNode;
 }
 
