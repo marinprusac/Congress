@@ -17,5 +17,5 @@ export const notesManifest: Manifest = {
   // Note bodies use [[wikilink]]/Markdown syntax - see
   // services/congress/frontend/src/pages/SharedViewPage.tsx.
   contentFormat: "markdown",
-  widgets: [{ id: "pinned", width: 2, height: 2, label: "Pinned" }],
+  widgets: [{ id: "pinned", width: 2, height: 3, label: "Pinned" }],
 };

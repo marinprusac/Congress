@@ -20,6 +20,29 @@
     <title>Congress — Capitol</title>
     <link rel="icon" type="image/png" href="%BASE_URL%icons/icon-192.png" />
     <link rel="apple-touch-icon" href="%BASE_URL%icons/icon-192.png" />
+    <!-- Capitol's own canvas dynamically imports OTHER Chambers'
+         remote-entry.js bundles (see Canvas.tsx/loadRemoteModule) to mount
+         their widgets - those bundles are built external to
+         react/react-dom/etc. and resolved at runtime against the shared
+         vendor build, exactly like services/congress/frontend/index.html's
+         own importmap. Capitol needs this even when accessed standalone
+         (a hard refresh landing directly on /capitol, not shell-hosted
+         inside Congress) since the canvas always mounts widgets regardless
+         of how Capitol itself was reached - see vite.config.ts's matching
+         `external` for why Capitol's own bundle is built the same way now,
+         instead of bundling its own separate copy of React. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "/vendor/react.js",
+          "react-dom": "/vendor/react-dom.js",
+          "react-dom/client": "/vendor/react-dom-client.js",
+          "react-router-dom": "/vendor/react-router-dom.js",
+          "@tanstack/react-query": "/vendor/react-query.js",
+          "react/jsx-runtime": "/vendor/jsx-runtime.js"
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

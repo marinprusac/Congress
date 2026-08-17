@@ -3,8 +3,8 @@ import { GRID } from "./grid";
 import type { CanvasScope } from "../../../../src/types";
 
 const GAP_PX = 8;
-const MIN_CELL_PX = 64;
-const MAX_CELL_PX = 160;
+const MIN_CELL_PX = 90;
+const MAX_CELL_PX = 260;
 
 // Derives each cell's *pixel* size from the container's measured box and
 // the scope's *fixed* cell count (see grid.ts's GRID for why the count

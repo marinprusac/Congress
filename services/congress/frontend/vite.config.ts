@@ -45,6 +45,11 @@ export default defineConfig({
         theme_color: "#2B4A3E",
         background_color: "#F7F6F3",
         display: "standalone",
+        // The canvas layout is scoped per viewport class (mobile/desktop),
+        // not designed to reflow live on rotation - locking orientation
+        // avoids a portrait-authored mobile layout suddenly having to
+        // behave like a landscape one mid-session on a phone.
+        orientation: "portrait",
         start_url: "/",
         icons: [
           { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },

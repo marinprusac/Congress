@@ -32,4 +32,20 @@ export default defineConfig(({ command }) => ({
       "/congress": CONGRESS_PROXY_TARGET,
     },
   },
+  build: {
+    rollupOptions: {
+      // Capitol's canvas dynamically imports other Chambers' remote-entry.js
+      // bundles to mount their widgets (see Canvas.tsx) - those are built
+      // external to these same packages and resolved at runtime against the
+      // shared vendor build via index.html's importmap. Capitol's own
+      // bundle has to resolve the same way, even when it's the one being
+      // loaded directly (a hard refresh at /capitol, not shell-hosted
+      // inside Congress) - otherwise Capitol's own React tree and any
+      // widget it mounts end up on two different copies of React, which
+      // breaks hooks. Only affects `vite build` - `vite dev` ignores
+      // rollupOptions entirely and keeps resolving these normally from
+      // node_modules, same as every other Chamber's dev server.
+      external: ["react", "react-dom", "react-dom/client", "react-router-dom", "@tanstack/react-query", "react/jsx-runtime"],
+    },
+  },
 }));

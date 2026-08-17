@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchRegistry, showToast } from "@congress/congress-ui";
 import type { ChamberRegistryEntry, ManifestWidget } from "@congress/shared-types";
@@ -75,42 +75,9 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["capitol", "layout", scope] }),
   });
 
-  // Auto-places any registered widget with no stored position for this
-  // scope, into the first free cell region - and persists it immediately so
-  // it's stable on reload, not just an ephemeral client-side default. Guards
-  // against re-attempting a widget already in flight (React Query's own
-  // refetch-on-invalidate would otherwise re-run this every render while a
-  // mutation is pending). Widgets that don't fit anywhere stay unplaced and
-  // surface in the tray for manual placement once room is freed up.
-  const pendingAutoPlace = useRef(new Set<string>());
-  useEffect(() => {
-    if (registryQuery.isLoading || layoutQuery.isLoading) return;
-    // Accumulated across this pass (not just read once from `placed`) so
-    // multiple never-placed widgets discovered in the same effect run claim
-    // different cells instead of all computing the same first-fit spot
-    // against the same stale occupancy snapshot.
-    const claimed = occupiedCells(placedRects());
-    for (const entry of catalog) {
-      const key = widgetKey(entry.chamber.name, entry.widget.id);
-      if (placementByKey.has(key) || pendingAutoPlace.current.has(key)) continue;
-      const spot = findFirstFit(entry.widget.width, entry.widget.height, dims, claimed);
-      if (!spot) continue;
-      for (let dy = 0; dy < entry.widget.height; dy++) {
-        for (let dx = 0; dx < entry.widget.width; dx++) claimed.add(`${spot.x + dx},${spot.y + dy}`);
-      }
-      pendingAutoPlace.current.add(key);
-      upsertMutation.mutate(
-        { chamber: entry.chamber.name, widgetId: entry.widget.id, x: spot.x, y: spot.y },
-        { onSettled: () => pendingAutoPlace.current.delete(key) }
-      );
-    }
-    // Deliberately keyed off the raw query results (only change on an
-    // actual refetch), not the derived `catalog`/`placementByKey` (new
-    // object/array identity every render) - otherwise this would re-run and
-    // re-scan on every render instead of only when the underlying data
-    // actually changes.
-  }, [registryQuery.data, layoutQuery.data, scope]);
-
+  // Widgets are never auto-placed - a newly-registered widget just sits in
+  // the tray until the owner explicitly places it (tray tap or drag), same
+  // as one they've removed. "Placed" is purely a manual, persisted choice.
   function attemptPlace(chamber: string, widgetId: string, width: number, height: number) {
     const spot = findFirstFit(width, height, dims, occupiedCells(placedRects()));
     if (!spot) {
