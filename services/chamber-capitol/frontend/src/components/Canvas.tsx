@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchRegistry, showToast } from "@congress/congress-ui";
 import type { ChamberRegistryEntry, ManifestWidget } from "@congress/shared-types";
@@ -24,8 +24,12 @@ function widgetKey(chamber: string, widgetId: string): string {
 export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggleEditing: () => void }) {
   const queryClient = useQueryClient();
   const scope = useCanvasScope();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const cellPx = useCanvasGrid(containerRef, scope);
+  // Callback ref (via useState), not useRef - the container div is only
+  // conditionally rendered (see below, once loading/error/empty states
+  // resolve), so useCanvasGrid needs to know the *moment* the real node
+  // attaches, not just once on initial mount when it may still be null.
+  const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
+  const cellPx = useCanvasGrid(containerEl, scope);
   const dims = GRID[scope];
 
   const registryQuery = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
@@ -140,7 +144,7 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
       )}
 
       {!isLoading && !isError && catalog.length > 0 && (
-        <div ref={containerRef} className="relative min-h-0 flex-1 overflow-hidden px-3 pb-3">
+        <div ref={setContainerEl} className="relative min-h-0 flex-1 overflow-hidden px-3 pb-3">
           {editing && <GridDots dims={dims} cellPx={cellPx} gapPx={GAP_PX} />}
           <div
             className="grid"

@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useState } from "react";
 import { GRID } from "./grid";
 import type { CanvasScope } from "../../../../src/types";
 
@@ -14,15 +14,21 @@ const GAP_PX = 8;
 // divides whatever space actually exists by that fixed count.
 const MIN_SANE_CELL_PX = 24;
 
-// Derives each cell's *pixel* size from the container's measured box and
-// the scope's *fixed* cell count. A narrow window shows smaller cells, not
-// fewer of them.
-export function useCanvasGrid(containerRef: RefObject<HTMLElement | null>, scope: CanvasScope): number {
+// Takes the container *element* itself (from a callback ref via useState in
+// the caller, not a useRef object) - the container is conditionally
+// rendered (only once loading/error/empty states have resolved), so a
+// plain useRef's "current" would still be null the one time this hook's
+// effect ran on mount if that happened before data loaded, and - since a
+// ref object's own identity never changes across renders - the effect would
+// never fire again once the container actually appeared, leaving cellPx
+// stuck at its initial default forever. Using the element itself (which
+// changes identity from null -> the real node once it mounts) as the effect
+// dependency makes re-observation happen exactly when it should.
+export function useCanvasGrid(containerEl: HTMLElement | null, scope: CanvasScope): number {
   const [cellPx, setCellPx] = useState(MIN_SANE_CELL_PX);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
+    if (!containerEl) return;
 
     const dims = GRID[scope];
     function measure(width: number, height: number) {
@@ -38,10 +44,10 @@ export function useCanvasGrid(containerRef: RefObject<HTMLElement | null>, scope
       const { width, height } = entry.contentRect;
       measure(width, height);
     });
-    observer.observe(el);
-    measure(el.clientWidth, el.clientHeight);
+    observer.observe(containerEl);
+    measure(containerEl.clientWidth, containerEl.clientHeight);
     return () => observer.disconnect();
-  }, [containerRef, scope]);
+  }, [containerEl, scope]);
 
   return cellPx;
 }

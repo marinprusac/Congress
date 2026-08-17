@@ -16,7 +16,7 @@ export interface GridDims {
 // device sizes, not by measurement.
 export const GRID: Record<CanvasScope, GridDims> = {
   mobile: { cols: 2, rows: 8 },
-  desktop: { cols: 4, rows: 6 },
+  desktop: { cols: 8, rows: 8 },
 };
 
 export interface PlacedRect {
