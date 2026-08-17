@@ -43,32 +43,30 @@ export function DocumentsListPage() {
     <section className="list-page">
       <ListSearchInput value={query} onChange={setQuery} placeholder="Search documents —" />
 
-      <div className="border-t border-dust">
-        {isLoading && <ListLoadingState />}
-        {isError && <ListErrorState label="Documents" />}
-        {!isLoading && !isError && documents?.length === 0 && (
-          <ListEmptyState label="documents" hasQuery={!!query} />
-        )}
-        {!isLoading &&
-          !isError &&
-          documents?.map((doc) => (
-            <Link
-              key={doc.id}
-              to={resolveChamberPath(`/d/${doc.id}`, "documents", shellHosted)}
-              onMouseEnter={() => prefetchDocument(doc.id)}
-              onFocus={() => prefetchDocument(doc.id)}
-              className="block border-b border-dust px-1 py-3 hover:bg-ink/[0.03]"
-            >
-              <div className="flex items-baseline justify-between gap-4">
-                <span className="font-display text-lg text-ink">{doc.title}</span>
-                <span className="shrink-0 font-mono text-xs text-dust">{formatTimestamp(doc.updatedAt)}</span>
-              </div>
-              <p className="mt-1 font-mono text-xs text-slate">
-                {doc.filename} — {formatBytes(doc.sizeBytes)}
-              </p>
-            </Link>
-          ))}
-      </div>
+      {isLoading && <ListLoadingState />}
+      {isError && <ListErrorState label="Documents" />}
+      {!isLoading && !isError && documents?.length === 0 && (
+        <ListEmptyState label="documents" hasQuery={!!query} />
+      )}
+      {!isLoading &&
+        !isError &&
+        documents?.map((doc) => (
+          <Link
+            key={doc.id}
+            to={resolveChamberPath(`/d/${doc.id}`, "documents", shellHosted)}
+            onMouseEnter={() => prefetchDocument(doc.id)}
+            onFocus={() => prefetchDocument(doc.id)}
+            className="block border-b border-dust px-1 py-3 hover:bg-ink/[0.03]"
+          >
+            <div className="flex items-baseline justify-between gap-4">
+              <span className="font-display text-lg text-ink">{doc.title}</span>
+              <span className="shrink-0 font-mono text-xs text-dust">{formatTimestamp(doc.updatedAt)}</span>
+            </div>
+            <p className="mt-1 font-mono text-xs text-slate">
+              {doc.filename} — {formatBytes(doc.sizeBytes)}
+            </p>
+          </Link>
+        ))}
     </section>
   );
 }

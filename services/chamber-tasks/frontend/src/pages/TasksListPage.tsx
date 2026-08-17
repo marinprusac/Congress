@@ -51,40 +51,38 @@ export function TasksListPage() {
     <section className="list-page">
       <ListSearchInput value={query} onChange={setQuery} placeholder="Search tasks —" />
 
-      <div className="border-t border-dust">
-        {isLoading && <ListLoadingState />}
-        {isError && <ListErrorState label="Tasks" />}
-        {!isLoading && !isError && tasks?.length === 0 && <ListEmptyState label="tasks" hasQuery={!!query} />}
-        {!isLoading &&
-          !isError &&
-          tasks?.map((task) => (
-            <div key={task.id} className="flex items-baseline gap-3 border-b border-dust px-1 py-3">
-              <button
-                type="button"
-                onClick={() => completeMutation.mutate({ id: task.id, completed: !task.completed })}
-                className="tap-target shrink-0 font-mono text-xs uppercase tracking-wide text-dust hover:text-accent"
-              >
-                {task.completed ? "Reopen" : "Done"}
-              </button>
-              <Link
-                to={resolveChamberPath(`/t/${task.id}`, "tasks", shellHosted)}
-                onMouseEnter={() => prefetchTask(task.id)}
-                onFocus={() => prefetchTask(task.id)}
-                className="min-w-0 flex-1 hover:bg-ink/[0.03]"
-              >
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className={task.completed ? "font-display text-lg text-dust line-through" : "font-display text-lg text-ink"}>
-                    {task.name}
-                  </span>
-                  {task.dueDate && (
-                    <span className="shrink-0 font-mono text-xs text-dust">{formatDueDate(task.dueDate)}</span>
-                  )}
-                </div>
-                {task.description && <p className="mt-1 text-sm text-slate">{task.description}</p>}
-              </Link>
-            </div>
-          ))}
-      </div>
+      {isLoading && <ListLoadingState />}
+      {isError && <ListErrorState label="Tasks" />}
+      {!isLoading && !isError && tasks?.length === 0 && <ListEmptyState label="tasks" hasQuery={!!query} />}
+      {!isLoading &&
+        !isError &&
+        tasks?.map((task) => (
+          <div key={task.id} className="flex items-baseline gap-3 border-b border-dust px-1 py-3">
+            <button
+              type="button"
+              onClick={() => completeMutation.mutate({ id: task.id, completed: !task.completed })}
+              className="tap-target shrink-0 font-mono text-xs uppercase tracking-wide text-dust hover:text-accent"
+            >
+              {task.completed ? "Reopen" : "Done"}
+            </button>
+            <Link
+              to={resolveChamberPath(`/t/${task.id}`, "tasks", shellHosted)}
+              onMouseEnter={() => prefetchTask(task.id)}
+              onFocus={() => prefetchTask(task.id)}
+              className="min-w-0 flex-1 hover:bg-ink/[0.03]"
+            >
+              <div className="flex items-baseline justify-between gap-4">
+                <span className={task.completed ? "font-display text-lg text-dust line-through" : "font-display text-lg text-ink"}>
+                  {task.name}
+                </span>
+                {task.dueDate && (
+                  <span className="shrink-0 font-mono text-xs text-dust">{formatDueDate(task.dueDate)}</span>
+                )}
+              </div>
+              {task.description && <p className="mt-1 text-sm text-slate">{task.description}</p>}
+            </Link>
+          </div>
+        ))}
     </section>
   );
 }

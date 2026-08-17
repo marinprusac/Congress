@@ -158,6 +158,16 @@ html[data-theme="dark"] {
   padding: 2rem 1.5rem;
 }
 
+/* Mobile: this is the first thing on every page, above the fold, on a
+   screen with much less vertical room to give it than desktop - the
+   desktop padding/title size above eats a disproportionate share of a
+   phone viewport otherwise. */
+@media (max-width: 640px) {
+  .chamber-header {
+    padding: 1.25rem 1.5rem 1rem;
+  }
+}
+
 /* Mobile default: title row, then actions (search + nav) stacked below it
    full-width - there's no room to fit a search field beside a 2.25rem
    title on a phone screen. */
@@ -198,6 +208,12 @@ html[data-theme="dark"] {
   font-family: var(--font-display);
   font-size: 2.25rem;
   color: var(--color-ink);
+}
+
+@media (max-width: 640px) {
+  .chamber-title {
+    font-size: 1.65rem;
+  }
 }
 
 .chamber-header-actions {
@@ -1170,7 +1186,7 @@ html[data-theme="dark"] {
 @media (max-width: 640px) {
   .notification-bell {
     position: absolute;
-    top: 2rem;
+    top: 1.25rem;
     right: 1.5rem;
   }
 }

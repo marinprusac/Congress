@@ -36,36 +36,34 @@ export function NotesListPage() {
     <section className="list-page">
       <ListSearchInput value={query} onChange={setQuery} placeholder="Search notes —" />
 
-      <div className="mt-4 border-t border-dust pt-4">
-        {isLoading && <ListLoadingState />}
-        {isError && <ListErrorState label="Notes" />}
-        {!isLoading && !isError && notes?.length === 0 && <ListEmptyState label="notes" hasQuery={!!query} />}
-        {!isLoading && !isError && notes && notes.length > 0 && (
-          <div className="notes-flow">
-            {notes.map((note) => (
-              <Link
-                key={note.id}
-                to={resolveChamberPath(`/n/${note.id}`, "notes", shellHosted)}
-                onMouseEnter={() => prefetchNote(note.id)}
-                onFocus={() => prefetchNote(note.id)}
-                className="note-card"
-              >
-                {note.pinned && (
-                  <span className="note-card-pin font-mono text-xs" aria-label="Pinned">
-                    *
-                  </span>
-                )}
-                <span
-                  className={`block font-display text-base text-ink ${note.pinned ? "pl-3.5" : ""}`}
-                >
-                  {note.title}
+      {isLoading && <ListLoadingState />}
+      {isError && <ListErrorState label="Notes" />}
+      {!isLoading && !isError && notes?.length === 0 && <ListEmptyState label="notes" hasQuery={!!query} />}
+      {!isLoading && !isError && notes && notes.length > 0 && (
+        <div className="notes-flow">
+          {notes.map((note) => (
+            <Link
+              key={note.id}
+              to={resolveChamberPath(`/n/${note.id}`, "notes", shellHosted)}
+              onMouseEnter={() => prefetchNote(note.id)}
+              onFocus={() => prefetchNote(note.id)}
+              className="note-card"
+            >
+              {note.pinned && (
+                <span className="note-card-pin font-mono text-xs" aria-label="Pinned">
+                  *
                 </span>
-                {note.excerpt && <p className="note-card-excerpt mt-1 line-clamp-2 text-xs text-slate">{note.excerpt}</p>}
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+              )}
+              <span
+                className={`block font-display text-base text-ink ${note.pinned ? "pl-3.5" : ""}`}
+              >
+                {note.title}
+              </span>
+              {note.excerpt && <p className="note-card-excerpt mt-1 line-clamp-2 text-xs text-slate">{note.excerpt}</p>}
+            </Link>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
