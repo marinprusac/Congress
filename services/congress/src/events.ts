@@ -11,7 +11,7 @@ const BATCH_LIMIT = 200;
 // Used when the publishing chamber hasn't declared a retentionMs for this
 // event type (manifestEventSchema) - short on purpose, this log is a switch
 // for chambers that poll on their own short interval, not a durable record.
-const DEFAULT_RETENTION_MS = 60 * 60 * 1000;
+const DEFAULT_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 function toEntry(row: typeof events.$inferSelect): EventLogEntry {
   return {
