@@ -30,12 +30,13 @@ interface ChamberHeaderProps {
   // undefined: an anonymous recipient has no session, so Capitol's own home
   // route would just bounce them to a login form they can't use.
   titleHref?: string;
-  // Same-Chamber Settings route, rendered as a gear icon button at the end
-  // of the actions row - replaces the old per-Chamber "Settings" nav-bar
-  // link now that ChamberPicker no longer renders one. Omit (SharedViewPage)
-  // to hide it entirely, same reasoning as titleHref being undefined there.
+  // Same-Chamber Settings route, rendered as a gear icon button at the
+  // start of the actions row (to the left of the search bar) - replaces
+  // the old per-Chamber "Settings" nav-bar link now that ChamberPicker no
+  // longer renders one. Omit (SharedViewPage) to hide it entirely, same
+  // reasoning as titleHref being undefined there.
   settingsHref?: string;
-  // Extra controls rendered after the search bar (before the settings icon)
+  // Extra controls rendered between the settings icon and the search bar
   // in the actions row, for a Chamber's own header-specific chrome.
   // Deliberately not baked into this shared component - kept as an escape
   // hatch for whatever a given Chamber's own header needs beyond
@@ -85,14 +86,14 @@ export function ChamberHeader({
         </div>
         {(showSearch && navigate) || resolvedSettingsHref || extraActions ? (
           <div className="chamber-header-actions">
-            {showSearch && navigate && renderIcon && (
-              <GlobalExhibitSearch ownChamber={ownChamber} navigate={navigate} renderIcon={renderIcon} />
-            )}
-            {extraActions}
             {resolvedSettingsHref && (
               <Link to={resolvedSettingsHref} className="chamber-header-icon-link" aria-label="Settings" title="Settings">
                 <SettingsIcon />
               </Link>
+            )}
+            {extraActions}
+            {showSearch && navigate && renderIcon && (
+              <GlobalExhibitSearch ownChamber={ownChamber} navigate={navigate} renderIcon={renderIcon} />
             )}
           </div>
         ) : null}
