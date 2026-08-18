@@ -222,6 +222,44 @@ html[data-theme="dark"] {
   gap: 1.25rem;
 }
 
+/* A Chamber's own extra header link (Capitol's Shares, Deputy's
+   Directives/History, ...) - same terse mono-uppercase treatment the old
+   ChamberPicker sub-nav links used, just relocated into the header. */
+.chamber-header-link {
+  font-family: var(--font-mono);
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-slate);
+}
+
+.chamber-header-link:hover,
+.chamber-header-link.active {
+  color: var(--color-accent);
+}
+
+/* Settings gear, and the model for any other icon-only header button - a
+   real ~44pt tap target regardless of the icon's own visual size, same
+   idiom as chamber-logs' own .notification-bell-trigger. */
+.chamber-header-icon-link {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: var(--color-slate);
+}
+
+.chamber-header-icon-link:hover {
+  color: var(--color-accent);
+}
+
+.chamber-header-icon-link svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
 .chamber-main {
   margin: 0 auto;
   max-width: 72rem;
@@ -301,15 +339,13 @@ html[data-theme="dark"] {
   }
 }
 
-/* ChamberPicker - persistent nav between Capitol and every Chamber, mounted
-   once inside ChamberLayout (every Chamber gets it for free) and once in
-   Capitol's own App.tsx. Desktop: fixed sidebar on the left, with whichever
-   entry is currently open showing its own sub-navigation (Settings, New,
-   Shares, ...) nested directly beneath it - every other entry stays a bare
-   icon+label row. Mobile: that same current-entry sub-navigation becomes a
-   fixed bar sitting directly above the icon-only switcher bar. */
-.chamber-picker-mobile,
-.chamber-picker-mobile-subnav {
+/* ChamberPicker - persistent cross-Chamber nav, mounted once inside
+   ChamberLayout (every Chamber gets it for free) and once in Capitol's own
+   App.tsx. Desktop: fixed sidebar on the left. Mobile: a fixed icon-only
+   switcher bar. A Chamber's own sub-navigation (Settings, New, ...) lives in
+   its own ChamberHeader instead of nested here - see settingsHref/
+   extraActions. */
+.chamber-picker-mobile {
   display: none;
 }
 
@@ -389,31 +425,6 @@ html[data-theme="dark"] {
   white-space: nowrap;
 }
 
-/* The current entry's own sub-navigation (e.g. Notes' "New"/"Settings",
-   Capitol's "Shares"/"Settings"), nested directly beneath its row - only
-   ever rendered for whichever entry is current (see ChamberPicker), never
-   for the others. */
-.chamber-picker-subnav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  margin: 0 0 0.5rem 2.5rem;
-}
-
-.chamber-picker-subnav-link {
-  padding: 0.15rem 0.4rem;
-  font-family: var(--font-mono);
-  font-size: 0.7em;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-dust);
-}
-
-.chamber-picker-subnav-link:hover,
-.chamber-picker-subnav-link.active {
-  color: var(--color-accent);
-}
-
 /* Reserves room for the desktop sidebar on whichever element is each host
    page's own outermost container. */
 @media (min-width: 641px) {
@@ -429,12 +440,11 @@ html[data-theme="dark"] {
 
 @media (max-width: 640px) {
   /* The icon bar's own height (bottom-most, touches the home indicator),
-     plus the current entry's sub-nav bar stacked directly above it - every
-     host page (Capitol included) always has both, so this combined height
-     is what every page's own bottom padding needs to reserve. */
+     every host page (Capitol included) needs this, so it's what every
+     page's own bottom padding reserves. */
   :root {
     --chamber-picker-height: calc(3rem + env(safe-area-inset-bottom));
-    --mobile-nav-height: calc(3rem + var(--chamber-picker-height));
+    --mobile-nav-height: var(--chamber-picker-height);
   }
 
   .chamber-shell,
@@ -452,42 +462,8 @@ html[data-theme="dark"] {
      browser's default [hidden] styling (both are author-origin, equal
      specificity - source order alone doesn't help against a same-file rule
      appearing earlier), same idiom as .exhibit-picker-dropdown[hidden]. */
-  .chamber-picker-mobile-subnav[hidden],
   .chamber-picker-mobile[hidden] {
     display: none;
-  }
-
-  .chamber-picker-mobile-subnav {
-    display: flex;
-    position: fixed;
-    bottom: var(--chamber-picker-height);
-    left: 0;
-    right: 0;
-    z-index: 40;
-    justify-content: space-around;
-    border-top: 1px solid var(--color-dust);
-    background-color: var(--color-parchment);
-    box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 15%, transparent);
-  }
-
-  .chamber-picker-mobile-subnav-link {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    justify-content: center;
-    /* A real tap target (~44pt+) instead of just the text's own line height -
-       the row's fixed 3rem in --mobile-nav-height above assumes this. */
-    min-height: 3rem;
-    font-family: var(--font-mono);
-    font-size: 0.7em;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-slate);
-  }
-
-  .chamber-picker-mobile-subnav-link:hover,
-  .chamber-picker-mobile-subnav-link.active {
-    color: var(--color-accent);
   }
 
   .chamber-picker-mobile {
@@ -1655,27 +1631,65 @@ html[data-theme="dark"] {
   }
 }
 
-/* ListSearchInput - floats fixed to the bottom of the viewport, on top of
-   the list content instead of scrolling away with it, on every breakpoint
-   (unlike .notification-panel's mobile-fixed/desktop-anchored split, this
-   is a persistent piece of chrome, not a transient popover, so it stays
-   fixed on desktop too). Mobile: clears the fixed bottom nav via
-   --mobile-nav-height, same idiom as .notification-panel. Desktop: clears
-   the fixed left sidebar via --chamber-picker-width, then centers within
-   the remaining width up to a comfortable max (auto margins on a fixed
-   element with both left/right set center it the same way they would on an
-   absolutely-positioned one). */
-.list-search-input {
+/* ListSearchInput's row (input + the "+" new-item button) - floats fixed to
+   the bottom of the viewport, on top of the list content instead of
+   scrolling away with it, on every breakpoint (unlike .notification-panel's
+   mobile-fixed/desktop-anchored split, this is a persistent piece of
+   chrome, not a transient popover, so it stays fixed on desktop too).
+   Mobile: clears the fixed bottom nav via --mobile-nav-height, same idiom
+   as .notification-panel. Desktop: clears the fixed left sidebar via
+   --chamber-picker-width, then centers within the remaining width up to a
+   comfortable max (auto margins on a fixed element with both left/right set
+   center it the same way they would on an absolutely-positioned one). */
+.list-search-row {
   position: fixed;
   z-index: 40;
   left: 0.5rem;
   right: 0.5rem;
   bottom: calc(var(--mobile-nav-height, 0px) + 0.5rem);
+  display: flex;
+  gap: 0.5rem;
+}
+
+.list-search-row .list-search-input {
+  flex: 1;
+  min-width: 0;
+  box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
+}
+
+/* The "+" button docked beside the search input - replaces the old "New"
+   entry in ChamberPicker's now-removed sub-nav bar. Also reused (without
+   .list-search-row's fixed/floating positioning) by pages with no local
+   search input but the same need for a "+" trigger, e.g. Calendar's Agenda
+   toolbar. */
+.list-search-new {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  border: 1px solid var(--color-dust);
+  background-color: var(--color-parchment);
+  font-family: var(--font-mono);
+  font-size: 1.4em;
+  line-height: 1;
+  color: var(--color-ink);
+}
+
+.list-search-new:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* Only the floating instance (docked beside the fixed search input) wants
+   the "lifted above content" shadow - a static inline "+" elsewhere in a
+   page's own flow doesn't. */
+.list-search-row .list-search-new {
   box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
 }
 
 @media (min-width: 641px) {
-  .list-search-input {
+  .list-search-row {
     left: calc(var(--chamber-picker-width, 0px) + 1.5rem);
     right: 1.5rem;
     bottom: 1.5rem;
@@ -1685,7 +1699,7 @@ html[data-theme="dark"] {
 }
 
 /* Applied to a list page's own outermost <section> (alongside
-   .list-search-input above) - since the search bar is now fixed/out of
+   .list-search-row above) - since the search bar is now fixed/out of
    flow, it no longer reserves its own space at the top of the page the way
    an in-flow element would, so without this the *last* row(s) of a long
    list would end up permanently hidden underneath it while scrolled to the

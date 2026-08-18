@@ -49,7 +49,12 @@ export function TasksListPage() {
 
   return (
     <section className="list-page">
-      <ListSearchInput value={query} onChange={setQuery} placeholder="Search tasks —" />
+      <ListSearchInput
+        value={query}
+        onChange={setQuery}
+        placeholder="Search tasks —"
+        newHref={resolveChamberPath("/new", "tasks", shellHosted)}
+      />
 
       {isLoading && <ListLoadingState />}
       {isError && <ListErrorState label="Tasks" />}

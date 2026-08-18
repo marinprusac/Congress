@@ -1,24 +1,14 @@
-import { Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { fetchRegistry } from "./registry.js";
 import { ChamberMark, CapitolMark } from "./ChamberMarks.js";
-import { useShellHosted, resolveChamberPath } from "./ShellHostContext.js";
+import { useShellHosted } from "./ShellHostContext.js";
 import { useKeyboardInset } from "./useKeyboardInset.js";
-
-export interface ChamberNavLink {
-  to: string;
-  label: string;
-}
 
 interface ChamberPickerProps {
   // "capitol" or a Chamber's manifest name - which entry is highlighted as
   // the one currently open.
   current: string;
-  // The current entry's own sub-navigation (e.g. Notes' "New"/"Settings",
-  // Capitol's "Shares"/"Settings") - only ever shown nested under whichever
-  // entry matches `current`, never under any other entry.
-  currentNavLinks: ChamberNavLink[];
   // Display name for the current Chamber's own row - rendered immediately
   // from this rather than waiting on the registry fetch below (which is
   // what supplies every *other* Chamber's icon/label/link). Without this,
@@ -58,40 +48,6 @@ function buildChamberList(
     .map((c) => ({ name: c.name, displayName: c.displayName, href: c.routes.home }));
   if (current === "capitol" || fromRegistry.some((c) => c.name === current)) return fromRegistry;
   return [{ name: current, displayName: currentLabel ?? current, href: `/${current}` }, ...fromRegistry];
-}
-
-function Subnav({
-  links,
-  pathname,
-  current,
-  shellHosted,
-}: {
-  links: ChamberNavLink[];
-  pathname: string;
-  current: string;
-  shellHosted: boolean;
-}) {
-  if (links.length === 0) return null;
-  return (
-    <div className="chamber-picker-subnav">
-      {links.map((link) => {
-        // Always same-Chamber navigation (this entry's own nav links), so a
-        // <Link> is safe in both hosting modes - only the resolved target
-        // (and so the active-state comparison) differs. See
-        // resolveChamberPath's comment for why.
-        const to = resolveChamberPath(link.to, current, shellHosted);
-        return (
-          <Link
-            key={link.to}
-            to={to}
-            className={pathname === to ? "chamber-picker-subnav-link active" : "chamber-picker-subnav-link"}
-          >
-            {link.label}
-          </Link>
-        );
-      })}
-    </div>
-  );
 }
 
 function ChamberIcon({
@@ -179,20 +135,18 @@ function CapitolLink({
 // of round-tripping through the homepage - a fixed sidebar on desktop, a
 // fixed bottom bar on mobile with Capitol centered among the Chambers (and
 // its icon a little larger, since it's the hub they all register around).
-// The currently-open entry's own sub-navigation nests directly under it
-// (desktop) or sits in a bar directly above the icon row (mobile) - see
-// .chamber-picker-subnav / .chamber-picker-mobile-subnav in styles.css.
-export function ChamberPicker({ current, currentNavLinks, currentLabel }: ChamberPickerProps) {
+// A Chamber's own sub-navigation (New/Settings/...) lives in its own
+// ChamberHeader now (settingsHref, extraActions) rather than nested here -
+// this picker is purely cross-Chamber navigation.
+export function ChamberPicker({ current, currentLabel }: ChamberPickerProps) {
   const { data } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
-  const { pathname } = useLocation();
   const shellHosted = useShellHosted();
   // iOS Safari anchors position:fixed elements to the *visual* viewport, not
   // the full layout viewport - so a fixed bottom:0 bar rides up to sit right
   // above the on-screen keyboard instead of staying put behind it. Nobody's
-  // switching Chambers or tapping a subnav link mid-keystroke, so it's
-  // simplest to just hide both bars outright while the keyboard is open
-  // rather than fighting iOS for the correct "pinned to the real bottom"
-  // position.
+  // switching Chambers mid-keystroke, so it's simplest to just hide the icon
+  // bar outright while the keyboard is open rather than fighting iOS for the
+  // correct "pinned to the real bottom" position.
   const keyboardOpen = useKeyboardInset() > 0;
 
   const registryChambers = (data ?? []).filter((c) => c.status === "active");
@@ -208,33 +162,10 @@ export function ChamberPicker({ current, currentNavLinks, currentLabel }: Chambe
     <>
       <nav className="chamber-picker-desktop" aria-label="Chambers">
         <CapitolLink current={current} shellHosted={shellHosted} mobile={false} />
-        {current === "capitol" && (
-          <Subnav links={currentNavLinks} pathname={pathname} current={current} shellHosted={shellHosted} />
-        )}
         <div className="chamber-picker-divider" />
         {chambers.map((chamber) => (
-          <Fragment key={chamber.name}>
-            <ChamberIcon chamber={chamber} current={current} mobile={false} shellHosted={shellHosted} />
-            {current === chamber.name && (
-              <Subnav links={currentNavLinks} pathname={pathname} current={current} shellHosted={shellHosted} />
-            )}
-          </Fragment>
+          <ChamberIcon key={chamber.name} chamber={chamber} current={current} mobile={false} shellHosted={shellHosted} />
         ))}
-      </nav>
-
-      <nav className="chamber-picker-mobile-subnav" aria-label="Current section" hidden={keyboardOpen}>
-        {currentNavLinks.map((link) => {
-          const to = resolveChamberPath(link.to, current, shellHosted);
-          return (
-            <Link
-              key={link.to}
-              to={to}
-              className={pathname === to ? "chamber-picker-mobile-subnav-link active" : "chamber-picker-mobile-subnav-link"}
-            >
-              {link.label}
-            </Link>
-          );
-        })}
       </nav>
 
       <nav className="chamber-picker-mobile" aria-label="Chambers" hidden={keyboardOpen}>

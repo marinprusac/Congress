@@ -26,8 +26,13 @@ export function ItemsListPage() {
   const prefetchItem = useListRowPrefetch((id: number) => ["item", id], fetchItem);
 
   return (
-    <section>
-      <ListSearchInput value={query} onChange={setQuery} placeholder="Search __CHAMBER_NAME__ —" />
+    <section className="list-page">
+      <ListSearchInput
+        value={query}
+        onChange={setQuery}
+        placeholder="Search __CHAMBER_NAME__ —"
+        newHref={resolveChamberPath("/new", "__CHAMBER_NAME__", shellHosted)}
+      />
 
       <div className="border-t border-dust">
         {isLoading && <ListLoadingState />}
