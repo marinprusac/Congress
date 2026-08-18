@@ -15,6 +15,13 @@
       "when": 1786810187599,
       "tag": "0001_sleepy_roulette",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787021429018,
+      "tag": "0002_silent_harrier",
+      "breakpoints": true
     }
   ]
 }

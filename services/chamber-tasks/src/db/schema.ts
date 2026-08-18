@@ -26,8 +26,8 @@ export const taskRefs = sqliteTable(
   (table) => [uniqueIndex("task_refs_task_target_idx").on(table.taskId, table.targetExhibitId)]
 );
 
-// Single-row table (id is always 1) - kept for contract uniformity with
-// every other Chamber, even though Tasks has no settings of its own yet.
+// Single-row table (id is always 1), same contract as every other Chamber.
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
+  checkIntervalMs: integer("check_interval_ms").notNull().default(15 * 60 * 1000),
 });

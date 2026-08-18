@@ -1,4 +1,4 @@
-import type { TaskSummary, TaskDetail, CreateTaskRequest, UpdateTaskRequest } from "../../../src/types";
+import type { TaskSummary, TaskDetail, CreateTaskRequest, UpdateTaskRequest, TasksSettings, UpdateTasksSettingsRequest } from "../../../src/types";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
@@ -56,5 +56,17 @@ export function setCompleted(id: number, completed: boolean): Promise<TaskDetail
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ completed }),
+  }).then((res) => json(res));
+}
+
+export function fetchSettings(): Promise<TasksSettings> {
+  return fetch(`${API_BASE}/settings`).then((res) => json(res));
+}
+
+export function updateSettings(input: UpdateTasksSettingsRequest): Promise<TasksSettings> {
+  return fetch(`${API_BASE}/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
   }).then((res) => json(res));
 }
