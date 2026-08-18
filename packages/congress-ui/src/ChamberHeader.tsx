@@ -4,6 +4,15 @@ import { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
 import { MobileSearchReveal } from "./MobileSearchReveal.js";
 import { useShellHosted, resolveChamberPath } from "./ShellHostContext.js";
 
+function SettingsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+    </svg>
+  );
+}
+
 interface ChamberHeaderProps {
   icon: ReactNode;
   title: string;
@@ -21,10 +30,16 @@ interface ChamberHeaderProps {
   // undefined: an anonymous recipient has no session, so Capitol's own home
   // route would just bounce them to a login form they can't use.
   titleHref?: string;
-  // Extra controls rendered after the search bar in the actions row, for a
-  // Chamber's own header-specific chrome. Deliberately not baked into this
-  // shared component - kept as an escape hatch for whatever a given
-  // Chamber's own header needs beyond search.
+  // Same-Chamber Settings route, rendered as a gear icon button at the end
+  // of the actions row - replaces the old per-Chamber "Settings" nav-bar
+  // link now that ChamberPicker no longer renders one. Omit (SharedViewPage)
+  // to hide it entirely, same reasoning as titleHref being undefined there.
+  settingsHref?: string;
+  // Extra controls rendered after the search bar (before the settings icon)
+  // in the actions row, for a Chamber's own header-specific chrome.
+  // Deliberately not baked into this shared component - kept as an escape
+  // hatch for whatever a given Chamber's own header needs beyond
+  // search/settings (e.g. Capitol's Shares link, Deputy's Directives/History).
   extraActions?: ReactNode;
 }
 
@@ -42,10 +57,12 @@ export function ChamberHeader({
   navigate,
   showSearch = true,
   titleHref = "/",
+  settingsHref,
   extraActions,
 }: ChamberHeaderProps) {
   const shellHosted = useShellHosted();
   const resolvedTitleHref = titleHref ? resolveChamberPath(titleHref, ownChamber, shellHosted) : titleHref;
+  const resolvedSettingsHref = settingsHref ? resolveChamberPath(settingsHref, ownChamber, shellHosted) : undefined;
   const titleContent = (
     <>
       {icon}
@@ -66,12 +83,19 @@ export function ChamberHeader({
             <div className="chamber-title-link">{titleContent}</div>
           )}
         </div>
-        {showSearch && navigate && (
+        {(showSearch && navigate) || resolvedSettingsHref || extraActions ? (
           <div className="chamber-header-actions">
-            {renderIcon && <GlobalExhibitSearch ownChamber={ownChamber} navigate={navigate} renderIcon={renderIcon} />}
+            {showSearch && navigate && renderIcon && (
+              <GlobalExhibitSearch ownChamber={ownChamber} navigate={navigate} renderIcon={renderIcon} />
+            )}
             {extraActions}
+            {resolvedSettingsHref && (
+              <Link to={resolvedSettingsHref} className="chamber-header-icon-link" aria-label="Settings" title="Settings">
+                <SettingsIcon />
+              </Link>
+            )}
           </div>
-        )}
+        ) : null}
       </div>
       {showSearch && renderIcon && navigate && (
         <MobileSearchReveal ownChamber={ownChamber} navigate={navigate} renderIcon={renderIcon} />

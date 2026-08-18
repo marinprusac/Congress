@@ -50,7 +50,17 @@ export function AgendaPage() {
   return (
     <section>
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-2 border-b border-dust pb-4">
-        <h2 className="font-display text-3xl text-ink">Agenda</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="font-display text-3xl text-ink">Agenda</h2>
+          <Link
+            to={resolveChamberPath("/new", "calendar", shellHosted)}
+            className="list-search-new"
+            aria-label="New event"
+            title="New event"
+          >
+            +
+          </Link>
+        </div>
         <div className="flex items-baseline gap-4">
           <span className="font-mono text-xs text-dust">{formatDateRange(anchor, windowEnd)}</span>
           <div className="flex gap-3 font-mono text-xs uppercase tracking-wide text-slate">

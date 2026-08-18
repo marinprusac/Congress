@@ -26,8 +26,13 @@ export function AutomationsListPage() {
   const prefetchAutomation = useListRowPrefetch((id: number) => ["automation", id], fetchAutomation);
 
   return (
-    <section>
-      <ListSearchInput value={query} onChange={setQuery} placeholder="Search automations —" />
+    <section className="list-page">
+      <ListSearchInput
+        value={query}
+        onChange={setQuery}
+        placeholder="Search automations —"
+        newHref={resolveChamberPath("/new", "automation", shellHosted)}
+      />
 
       <div className="border-t border-dust">
         {isLoading && <ListLoadingState />}

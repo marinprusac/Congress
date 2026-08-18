@@ -1,20 +1,38 @@
+import { Link } from "react-router-dom";
+
 export function ListSearchInput({
   value,
   onChange,
   placeholder,
+  newHref,
+  newLabel = "New",
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
+  // Same-Chamber route to create a new item - already resolved via
+  // resolveChamberPath by the caller (same idiom as every other same-Chamber
+  // <Link> in a list page). Rendered as a "+" button docked beside the
+  // search input, replacing the old "New" entry in ChamberPicker's
+  // now-removed sub-nav bar. Omit on a list page with no creation flow.
+  newHref?: string;
+  newLabel?: string;
 }) {
   return (
-    <input
-      type="search"
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="list-search-input border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-    />
+    <div className="list-search-row">
+      <input
+        type="search"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="list-search-input border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+      />
+      {newHref && (
+        <Link to={newHref} className="list-search-new" aria-label={newLabel} title={newLabel}>
+          +
+        </Link>
+      )}
+    </div>
   );
 }
 

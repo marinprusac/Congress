@@ -34,7 +34,12 @@ export function NotesListPage() {
 
   return (
     <section className="list-page">
-      <ListSearchInput value={query} onChange={setQuery} placeholder="Search notes —" />
+      <ListSearchInput
+        value={query}
+        onChange={setQuery}
+        placeholder="Search notes —"
+        newHref={resolveChamberPath("/new", "notes", shellHosted)}
+      />
 
       {isLoading && <ListLoadingState />}
       {isError && <ListErrorState label="Notes" />}

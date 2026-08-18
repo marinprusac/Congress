@@ -26,8 +26,13 @@ export function DirectivesListPage() {
   const prefetchDirective = useListRowPrefetch((id: number) => ["directive", id], fetchDirective);
 
   return (
-    <section>
-      <ListSearchInput value={query} onChange={setQuery} placeholder="Search directives —" />
+    <section className="list-page">
+      <ListSearchInput
+        value={query}
+        onChange={setQuery}
+        placeholder="Search directives —"
+        newHref={resolveChamberPath("/directives/new", "deputy", shellHosted)}
+      />
 
       <div className="border-t border-dust">
         {isLoading && <ListLoadingState />}

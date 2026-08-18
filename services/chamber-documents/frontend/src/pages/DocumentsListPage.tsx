@@ -41,7 +41,13 @@ export function DocumentsListPage() {
 
   return (
     <section className="list-page">
-      <ListSearchInput value={query} onChange={setQuery} placeholder="Search documents —" />
+      <ListSearchInput
+        value={query}
+        onChange={setQuery}
+        placeholder="Search documents —"
+        newHref={resolveChamberPath("/new", "documents", shellHosted)}
+        newLabel="Upload"
+      />
 
       {isLoading && <ListLoadingState />}
       {isError && <ListErrorState label="Documents" />}

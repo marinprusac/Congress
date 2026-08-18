@@ -26,8 +26,13 @@ export function LogRulesListPage() {
   const prefetchRule = useListRowPrefetch((id: number) => ["log-rule", id], fetchLogRule);
 
   return (
-    <section>
-      <ListSearchInput value={query} onChange={setQuery} placeholder="Search log rules —" />
+    <section className="list-page">
+      <ListSearchInput
+        value={query}
+        onChange={setQuery}
+        placeholder="Search log rules —"
+        newHref={resolveChamberPath("/new", "logs", shellHosted)}
+      />
 
       <div className="border-t border-dust">
         {isLoading && <ListLoadingState />}
