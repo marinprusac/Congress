@@ -27,21 +27,17 @@ export const logRuleDetailSchema = logRuleSummarySchema;
 export type LogRuleDetail = z.infer<typeof logRuleDetailSchema>;
 
 // A rule that does neither is a no-op the owner almost certainly didn't
-// intend, and notify's own template/dedupe fields are meaningless (and
-// unfillable in the editor) unless notify is actually on - same two-refine
-// shape as the old automations' single "actionTitleTemplate required when
-// pushing" check, just split across two independent toggles now.
+// intend - same refine shape as the old automations' single
+// "actionTitleTemplate required when pushing" check. notify's own
+// title/body/url/dedupe-key templates are all optional inputs now - the
+// owner never has to fill them in, since eventPoller.ts falls back to the
+// rule's own title/id when they're unset.
 const logRuleBaseSchema = z.object({
   recordToHistory: z.boolean(),
   notify: z.boolean(),
-  notifyTitleTemplate: z.string().optional(),
-  notifyDedupeKeyTemplate: z.string().optional(),
 });
 function refineLogRuleAction<T extends z.infer<typeof logRuleBaseSchema>>(v: T) {
   return v.recordToHistory || v.notify;
-}
-function refineNotifyFields<T extends z.infer<typeof logRuleBaseSchema>>(v: T) {
-  return !v.notify || (!!v.notifyTitleTemplate && !!v.notifyDedupeKeyTemplate);
 }
 
 export const createLogRuleRequestSchema = z
@@ -61,11 +57,7 @@ export const createLogRuleRequestSchema = z
     notifyDedupeKeyTemplate: z.string().optional(),
     enabled: z.boolean().default(true),
   })
-  .refine(refineLogRuleAction, { message: "a rule must record to history, notify, or both", path: ["recordToHistory"] })
-  .refine(refineNotifyFields, {
-    message: "notifyTitleTemplate and notifyDedupeKeyTemplate are required when notify is true",
-    path: ["notifyTitleTemplate"],
-  });
+  .refine(refineLogRuleAction, { message: "a rule must record to history, notify, or both", path: ["recordToHistory"] });
 export type CreateLogRuleRequest = z.infer<typeof createLogRuleRequestSchema>;
 
 export const updateLogRuleRequestSchema = z.object({

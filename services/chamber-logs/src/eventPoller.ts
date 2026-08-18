@@ -95,11 +95,11 @@ async function runRule(rule: ReturnType<typeof listEnabledLogRulesForTrigger>[nu
   }
 
   if (rule.notify) {
-    const dedupeKey = interpolate(rule.notifyDedupeKeyTemplate ?? "", event.payload);
-    // Required at the request-schema level (createLogRuleRequestSchema),
-    // but that only guards creation - fall back to the rule's own title so
-    // a since-edited rule missing its template still produces a visible
-    // (if generic) notification rather than a blank one.
+    // The dedupe key template is an optional field the owner rarely fills
+    // in - default to a key scoped to this rule so repeat firings still
+    // update the one notification in place instead of colliding with
+    // another rule's own default-keyed notification for the same chamber.
+    const dedupeKey = rule.notifyDedupeKeyTemplate ? interpolate(rule.notifyDedupeKeyTemplate, event.payload) : `rule-${rule.id}`;
     const title = rule.notifyTitleTemplate ? interpolate(rule.notifyTitleTemplate, event.payload) : rule.title;
     const body = rule.notifyBodyTemplate ? interpolate(rule.notifyBodyTemplate, event.payload) : undefined;
     const chamberUrl = rule.notifyUrlTemplate ? interpolate(rule.notifyUrlTemplate, event.payload) : undefined;

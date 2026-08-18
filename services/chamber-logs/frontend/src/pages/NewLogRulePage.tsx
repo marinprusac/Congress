@@ -31,10 +31,6 @@ export function NewLogRulePage() {
   const [minPriority, setMinPriority] = useState<PriorityLevel | "">("");
   const [recordToHistory, setRecordToHistory] = useState(true);
   const [notify, setNotify] = useState(false);
-  const [notifyTitleTemplate, setNotifyTitleTemplate] = useState("");
-  const [notifyBodyTemplate, setNotifyBodyTemplate] = useState("");
-  const [notifyUrlTemplate, setNotifyUrlTemplate] = useState("");
-  const [notifyDedupeKeyTemplate, setNotifyDedupeKeyTemplate] = useState("");
 
   const catalogQuery = useQuery({ queryKey: ["event-catalog"], queryFn: fetchEventCatalog });
 
@@ -48,10 +44,6 @@ export function NewLogRulePage() {
         minPriority: minPriority || undefined,
         recordToHistory,
         notify,
-        notifyTitleTemplate: notify ? notifyTitleTemplate : undefined,
-        notifyBodyTemplate: notify ? notifyBodyTemplate || undefined : undefined,
-        notifyUrlTemplate: notify ? notifyUrlTemplate || undefined : undefined,
-        notifyDedupeKeyTemplate: notify ? notifyDedupeKeyTemplate : undefined,
       }),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["log-rules"] });
@@ -59,11 +51,7 @@ export function NewLogRulePage() {
     },
   });
 
-  const canSubmit =
-    title.trim() &&
-    triggerEventType.trim() &&
-    (recordToHistory || notify) &&
-    (!notify || (notifyTitleTemplate.trim() && notifyDedupeKeyTemplate.trim()));
+  const canSubmit = title.trim() && triggerEventType.trim() && (recordToHistory || notify);
 
   return (
     <section>
@@ -106,25 +94,6 @@ export function NewLogRulePage() {
           <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
           Push a notification
         </label>
-
-        {notify && (
-          <>
-            <FormLabel>Notification title ({"{{"}payload.x{"}}"} interpolated)</FormLabel>
-            <input value={notifyTitleTemplate} onChange={(e) => setNotifyTitleTemplate(e.target.value)} className={inputClass} />
-
-            <FormLabel>Notification body (optional)</FormLabel>
-            <input value={notifyBodyTemplate} onChange={(e) => setNotifyBodyTemplate(e.target.value)} className={inputClass} />
-
-            <FormLabel>Link (optional, e.g. {"{{"}payload.url{"}}"})</FormLabel>
-            <input value={notifyUrlTemplate} onChange={(e) => setNotifyUrlTemplate(e.target.value)} className={inputClass} />
-
-            <FormLabel>
-              Dedupe key ({"{{"}payload.x{"}}"} interpolated - reused if this rule notifies again for the same underlying thing, so
-              it updates the existing notification in place instead of piling up duplicates)
-            </FormLabel>
-            <input value={notifyDedupeKeyTemplate} onChange={(e) => setNotifyDedupeKeyTemplate(e.target.value)} className={inputClass} />
-          </>
-        )}
 
         <FormLabel>Notes (optional, [[ to reference an Exhibit)</FormLabel>
         <ExhibitTextarea

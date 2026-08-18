@@ -82,10 +82,6 @@ export function LogRuleViewPage() {
         minPriority: r.minPriority ?? undefined,
         recordToHistory: r.recordToHistory,
         notify: r.notify,
-        notifyTitleTemplate: r.notifyTitleTemplate ?? undefined,
-        notifyBodyTemplate: r.notifyBodyTemplate ?? undefined,
-        notifyUrlTemplate: r.notifyUrlTemplate ?? undefined,
-        notifyDedupeKeyTemplate: r.notifyDedupeKeyTemplate ?? undefined,
         enabled: r.enabled,
       });
     }
@@ -208,61 +204,6 @@ export function LogRuleViewPage() {
           )}
         </div>
 
-        {(editing ? draft.notify : rule.notify) && (
-          <>
-            <div>
-              {fieldLabel("Notification title")}
-              {editing ? (
-                <input
-                  value={draft.notifyTitleTemplate ?? ""}
-                  onChange={(e) => setDraft((d) => ({ ...d, notifyTitleTemplate: e.target.value }))}
-                  className={inputClass}
-                />
-              ) : (
-                <p className="font-mono text-sm text-ink">{rule.notifyTitleTemplate || "— None —"}</p>
-              )}
-            </div>
-
-            <div>
-              {fieldLabel("Notification body")}
-              {editing ? (
-                <input
-                  value={draft.notifyBodyTemplate ?? ""}
-                  onChange={(e) => setDraft((d) => ({ ...d, notifyBodyTemplate: e.target.value }))}
-                  className={inputClass}
-                />
-              ) : (
-                <p className="font-mono text-sm text-ink">{rule.notifyBodyTemplate || "— None —"}</p>
-              )}
-            </div>
-
-            <div>
-              {fieldLabel("Link")}
-              {editing ? (
-                <input
-                  value={draft.notifyUrlTemplate ?? ""}
-                  onChange={(e) => setDraft((d) => ({ ...d, notifyUrlTemplate: e.target.value }))}
-                  className={inputClass}
-                />
-              ) : (
-                <p className="font-mono text-sm text-ink">{rule.notifyUrlTemplate || "— None —"}</p>
-              )}
-            </div>
-
-            <div>
-              {fieldLabel("Dedupe key")}
-              {editing ? (
-                <input
-                  value={draft.notifyDedupeKeyTemplate ?? ""}
-                  onChange={(e) => setDraft((d) => ({ ...d, notifyDedupeKeyTemplate: e.target.value }))}
-                  className={inputClass}
-                />
-              ) : (
-                <p className="font-mono text-sm text-ink">{rule.notifyDedupeKeyTemplate || "— None —"}</p>
-              )}
-            </div>
-          </>
-        )}
       </div>
 
       <ExhibitLinksLayout
