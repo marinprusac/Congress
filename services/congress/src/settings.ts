@@ -6,6 +6,6 @@ import { settings } from "./db/schema.js";
 export const { getSettings, updateSettings } = createSingleRowSettings<typeof settings.$inferSelect, CapitolSettings>({
   db,
   table: settings,
-  toSettings: (row) => ({ darkMode: row.darkMode }),
-  defaults: { darkMode: false },
+  toSettings: (row) => ({ darkMode: row.darkMode, eventRetentionMs: row.eventRetentionMs }),
+  defaults: { darkMode: false, eventRetentionMs: 24 * 60 * 60 * 1000 },
 });

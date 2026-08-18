@@ -125,7 +125,7 @@ app.post("/congress/events/publish", requireInternalToken, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
-  publishEvent(parsed.data);
+  await publishEvent(parsed.data);
   return c.json({ ok: true });
 });
 

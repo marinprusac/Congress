@@ -3,15 +3,12 @@ import type { EventPublishRequest, EventLogEntry, EventLogResponse } from "@cong
 import { db } from "./db/client.js";
 import { events } from "./db/schema.js";
 import { getChamber } from "./registry.js";
+import { getSettings } from "./settings.js";
 
 // Capped per poll batch, same idiom as notifications.ts's LIST_LIMIT - a
 // poller that fell behind (was offline a while) catches up over several
 // polls rather than one unbounded query.
 const BATCH_LIMIT = 200;
-// Used when the publishing chamber hasn't declared a retentionMs for this
-// event type (manifestEventSchema) - short on purpose, this log is a switch
-// for chambers that poll on their own short interval, not a durable record.
-const DEFAULT_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 function toEntry(row: typeof events.$inferSelect): EventLogEntry {
   return {
@@ -23,17 +20,18 @@ function toEntry(row: typeof events.$inferSelect): EventLogEntry {
   };
 }
 
-export function publishEvent(req: EventPublishRequest): void {
+export async function publishEvent(req: EventPublishRequest): Promise<void> {
   const occurredAt = req.occurredAt ? new Date(req.occurredAt) : new Date();
   // Copies a number the publishing chamber already declared about its own
   // event type, same as label/description - not an interpretation of
   // `type`/`payload` content, just mechanical bookkeeping about how long to
-  // keep the row. Falls back to the default when the chamber never declared
-  // this event type at all (nothing stops a Chamber from publishing an
+  // keep the row. Falls back to the owner-tunable Settings default (see
+  // settings.ts's eventRetentionMs) when the chamber never declared this
+  // event type at all (nothing stops a Chamber from publishing an
   // undeclared type - the catalog is descriptive, not enforced) or isn't
   // currently registered.
   const declared = getChamber(req.chamber)?.events.find((e) => e.type === req.type)?.retentionMs;
-  const retentionMs = declared ?? DEFAULT_RETENTION_MS;
+  const retentionMs = declared ?? (await getSettings()).eventRetentionMs;
 
   db.insert(events)
     .values({

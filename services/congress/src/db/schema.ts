@@ -103,4 +103,5 @@ export const events = sqliteTable(
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
   darkMode: integer("dark_mode", { mode: "boolean" }).notNull().default(false),
+  eventRetentionMs: integer("event_retention_ms").notNull().default(24 * 60 * 60 * 1000),
 });

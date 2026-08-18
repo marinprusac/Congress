@@ -1,0 +1,1 @@
+ALTER TABLE `settings` ADD `event_retention_ms` integer DEFAULT 86400000 NOT NULL;
