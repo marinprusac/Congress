@@ -29,5 +29,4 @@ export const taskRefs = sqliteTable(
 // Single-row table (id is always 1), same contract as every other Chamber.
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
-  checkIntervalMs: integer("check_interval_ms").notNull().default(15 * 60 * 1000),
 });

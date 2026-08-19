@@ -5,6 +5,7 @@ import { db } from "./db/client.js";
 import { logRules } from "./db/schema.js";
 import { toExhibitId, parseLogRuleId, pushExhibitSync } from "./exhibits.js";
 import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForLogRule } from "./refs.js";
+import { notifySubscriptionsChanged } from "./subscriptions.js";
 
 // The set of Exhibits a log rule points at is the union of what's embedded
 // in its body ("[[" tokens) and what was added explicitly via the
@@ -132,6 +133,7 @@ export async function createLogRule(input: CreateLogRuleRequest): Promise<LogRul
     .get();
 
   await syncLogRuleExhibit(inserted.id, inserted.title, inserted.body);
+  notifySubscriptionsChanged();
 
   return toSummary(inserted);
 }
@@ -162,6 +164,7 @@ export async function updateLogRule(id: number, input: UpdateLogRuleRequest): Pr
   db.update(logRules).set(next).where(eq(logRules.id, id)).run();
 
   await syncLogRuleExhibit(id, next.title, next.body);
+  notifySubscriptionsChanged();
 
   return getLogRule(id);
 }
@@ -179,6 +182,7 @@ export async function deleteLogRule(id: number): Promise<boolean> {
       outgoingRefs: [],
       deleted: true,
     });
+    notifySubscriptionsChanged();
   }
   return result.changes > 0;
 }

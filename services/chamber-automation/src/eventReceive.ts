@@ -1,38 +1,12 @@
 import { eq, lt, and } from "drizzle-orm";
-import { eventLogResponseSchema, type EventLogEntry, type ChamberRegistryEntry } from "@congress/shared-types";
+import type { EventDelivery } from "@congress/shared-types";
 import { fetchRegistry, callChamberTool } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
-import { pollerState, automationRuns } from "./db/schema.js";
+import { automationRuns } from "./db/schema.js";
 import { env } from "./env.js";
 import { listEnabledAutomationsForTrigger, markAutomationFired } from "./automations.js";
 
-const POLL_INTERVAL_MS = 30_000;
 const RUNS_PER_AUTOMATION = 20;
-
-const POLLER_ID = 1;
-
-function getCursor(): number {
-  const row = db.select().from(pollerState).where(eq(pollerState.id, POLLER_ID)).get();
-  return row?.lastEventId ?? 0;
-}
-
-function setCursor(id: number): void {
-  const existing = db.select().from(pollerState).where(eq(pollerState.id, POLLER_ID)).get();
-  if (existing) {
-    db.update(pollerState).set({ lastEventId: id }).where(eq(pollerState.id, POLLER_ID)).run();
-  } else {
-    db.insert(pollerState).values({ id: POLLER_ID, lastEventId: id }).run();
-  }
-}
-
-async function fetchEventsSince(since: number): Promise<{ events: EventLogEntry[]; cursor: number }> {
-  const res = await fetch(`${env.CAPITOL_URL}/congress/events?since=${since}`, {
-    headers: { "X-Congress-Internal-Token": env.CONGRESS_INTERNAL_TOKEN },
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!res.ok) throw new Error(`Congress returned ${res.status}`);
-  return eventLogResponseSchema.parse(await res.json());
-}
 
 // Reads a dotted path ("a.b.c") out of a plain object, returning undefined
 // for any missing/non-object segment - used by both the condition check and
@@ -80,7 +54,6 @@ function buildArgs(argsTemplate: Record<string, string>, payload: Record<string,
 
 function recordRun(
   automationId: number,
-  eventId: number,
   payload: Record<string, unknown>,
   targetChamber: string,
   toolName: string,
@@ -89,7 +62,7 @@ function recordRun(
   errorMessage: string | null
 ): void {
   db.insert(automationRuns)
-    .values({ automationId, eventId, payloadJson: JSON.stringify(payload), targetChamber, toolName, ok, resultJson, errorMessage, firedAt: new Date() })
+    .values({ automationId, payloadJson: JSON.stringify(payload), targetChamber, toolName, ok, resultJson, errorMessage, firedAt: new Date() })
     .run();
 
   // Prune to the newest RUNS_PER_AUTOMATION rows for this automation - see
@@ -107,16 +80,20 @@ function recordRun(
   }
 }
 
-async function runAutomation(
-  automation: ReturnType<typeof listEnabledAutomationsForTrigger>[number],
-  event: EventLogEntry,
-  registry: ChamberRegistryEntry[]
-): Promise<void> {
+async function runAutomation(automation: ReturnType<typeof listEnabledAutomationsForTrigger>[number], event: EventDelivery): Promise<void> {
   if (!conditionMatches(automation, event.payload)) return;
+
+  let registry;
+  try {
+    registry = await fetchRegistry(env.CAPITOL_URL, env.CONGRESS_INTERNAL_TOKEN);
+  } catch (err) {
+    console.warn(`Registry fetch failed: ${(err as Error).message}`);
+    return;
+  }
 
   const target = registry.find((c) => c.name === automation.targetChamber);
   if (!target || !target.mcpUrl) {
-    recordRun(automation.id, event.id, event.payload, automation.targetChamber, automation.toolName, false, null, `Chamber "${automation.targetChamber}" is not registered or has no MCP server`);
+    recordRun(automation.id, event.payload, automation.targetChamber, automation.toolName, false, null, `Chamber "${automation.targetChamber}" is not registered or has no MCP server`);
     await markAutomationFired(automation.id);
     return;
   }
@@ -125,60 +102,25 @@ async function runAutomation(
 
   try {
     const result = await callChamberTool(target.mcpUrl, env.CONGRESS_INTERNAL_TOKEN, automation.toolName, args);
-    recordRun(automation.id, event.id, event.payload, automation.targetChamber, automation.toolName, true, JSON.stringify(result), null);
+    recordRun(automation.id, event.payload, automation.targetChamber, automation.toolName, true, JSON.stringify(result), null);
   } catch (err) {
-    recordRun(automation.id, event.id, event.payload, automation.targetChamber, automation.toolName, false, null, (err as Error).message);
+    recordRun(automation.id, event.payload, automation.targetChamber, automation.toolName, false, null, (err as Error).message);
   }
 
   await markAutomationFired(automation.id);
 }
 
-async function poll(): Promise<void> {
-  const since = getCursor();
-  let batch: { events: EventLogEntry[]; cursor: number };
-  try {
-    batch = await fetchEventsSince(since);
-  } catch (err) {
-    console.warn(`Event poll failed: ${(err as Error).message}`);
-    return;
-  }
-  if (batch.events.length === 0) {
-    if (batch.cursor !== since) setCursor(batch.cursor);
-    return;
-  }
-
-  // Fetched once per tick, not per automation - the registry rarely changes
-  // within a 30s window, and every matching automation in this batch needs
-  // the same lookup.
-  let registry: ChamberRegistryEntry[];
-  try {
-    registry = await fetchRegistry(env.CAPITOL_URL, env.CONGRESS_INTERNAL_TOKEN);
-  } catch (err) {
-    console.warn(`Registry fetch failed: ${(err as Error).message}`);
-    return;
-  }
-
-  for (const event of batch.events) {
-    const matches = listEnabledAutomationsForTrigger(event.type);
-    for (const automation of matches) {
-      try {
-        await runAutomation(automation, event, registry);
-      } catch (err) {
-        console.warn(`Automation ${automation.id} failed on event ${event.id}: ${(err as Error).message}`);
-      }
+// Handed to mountEventReceiveRoute (@congress/chamber-kit) - runs every
+// enabled automation whose triggerEventType matches this one delivered
+// event, same logic the old poll loop ran per batched event, just invoked
+// directly per push instead of on a 30s tick.
+export async function handleReceivedEvent(event: EventDelivery): Promise<void> {
+  const matches = listEnabledAutomationsForTrigger(event.type);
+  for (const automation of matches) {
+    try {
+      await runAutomation(automation, event);
+    } catch (err) {
+      console.warn(`Automation ${automation.id} failed on event ${event.chamber}.${event.type}: ${(err as Error).message}`);
     }
   }
-
-  if (batch.cursor !== since) setCursor(batch.cursor);
-}
-
-let pollInterval: ReturnType<typeof setInterval> | undefined;
-
-export function startEventPoller(): void {
-  void poll();
-  pollInterval = setInterval(() => void poll(), POLL_INTERVAL_MS);
-}
-
-export function stopEventPoller(): void {
-  if (pollInterval) clearInterval(pollInterval);
 }

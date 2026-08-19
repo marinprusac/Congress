@@ -8,6 +8,7 @@ import {
   exhibitSyncRequestSchema,
   updateCapitolSettingsRequestSchema,
   eventPublishRequestSchema,
+  chamberSubscriptionSchema,
 } from "@congress/shared-types";
 import { env } from "./env.js";
 import { requireInternalToken, requireSessionOrInternalToken } from "./auth.js";
@@ -33,15 +34,24 @@ import {
   getManualConnectionOwner,
 } from "./exhibits.js";
 import { getSettings, updateSettings } from "./settings.js";
-import { publishEvent, listEventsSince, pruneOldEvents } from "./events.js";
+import { publishEvent } from "./events.js";
 import { mcpApp } from "./mcp/server.js";
 
 // Only Capitol itself validates register/deregister/heartbeat/exhibit-resolve
 // requests - no Chamber ever needs these shapes, so they live here rather
-// than in the shared-types barrel every service imports.
-const registerRequestSchema = manifestSchema;
+// than in the shared-types barrel every service imports. `subscriptions` on
+// both register and heartbeat is this Chamber's own dynamic event interest
+// list (see shared-types/events.ts's chamberSubscriptionSchema) - defaulted
+// so a Chamber that never subscribes to anything doesn't have to think
+// about this field.
+const registerRequestSchema = manifestSchema.extend({
+  subscriptions: z.array(chamberSubscriptionSchema).default([]),
+});
 const deregisterRequestSchema = z.object({ name: z.string().min(1) });
-const heartbeatRequestSchema = z.object({ name: z.string().min(1) });
+const heartbeatRequestSchema = z.object({
+  name: z.string().min(1),
+  subscriptions: z.array(chamberSubscriptionSchema).default([]),
+});
 // Chamber included per-ref since an id that never synced has no cache row to
 // infer the owning chamber from.
 const capitolExhibitResolveRequestSchema = z.object({
@@ -76,7 +86,7 @@ app.post("/congress/register", requireInternalToken, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_manifest", issues: parsed.error.flatten() }, 400);
   }
-  const entry = registerChamber(parsed.data);
+  const entry = registerChamber(parsed.data, parsed.data.subscriptions);
   return c.json(entry, 201);
 });
 
@@ -97,7 +107,7 @@ app.post("/congress/heartbeat", requireInternalToken, async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
-  const entry = recordHeartbeat(parsed.data.name);
+  const entry = recordHeartbeat(parsed.data.name, parsed.data.subscriptions);
   if (!entry) return c.json({ error: "chamber_not_found" }, 404);
   return c.json(entry, 200);
 });
@@ -112,26 +122,20 @@ app.post("/congress/exhibits/sync", requireInternalToken, async (c) => {
   return c.json({ ok: true });
 });
 
-// Generic event log - Congress only ever appends and returns entries here,
-// never inspecting `type`/`payload` or relaying to a chamber by name. See
-// events.ts's own comment; a Chamber wanting to react to events (today,
-// only the notifications Chamber) polls the GET route on its own schedule.
+// Push-relays a domain event to every currently-active, currently-
+// subscribed Chamber instead of storing it - see events.ts's own comment.
+// Not awaited: publishEvent kicks off each interested Chamber's own
+// background delivery/retry and returns immediately, so a slow or
+// temporarily-unreachable subscriber never makes the publishing Chamber's
+// own request hang.
 app.post("/congress/events/publish", requireInternalToken, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = eventPublishRequestSchema.safeParse(body);
   if (!parsed.success) {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
-  await publishEvent(parsed.data);
+  publishEvent(parsed.data);
   return c.json({ ok: true });
-});
-
-app.get("/congress/events", requireInternalToken, (c) => {
-  const since = Number(c.req.query("since") ?? "0");
-  if (!Number.isInteger(since) || since < 0) {
-    return c.json({ error: "invalid_since" }, 400);
-  }
-  return c.json(listEventsSince(since));
 });
 
 // An empty query is meaningful here - it asks each Chamber for its most
@@ -243,22 +247,4 @@ export function startHeartbeatSweep() {
 
 export function stopHeartbeatSweep() {
   if (sweepInterval) clearInterval(sweepInterval);
-}
-
-// Short on purpose: retention is per-event and can be as low as a few
-// minutes (see events.ts's DEFAULT_RETENTION_MS/manifestEventSchema), so an
-// hourly sweep would let short-retention rows sit for up to an hour past
-// their own expiresAt before actually disappearing.
-const EVENT_PRUNE_INTERVAL_MS = 5 * 60 * 1000;
-
-let eventPruneInterval: ReturnType<typeof setInterval> | undefined;
-
-export function startEventPruneSweep() {
-  eventPruneInterval = setInterval(() => {
-    pruneOldEvents();
-  }, EVENT_PRUNE_INTERVAL_MS);
-}
-
-export function stopEventPruneSweep() {
-  if (eventPruneInterval) clearInterval(eventPruneInterval);
 }

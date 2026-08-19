@@ -6,6 +6,6 @@ import { settings } from "./db/schema.js";
 export const { getSettings, updateSettings } = createSingleRowSettings<typeof settings.$inferSelect, TasksSettings>({
   db,
   table: settings,
-  toSettings: (row) => ({ checkIntervalMs: row.checkIntervalMs }),
-  defaults: { checkIntervalMs: 15 * 60 * 1000 },
+  toSettings: () => ({}),
+  defaults: {},
 });

@@ -3,14 +3,12 @@ import { createPublishEvent } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
 import { tasks } from "./db/schema.js";
 import { env } from "./env.js";
-import { getSettings } from "./settings.js";
 
-// Publishes to Congress's generic event log rather than pushing a
-// notification directly - this Chamber only knows a task is due, not
-// whether anything should happen about it or what that should say; the
-// notifications Chamber's own automations decide that. See
-// chamber-kit's createPublishEvent and this Chamber's manifest.ts for the
-// event catalog.
+// Publishes to Congress's push relay rather than pushing a notification
+// directly - this Chamber only knows a task is due, not whether anything
+// should happen about it or what that should say; the notifications
+// Chamber's own rules decide that. See chamber-kit's createPublishEvent and
+// this Chamber's manifest.ts for the event catalog.
 const publishEvent = createPublishEvent({
   chamber: "tasks",
   capitolUrl: env.CAPITOL_URL,
@@ -20,28 +18,20 @@ const publishEvent = createPublishEvent({
 // A task surfaces once its due date is within a day out, and stays surfaced
 // until it's completed or its due date moves back out of range - but the
 // due_soon/overdue event itself only fires once per state transition (see
-// lastNotifiedState below), not on every tick it remains true. Congress's
-// event log is a switch, not a durable record (CLAUDE.md's Events section) -
-// re-publishing an unchanged state every tick was flooding Logs Chamber's
-// append-only event_history with one row per task per tick, and would fire
-// an Automation Chamber automation repeatedly with no dedup of its own
-// (unlike a log rule's notify action, which at least collapses onto one
-// push via its dedupe key).
+// lastNotifiedState below), not every time this Chamber re-checks. A
+// publish is a push-relayed switch, not a durable record (CLAUDE.md's
+// Events section) - re-publishing an unchanged state on every check would
+// flood Logs Chamber's append-only event_history with one row per task per
+// check, and would fire an Automation Chamber automation repeatedly with no
+// dedup of its own (unlike a log rule's notify action, which at least
+// collapses onto one push via its dedupe key).
 const LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
-
-// How often this process wakes up to see whether a due/overdue checkup is
-// due yet - independent of, and much shorter than, the owner-configurable
-// checkIntervalMs itself (settings.ts), same split as chamber-deputy's
-// TICK_INTERVAL_MS vs. checkupIntervalMs. A code-owned tick this short means
-// a lowered checkIntervalMs takes effect promptly instead of waiting for a
-// restart.
-const TICK_INTERVAL_MS = 60 * 1000;
 
 // Tracks which state ("due_soon" or "overdue") this process last published
 // an event for, per task - both so a task that's completed (or its due date
 // pushed back) between checks gets an explicit tasks.due_cleared event
 // instead of just silently going stale, and so a still-true state doesn't
-// re-publish on every tick (only the due_soon -> overdue transition does,
+// re-publish on every check (only the due_soon -> overdue transition does,
 // since that's a genuine change worth surfacing again). In-memory and reset
 // on restart - same accepted gap as before this Chamber moved to events (see
 // git history): on restart, every currently-due task looks "new" again and
@@ -80,25 +70,69 @@ async function checkDueTasks(): Promise<void> {
   for (const [id, state] of currentlyDue) lastNotifiedState.set(id, state);
 }
 
-// In-memory, reset on restart - same accepted gap as lastNotifiedTaskIds
-// above; a restart just re-runs the checkup on the next tick rather than
-// waiting out the rest of the interval.
-let lastCheckAt: number | null = null;
+// setTimeout overflows past this (2^31-1 ms, ~24.8 days) rather than firing
+// - capped well under that so a due date further out than this just means
+// one extra no-op wake-up before the timer's recomputed and re-armed
+// closer to the real threshold.
+const MAX_TIMEOUT_MS = 24 * 24 * 60 * 60 * 1000;
 
-async function tick(): Promise<void> {
-  const settings = await getSettings();
-  if (lastCheckAt !== null && Date.now() - lastCheckAt < settings.checkIntervalMs) return;
-  lastCheckAt = Date.now();
-  await checkDueTasks();
+// The next instant a due_soon or overdue threshold is crossed, across every
+// incomplete task with a due date - null when there's nothing upcoming to
+// wait for. A task can cross two thresholds (due_soon, then overdue); only
+// ones still in the future matter here, since anything already past is
+// caught by the checkDueTasks() call that runs right before this.
+function nextThresholdMs(now: number): number | null {
+  const rows = db
+    .select({ dueDate: tasks.dueDate })
+    .from(tasks)
+    .where(and(eq(tasks.completed, false), isNotNull(tasks.dueDate)))
+    .all();
+
+  let soonest: number | null = null;
+  for (const row of rows) {
+    if (!row.dueDate) continue;
+    const dueMs = row.dueDate.getTime();
+    for (const candidate of [dueMs - LOOKAHEAD_MS, dueMs]) {
+      if (candidate > now && (soonest === null || candidate < soonest)) soonest = candidate;
+    }
+  }
+  return soonest;
 }
 
-let tickInterval: ReturnType<typeof setInterval> | undefined;
+let wakeTimer: ReturnType<typeof setTimeout> | undefined;
+
+function scheduleNextWake(): void {
+  if (wakeTimer) clearTimeout(wakeTimer);
+  const now = Date.now();
+  const nextMs = nextThresholdMs(now);
+  // Nothing upcoming to wait for right now - reschedule() (called from
+  // every task create/update/delete) re-arms this the moment a due date is
+  // added or moved earlier, so there's nothing to poll for in the meantime.
+  if (nextMs === null) {
+    wakeTimer = undefined;
+    return;
+  }
+  const delay = Math.min(nextMs - now, MAX_TIMEOUT_MS);
+  wakeTimer = setTimeout(() => void runCheckAndReschedule(), delay);
+}
+
+async function runCheckAndReschedule(): Promise<void> {
+  await checkDueTasks();
+  scheduleNextWake();
+}
+
+// Called after every task create/update/delete (tasks.ts) - a mutation may
+// have moved the soonest threshold earlier (or created/cleared one
+// entirely), so this recomputes and re-arms immediately rather than waiting
+// for whatever timer is already scheduled.
+export function reschedule(): void {
+  scheduleNextWake();
+}
 
 export function startDueTaskNotifications(): void {
-  void tick();
-  tickInterval = setInterval(() => void tick(), TICK_INTERVAL_MS);
+  void runCheckAndReschedule();
 }
 
 export function stopDueTaskNotifications(): void {
-  if (tickInterval) clearInterval(tickInterval);
+  if (wakeTimer) clearTimeout(wakeTimer);
 }

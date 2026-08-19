@@ -8,8 +8,11 @@ import {
   mountSettingsRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
+  mountEventReceiveRoute,
 } from "@congress/chamber-kit";
 import { manifest } from "./manifest.js";
+import { env } from "./env.js";
+import { handleReceivedEvent } from "./eventReceive.js";
 import {
   listLogRules,
   listRecentLogRules,
@@ -33,6 +36,7 @@ import { mcpApp } from "./mcp/server.js";
 export const app = new Hono<{ Bindings: HttpBindings }>();
 
 mountManifestAndHealth(app, manifest);
+mountEventReceiveRoute(app, env.CONGRESS_INTERNAL_TOKEN, handleReceivedEvent);
 
 app.get("/api/log-rules/recent", async (c) => {
   return c.json(await listRecentLogRules());

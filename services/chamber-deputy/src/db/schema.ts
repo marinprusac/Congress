@@ -95,17 +95,25 @@ export const settings = sqliteTable("settings", {
   pausedReason: text("paused_reason"),
 });
 
-// This Chamber's own bookkeeping for how far it's read Congress's event log
-// - deliberately separate from `settings` above (owner-facing), and split
-// into two cursors rather than one: `lastUrgentEventId` tracks what's been
-// checked for an urgent fast-path preemption, `lastCheckupEventId` tracks
-// what's been folded into a periodic checkup's own prompt context. They
-// advance independently (a checkup runs far less often than the urgent
-// scan) but off the same underlying event batch - see eventPoller.ts's
-// tick().
-export const pollerState = sqliteTable("poller_state", {
-  id: integer("id").primaryKey().default(1),
-  lastUrgentEventId: integer("last_urgent_event_id").notNull().default(0),
-  lastCheckupEventId: integer("last_checkup_event_id").notNull().default(0),
-  lastCheckupAt: integer("last_checkup_at", { mode: "timestamp_ms" }),
-});
+// This Chamber's own short-lived buffer of events received since the last
+// periodic checkup (see checkup.ts) - deliberately separate from `settings`
+// above (owner-facing). Congress no longer keeps a replayable log of its
+// own (see services/congress/src/events.ts), so a Chamber that wants to
+// fold "everything since last time" into a periodic prompt has to persist
+// that itself instead of re-polling a cursor against Congress's own
+// storage. Drained (read + deleted) in one step every time a periodic
+// checkup actually runs (eventReceive.ts's handleReceivedEvent inserts,
+// checkup.ts's runPeriodicCheckup drains) - an urgent event both lands here
+// *and* separately preempts an immediate run, same two-track behavior the
+// old poller's lastUrgentEventId/lastCheckupEventId split gave it.
+export const pendingCheckupEvents = sqliteTable(
+  "pending_checkup_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    chamber: text("chamber").notNull(),
+    type: text("type").notNull(),
+    payloadJson: text("payload_json").notNull(),
+    occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("pending_checkup_events_occurred_at_idx").on(table.occurredAt)]
+);

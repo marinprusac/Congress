@@ -51,7 +51,6 @@ export type UpdateAutomationRequest = z.infer<typeof updateAutomationRequestSche
 export const automationRunSchema = z.object({
   id: z.number().int(),
   automationId: z.number().int(),
-  eventId: z.number().int(),
   payload: z.record(z.string(), z.unknown()),
   targetChamber: z.string(),
   toolName: z.string(),

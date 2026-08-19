@@ -3,23 +3,24 @@ import { z } from "zod";
 // Published by a Chamber that wants something to happen when a condition
 // only it can detect becomes true - "task is due soon", "event starting in
 // 5 min" - without knowing or caring whether anything is listening.
-// Congress only ever appends these to its own log (POST
-// /congress/events/publish); it never inspects `type`, relays to a chamber
-// by name, or otherwise acts on the event itself - any Chamber (today, only
-// the notifications Chamber) pulls new ones on its own schedule via GET
-// /congress/events?since=<cursor>. `type` is conventionally
+// Congress never stores these or inspects `type`/`payload` itself - it
+// immediately push-relays a publish (POST /congress/events/publish) to
+// every currently-active Chamber whose own declared subscriptions
+// (chamberSubscriptionSchema below) match, POSTing to that Chamber's own
+// fixed-convention POST /api/events/receive. `type` is conventionally
 // "<chamber>.<event>" (e.g. "tasks.due_soon") so it's self-namespacing
 // without a separate chamber filter downstream - see manifestEventSchema
 // (manifest.ts) for how a Chamber declares its own catalog of these.
 // A convention, not an enforced part of the request shape below - a
 // publishing Chamber may set `payload.priority` to one of these to signal
 // how much attention an instance of an event deserves (a task due in 5
-// minutes vs. one due tomorrow, say), ordered low to urgent. Congress itself
-// never reads this - it's Logs Chamber that extracts it (defaulting to
-// "normal" when a Chamber didn't set one) to drive its own rules'
-// `minPriority` threshold and its priority-filtered widget. Kept here rather
-// than chamber-local so any publishing Chamber and Logs Chamber agree on the
-// same vocabulary/ordering without importing from each other.
+// minutes vs. one due tomorrow, say), ordered low to urgent. Congress uses
+// this only for coarse per-chamber-subscription routing (see
+// chamberSubscriptionSchema); a receiving Chamber's own rules (e.g. Logs
+// Chamber's minPriority threshold) still do their own precise check after
+// receiving. Kept here rather than chamber-local so any publishing Chamber
+// and any subscriber agree on the same vocabulary/ordering without
+// importing from each other.
 export const PRIORITY_LEVELS = ["low", "normal", "high", "urgent"] as const;
 export const priorityLevelSchema = z.enum(PRIORITY_LEVELS);
 export type PriorityLevel = z.infer<typeof priorityLevelSchema>;
@@ -32,6 +33,24 @@ export const eventPublishRequestSchema = z.object({
 });
 export type EventPublishRequest = z.infer<typeof eventPublishRequestSchema>;
 
+// What a subscribing Chamber's own POST /api/events/receive is handed - one
+// per matched publish, delivered directly rather than read off a stored
+// log, so there's no `id`/cursor here the way there used to be. A Chamber
+// that needs to keep its own record of what it's received (e.g. Deputy
+// Chamber buffering toward its next periodic checkup) does so in its own
+// storage, keyed however it likes - this shape is just the wire delivery.
+export const eventDeliverySchema = z.object({
+  chamber: z.string(),
+  type: z.string(),
+  payload: z.record(z.string(), z.unknown()),
+  occurredAt: z.string(),
+});
+export type EventDelivery = z.infer<typeof eventDeliverySchema>;
+
+// A locally-numbered event, for a Chamber that keeps its own short-lived
+// buffer of received deliveries (see chamber-deputy's pending_checkup_events)
+// and wants a stable id to dedupe/order by within that buffer - `id` here is
+// only ever meaningful to whoever assigned it, never a Congress-wide id.
 export const eventLogEntrySchema = z.object({
   id: z.number().int(),
   chamber: z.string(),
@@ -41,11 +60,20 @@ export const eventLogEntrySchema = z.object({
 });
 export type EventLogEntry = z.infer<typeof eventLogEntrySchema>;
 
-export const eventLogResponseSchema = z.object({
-  events: z.array(eventLogEntrySchema),
-  // The id to pass as the next poll's `?since=` - the id of the last event
-  // in this batch, or the caller's own `since` echoed back when the batch
-  // was empty (nothing to advance past yet).
-  cursor: z.number().int(),
+// One entry in a Chamber's own dynamic, owner-editable interest list -
+// carried on every heartbeat (not the static manifest, since what a Chamber
+// cares about changes at runtime as its own rules/automations/directives
+// are edited) so Congress knows who to push a given publish to without
+// broadcasting to every registered Chamber regardless of interest. `type`
+// of "*" means "every event type" (used by a Chamber whose own logic
+// doesn't filter by type at all, e.g. Deputy). `minPriority` is this
+// Chamber's own loosest threshold across everything it cares about for that
+// type - Congress's own filter is a coarse "could this possibly interest
+// this Chamber" gate; the Chamber still does its own precise per-rule
+// matching after receiving (see docs/creating-a-chamber.md's Events
+// section).
+export const chamberSubscriptionSchema = z.object({
+  type: z.string().min(1),
+  minPriority: priorityLevelSchema.optional(),
 });
-export type EventLogResponse = z.infer<typeof eventLogResponseSchema>;
+export type ChamberSubscription = z.infer<typeof chamberSubscriptionSchema>;

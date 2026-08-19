@@ -29,16 +29,12 @@ export const updateTaskRequestSchema = z.object({
 });
 export type UpdateTaskRequest = z.infer<typeof updateTaskRequestSchema>;
 
-export const tasksSettingsSchema = z.object({
-  // How often the due/overdue checkup (notifications.ts) re-scans open
-  // tasks and publishes tasks.due_soon/tasks.overdue/tasks.due_cleared
-  // events. Owner-tunable instead of a hardcoded constant, same reasoning
-  // as chamber-deputy's checkupIntervalMs.
-  checkIntervalMs: z.number().int().positive(),
-});
+// No settings of its own today - the due/overdue checkup (notifications.ts)
+// is now a precise next-wake timer rather than a polled interval, so
+// there's no "how often to check" knob left to expose. Kept for contract
+// uniformity with every other Chamber's own settings surface.
+export const tasksSettingsSchema = z.object({});
 export type TasksSettings = z.infer<typeof tasksSettingsSchema>;
 
-export const updateTasksSettingsRequestSchema = z.object({
-  checkIntervalMs: z.number().int().positive().optional(),
-});
+export const updateTasksSettingsRequestSchema = z.object({});
 export type UpdateTasksSettingsRequest = z.infer<typeof updateTasksSettingsRequestSchema>;

@@ -29,6 +29,13 @@
       "when": 1786996042055,
       "tag": "0003_nappy_epoch",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1787171337389,
+      "tag": "0004_aberrant_zeigeist",
+      "breakpoints": true
     }
   ]
 }

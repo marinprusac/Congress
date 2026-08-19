@@ -119,15 +119,6 @@ export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
 });
 
-// This Chamber's own bookkeeping for how far it's read Congress's event log
-// - deliberately separate from `settings` above (which backs the
-// owner-facing Settings page / updateSettingsRequestSchema): this cursor is
-// an internal implementation detail of eventPoller.ts, never user-editable.
-export const pollerState = sqliteTable("poller_state", {
-  id: integer("id").primaryKey().default(1),
-  lastEventId: integer("last_event_id").notNull().default(0),
-});
-
 // This Chamber's own notification center - formerly Congress-owned
 // (services/congress/src/db/schema.ts), moved here so Congress has no
 // notification-specific product surface at all. One row per (chamber,

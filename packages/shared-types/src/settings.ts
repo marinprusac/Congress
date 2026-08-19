@@ -8,18 +8,10 @@ import { z } from "zod";
 // Chamber's normal per-Chamber settings contract instead of this one.
 export const capitolSettingsSchema = z.object({
   darkMode: z.boolean(),
-  // How long Congress's generic event log (events.ts) keeps a published
-  // event before pruning it, when the publishing Chamber's own manifest
-  // didn't declare a more specific retentionMs for that event type - see
-  // events.ts's publishEvent. Owner-tunable here instead of a hardcoded
-  // constant so a Chamber whose poll interval grows doesn't need a
-  // code change/redeploy to keep events alive long enough to be seen.
-  eventRetentionMs: z.number().int().positive(),
 });
 export type CapitolSettings = z.infer<typeof capitolSettingsSchema>;
 
 export const updateCapitolSettingsRequestSchema = z.object({
   darkMode: z.boolean().optional(),
-  eventRetentionMs: z.number().int().positive().optional(),
 });
 export type UpdateCapitolSettingsRequest = z.infer<typeof updateCapitolSettingsRequestSchema>;

@@ -3,10 +3,15 @@ import { env } from "./env.js";
 import { app } from "./server.js";
 import { runMigrations, closeDb } from "./db/client.js";
 import { manifest } from "./manifest.js";
-import { startEventPoller, stopEventPoller } from "./eventPoller.js";
+import { computeSubscriptions, setSubscriptionChangeNotifier } from "./subscriptions.js";
 
-createChamberBootstrap({ displayName: "Automation Chamber", manifest, app, env, runMigrations, closeDb });
-
-startEventPoller();
-process.on("SIGINT", stopEventPoller);
-process.on("SIGTERM", stopEventPoller);
+const { heartbeatNow } = createChamberBootstrap({
+  displayName: "Automation Chamber",
+  manifest,
+  app,
+  env,
+  runMigrations,
+  closeDb,
+  getSubscriptions: computeSubscriptions,
+});
+setSubscriptionChangeNotifier(() => void heartbeatNow());

@@ -1,5 +1,5 @@
 import { eq, and, lt, sql } from "drizzle-orm";
-import type { Manifest, ChamberRegistryEntry, ChamberStatus } from "@congress/shared-types";
+import type { Manifest, ChamberRegistryEntry, ChamberStatus, ChamberSubscription } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { chambers } from "./db/schema.js";
 
@@ -11,6 +11,7 @@ function toEntry(row: typeof chambers.$inferSelect): ChamberRegistryEntry {
     routes: JSON.parse(row.routesJson),
     widgets: JSON.parse(row.widgetsJson),
     events: JSON.parse(row.eventsJson),
+    subscriptions: JSON.parse(row.subscriptionsJson),
     apiBase: row.apiBase,
     mcpUrl: row.mcpUrl ?? undefined,
     healthUrl: row.healthUrl,
@@ -20,7 +21,7 @@ function toEntry(row: typeof chambers.$inferSelect): ChamberRegistryEntry {
   };
 }
 
-export function registerChamber(manifest: Manifest): ChamberRegistryEntry {
+export function registerChamber(manifest: Manifest, subscriptions: ChamberSubscription[] = []): ChamberRegistryEntry {
   const now = new Date();
   const existing = db.select().from(chambers).where(eq(chambers.name, manifest.name)).get();
 
@@ -32,6 +33,7 @@ export function registerChamber(manifest: Manifest): ChamberRegistryEntry {
         routesJson: JSON.stringify(manifest.routes),
         widgetsJson: JSON.stringify(manifest.widgets),
         eventsJson: JSON.stringify(manifest.events),
+        subscriptionsJson: JSON.stringify(subscriptions),
         apiBase: manifest.apiBase,
         mcpUrl: manifest.mcpUrl ?? null,
         healthUrl: manifest.healthUrl,
@@ -50,6 +52,7 @@ export function registerChamber(manifest: Manifest): ChamberRegistryEntry {
         routesJson: JSON.stringify(manifest.routes),
         widgetsJson: JSON.stringify(manifest.widgets),
         eventsJson: JSON.stringify(manifest.events),
+        subscriptionsJson: JSON.stringify(subscriptions),
         apiBase: manifest.apiBase,
         mcpUrl: manifest.mcpUrl ?? null,
         healthUrl: manifest.healthUrl,
@@ -74,7 +77,7 @@ export function deregisterChamber(name: string): ChamberRegistryEntry | null {
   return row ? toEntry(row) : null;
 }
 
-export function recordHeartbeat(name: string): ChamberRegistryEntry | null {
+export function recordHeartbeat(name: string, subscriptions?: ChamberSubscription[]): ChamberRegistryEntry | null {
   const existing = db.select().from(chambers).where(eq(chambers.name, name)).get();
   if (!existing) return null;
 
@@ -84,6 +87,10 @@ export function recordHeartbeat(name: string): ChamberRegistryEntry | null {
       // Still record freshness while detached, but a live heartbeat must
       // not itself clear a manual detach - only attachChamber does.
       status: existing.status === "detached" ? "detached" : "active",
+      // Always refreshed on a heartbeat that provides it (even to an empty
+      // list) - a still-true empty subscription genuinely means "nothing
+      // to relay right now", not "leave the old list alone".
+      ...(subscriptions !== undefined ? { subscriptionsJson: JSON.stringify(subscriptions) } : {}),
     })
     .where(eq(chambers.name, name))
     .run();

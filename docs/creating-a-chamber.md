@@ -115,6 +115,7 @@ don't reimplement them:
 | `createTableBackedExhibits(config)` | Implements the whole Exhibit content contract (search/resolve) for a table-backed entity from a handful of callbacks. |
 | `createPushExhibitSync(opts)` | Fire-and-forget `POST /congress/exhibits/sync` after create/update/delete. |
 | `createPublishEvent(opts)` | Fire-and-forget `POST /congress/events/publish` for a domain event another Chamber's rules or automations might react to - see §5.2. |
+| `mountEventReceiveRoute(app, internalToken, onEvent)` | Mounts `POST /api/events/receive`, the push counterpart to `createPublishEvent` - Congress calls this directly the moment a publish matches your own declared subscriptions, instead of you polling for it. See §5.2. |
 | `createSingleRowSettings(config)` | The "id is always 1, select-then-upsert" settings pattern every Chamber uses. |
 | `createManualRefs`/`createManualRefsByExhibitId` | CRUD for the "Connections" side-panel's manually-added refs, separate from wikilinks parsed out of body text. |
 | `extractOutgoingExhibitRefs(text)` | Parses `[[...]]` tokens out of body text into an exhibit-id list. |
@@ -219,7 +220,7 @@ tools reachable at `/mcp` (gated by `CONGRESS_INTERNAL_TOKEN`, not a
 session cookie, since MCP clients are machines) — just works once the
 manifest is correct and the process is heartbeating.
 
-### 5.2 Declaring events
+### 5.2 Publishing and receiving events
 
 If your Chamber has a background check that decides "the owner should know
 about this" (a due date, an incoming webhook, anything else only your
@@ -249,19 +250,21 @@ await publishEvent({
 
 `type` is conventionally `"<chamber>.<event>"` (e.g. `budget.overspent`) so
 it's self-namespacing without a separate chamber filter downstream. Congress
-itself only ever appends this to its own generic event log
-(`POST /congress/events/publish`) — it never inspects `type`/`payload` or
-relays to a specific chamber by name, so publishing works the same whether
-or not Logs Chamber, Automation Chamber, or anything else happens to be
-registered. If `payload` includes a `priority` field, set it to one of
-`PRIORITY_LEVELS` (`shared-types`: `"low" | "normal" | "high" | "urgent"`) -
-a convention, not enforced - so Logs Chamber's own rules and
-priority-filtered widget can tell an urgent firing from a routine one;
-anything else defaults to `"normal"`.
+never stores this or inspects `type`/`payload` — `POST
+/congress/events/publish` immediately push-relays it to every currently-
+active Chamber whose own declared subscriptions match (see "Receiving
+events" below), retrying a briefly-unreachable one with increasing delays
+rather than storing anything durably. Publishing works the same whether or
+not anything happens to be subscribed, or even registered. If `payload`
+includes a `priority` field, set it to one of `PRIORITY_LEVELS`
+(`shared-types`: `"low" | "normal" | "high" | "urgent"`) - a convention,
+not enforced - so a receiving Chamber's own rules and priority-filtered
+widgets can tell an urgent firing from a routine one; anything else
+defaults to `"normal"`.
 
 Optionally declare the event types you may publish in your manifest's
 `events` array (mirrors `widgets`, but keyed by `type`/`label`/
-`description?`/`retentionMs?` rather than `id`/`width`/`height`/`label`):
+`description?` rather than `id`/`width`/`height`/`label`):
 
 ```ts
 events: [
@@ -278,11 +281,52 @@ picker on Logs Chamber's and Automation Chamber's own editors (read live off
 `GET /congress/registry`, never hardcoded to a specific chamber name), not a
 subscription or a requirement to actually fire that event. Defaulted to
 `[]` like `widgets`, so most Chambers never touch this field at all.
-`retentionMs` controls how long Congress keeps a published instance of that
-event type in its own log before pruning it — an hour by default
-(`DEFAULT_RETENTION_MS`, `services/congress/src/events.ts`), which is
-already plenty for any Chamber polling on a normal interval; only set it if
-your own consumer polls unusually infrequently.
+
+**Receiving events** is symmetric, and just as generic — every Chamber gets
+it via `chamber-kit`, whether or not it ever ends up used. There are two
+halves: a fixed-convention route that Congress pushes to, and a dynamic
+subscription list carried on your existing heartbeat that tells Congress
+what you actually want pushed.
+
+```ts
+// server.ts
+import { mountEventReceiveRoute } from "@congress/chamber-kit";
+
+mountEventReceiveRoute(app, env.CONGRESS_INTERNAL_TOKEN, async (event) => {
+  if (event.type !== "budget.overspent") return;
+  // ...react to event.payload...
+});
+```
+
+```ts
+// index.ts
+const { heartbeatNow } = createChamberBootstrap({
+  // ...displayName, manifest, app, env, runMigrations, closeDb...
+  getSubscriptions: () => [{ type: "budget.overspent", minPriority: "high" }],
+});
+```
+
+`getSubscriptions` is read fresh on every heartbeat (not baked into the
+static manifest), so it can — and for Logs/Automation Chamber, does —
+reflect owner-editable state: recompute it from whatever rules/automations
+currently reference a trigger type, aggregating to one entry per type using
+the *loosest* `minPriority` among them if several rules watch the same type
+at different thresholds (see `chamber-logs/src/subscriptions.ts` for the
+worked pattern). `type: "*"` subscribes to every event type regardless of
+what it's called — used by a Chamber whose own logic doesn't filter by type
+at all (Deputy Chamber). Congress's own filter is only ever a coarse "could
+this possibly interest this Chamber" gate; do your own precise per-rule
+matching (exact `minPriority`, condition fields, whatever else you need)
+inside `onEvent` after receiving, same as before this system moved off
+polling. If a rule/automation mutation changes what `getSubscriptions()`
+would now return, call the returned `heartbeatNow()` right after the
+mutation so Congress's copy updates immediately instead of waiting up to
+`HEARTBEAT_INTERVAL_MS` for the next scheduled beat.
+
+A Chamber that never expects to react to another Chamber's events omits
+`getSubscriptions` and `mountEventReceiveRoute` entirely — there's nothing
+to opt into structurally, and Congress simply never has anything to push to
+it.
 
 ### 5.3 Being called by an automation
 

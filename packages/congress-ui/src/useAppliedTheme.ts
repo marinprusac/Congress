@@ -4,7 +4,7 @@ import type { CapitolSettings, UpdateCapitolSettingsRequest } from "@congress/sh
 
 async function fetchCapitolSettings(): Promise<CapitolSettings> {
   const res = await fetch("/congress/settings");
-  if (!res.ok) return { darkMode: false, eventRetentionMs: 24 * 60 * 60 * 1000 };
+  if (!res.ok) return { darkMode: false };
   return res.json();
 }
 

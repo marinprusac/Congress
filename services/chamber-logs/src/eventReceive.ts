@@ -1,38 +1,7 @@
-import { eq } from "drizzle-orm";
-import { eventLogResponseSchema, priorityLevelSchema, type EventLogEntry, type PriorityLevel } from "@congress/shared-types";
-import { db } from "./db/client.js";
-import { pollerState } from "./db/schema.js";
-import { env } from "./env.js";
+import { priorityLevelSchema, type EventDelivery, type PriorityLevel } from "@congress/shared-types";
 import { listEnabledLogRulesForTrigger, markLogRuleFired } from "./logRules.js";
 import { pushNotification } from "./notifications.js";
 import { recordHistory, priorityRankFor } from "./eventHistory.js";
-
-const POLL_INTERVAL_MS = 30_000;
-
-const POLLER_ID = 1;
-
-function getCursor(): number {
-  const row = db.select().from(pollerState).where(eq(pollerState.id, POLLER_ID)).get();
-  return row?.lastEventId ?? 0;
-}
-
-function setCursor(id: number): void {
-  const existing = db.select().from(pollerState).where(eq(pollerState.id, POLLER_ID)).get();
-  if (existing) {
-    db.update(pollerState).set({ lastEventId: id }).where(eq(pollerState.id, POLLER_ID)).run();
-  } else {
-    db.insert(pollerState).values({ id: POLLER_ID, lastEventId: id }).run();
-  }
-}
-
-async function fetchEventsSince(since: number): Promise<{ events: EventLogEntry[]; cursor: number }> {
-  const res = await fetch(`${env.CAPITOL_URL}/congress/events?since=${since}`, {
-    headers: { "X-Congress-Internal-Token": env.CONGRESS_INTERNAL_TOKEN },
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!res.ok) throw new Error(`Congress returned ${res.status}`);
-  return eventLogResponseSchema.parse(await res.json());
-}
 
 // Reads a dotted path ("a.b.c") out of a plain object, returning undefined
 // for any missing/non-object segment - used by the condition check,
@@ -77,7 +46,7 @@ function interpolate(template: string, payload: Record<string, unknown>): string
   });
 }
 
-async function runRule(rule: ReturnType<typeof listEnabledLogRulesForTrigger>[number], event: EventLogEntry): Promise<void> {
+async function runRule(rule: ReturnType<typeof listEnabledLogRulesForTrigger>[number], event: EventDelivery): Promise<void> {
   if (!conditionMatches(rule, event.payload)) return;
   const priority = priorityOf(event.payload);
   if (!minPriorityMatches(rule, priority)) return;
@@ -112,37 +81,17 @@ async function runRule(rule: ReturnType<typeof listEnabledLogRulesForTrigger>[nu
   await markLogRuleFired(rule.id);
 }
 
-async function poll(): Promise<void> {
-  const since = getCursor();
-  let batch: { events: EventLogEntry[]; cursor: number };
-  try {
-    batch = await fetchEventsSince(since);
-  } catch (err) {
-    console.warn(`Event poll failed: ${(err as Error).message}`);
-    return;
-  }
-
-  for (const event of batch.events) {
-    const matches = listEnabledLogRulesForTrigger(event.type);
-    for (const rule of matches) {
-      try {
-        await runRule(rule, event);
-      } catch (err) {
-        console.warn(`Log rule ${rule.id} failed on event ${event.id}: ${(err as Error).message}`);
-      }
+// Handed to mountEventReceiveRoute (@congress/chamber-kit) - runs every
+// enabled rule whose triggerEventType matches this one delivered event,
+// same logic the old poll loop ran per batched event, just invoked directly
+// per push instead of on a 30s tick.
+export async function handleReceivedEvent(event: EventDelivery): Promise<void> {
+  const matches = listEnabledLogRulesForTrigger(event.type);
+  for (const rule of matches) {
+    try {
+      await runRule(rule, event);
+    } catch (err) {
+      console.warn(`Log rule ${rule.id} failed on event ${event.chamber}.${event.type}: ${(err as Error).message}`);
     }
   }
-
-  if (batch.cursor !== since) setCursor(batch.cursor);
-}
-
-let pollInterval: ReturnType<typeof setInterval> | undefined;
-
-export function startEventPoller(): void {
-  void poll();
-  pollInterval = setInterval(() => void poll(), POLL_INTERVAL_MS);
-}
-
-export function stopEventPoller(): void {
-  if (pollInterval) clearInterval(pollInterval);
 }

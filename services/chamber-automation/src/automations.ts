@@ -5,6 +5,7 @@ import { db } from "./db/client.js";
 import { automations, automationRuns } from "./db/schema.js";
 import { toExhibitId, parseAutomationId, pushExhibitSync } from "./exhibits.js";
 import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForAutomation } from "./refs.js";
+import { notifySubscriptionsChanged } from "./subscriptions.js";
 
 // The set of Exhibits an automation points at is the union of what's
 // embedded in its body ("[[" tokens) and what was added explicitly via the
@@ -122,6 +123,7 @@ export async function createAutomation(input: CreateAutomationRequest): Promise<
     .get();
 
   await syncAutomationExhibit(inserted.id, inserted.title, inserted.body);
+  notifySubscriptionsChanged();
 
   return toSummary(inserted);
 }
@@ -146,6 +148,7 @@ export async function updateAutomation(id: number, input: UpdateAutomationReques
   db.update(automations).set(next).where(eq(automations.id, id)).run();
 
   await syncAutomationExhibit(id, next.title, next.body);
+  notifySubscriptionsChanged();
 
   return getAutomation(id);
 }
@@ -163,6 +166,7 @@ export async function deleteAutomation(id: number): Promise<boolean> {
       outgoingRefs: [],
       deleted: true,
     });
+    notifySubscriptionsChanged();
   }
   return result.changes > 0;
 }
@@ -184,7 +188,6 @@ export async function listAutomationRuns(automationId: number): Promise<Automati
   return rows.map((row) => ({
     id: row.id,
     automationId: row.automationId,
-    eventId: row.eventId,
     payload: JSON.parse(row.payloadJson),
     targetChamber: row.targetChamber,
     toolName: row.toolName,

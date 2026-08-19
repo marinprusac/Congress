@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { chamberSubscriptionSchema } from "./events.js";
 
 // "detached" is a manual owner override (see congress/src/registry.ts's
 // detachChamber/attachChamber) - distinct from "offline" so an incoming
@@ -34,21 +35,14 @@ export type ManifestWidget = z.infer<typeof manifestWidgetSchema>;
 // /congress/events/publish) - purely a declared catalog for other Chambers'
 // own UI (e.g. an automation editor's event-type picker) to read off the
 // live registry; Congress itself never inspects this field beyond storing
-// and returning it; see events.ts for the actual publish/log contract.
-// `type` is conventionally "<chamber>.<event>" (e.g. "tasks.due_soon") so
-// it's self-namespacing without a separate chamber filter downstream.
+// and returning it; see events.ts for the actual publish/push-relay
+// contract. `type` is conventionally "<chamber>.<event>" (e.g.
+// "tasks.due_soon") so it's self-namespacing without a separate chamber
+// filter downstream.
 export const manifestEventSchema = z.object({
   type: z.string().min(1),
   label: z.string().min(1),
   description: z.string().optional(),
-  // How long Congress keeps a published instance of this event type in its
-  // own log before pruning it - Congress copies this number verbatim onto
-  // each published row (see services/congress/src/events.ts) without
-  // interpreting it, same as it never interprets `payload`. Defaults to a
-  // short window (see that file's DEFAULT_RETENTION_MS) when unset - the
-  // event log is a switch for chambers that poll on their own short
-  // interval, not a durable record (that's Logs Chamber's job).
-  retentionMs: z.number().int().positive().optional(),
 });
 export type ManifestEvent = z.infer<typeof manifestEventSchema>;
 
@@ -74,5 +68,10 @@ export const chamberRegistryEntrySchema = manifestSchema.extend({
   status: chamberStatusSchema,
   registeredAt: z.string(),
   lastHeartbeatAt: z.string().nullable(),
+  // This Chamber's current dynamic event interest list, kept fresh on every
+  // heartbeat (see events.ts's chamberSubscriptionSchema) - not part of the
+  // static manifest above, since it changes at runtime as the Chamber's own
+  // rules/automations are edited, independent of a redeploy.
+  subscriptions: z.array(chamberSubscriptionSchema).default([]),
 });
 export type ChamberRegistryEntry = z.infer<typeof chamberRegistryEntrySchema>;

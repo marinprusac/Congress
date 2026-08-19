@@ -73,7 +73,6 @@ export const automationRuns = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     automationId: integer("automation_id").notNull(),
-    eventId: integer("event_id").notNull(),
     payloadJson: text("payload_json").notNull(),
     targetChamber: text("target_chamber").notNull(),
     toolName: text("tool_name").notNull(),
@@ -92,14 +91,4 @@ export const automationRuns = sqliteTable(
 // every other Chamber, even if this one has no settings of its own yet.
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
-});
-
-// This Chamber's own bookkeeping for how far it's read Congress's event log
-// - independent of Logs Chamber's own cursor (each Chamber polling the same
-// log keeps its own position), and deliberately separate from `settings`
-// above (which backs the owner-facing Settings page): this cursor is an
-// internal implementation detail of eventPoller.ts, never user-editable.
-export const pollerState = sqliteTable("poller_state", {
-  id: integer("id").primaryKey().default(1),
-  lastEventId: integer("last_event_id").notNull().default(0),
 });

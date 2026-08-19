@@ -1,6 +1,6 @@
 import { lt } from "drizzle-orm";
 import { db } from "./db/client.js";
-import { deputyRuns, messages } from "./db/schema.js";
+import { deputyRuns, messages, pendingCheckupEvents } from "./db/schema.js";
 import { getSettings } from "./settings.js";
 
 // Unlike automation_runs (pruned on insert, capped per-entity), deputy_runs/
@@ -10,11 +10,19 @@ import { getSettings } from "./settings.js";
 // plenty for a 30-day-default window; not worth a tighter cadence.
 const SWEEP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
+// Safety net, not the normal path: pending_checkup_events is drained on
+// every periodic checkup (checkup.ts) and should never actually reach this
+// age - this only matters if checkups have been paused (settings.paused)
+// for a very long stretch, so the buffer doesn't grow unboundedly in the
+// meantime.
+const PENDING_EVENT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 async function sweep(): Promise<void> {
   const settings = await getSettings();
   const cutoff = new Date(Date.now() - settings.retentionDays * 24 * 60 * 60 * 1000);
   db.delete(deputyRuns).where(lt(deputyRuns.createdAt, cutoff)).run();
   db.delete(messages).where(lt(messages.createdAt, cutoff)).run();
+  db.delete(pendingCheckupEvents).where(lt(pendingCheckupEvents.occurredAt, new Date(Date.now() - PENDING_EVENT_MAX_AGE_MS))).run();
 }
 
 let sweepInterval: ReturnType<typeof setInterval> | undefined;

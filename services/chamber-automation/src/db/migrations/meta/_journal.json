@@ -8,6 +8,13 @@
       "when": 1786996628173,
       "tag": "0000_lively_zuras",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1787171418966,
+      "tag": "0001_awesome_beyonder",
+      "breakpoints": true
     }
   ]
 }

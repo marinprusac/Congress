@@ -8,6 +8,12 @@ export const chambers = sqliteTable("chambers", {
   routesJson: text("routes_json").notNull(),
   widgetsJson: text("widgets_json").notNull().default("[]"),
   eventsJson: text("events_json").notNull().default("[]"),
+  // This Chamber's current dynamic event interest list (see shared-types/
+  // events.ts's chamberSubscriptionSchema), refreshed on every heartbeat -
+  // small bounded routing metadata, not an event log, so keeping it here
+  // doesn't reopen the "Congress stores no events" decision. Read by
+  // events.ts's fan-out to decide who a given publish gets pushed to.
+  subscriptionsJson: text("subscriptions_json").notNull().default("[]"),
   apiBase: text("api_base").notNull(),
   mcpUrl: text("mcp_url"),
   healthUrl: text("health_url").notNull(),
@@ -62,32 +68,6 @@ export const exhibitRefs = sqliteTable(
   ]
 );
 
-// Generic, chamber-agnostic append-only event log - any Chamber can publish
-// (POST /congress/events/publish) or poll for new entries since a cursor
-// (GET /congress/events?since=). Congress never inspects `type`/`payload`
-// or relays to a specific chamber by name - it's purely a store+fan-out,
-// same spirit as exhibit_cache. `expiresAt` is computed once at publish
-// time (see events.ts's publishEvent) from the publishing chamber's own
-// declared retentionMs for that event type (manifestEventSchema), falling
-// back to a short default - copied onto the row rather than recomputed at
-// prune time so a chamber changing its declared retention later doesn't
-// retroactively change already-published rows. This is a switch, not a
-// durable record - a personal single-user system doesn't need unbounded
-// retention of already-fired events (that's Logs Chamber's own
-// event_history table's job).
-export const events = sqliteTable(
-  "events",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    chamber: text("chamber").notNull(),
-    type: text("type").notNull(),
-    payloadJson: text("payload_json").notNull().default("{}"),
-    occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull(),
-    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
-  },
-  (table) => [index("events_occurred_at_idx").on(table.occurredAt), index("events_expires_at_idx").on(table.expiresAt)]
-);
-
 // Single-row table (id is always 1) - one Congress-wide settings scope, not
 // per-user or per-Chamber. Chamber-local preferences (e.g. Capitol's own
 // "hidden widgets" list) live in that Chamber's own settings table instead -
@@ -95,5 +75,4 @@ export const events = sqliteTable(
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
   darkMode: integer("dark_mode", { mode: "boolean" }).notNull().default(false),
-  eventRetentionMs: integer("event_retention_ms").notNull().default(24 * 60 * 60 * 1000),
 });

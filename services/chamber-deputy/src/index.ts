@@ -3,16 +3,25 @@ import { env } from "./env.js";
 import { app } from "./server.js";
 import { runMigrations, closeDb } from "./db/client.js";
 import { manifest } from "./manifest.js";
-import { startEventPoller, stopEventPoller } from "./eventPoller.js";
 import { startRetentionSweep, stopRetentionSweep } from "./retention.js";
+import { startPeriodicCheckup, stopPeriodicCheckup } from "./checkup.js";
+import { computeSubscriptions } from "./subscriptions.js";
 
-createChamberBootstrap({ displayName: "Deputy Chamber", manifest, app, env, runMigrations, closeDb });
+createChamberBootstrap({
+  displayName: "Deputy Chamber",
+  manifest,
+  app,
+  env,
+  runMigrations,
+  closeDb,
+  getSubscriptions: computeSubscriptions,
+});
 
-startEventPoller();
+startPeriodicCheckup();
 startRetentionSweep();
 
 function shutdown() {
-  stopEventPoller();
+  stopPeriodicCheckup();
   stopRetentionSweep();
 }
 process.on("SIGINT", shutdown);

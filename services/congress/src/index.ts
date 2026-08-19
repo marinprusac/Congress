@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
 import { env } from "./env.js";
-import { app, startHeartbeatSweep, stopHeartbeatSweep, startEventPruneSweep, stopEventPruneSweep } from "./server.js";
+import { app, startHeartbeatSweep, stopHeartbeatSweep } from "./server.js";
 import { runMigrations, closeDb } from "./db/client.js";
 
 runMigrations();
@@ -10,12 +10,10 @@ const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (
 });
 
 startHeartbeatSweep();
-startEventPruneSweep();
 
 function shutdown() {
   console.log("Shutting down Congress...");
   stopHeartbeatSweep();
-  stopEventPruneSweep();
   server.close(() => {
     closeDb();
     process.exit(0);
