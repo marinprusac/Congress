@@ -8,11 +8,11 @@ import { makeExcerpt } from "./wikilinks.js";
 import { toExhibitId, parseNoteId, pushExhibitSync } from "./exhibits.js";
 import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForNote } from "./refs.js";
 
-// The set of Exhibits this note points at is the union of what's embedded
+// The set of Exhibits this note connects to is the union of what's embedded
 // in its body ("[[" tokens) and what was added explicitly via the
-// References side panel (packages/congress-ui's ExhibitLinksLayout) - pushed
-// to Capitol as one outgoingRefs list either way, so backlinks/frontlinks
-// don't need to know which source produced a given ref.
+// Connections side panel (packages/congress-ui's ExhibitLinksLayout) - pushed
+// to Capitol as one outgoingRefs list either way, so the undirected
+// Connections graph doesn't need to know which source produced a given ref.
 async function syncNoteExhibit(id: number, title: string, body: string): Promise<void> {
   const manual = listManualRefs(id);
   const outgoingRefs = new Set([...extractOutgoingExhibitRefs(body), ...manual]);

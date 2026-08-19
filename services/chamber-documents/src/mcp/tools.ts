@@ -30,7 +30,7 @@ export function registerTools(server: McpServer) {
     {
       title: "Get Document",
       description:
-        "Get a single document's metadata and description. Use Capitol's resolve_exhibits/search_exhibits for outgoing references and backlinks; the file itself is not returned here.",
+        "Get a single document's metadata and description. Use Capitol's resolve_exhibits/search_exhibits for outgoing references and connections; the file itself is not returned here.",
       inputSchema: { id: z.number().int() },
     },
     async ({ id }) => {

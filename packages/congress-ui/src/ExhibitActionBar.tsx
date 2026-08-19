@@ -7,7 +7,7 @@ interface ExhibitActionBarProps {
 
 // The Pin/Complete, Share, Edit, Delete (and, while editing, Save/Close)
 // button cluster every view page has - rendered at the bottom of the
-// content, above the backlinks/frontlinks panels, instead of in a title-row
+// content, above the Connections panel, instead of in a title-row
 // at the top. Deliberately just a styled wrapper around whatever buttons the
 // caller passes: each Chamber's exact set of controls differs (Pin vs.
 // Complete/Reopen, Delete living on a separate edit page for Calendar) too

@@ -28,9 +28,9 @@ import {
   searchExhibits,
   resolveExhibits,
   resolveOneLive,
-  getBacklinks,
-  getFrontlinks,
+  getConnections,
   getCachedChamber,
+  getManualConnectionOwner,
 } from "./exhibits.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { publishEvent, listEventsSince, pruneOldEvents } from "./events.js";
@@ -152,41 +152,27 @@ app.post("/congress/exhibits/resolve", requireSession, async (c) => {
   return c.json({ results });
 });
 
-app.get("/congress/exhibits/:id/backlinks", requireSession, async (c) => {
-  const backlinks = await getBacklinks(c.req.param("id"));
-  return c.json({ backlinks });
+app.get("/congress/exhibits/:id/connections", requireSession, async (c) => {
+  const connections = await getConnections(c.req.param("id"));
+  return c.json({ connections });
 });
 
-app.get("/congress/exhibits/:id/frontlinks", requireSession, async (c) => {
-  const frontlinks = await getFrontlinks(c.req.param("id"));
-  return c.json({ frontlinks });
-});
-
-// Lets a References panel add/remove a reference that lives on a *different*
-// Exhibit than the one currently being viewed (e.g. adding this note to
-// another exhibit's outgoing refs from this note's own "Referenced by"
-// panel) - resolves which Chamber owns `:id` from the cache and proxies to
-// that Chamber's own "/api/exhibits/:id/refs" (see mountManualRefsRoutes in
-// @congress/chamber-kit). 404s if the target Chamber hasn't adopted that
-// route yet, or if `:id` has never synced to Capitol at all.
-app.post("/congress/exhibits/:id/refs", requireSession, async (c) => {
+// Adds a manual connection from the Exhibit currently being viewed (`:id`,
+// always already-cached - it's the record on screen) to a picked Exhibit
+// (`targetExhibitId`) - proxies to `:id`'s own Chamber's
+// "/api/exhibits/:id/refs" (see mountManualRefsRoutes in @congress/chamber-kit).
+app.post("/congress/exhibits/:id/connections", requireSession, async (c) => {
   const id = c.req.param("id");
-  // `:id` itself can be uncached too (adding a reference from a
-  // never-touched Exhibit's own "Referenced by" panel - e.g. a pre-existing
-  // Google Calendar event) - the frontend passes the Chamber it already
-  // knows from the search result as a fallback routing hint, since a cache
-  // lookup alone would have nothing to go on and 404 before ever reaching
-  // the target Chamber. See addExhibitRef's own comment on `sourceChamber`.
-  const chamber = getCachedChamber(id) ?? c.req.query("chamber") ?? null;
+  const chamber = getCachedChamber(id);
   if (!chamber) return c.json({ error: "not_found" }, 404);
 
   // Best-effort eager cache of the target, using the clone so the body
   // stream proxyToChamberPath forwards below is untouched - see
   // manualRefRequestSchema's own comment on `targetChamber` for why this
-  // matters: without it, a ref pointing at something never created/edited
-  // within Congress (e.g. a pre-existing Google Calendar event) saves fine
-  // but never shows up in either panel, since getFrontlinks/getBacklinks
-  // silently skip an uncached target.
+  // matters: without it, a connection pointing at something never
+  // created/edited within Congress (e.g. a pre-existing Google Calendar
+  // event) saves fine but never shows up in the panel, since getConnections
+  // silently skips an uncached, chamber-unknown target.
   try {
     const body: unknown = await c.req.raw.clone().json();
     const targetExhibitId = (body as { targetExhibitId?: unknown })?.targetExhibitId;
@@ -202,12 +188,20 @@ app.post("/congress/exhibits/:id/refs", requireSession, async (c) => {
   return proxyToChamberPath(c, chamber, `/exhibits/${encodeURIComponent(id)}/refs`);
 });
 
-app.delete("/congress/exhibits/:id/refs/:targetExhibitId", requireSession, async (c) => {
+// Removes a manual connection between `:id` (the Exhibit currently being
+// viewed) and `:otherExhibitId`, regardless of which of the two the
+// underlying row happens to be stored on - see getManualConnectionOwner.
+app.delete("/congress/exhibits/:id/connections/:otherExhibitId", requireSession, async (c) => {
   const id = c.req.param("id");
-  const chamber = getCachedChamber(id);
-  if (!chamber) return c.json({ error: "not_found" }, 404);
-  const targetExhibitId = encodeURIComponent(c.req.param("targetExhibitId"));
-  return proxyToChamberPath(c, chamber, `/exhibits/${encodeURIComponent(id)}/refs/${targetExhibitId}`);
+  const otherExhibitId = c.req.param("otherExhibitId");
+  const owner = getManualConnectionOwner(id, otherExhibitId);
+  if (!owner) return c.json({ error: "not_found" }, 404);
+  const otherId = owner.ownerId === id ? otherExhibitId : id;
+  return proxyToChamberPath(
+    c,
+    owner.chamber,
+    `/exhibits/${encodeURIComponent(owner.ownerId)}/refs/${encodeURIComponent(otherId)}`
+  );
 });
 
 app.all("/api/:chamber/*", requireSession, forwardToChamber);

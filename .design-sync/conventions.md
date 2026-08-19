@@ -17,7 +17,7 @@ const queryClient = new QueryClient();
 </QueryClientProvider>
 ```
 
-- **`QueryClientProvider`** — nearly every component fetches through `useQuery` (search, sharing, backlinks/frontlinks, the Chamber registry). Without it: "No QueryClient set" crash.
+- **`QueryClientProvider`** — nearly every component fetches through `useQuery` (search, sharing, Connections panels, the Chamber registry). Without it: "No QueryClient set" crash.
 - **`BrowserRouter`** (or any Router) — `ChamberLayout`, `ChamberPicker`, and `GlobalExhibitSearch` use `Link`/`useLocation`/`useNavigate`. Without it: "useNavigate() may be used only in the context of a Router" crash.
 
 `ChamberLayout` is the full page shell (header + `<Outlet/>` + the `ChamberPicker` nav) — mount it as a layout route, not a one-off block. It expects an `icon` (a `ChamberMark`), a `title`, `navLinks` (`{to, label}[]`), `ownChamber` (a chamber id string), and `renderIcon={getChamberIcon}`.

@@ -16,8 +16,8 @@ export { stripFrontmatter } from "./frontmatter.js";
 export { navigateToExhibit } from "./navigateToExhibit.js";
 export { ChamberLayout } from "./ChamberLayout.js";
 export { ChamberHeader } from "./ChamberHeader.js";
-export { useExhibitLinks } from "./useExhibitLinks.js";
-export { addExhibitRef, removeExhibitRef } from "./exhibitRefs.js";
+export { useExhibitConnections } from "./useExhibitConnections.js";
+export { addExhibitConnection, removeExhibitConnection } from "./exhibitRefs.js";
 export { ExhibitLinksLayout } from "./ExhibitLinksLayout.js";
 export { ExhibitActionBar } from "./ExhibitActionBar.js";
 export {

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { z } from "zod";
 import type {
   ExhibitSyncRequest,
@@ -155,32 +155,70 @@ export function getCachedChamber(id: string): string | null {
   return cached?.chamber ?? null;
 }
 
-export async function getBacklinks(id: string): Promise<ExhibitRefEntry[]> {
-  const rows = db.select().from(exhibitRefs).where(eq(exhibitRefs.targetId, id)).all();
-  const refs = rows.map((r) => ({ id: r.sourceId, chamber: r.sourceChamber }));
-  const resolved = await resolveExhibits(refs);
-  // Promise.all (inside resolveExhibits) preserves input order, so `rows`
-  // and `resolved` line up index-for-index.
-  return resolved.map((r, i) => ({ ...r, isManual: rows[i]!.isManual }));
+// A Connection has no direction to the caller - exhibit_refs still stores
+// each row as owner->other internally (see the schema comment: that's an
+// attribution detail for sync bookkeeping, letting a chamber's own sync
+// delete-and-reinsert exactly the rows *it* discovered without touching a
+// connection the other side discovered independently), but this collapses
+// both directions into one deduped entry per "other" exhibit, isManual true
+// if either side's row is manual.
+export async function getConnections(id: string): Promise<ExhibitRefEntry[]> {
+  const asOther = db.select().from(exhibitRefs).where(eq(exhibitRefs.targetId, id)).all();
+  const asOwner = db.select().from(exhibitRefs).where(eq(exhibitRefs.sourceId, id)).all();
+
+  const byOtherId = new Map<string, { chamber: string | null; isManual: boolean }>();
+  for (const row of asOther) {
+    // This exhibit is row's target -> the other side is row.sourceId, whose
+    // chamber is always known (sourceChamber is recorded on every row).
+    const existing = byOtherId.get(row.sourceId);
+    byOtherId.set(row.sourceId, { chamber: row.sourceChamber, isManual: (existing?.isManual ?? false) || row.isManual });
+  }
+  for (const row of asOwner) {
+    // This exhibit is row's owner -> the other side is row.targetId, whose
+    // chamber was never recorded on the row itself (only exhibit_cache might
+    // know it) - same limitation the old frontlinks read had.
+    const existing = byOtherId.get(row.targetId);
+    byOtherId.set(row.targetId, { chamber: existing?.chamber ?? null, isManual: (existing?.isManual ?? false) || row.isManual });
+  }
+
+  const toResolve: { id: string; chamber: string }[] = [];
+  const isManualByOtherId = new Map<string, boolean>();
+  for (const [otherId, entry] of byOtherId) {
+    let chamber = entry.chamber;
+    if (chamber === null) {
+      const cached = db.select().from(exhibitCache).where(eq(exhibitCache.id, otherId)).get();
+      if (!cached) continue; // no cache row and no known chamber - nothing to route a resolve through
+      chamber = cached.chamber;
+    }
+    toResolve.push({ id: otherId, chamber });
+    isManualByOtherId.set(otherId, entry.isManual);
+  }
+
+  const resolved = await resolveExhibits(toResolve);
+  // Promise.all (inside resolveExhibits) preserves input order, so
+  // `toResolve` and `resolved` line up index-for-index.
+  return resolved.map((r, i) => ({ ...r, isManual: isManualByOtherId.get(toResolve[i]!.id) ?? false }));
 }
 
-// Unlike getBacklinks, a target's chamber is never recorded in exhibit_refs
-// (only the source's is - see the schema comment), so this can only resolve
-// against exhibit_cache and must skip a target with no cache row instead of
-// guessing a chamber for a live resolve. In practice this doesn't arise: a
-// chamber syncs on every create, and a "[[" reference can only target
-// something that already exists.
-export async function getFrontlinks(id: string): Promise<ExhibitRefEntry[]> {
-  const rows = db.select().from(exhibitRefs).where(eq(exhibitRefs.sourceId, id)).all();
-  const results: ExhibitRefEntry[] = [];
-  for (const { targetId, isManual } of rows) {
-    const cached = db.select().from(exhibitCache).where(eq(exhibitCache.id, targetId)).get();
-    if (!cached) continue;
-    results.push(
-      cached.deleted
-        ? { id: targetId, chamber: cached.chamber, deleted: true, isManual }
-        : { id: targetId, chamber: cached.chamber, name: cached.name, url: cached.url, isManual }
-    );
-  }
-  return results;
+// Which side owns a manual connection between two exhibit ids, so a DELETE
+// from either exhibit's Connections panel removes the right underlying row
+// regardless of which side it was originally added from - a manual
+// connection has no canonical owner from the UI's perspective, only from
+// storage's (see exhibit_refs's own schema comment).
+export function getManualConnectionOwner(aId: string, bId: string): { ownerId: string; chamber: string } | null {
+  const row = db
+    .select()
+    .from(exhibitRefs)
+    .where(
+      and(
+        eq(exhibitRefs.isManual, true),
+        or(
+          and(eq(exhibitRefs.sourceId, aId), eq(exhibitRefs.targetId, bId)),
+          and(eq(exhibitRefs.sourceId, bId), eq(exhibitRefs.targetId, aId))
+        )
+      )
+    )
+    .get();
+  if (!row) return null;
+  return { ownerId: row.sourceId, chamber: row.sourceChamber };
 }

@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ExhibitRefEntry, CapitolExhibitSearchResult } from "@congress/shared-types";
 import { ExhibitChip } from "./ExhibitChip.js";
-import { useExhibitLinks } from "./useExhibitLinks.js";
+import { useExhibitConnections } from "./useExhibitConnections.js";
 import { useExhibitSearch } from "./useExhibitSearch.js";
 import { useKeyboardInset } from "./useKeyboardInset.js";
-import { addExhibitRef, removeExhibitRef } from "./exhibitRefs.js";
+import { addExhibitConnection, removeExhibitConnection } from "./exhibitRefs.js";
 
 interface AddReferenceControlProps {
   exhibitId: string;
@@ -243,22 +243,21 @@ interface ExhibitLinksLayoutProps {
   // haven't finished reading the references of yet).
   actions?: ReactNode;
   className?: string;
-  // Turns on the "+"/"×" controls on *both* panels - explicit references
-  // are a mirror: adding one from "Backlinks" writes to the picked
-  // Exhibit's own outgoing refs (via Capitol's proxy, see exhibitRefs.ts),
-  // exactly as if you'd added this Exhibit from that one's own "Frontlinks"
-  // panel. Omit to keep both panels read-only (the previous behavior).
+  // Turns on the "+"/"×" controls on the Connections panel - adding a
+  // connection writes an outgoing ref from this Exhibit (via Capitol's
+  // proxy, see exhibitRefs.ts). Omit to keep the panel read-only (the
+  // previous behavior).
   editable?: boolean;
   // Only a Chamber whose own Exhibits can be quick-created (Notes, today)
-  // passes this - shows "+ Create <query>" in both panels' add popovers.
+  // passes this - shows "+ Create <query>" in the add popover.
   onCreateReference?: (title: string) => Promise<CapitolExhibitSearchResult>;
 }
 
-// Flanks its children with two panels backed by Capitol's exhibit_refs graph
-// (the same table Exhibit Sharing's closure BFS walks): exhibits referencing
-// this one on the left, exhibits this one references on the right - on
-// desktop, at the sides of the content; on mobile, stacked below it as a
-// two-column row instead (see .exhibit-links-layout in styles.css).
+// Flanks its children with a single panel backed by Capitol's exhibit_refs
+// graph - every Exhibit connected to this one, undirected: no
+// differentiation of whether this one or the other one established the
+// connection. On desktop, at the side of the content; on mobile, stacked
+// below it (see .exhibit-links-layout in styles.css).
 export function ExhibitLinksLayout({
   exhibitId,
   renderIcon,
@@ -270,37 +269,22 @@ export function ExhibitLinksLayout({
   onCreateReference,
 }: ExhibitLinksLayoutProps) {
   const queryClient = useQueryClient();
-  const { backlinks, frontlinks } = useExhibitLinks(exhibitId);
+  const connections = useExhibitConnections(exhibitId);
 
   function refresh() {
-    queryClient.invalidateQueries({ queryKey: ["exhibit-backlinks", exhibitId] });
-    queryClient.invalidateQueries({ queryKey: ["exhibit-frontlinks", exhibitId] });
+    queryClient.invalidateQueries({ queryKey: ["exhibit-connections", exhibitId] });
   }
 
-  // Front (References/outgoing): this Exhibit -> the picked one. The
-  // picked result's chamber is passed through so Capitol can eagerly cache
-  // it if it's never been created/edited within Congress before (e.g. a
-  // pre-existing Google Calendar event) - see addExhibitRef's own comment.
-  async function addFrontReference(result: CapitolExhibitSearchResult) {
-    await addExhibitRef(exhibitId, result.id, result.chamber);
+  // The picked result's chamber is passed through so Capitol can eagerly
+  // cache it if it's never been created/edited within Congress before (e.g.
+  // a pre-existing Google Calendar event) - see addExhibitConnection's own
+  // comment.
+  async function addConnection(result: CapitolExhibitSearchResult) {
+    await addExhibitConnection(exhibitId, result.id, result.chamber);
     refresh();
   }
-  async function removeFrontReference(entry: ExhibitRefEntry) {
-    await removeExhibitRef(exhibitId, entry.id);
-    refresh();
-  }
-  // Back (Referenced by/incoming): the picked Exhibit -> this one - the
-  // mirror image of the front panel's add, written on the *other*
-  // Exhibit's own outgoing refs. No targetChamber needed here - the target
-  // is *this* Exhibit, which is already cached (its own page is what's on
-  // screen right now). `result.chamber` is passed as sourceChamber instead,
-  // since here it's `result.id` (possibly uncached) being written to.
-  async function addBackReference(result: CapitolExhibitSearchResult) {
-    await addExhibitRef(result.id, exhibitId, undefined, result.chamber);
-    refresh();
-  }
-  async function removeBackReference(entry: ExhibitRefEntry) {
-    await removeExhibitRef(entry.id, exhibitId);
+  async function removeConnection(entry: ExhibitRefEntry) {
+    await removeExhibitConnection(exhibitId, entry.id);
     refresh();
   }
 
@@ -309,37 +293,18 @@ export function ExhibitLinksLayout({
       <div className="exhibit-links-main">{children}</div>
       <div className="exhibit-links-divider" aria-hidden="true" />
       <LinksPanel
-        title="Backlinks"
-        results={backlinks}
+        title="Connections"
+        results={connections}
         renderIcon={renderIcon}
         onNavigate={onNavigate}
-        className="exhibit-links-panel-back"
-        onRemove={editable ? removeBackReference : undefined}
+        className="exhibit-links-panel-connections"
+        onRemove={editable ? removeConnection : undefined}
         addControl={
           editable && (
             <AddReferenceControl
               exhibitId={exhibitId}
-              existingIds={new Set(backlinks.map((r) => r.id))}
-              onAdd={addBackReference}
-              onCreate={onCreateReference}
-              renderIcon={renderIcon}
-            />
-          )
-        }
-      />
-      <LinksPanel
-        title="Frontlinks"
-        results={frontlinks}
-        renderIcon={renderIcon}
-        onNavigate={onNavigate}
-        className="exhibit-links-panel-front"
-        onRemove={editable ? removeFrontReference : undefined}
-        addControl={
-          editable && (
-            <AddReferenceControl
-              exhibitId={exhibitId}
-              existingIds={new Set(frontlinks.map((r) => r.id))}
-              onAdd={addFrontReference}
+              existingIds={new Set(connections.map((r) => r.id))}
+              onAdd={addConnection}
               onCreate={onCreateReference}
               renderIcon={renderIcon}
             />

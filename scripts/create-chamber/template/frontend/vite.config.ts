@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 const PROXY_TARGET = "http://127.0.0.1:__CHAMBER_PORT__";
-// Exhibit search/resolve/backlinks go straight to Congress, not this
+// Exhibit search/resolve/connections go straight to Congress, not this
 // Chamber's own backend - in prod this resolves same-origin through
 // Congress's proxy automatically, so only dev needs an explicit target.
 const CONGRESS_PROXY_TARGET = "http://127.0.0.1:3000";

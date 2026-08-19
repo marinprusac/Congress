@@ -30,10 +30,20 @@ export const exhibitCache = sqliteTable("exhibit_cache", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
 
-// Reverse index of outgoing references, for backlinks. sourceChamber is
-// stored alongside sourceId so a backlink lookup doesn't need a second query
-// against exhibitCache just to know which Chamber to resolve the source
-// through.
+// Backs the undirected "Connections" between two Exhibits - whenever either
+// side references the other (body text or a manual add), the two are
+// connected, with no differentiation of which side established it. Storage
+// is still one directed row per discovery (sourceId "owns" the row) because
+// that's what lets a chamber's own sync delete-and-reinsert exactly the
+// connections *it* discovered (its own outgoingRefs) without disturbing one
+// the other side discovered independently - but this is purely a
+// sync-bookkeeping detail. Nothing reads sourceId/targetId as a meaningful
+// direction: getConnections (exhibits.ts) collapses both directions into one
+// deduped entry per exhibit, and a manual connection is removable from
+// either side regardless of which one happens to own the row (see
+// getManualConnectionOwner). sourceChamber is stored alongside sourceId so a
+// connections lookup doesn't need a second query against exhibitCache just
+// to know which Chamber to resolve that side through.
 export const exhibitRefs = sqliteTable(
   "exhibit_refs",
   {
@@ -41,9 +51,9 @@ export const exhibitRefs = sqliteTable(
     sourceId: text("source_id").notNull(),
     sourceChamber: text("source_chamber").notNull(),
     targetId: text("target_id").notNull(),
-    // Whether the source Chamber considers this ref one it added explicitly
-    // via a References-panel "+" (removable from either side) rather than
-    // one it can only re-derive by re-parsing its own body text.
+    // Whether this connection was added explicitly via a Connections-panel
+    // "+" (removable from either side) rather than one that can only be
+    // re-derived by re-parsing the owning side's own body text.
     isManual: integer("is_manual", { mode: "boolean" }).notNull().default(false),
   },
   (table) => [

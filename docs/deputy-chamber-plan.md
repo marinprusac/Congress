@@ -28,7 +28,7 @@ A new Exhibit type, `directives`, is Deputy's mandate. Each one:
 
 That's the whole schema — deliberately thinner than Automation's `automations` table (no `triggerEventType`/`conditionField`/`argsTemplate`). Automation Chamber needs that structure because its executor is dumb code matching an event type to a fixed call. Deputy's executor is Claude itself: every enabled directive is handed to it as context on every run, and it decides relevance and action itself. A directive can be purely time-based ("every morning, do X" — no event corresponds to this at all) or event-reactive ("if a flight event starts within 24h, remind me") in the same free-text field, because nothing downstream needs to parse it structurally.
 
-List/detail pages mirror Automations/Log Rules exactly (same list-search-form primitives from `congress-ui`). Directives show up in global search and backlinks like any Exhibit.
+List/detail pages mirror Automations/Log Rules exactly (same list-search-form primitives from `congress-ui`). Directives show up in global search and Connections panels like any Exhibit.
 
 **Decided: Directives are UI-owned only.** No MCP tool exposes directive CRUD (consistent with §2), so nothing — including Deputy itself during an unattended run — can rewrite its own mandate without the owner going through the Directives page by hand. A future "propose a new directive" *chat-only* path is plausible (§14) but isn't in v1.
 

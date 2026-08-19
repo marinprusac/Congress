@@ -29,7 +29,7 @@ export function registerTools(server: McpServer) {
     "get_note",
     {
       title: "Get Note",
-      description: "Get a single note's full content and frontmatter. Use Capitol's resolve_exhibits/search_exhibits for outgoing references and backlinks.",
+      description: "Get a single note's full content and frontmatter. Use Capitol's resolve_exhibits/search_exhibits for outgoing references and connections.",
       inputSchema: { id: z.number().int() },
     },
     async ({ id }) => {

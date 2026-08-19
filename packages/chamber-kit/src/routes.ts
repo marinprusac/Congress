@@ -70,7 +70,7 @@ export interface ManualRefsApi {
   // same convention as ExhibitContentApi above, and for the same reason:
   // this is mounted at a fixed path with no Chamber-specific prefix, and
   // Capitol proxies to it generically (see POST/DELETE
-  // "/congress/exhibits/:id/refs" in services/congress/src/server.ts) without
+  // "/congress/exhibits/:id/connections" in services/congress/src/server.ts) without
   // knowing any Chamber's internal id scheme. Return null/false for an id
   // this Chamber doesn't own or can't parse.
   list: (exhibitId: string) => string[] | null;

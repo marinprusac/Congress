@@ -155,8 +155,7 @@ function installFetchMock() {
     }
     if (path === "/congress/exhibits/search") return jsonResponse({ results: SEARCH_RESULTS });
     if (path === "/congress/exhibits/resolve" && method === "POST") return jsonResponse({ results: RESOLVE_RESULTS });
-    if (path.endsWith("/backlinks")) return jsonResponse({ backlinks: RESOLVE_RESULTS.slice(0, 2) });
-    if (path.endsWith("/frontlinks")) return jsonResponse({ frontlinks: RESOLVE_RESULTS.slice(2) });
+    if (path.endsWith("/connections")) return jsonResponse({ connections: RESOLVE_RESULTS });
     if (path.endsWith("/sharing")) return jsonResponse({ shares: SHARING_ENTRIES });
     if (path.endsWith("/shares") && method === "GET") return jsonResponse({ shares: [SHARE_SUMMARY] });
     if (path === "/congress/shares" && method === "POST") return jsonResponse(SHARE_SUMMARY);

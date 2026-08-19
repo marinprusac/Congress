@@ -4,8 +4,6 @@ export function NoteWithLinks() {
   return (
     <ExhibitLinksLayout
       exhibitId="note-9"
-      emptyBacklinksLabel="Nothing references this note"
-      emptyFrontlinksLabel="This note references nothing"
       renderIcon={getChamberIcon}
       onNavigate={() => {}}
     >
@@ -31,8 +29,6 @@ export function ShortNoteWithLinks() {
   return (
     <ExhibitLinksLayout
       exhibitId="note-9"
-      emptyBacklinksLabel="Nothing references this note"
-      emptyFrontlinksLabel="This note references nothing"
       renderIcon={getChamberIcon}
       onNavigate={() => {}}
     >

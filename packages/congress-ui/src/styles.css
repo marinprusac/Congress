@@ -638,19 +638,18 @@ html[data-theme="dark"] {
   color: var(--color-dust);
 }
 
-/* Mobile default: content, then a single divider spanning both columns,
-   then backlinks/frontlinks as a two-column row, then the page's own
-   actions last - nobody needs Edit/Delete before they've even seen what
-   references this. */
+/* Mobile default: content, then a divider, then the Connections panel, then
+   the page's own actions last - nobody needs Edit/Delete before they've even
+   seen what this connects to. */
 .exhibit-links-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   grid-template-areas:
-    "main main"
-    "divider divider"
-    "back front"
-    "actions actions";
-  gap: 1.5rem 1.5rem;
+    "main"
+    "divider"
+    "connections"
+    "actions";
+  gap: 1.5rem;
 }
 
 .exhibit-links-main {
@@ -658,8 +657,6 @@ html[data-theme="dark"] {
   min-width: 0;
 }
 
-/* One boundary shared by both columns, not one each - two side-by-side
-   half-width lines read as a layout glitch, not a section break. */
 .exhibit-links-divider {
   grid-area: divider;
   border-top: 1px solid var(--color-dust);
@@ -669,28 +666,20 @@ html[data-theme="dark"] {
   grid-area: actions;
 }
 
-.exhibit-links-panel-back,
-.exhibit-links-panel-front {
+.exhibit-links-panel-connections {
+  grid-area: connections;
   min-width: 0;
 }
 
-.exhibit-links-panel-back {
-  grid-area: back;
-}
-
-.exhibit-links-panel-front {
-  grid-area: front;
-}
-
-/* Desktop: backlinks and frontlinks flank the content instead of stacking
-   below it - "back"/"front" span both rows so the actions row underneath
-   "main" doesn't leave a gap in either side panel's own border/padding. */
+/* Desktop: the Connections panel flanks the content instead of stacking
+   below it - it spans both rows so the actions row underneath "main"
+   doesn't leave a gap in its own border/padding. */
 @media (min-width: 641px) {
   .exhibit-links-layout {
-    grid-template-columns: 12rem minmax(0, 1fr) 12rem;
+    grid-template-columns: minmax(0, 1fr) 12rem;
     grid-template-areas:
-      "back main front"
-      "back actions front";
+      "main connections"
+      "actions connections";
     gap: 1.5rem 0;
     align-items: start;
   }
@@ -699,13 +688,7 @@ html[data-theme="dark"] {
     display: none;
   }
 
-  .exhibit-links-panel-back {
-    border-right: 1px solid var(--color-dust);
-    padding-right: 1.25rem;
-    margin-right: 1.25rem;
-  }
-
-  .exhibit-links-panel-front {
+  .exhibit-links-panel-connections {
     border-left: 1px solid var(--color-dust);
     padding-left: 1.25rem;
     margin-left: 1.25rem;

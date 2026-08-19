@@ -116,7 +116,7 @@ don't reimplement them:
 | `createPushExhibitSync(opts)` | Fire-and-forget `POST /congress/exhibits/sync` after create/update/delete. |
 | `createPublishEvent(opts)` | Fire-and-forget `POST /congress/events/publish` for a domain event another Chamber's rules or automations might react to - see §5.2. |
 | `createSingleRowSettings(config)` | The "id is always 1, select-then-upsert" settings pattern every Chamber uses. |
-| `createManualRefs`/`createManualRefsByExhibitId` | CRUD for the "References" side-panel refs, separate from wikilinks parsed out of body text. |
+| `createManualRefs`/`createManualRefsByExhibitId` | CRUD for the "Connections" side-panel's manually-added refs, separate from wikilinks parsed out of body text. |
 | `extractOutgoingExhibitRefs(text)` | Parses `[[...]]` tokens out of body text into an exhibit-id list. |
 | `mountManifestAndHealth`, `mountExhibitSearchRoutes`, `mountSettingsRoutes`, `mountManualRefsRoutes`, `mountStaticFrontend` | One-line Hono route mounting for each of the above. Mount `mountStaticFrontend` last — it's the SPA fallback; it also serves `frontend/public/*` directly (falling through from `frontend/dist`) so assets like your icon resolve even before `build:web` has run. |
 
@@ -128,7 +128,7 @@ And `congress-ui`'s frontend surface:
 | `useAppliedTheme` | Applies Congress's dark-mode setting; call once in `App()`. |
 | `useShellHosted`, `resolveChamberPath`, `navigateToExhibit` | Tell whether you're rendered standalone or shell-hosted inside Congress, and build correct links either way — use these instead of hand-writing absolute paths. |
 | `ExhibitTextarea`, `ExhibitAnnotatedText`, `ExhibitChip`, `ExhibitMarkdown` | The `[[` picker/autocomplete, rendering body text with resolved exhibit chips, and (optionally) Markdown rendering. |
-| `ExhibitActionBar`, `ExhibitLinksLayout` | Detail-page chrome: edit/delete actions, front/backlinks panel. |
+| `ExhibitActionBar`, `ExhibitLinksLayout` | Detail-page chrome: edit/delete actions, undirected Connections panel. |
 | `useSearchableList`, `useListRowPrefetch`, `ListSearchInput`, `ListLoadingState`, `ListErrorState`, `ListEmptyState` | List-page search + loading/error/empty states + hover-prefetch. |
 | `PageHeader`, `FormLabel`, `FormTextInput`, `FormErrorMessage`, `FormSubmitButton` | Generic page/form chrome. |
 | `WidgetPreviewShell` | Shared chrome (label, "+ New" link, loading/error/empty states) for a homepage widget's own content — see §5.1. |
@@ -142,7 +142,7 @@ generated scaffold already does this for the generic "Items" entity, so in
 most cases you're just updating the callbacks to match your real schema,
 not writing this from scratch. Every create/update/delete should call
 `pushExhibitSync` so Congress's `exhibit_cache`/`exhibit_refs` stay current;
-backlinks and frontlinks panels are computed live from that graph, nothing
+the undirected Connections panel is computed live from that graph, nothing
 is duplicated.
 
 If your Chamber's content genuinely isn't table-backed (Calendar's
