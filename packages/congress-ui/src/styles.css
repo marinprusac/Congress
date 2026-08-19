@@ -1231,7 +1231,11 @@ html[data-theme="dark"] {
   position: fixed;
   inset: 0;
   z-index: 70;
-  background-color: color-mix(in srgb, var(--color-ink) 45%, transparent);
+  /* Deliberately not `--color-ink`-based - see .nav-panel-backdrop's own
+     comment: that token flips light in dark mode (it's the *foreground*
+     color there), which turned this into a white wash over the screen
+     instead of a dark one. */
+  background-color: color-mix(in srgb, black 45%, transparent);
 }
 
 .confirm-sheet {
