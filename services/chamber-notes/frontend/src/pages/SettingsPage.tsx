@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PageHeader } from "@congress/congress-ui";
 import { fetchSettings, updateSettings } from "@/lib/api";
 
 export function SettingsPage() {
@@ -14,8 +13,6 @@ export function SettingsPage() {
 
   return (
     <section>
-      <PageHeader title="Settings" />
-
       {isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}
       {isError && <p className="font-mono text-sm text-alert">Failed to load settings.</p>}
 

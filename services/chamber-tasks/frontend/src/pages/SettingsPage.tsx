@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PageHeader, FormLabel, FormSubmitButton, FormErrorMessage } from "@congress/congress-ui";
+import { FormLabel, FormSubmitButton, FormErrorMessage } from "@congress/congress-ui";
 import { fetchSettings, updateSettings } from "@/lib/api";
 
 const inputClass =
@@ -26,8 +26,6 @@ export function SettingsPage() {
 
   return (
     <section>
-      <PageHeader title="Settings" />
-
       <form
         onSubmit={(e) => {
           e.preventDefault();

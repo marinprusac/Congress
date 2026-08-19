@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { PageHeader } from "@congress/congress-ui";
 import { fetchPushConfig, getCurrentSubscription, subscribeToPush, unsubscribeFromPush } from "@/lib/push";
 
 // Per-device, not a Chamber-wide setting - each browser/device holds its own
@@ -90,7 +89,6 @@ function PushNotificationsSection() {
 export function SettingsPage() {
   return (
     <section>
-      <PageHeader title="Settings" />
       <PushNotificationsSection />
     </section>
   );

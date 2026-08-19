@@ -4,7 +4,6 @@ import { Layout } from "@/components/Layout";
 import { NotesListPage } from "@/pages/NotesListPage";
 import { NoteViewPage } from "@/pages/NoteViewPage";
 import { NewNotePage } from "@/pages/NewNotePage";
-import { SettingsPage } from "@/pages/SettingsPage";
 
 export function App() {
   useAppliedTheme();
@@ -15,7 +14,6 @@ export function App() {
         <Route index element={<NotesListPage />} />
         <Route path="n/:id" element={<NoteViewPage />} />
         <Route path="new" element={<NewNotePage />} />
-        <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>
   );

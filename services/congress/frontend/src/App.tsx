@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchRegistry } from "@congress/congress-ui";
 import { LoginGate } from "@/components/LoginGate";
 import { ChamberHost, preloadChamber, ChamberWarmups } from "@/components/ChamberHost";
+import { SettingsPage } from "@/pages/SettingsPage";
 
 export function App() {
   // Warms every active Chamber's remote-entry.js/.css as soon as the
@@ -46,6 +47,21 @@ export function App() {
           element={
             <LoginGate>
               <Navigate to="/capitol" replace />
+            </LoginGate>
+          }
+        />
+        {/* Congress's own unified Settings - every Chamber's own settings
+            content mounted as one tab-category each (see SettingsPage),
+            reached through NavPanel's single Settings entry point instead
+            of a per-Chamber route. Declared ahead of "/:chamber/*" below so
+            it never gets swallowed by that pattern, though React Router's
+            own static-over-dynamic ranking would already prefer it either
+            way. */}
+        <Route
+          path="/settings"
+          element={
+            <LoginGate>
+              <SettingsPage />
             </LoginGate>
           }
         />

@@ -104,11 +104,12 @@ html[data-theme="dark"] {
     overscroll-behavior-y: none;
     /* Also suppresses iOS's edge-swipe-back gesture in a standalone PWA -
        that gesture rides the same overscroll/rubber-band mechanism at the
-       document's own left/right edge this disables. Horizontal drags are
-       reserved for a future in-app gesture instead of browser-history
-       navigation; this doesn't touch nested horizontal scrollers like
-       .note-prose pre/.note-table-wrapper, which scroll within their own
-       box, not the document's. */
+       document's own left/right edge this disables. That reclaimed
+       left-edge gesture space is what NavPanel's own swipe-to-open now uses
+       instead of browser-history navigation (useNavPanelSwipe); this
+       doesn't touch nested horizontal scrollers like .note-prose pre/
+       .note-table-wrapper, which scroll within their own box, not the
+       document's. */
     overscroll-behavior-x: none;
   }
 
@@ -152,10 +153,12 @@ html[data-theme="dark"] {
   padding-right: env(safe-area-inset-right);
 }
 
+/* Deliberately terse - a title bar, not a masthead. No border-bottom: the
+   page's own content starts right away, with only its own spacing (not a
+   drawn rule) separating it from the header above. */
 .chamber-header {
   position: relative;
-  border-bottom: 1px solid var(--color-dust);
-  padding: 2rem 1.5rem;
+  padding: 0.85rem 1.5rem;
 }
 
 /* Mobile: this is the first thing on every page, above the fold, on a
@@ -164,7 +167,7 @@ html[data-theme="dark"] {
    phone viewport otherwise. */
 @media (max-width: 640px) {
   .chamber-header {
-    padding: 1.25rem 1.5rem 1rem;
+    padding: 0.6rem 1.25rem 0.5rem;
   }
 }
 
@@ -190,9 +193,9 @@ html[data-theme="dark"] {
    every Chamber's header reads as part of the same system Capitol's does. */
 .chamber-eyebrow {
   display: block;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.1rem;
   font-family: var(--font-mono);
-  font-size: 0.7em;
+  font-size: 0.6em;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--color-dust);
@@ -201,18 +204,18 @@ html[data-theme="dark"] {
 .chamber-title-link {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .chamber-title {
   font-family: var(--font-display);
-  font-size: 2.25rem;
+  font-size: 1.4rem;
   color: var(--color-ink);
 }
 
 @media (max-width: 640px) {
   .chamber-title {
-    font-size: 1.65rem;
+    font-size: 1.15rem;
   }
 }
 
@@ -273,11 +276,7 @@ html[data-theme="dark"] {
    .chamber-shell/.chamber-main above untouched. Turns .chamber-shell into a
    height-locked flex column instead of a normally-scrolling document -
    ChamberHeader (in-flow) takes its own natural height, .chamber-main--canvas
-   fills the rest. .chamber-shell's own padding-bottom (reserving room for
-   the fixed mobile bottom nav, see --mobile-nav-height above) still applies
-   since this modifier only adds properties rather than replacing the rule -
-   the flex column's content box is already inset by it, so the canvas
-   naturally stops above the nav bar without any extra arithmetic here. */
+   fills the rest. */
 .chamber-shell--canvas {
   height: 100dvh;
   display: flex;
@@ -294,63 +293,16 @@ html[data-theme="dark"] {
   overflow: hidden;
 }
 
-/* ChamberPicker - persistent cross-Chamber nav, mounted once inside
-   ChamberLayout (every Chamber gets it for free) and once in Capitol's own
-   App.tsx. Desktop: fixed sidebar on the left. Mobile: a fixed icon-only
-   switcher bar. A Chamber's own sub-navigation (Settings, New, ...) lives in
-   its own ChamberHeader instead of nested here - see settingsHref/
-   extraActions. */
-.chamber-picker-mobile {
-  display: none;
-}
-
-.chamber-picker-desktop {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  width: var(--chamber-picker-width, 12rem);
-  overflow-y: auto;
-  padding: calc(1rem + env(safe-area-inset-top)) 0.75rem 1rem calc(0.75rem + env(safe-area-inset-left));
-  border-right: 1px solid var(--color-dust);
-  background-color: var(--color-parchment);
-}
-
-/* Capitol sits above a divider, in the display font at a larger size than
-   the plain Chamber rows below - it's the hub every Chamber registers
-   around, not just one more entry in the list. */
-.chamber-picker-capitol-link {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem;
-  color: var(--color-ink);
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-}
-
-.chamber-picker-capitol-link:hover,
-.chamber-picker-capitol-link.active {
-  color: var(--color-accent);
-}
-
-.chamber-picker-capitol-icon {
-  width: 1.75rem;
-  height: 1.75rem;
-  flex-shrink: 0;
-}
-
-.chamber-picker-divider {
-  height: 1px;
-  margin: 0.5rem 0.5rem 0.75rem;
-  background-color: var(--color-dust);
-}
-
-.chamber-picker-link {
+/* NavPanel - persistent cross-Chamber nav plus the one Settings entry
+   point, mounted once inside ChamberLayout (every Chamber gets it for
+   free) and once in Capitol's own App.tsx, and once more by Congress's own
+   unified Settings page. Desktop: an always-visible fixed sidebar on the
+   left. Mobile: off-canvas by default, slid in from the left edge only by
+   swiping right (useNavPanelSwipe) - there's no persistent trigger button,
+   which is also why .nav-panel-mobile-chambers below anchors the Chambers
+   list to the panel's own bottom edge rather than its top, for one-handed
+   thumb reach the instant it opens. */
+.nav-panel-link {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -360,29 +312,105 @@ html[data-theme="dark"] {
   font-size: 0.8em;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  /* Long-press-and-drag (useReorderableList) tracks the pointer itself once
+     a press is held long enough - without this, touch's own native
+     scroll/pan takes over the gesture partway through a drag on mobile. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.chamber-picker-link:hover,
-.chamber-picker-link.active {
+.nav-panel-link:hover,
+.nav-panel-link.active {
   color: var(--color-accent);
 }
 
-.chamber-picker-icon {
+/* Picked up by useReorderableList's long-press - a light lift so the row
+   being dragged visibly separates from the rest of the list. */
+.nav-panel-link--dragging {
+  color: var(--color-accent);
+  background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+/* Icon-only, deliberately understated (plain dust, no accent-toned label) -
+   Settings is a utility destination, not one more entry in the Chambers
+   list it sits apart from (bottom of the sidebar on desktop, top of the
+   panel on mobile - see NavPanel's own comment). */
+.nav-panel-link--settings {
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  justify-content: center;
+  padding: 0;
+}
+
+.nav-panel-icon {
   width: 1.25rem;
   height: 1.25rem;
   flex-shrink: 0;
 }
 
-.chamber-picker-label {
+.nav-panel-icon-settings {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+}
+
+.nav-panel-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Reserves room for the desktop sidebar on whichever element is each host
-   page's own outermost container. */
+/* Pinned above Settings at the bottom of the desktop sidebar (margin-top:
+   auto pushes both it and Settings down regardless of how long the
+   Chambers list above is) - keeps Settings visually apart from the
+   reorderable list rather than leading it. */
+.nav-panel-divider {
+  height: 1px;
+  margin: auto 0.5rem 0.75rem;
+  background-color: var(--color-dust);
+}
+
+.nav-panel-chambers,
+.nav-panel-mobile-chambers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.nav-panel-desktop {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  display: none;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: var(--chamber-picker-width, 12rem);
+  overflow-y: auto;
+  padding: calc(1rem + env(safe-area-inset-top)) 0.75rem 1rem calc(0.75rem + env(safe-area-inset-left));
+  border-right: 1px solid var(--color-dust);
+  background-color: var(--color-parchment);
+}
+
+.nav-panel-backdrop {
+  display: none;
+}
+
+.nav-panel-mobile {
+  display: none;
+}
+
 @media (min-width: 641px) {
+  .nav-panel-desktop {
+    display: flex;
+  }
+
+  /* Reserves room for the desktop sidebar on whichever element is each
+     host page's own outermost container. */
   :root {
     --chamber-picker-width: 12rem;
   }
@@ -394,76 +422,120 @@ html[data-theme="dark"] {
 }
 
 @media (max-width: 640px) {
-  /* The icon bar's own height (bottom-most, touches the home indicator),
-     every host page (Capitol included) needs this, so it's what every
-     page's own bottom padding reserves. */
-  :root {
-    --chamber-picker-height: calc(3rem + env(safe-area-inset-bottom));
-    --mobile-nav-height: var(--chamber-picker-height);
-  }
-
-  .chamber-shell,
-  .capitol-shell {
-    padding-bottom: var(--mobile-nav-height);
-  }
-
-  .chamber-picker-desktop {
-    display: none;
-  }
-
-  /* Hidden outright (not just repositioned) while the on-screen keyboard is
-     open - see ChamberPicker's keyboardOpen comment. Needs its own [hidden]
-     rule since the plain display:flex below it otherwise outranks the
-     browser's default [hidden] styling (both are author-origin, equal
-     specificity - source order alone doesn't help against a same-file rule
-     appearing earlier), same idiom as .exhibit-picker-dropdown[hidden]. */
-  .chamber-picker-mobile[hidden] {
-    display: none;
-  }
-
-  .chamber-picker-mobile {
-    display: flex;
+  .nav-panel-backdrop {
+    display: block;
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 41;
-    justify-content: space-around;
-    align-items: center;
-    height: var(--chamber-picker-height);
-    border-top: 1px solid var(--color-dust);
-    background-color: var(--color-parchment);
-    padding-bottom: env(safe-area-inset-bottom);
-    box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 15%, transparent);
+    inset: 0;
+    z-index: 39;
+    background-color: color-mix(in srgb, var(--color-ink) 45%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease-out;
   }
 
-  .chamber-picker-mobile-link {
+  .nav-panel-backdrop[data-open="true"] {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .nav-panel-mobile {
     display: flex;
     flex-direction: column;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    width: min(80vw, 18rem);
+    padding: calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom))
+      calc(1rem + env(safe-area-inset-left));
+    border-right: 1px solid var(--color-dust);
+    background-color: var(--color-parchment);
+    box-shadow: 4px 0 20px color-mix(in srgb, var(--color-ink) 20%, transparent);
+    transform: translateX(-100%);
+    transition: transform 220ms ease-out;
+  }
+
+  .nav-panel-mobile[data-open="true"] {
+    transform: translateX(0);
+  }
+
+  .nav-panel-mobile-top {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--color-dust);
+  }
+
+  .nav-panel-close {
+    margin-left: auto;
+    display: flex;
+    flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    gap: 0.15rem;
-    min-height: 3rem;
-    min-width: 2.5rem;
+    width: 2rem;
+    height: 2rem;
+    font-size: 1.4rem;
+    line-height: 1;
     color: var(--color-dust);
   }
 
-  .chamber-picker-mobile-link:hover,
-  .chamber-picker-mobile-link.active {
-    color: var(--color-accent);
+  /* Anchored to the panel's own bottom, not appended after Capitol/
+     Settings above - see this block's own top comment. */
+  .nav-panel-mobile-chambers {
+    margin-top: auto;
+    overflow-y: auto;
   }
 
-  .chamber-picker-mobile-label {
-    font-family: var(--font-mono);
-    font-size: 0.6em;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+  .nav-panel-mobile .nav-panel-link {
+    font-size: 0.95rem;
+    padding: 0.65rem 0.5rem;
   }
+}
 
-  .chamber-picker-icon-capitol {
-    width: 1.5rem;
-    height: 1.5rem;
-  }
+/* Settings page tabs - one category per active Chamber that has its own
+   settings content, plus the fixed "General" tab for Congress's own
+   (dark mode, event retention, sign out). Mobile-first: a horizontally
+   scrolling strip rather than a wrap, so a long Chamber list never pushes
+   a tab below the fold. */
+.settings-tabs {
+  display: flex;
+  gap: 1.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-dust);
+}
+
+.settings-tab {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-dust);
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid transparent;
+}
+
+.settings-tab:hover {
+  color: var(--color-ink);
+}
+
+.settings-tab.active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.settings-tab-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
 }
 
 /* Expands a small inline text action's hit area toward Apple's ~44pt tap
@@ -752,10 +824,10 @@ html[data-theme="dark"] {
   position: fixed;
   left: 0.5rem;
   right: 0.5rem;
-  /* Clears the mobile bottom nav (a fixed element in the same corner)
-     instead of sitting underneath it - falls back to a plain 0.5rem
-     when --mobile-nav-height isn't defined (i.e. above the 640px
-     breakpoint, where the desktop override below replaces this anyway). */
+  /* --mobile-nav-height is never actually set anymore (NavPanel's mobile
+     variant is an off-canvas overlay, not persistent chrome reserving its
+     own space) - kept as a fallback-only var rather than a bare 0.5rem in
+     case that ever changes again, not because anything sets it today. */
   bottom: calc(var(--mobile-nav-height, 0px) + 0.5rem);
   z-index: 50;
   max-height: 40vh;
@@ -1267,11 +1339,10 @@ html[data-theme="dark"] {
    scrolling away with it, on every breakpoint (unlike .notification-panel's
    mobile-fixed/desktop-anchored split, this is a persistent piece of
    chrome, not a transient popover, so it stays fixed on desktop too).
-   Mobile: clears the fixed bottom nav via --mobile-nav-height, same idiom
-   as .notification-panel. Desktop: clears the fixed left sidebar via
-   --chamber-picker-width, then centers within the remaining width up to a
-   comfortable max (auto margins on a fixed element with both left/right set
-   center it the same way they would on an absolutely-positioned one). */
+   Desktop: clears the fixed left sidebar via --chamber-picker-width, then
+   centers within the remaining width up to a comfortable max (auto margins
+   on a fixed element with both left/right set center it the same way they
+   would on an absolutely-positioned one). */
 .list-search-row {
   position: fixed;
   z-index: 40;
@@ -1335,11 +1406,7 @@ html[data-theme="dark"] {
    an in-flow element would, so without this the *last* row(s) of a long
    list would end up permanently hidden underneath it while scrolled to the
    bottom. Sized to roughly the search bar's own height plus its bottom
-   offset - NOT --mobile-nav-height too: .chamber-shell's own padding-bottom
-   (see above) already reserves that for the fixed bottom nav, and the
-   search bar's own `bottom` is already expressed *relative to* that same
-   nav clearance, so adding it again here would double-reserve it and leave
-   a large dead gap at the end of every list. */
+   offset. */
 .list-page {
   padding-bottom: 3.5rem;
 }

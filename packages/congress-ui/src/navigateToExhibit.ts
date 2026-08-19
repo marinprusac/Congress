@@ -5,7 +5,7 @@ import { resolveChamberPath } from "./ShellHostContext.js";
 // Chamber's root, not to whichever Chamber's frontend happens to be
 // rendering the chip. A same-Chamber reference can navigate via the local
 // router (resolveChamberPath handles standalone vs. shell-hosted targeting,
-// same as ChamberHeader/ChamberPicker), but a cross-Chamber one has no
+// same as ChamberHeader/NavPanel), but a cross-Chamber one has no
 // matching route in the current tree at all - either this Chamber's own
 // standalone build, which has no idea another Chamber's routes even exist,
 // or, shell-hosted, ChamberHost only ever has one Chamber's remote entry

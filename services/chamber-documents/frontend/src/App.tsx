@@ -4,7 +4,6 @@ import { Layout } from "@/components/Layout";
 import { DocumentsListPage } from "@/pages/DocumentsListPage";
 import { DocumentViewPage } from "@/pages/DocumentViewPage";
 import { UploadDocumentPage } from "@/pages/UploadDocumentPage";
-import { SettingsPage } from "@/pages/SettingsPage";
 
 export function App() {
   useAppliedTheme();
@@ -15,7 +14,6 @@ export function App() {
         <Route index element={<DocumentsListPage />} />
         <Route path="d/:id" element={<DocumentViewPage />} />
         <Route path="new" element={<UploadDocumentPage />} />
-        <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>
   );

@@ -1,0 +1,179 @@
+import { useState, type ComponentType } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ChamberHeader,
+  NavPanel,
+  ChamberMark,
+  useAppliedTheme,
+  useCapitolSettings,
+  capitolSettingsQueryKey,
+  updateCapitolSettings,
+  fetchRegistry,
+  loadRemoteModule,
+} from "@congress/congress-ui";
+import { SignOutControl } from "@/components/LoginGate";
+
+function SettingsGearIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-6 w-6 text-ink"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+    </svg>
+  );
+}
+
+interface ChamberSettingsPanel {
+  name: string;
+  displayName: string;
+  Component: ComponentType;
+}
+
+// Resolves every active Chamber's own `settings` export (see RemoteModule)
+// out of the same remote-entry.js ChamberWarmups already preloads on
+// registry load - a Chamber with nothing configurable, or one that fails to
+// load, is simply excluded from the tab strip rather than shown broken.
+function useChamberSettingsPanels(chambers: { name: string; displayName: string }[]) {
+  const key = chambers.map((c) => c.name).join(",");
+  return useQuery({
+    queryKey: ["settings-panels", key],
+    queryFn: async (): Promise<ChamberSettingsPanel[]> => {
+      const resolved = await Promise.all(
+        chambers.map(async (c) => {
+          try {
+            const mod = await loadRemoteModule(c.name);
+            return mod.settings ? { name: c.name, displayName: c.displayName, Component: mod.settings } : null;
+          } catch {
+            return null;
+          }
+        })
+      );
+      return resolved.filter((panel): panel is ChamberSettingsPanel => panel !== null);
+    },
+    enabled: chambers.length > 0,
+    staleTime: Infinity,
+  });
+}
+
+// Congress-owned settings (dark mode, event log retention) plus sign-out -
+// previously exposed through Capitol's own Settings page even though
+// they're not Capitol's (see CapitolSettings' own comment in shared-types),
+// now the one default tab here instead, alongside every other Chamber's own.
+function GeneralTab() {
+  const queryClient = useQueryClient();
+  const { data, isLoading, isError } = useCapitolSettings();
+
+  const mutation = useMutation({
+    mutationFn: updateCapitolSettings,
+    onSuccess: (updated) => queryClient.setQueryData(capitolSettingsQueryKey(), updated),
+  });
+
+  return (
+    <div>
+      {isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}
+      {isError && <p className="font-mono text-sm text-alert">Failed to load settings.</p>}
+
+      {data && (
+        <div className="space-y-6">
+          <div>
+            <label className="flex items-center gap-2 font-mono text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={data.darkMode}
+                onChange={(e) => mutation.mutate({ darkMode: e.target.checked })}
+              />
+              Dark mode
+            </label>
+            <p className="mt-1 pl-6 font-mono text-xs text-dust">Applies across Congress and every Chamber, on any device.</p>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 font-mono text-sm text-ink">
+              Event log retention (hours)
+              <input
+                type="number"
+                min={1}
+                defaultValue={Math.round(data.eventRetentionMs / 3_600_000)}
+                onBlur={(e) => {
+                  const hours = Number(e.target.value);
+                  if (hours > 0) mutation.mutate({ eventRetentionMs: hours * 3_600_000 });
+                }}
+                className="w-20 border border-dust bg-parchment px-2 py-1 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+              />
+            </label>
+            <p className="mt-1 font-mono text-xs text-dust">
+              How long Congress's generic event log keeps a published event before pruning it, when the publishing
+              Chamber doesn't declare its own retention for that event type. Chambers polling less often than this
+              may miss events published between polls if this is too short.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-10 border-t border-dust pt-6">
+        <SignOutControl />
+      </div>
+    </div>
+  );
+}
+
+// Unified Settings - one page, reached from NavPanel's single Settings
+// entry point instead of a gear icon on every Chamber's own header. Every
+// Chamber's own settings content (previously each Chamber's own routed
+// /settings page) is mounted here as one tab-category, resolved from that
+// Chamber's own remote entry the same way Capitol's canvas resolves widgets
+// - see useChamberSettingsPanels above and RemoteModule's `settings` field.
+export function SettingsPage() {
+  useAppliedTheme();
+
+  const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
+  const activeChambers = (registry ?? []).filter((c) => c.status === "active");
+  const { data: panels } = useChamberSettingsPanels(
+    activeChambers.map((c) => ({ name: c.name, displayName: c.displayName }))
+  );
+
+  const [tab, setTab] = useState<string>("general");
+  const activePanel = (panels ?? []).find((p) => p.name === tab);
+
+  return (
+    <div className="chamber-shell">
+      <NavPanel current="settings" currentLabel="Settings" />
+      <ChamberHeader icon={<SettingsGearIcon />} title="Settings" showSearch={false} />
+      <main className="chamber-main">
+        <div className="settings-tabs" role="tablist" aria-label="Settings categories">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "general"}
+            className={tab === "general" ? "settings-tab active" : "settings-tab"}
+            onClick={() => setTab("general")}
+          >
+            General
+          </button>
+          {(panels ?? []).map((panel) => (
+            <button
+              key={panel.name}
+              type="button"
+              role="tab"
+              aria-selected={tab === panel.name}
+              className={tab === panel.name ? "settings-tab active" : "settings-tab"}
+              onClick={() => setTab(panel.name)}
+            >
+              <ChamberMark name={panel.name} className="settings-tab-icon" />
+              {panel.displayName}
+            </button>
+          ))}
+        </div>
+        <section className="settings-tab-panel">{tab === "general" ? <GeneralTab /> : activePanel && <activePanel.Component />}</section>
+      </main>
+    </div>
+  );
+}

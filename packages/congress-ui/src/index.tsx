@@ -33,7 +33,7 @@ export type { PullZone } from "./usePullGesture.js";
 export { ChamberMark, CapitolMark, getChamberIcon } from "./ChamberMarks.js";
 export { WidgetPreviewShell } from "./WidgetPreviewShell.js";
 export { fetchRegistry } from "./registry.js";
-export { ChamberPicker } from "./ChamberPicker.js";
+export { NavPanel } from "./NavPanel.js";
 export { markShellHosted, useShellHosted, resolveChamberPath } from "./ShellHostContext.js";
 export { preventPinchZoom } from "./preventZoom.js";
 export { resolveApiBase, parseJsonResponse, assertDeleteOk } from "./api.js";

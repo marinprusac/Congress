@@ -8,7 +8,6 @@ import {
   setCalendarSelection,
 } from "@/lib/api";
 import type { GoogleAccount } from "../../../src/types";
-import { PageHeader } from "@congress/congress-ui";
 
 function AccountCalendars({ account }: { account: GoogleAccount }) {
   const queryClient = useQueryClient();
@@ -90,8 +89,6 @@ export function SettingsPage() {
 
   return (
     <section>
-      <PageHeader title="Settings" />
-
       <div className="mb-8">
         <div className="mb-3 flex items-baseline justify-between">
           <h3 className="font-display text-xl text-ink">Connected Accounts</h3>

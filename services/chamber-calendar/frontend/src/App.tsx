@@ -5,7 +5,6 @@ import { AgendaPage } from "@/pages/AgendaPage";
 import { NewEventPage } from "@/pages/NewEventPage";
 import { EventViewPage } from "@/pages/EventViewPage";
 import { EditEventPage } from "@/pages/EditEventPage";
-import { SettingsPage } from "@/pages/SettingsPage";
 
 export function App() {
   useAppliedTheme();
@@ -17,7 +16,6 @@ export function App() {
         <Route path="new" element={<NewEventPage />} />
         <Route path="e/:accountId/:calendarId/:eventId" element={<EventViewPage />} />
         <Route path="e/:accountId/:calendarId/:eventId/edit" element={<EditEventPage />} />
-        <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>
   );

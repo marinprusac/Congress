@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { ChamberHeader } from "./ChamberHeader.js";
-import { ChamberPicker } from "./ChamberPicker.js";
+import { NavPanel } from "./NavPanel.js";
 
 interface ChamberLayoutProps {
   icon: ReactNode;
@@ -17,8 +17,8 @@ interface ChamberLayoutProps {
 }
 
 // Shared shell for every Chamber's own frontend (Notes/Calendar/Documents) -
-// ChamberPicker (cross-Chamber nav) plus this Chamber's own header (which
-// carries its own Settings link) and content. A Chamber's home route is
+// NavPanel (cross-Chamber nav, plus the one unified Settings entry point)
+// plus this Chamber's own header and content. A Chamber's home route is
 // always its default landing page (e.g. Notes' "All Notes" list) - there's
 // no separate "home" nav link to it.
 export function ChamberLayout({ icon, title, ownChamber, renderIcon, extraActions }: ChamberLayoutProps) {
@@ -26,14 +26,13 @@ export function ChamberLayout({ icon, title, ownChamber, renderIcon, extraAction
 
   return (
     <div className="chamber-shell">
-      <ChamberPicker current={ownChamber} currentLabel={title} />
+      <NavPanel current={ownChamber} currentLabel={title} />
       <ChamberHeader
         icon={icon}
         title={title}
         ownChamber={ownChamber}
         renderIcon={renderIcon}
         navigate={navigate}
-        settingsHref="/settings"
         extraActions={extraActions}
       />
       <main className="chamber-main">

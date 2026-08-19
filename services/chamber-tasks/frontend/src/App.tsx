@@ -4,7 +4,6 @@ import { Layout } from "@/components/Layout";
 import { TasksListPage } from "@/pages/TasksListPage";
 import { TaskViewPage } from "@/pages/TaskViewPage";
 import { NewTaskPage } from "@/pages/NewTaskPage";
-import { SettingsPage } from "@/pages/SettingsPage";
 
 export function App() {
   useAppliedTheme();
@@ -15,7 +14,6 @@ export function App() {
         <Route index element={<TasksListPage />} />
         <Route path="t/:id" element={<TaskViewPage />} />
         <Route path="new" element={<NewTaskPage />} />
-        <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>
   );

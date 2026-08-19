@@ -4,11 +4,16 @@ import type { ComponentType } from "react";
 // is the whole app (what ChamberHost mounts for full-page navigation),
 // `widgets` is the id -> component map Capitol's canvas resolves widgets
 // out of (a Chamber with no widgets, or Congress's own shell, just omits
-// it). One shared shape so both consumers agree on what's in the module
-// namespace object import() resolves to.
+// it), and `settings` is that Chamber's own settings panel content -
+// resolved the same way, out of the same already-fetched module - and
+// mounted as one tab of Congress's own unified Settings page instead of a
+// route the Chamber hosts itself (a Chamber with nothing configurable omits
+// it, same as widgets). One shared shape so every consumer agrees on what's
+// in the module namespace object import() resolves to.
 export interface RemoteModule {
   default: ComponentType;
   widgets?: Record<string, ComponentType>;
+  settings?: ComponentType;
 }
 
 // Shared by ChamberHost (full-Chamber navigation) and Capitol's canvas
