@@ -438,7 +438,12 @@ html[data-theme="dark"] {
     position: fixed;
     inset: 0;
     z-index: 39;
-    background-color: color-mix(in srgb, var(--color-ink) 45%, transparent);
+    /* Deliberately not `--color-ink`-based: that token flips light in dark
+       mode (it's the *foreground* color there), which would turn this
+       scrim into a white wash over the screen instead of a dark one. A
+       backdrop should read as dark in both themes, same as any modal
+       scrim. */
+    background-color: color-mix(in srgb, black 45%, transparent);
     opacity: 0;
     pointer-events: none;
     transition: opacity 200ms ease-out;
@@ -462,9 +467,19 @@ html[data-theme="dark"] {
       calc(1rem + env(safe-area-inset-left));
     border-right: 1px solid var(--color-dust);
     background-color: var(--color-parchment);
-    box-shadow: 4px 0 20px color-mix(in srgb, var(--color-ink) 20%, transparent);
     transform: translateX(-100%);
     transition: transform 220ms ease-out;
+  }
+
+  /* Scoped to open/dragging rather than the base rule above - box-shadow
+     paints outside the element's own box, so applied unconditionally it
+     bled a faint glow past the left screen edge even while the panel sat
+     fully off-canvas at rest. `data-dragging` (set from useNavPanelSwipe's
+     `dragOffsetPx`/`dragProgress`, not just `data-open`) keeps the shadow
+     present through an in-progress drag too, not just once it settles. */
+  .nav-panel-mobile[data-open="true"],
+  .nav-panel-mobile[data-dragging="true"] {
+    box-shadow: 4px 0 20px color-mix(in srgb, var(--color-ink) 20%, transparent);
   }
 
   .nav-panel-mobile[data-open="true"] {

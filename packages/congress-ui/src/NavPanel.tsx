@@ -192,7 +192,8 @@ function ChamberRow({
 export function NavPanel({ current, currentLabel }: NavPanelProps) {
   const { data } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
   const shellHosted = useShellHosted();
-  const { open, close } = useNavPanelSwipe();
+  const { open, dragOffsetPx, dragProgress, panelRef, close } = useNavPanelSwipe();
+  const dragging = dragOffsetPx !== null;
 
   const registryChambers = (data ?? []).filter((c) => c.status === "active");
   const chambers = buildChamberList(registryChambers, current, currentLabel);
@@ -230,9 +231,22 @@ export function NavPanel({ current, currentLabel }: NavPanelProps) {
         <SettingsRow current={current} shellHosted={shellHosted} onNavigate={close} variant="desktop" />
       </nav>
 
-      <div className="nav-panel-backdrop" data-open={open} onClick={close} aria-hidden={!open} />
+      <div
+        className="nav-panel-backdrop"
+        data-open={open}
+        onClick={close}
+        aria-hidden={!open}
+        style={dragProgress !== null ? { opacity: dragProgress, transition: "none" } : undefined}
+      />
 
-      <nav className="nav-panel-mobile" aria-label="Navigation" data-open={open}>
+      <nav
+        className="nav-panel-mobile"
+        aria-label="Navigation"
+        data-open={open}
+        data-dragging={dragging}
+        ref={panelRef}
+        style={dragOffsetPx !== null ? { transform: `translateX(${dragOffsetPx}px)`, transition: "none" } : undefined}
+      >
         <div className="nav-panel-mobile-top">
           <SettingsRow current={current} shellHosted={shellHosted} onNavigate={close} variant="mobile" />
           <button type="button" className="nav-panel-close" onClick={close} aria-label="Close navigation">
