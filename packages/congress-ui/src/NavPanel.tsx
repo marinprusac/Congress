@@ -92,6 +92,7 @@ function CrossAppLink({
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
       ref={rowRef}
+      draggable={false}
     >
       {children}
     </Link>
@@ -103,6 +104,7 @@ function CrossAppLink({
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
       ref={rowRef}
+      draggable={false}
     >
       {children}
     </a>

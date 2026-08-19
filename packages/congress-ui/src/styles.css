@@ -318,6 +318,11 @@ html[data-theme="dark"] {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  /* Anchors are natively draggable in the browser (link/image drag-out) -
+     without this, that native drag competes with useReorderableList's own
+     pointer-based drag and pops up the browser's "drop to open/copy link"
+     affordance instead of reordering. */
+  -webkit-user-drag: none;
 }
 
 .nav-panel-link:hover,
