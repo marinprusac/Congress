@@ -167,10 +167,9 @@ export async function getBacklinks(id: string): Promise<ExhibitRefEntry[]> {
 // Unlike getBacklinks, a target's chamber is never recorded in exhibit_refs
 // (only the source's is - see the schema comment), so this can only resolve
 // against exhibit_cache and must skip a target with no cache row instead of
-// guessing a chamber for a live resolve - the same tradeoff computeShareClosure
-// makes for the same reason. In practice this doesn't arise: a chamber syncs
-// on every create, and a "[[" reference can only target something that
-// already exists.
+// guessing a chamber for a live resolve. In practice this doesn't arise: a
+// chamber syncs on every create, and a "[[" reference can only target
+// something that already exists.
 export async function getFrontlinks(id: string): Promise<ExhibitRefEntry[]> {
   const rows = db.select().from(exhibitRefs).where(eq(exhibitRefs.sourceId, id)).all();
   const results: ExhibitRefEntry[] = [];

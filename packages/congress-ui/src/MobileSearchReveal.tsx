@@ -55,7 +55,7 @@ export function MobileSearchReveal({ ownChamber, navigate, renderIcon }: MobileS
   });
 
   // Tapping anywhere outside the expanded search bar dismisses it, same as
-  // SharePopover/ExhibitPickerDropdown's own click-away handling.
+  // ExhibitPickerDropdown's own click-away handling.
   useEffect(() => {
     if (!expanded) return;
     function onOutsideDown(e: MouseEvent) {

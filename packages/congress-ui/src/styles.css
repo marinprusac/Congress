@@ -222,8 +222,8 @@ html[data-theme="dark"] {
   gap: 1.25rem;
 }
 
-/* A Chamber's own extra header link (Capitol's Shares, Deputy's
-   Directives/History, ...) - same terse mono-uppercase treatment the old
+/* A Chamber's own extra header link (Deputy's Directives/History, ...) -
+   same terse mono-uppercase treatment the old
    ChamberPicker sub-nav links used, just relocated into the header. */
 .chamber-header-link {
   font-family: var(--font-mono);
@@ -269,7 +269,7 @@ html[data-theme="dark"] {
 /* Capitol's homepage canvas is the one page in the whole app that must never
    scroll - "whatever fits the screen is it" (see Canvas.tsx). Applied by
    Capitol's own Layout only on that route; every other page (Settings,
-   Shares, every other Chamber entirely) keeps the default scrolling
+   every other Chamber entirely) keeps the default scrolling
    .chamber-shell/.chamber-main above untouched. Turns .chamber-shell into a
    height-locked flex column instead of a normally-scrolling document -
    ChamberHeader (in-flow) takes its own natural height, .chamber-main--canvas
@@ -292,51 +292,6 @@ html[data-theme="dark"] {
   max-width: none;
   padding: 0;
   overflow: hidden;
-}
-
-/* SharedViewPage's nav (the share's Contents list) + main content. Mobile
-   default: main content first (what a recipient actually clicked the link
-   for), Contents stacked below as secondary browsing - same "children
-   first, side panels after" order .exhibit-links-layout already uses.
-   Desktop widens into a sidebar-flanks-content layout instead. */
-.shared-view-layout {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  max-width: 76rem;
-  margin: 0 auto;
-  padding: 1.5rem;
-}
-
-.shared-view-nav {
-  order: 2;
-}
-
-.shared-view-main {
-  order: 1;
-  min-width: 0;
-}
-
-@media (min-width: 641px) {
-  .shared-view-layout {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 2rem;
-    padding: 2.5rem 1.5rem;
-  }
-
-  .shared-view-nav {
-    order: 0;
-    width: 16rem;
-    flex-shrink: 0;
-    border-right: 1px solid var(--color-dust);
-    padding-right: 1rem;
-  }
-
-  .shared-view-main {
-    order: 0;
-    flex: 1;
-  }
 }
 
 /* ChamberPicker - persistent cross-Chamber nav, mounted once inside
@@ -535,7 +490,7 @@ html[data-theme="dark"] {
 }
 
 /* ExhibitMarkdown's react-markdown output styling - used by Notes' own
-   view/edit page and, for a shared Note, SharedViewPage. */
+   view/edit page. */
 .note-prose h1,
 .note-prose h2,
 .note-prose h3,
@@ -683,26 +638,6 @@ html[data-theme="dark"] {
   color: var(--color-dust);
 }
 
-.exhibit-sharing-badge {
-  display: inline-flex;
-  align-items: center;
-  font-family: var(--font-mono);
-  font-size: 0.6em;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.15em 0.6em;
-  white-space: nowrap;
-  text-decoration: none;
-  cursor: pointer;
-  color: var(--color-accent);
-  border: 1px solid var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-}
-
-.exhibit-sharing-badge:hover {
-  opacity: 0.75;
-}
-
 /* Mobile default: content, then a single divider spanning both columns,
    then backlinks/frontlinks as a two-column row, then the page's own
    actions last - nobody needs Edit/Delete before they've even seen what
@@ -800,7 +735,7 @@ html[data-theme="dark"] {
 }
 
 /* Shared by every mobile-docked sheet (this dropdown, the exhibit-ref-add
-   popover, the share popover, ConfirmSheet) - rounds only the top corners
+   popover, ConfirmSheet) - rounds only the top corners
    (the bottom edge is the screen edge, rounding it would look like a gap)
    and slides up on mount, so a bottom-docked panel reads as a native sheet
    instead of a UI element that just appears mid-frame. Scoped to the mobile
@@ -1154,293 +1089,6 @@ html[data-theme="dark"] {
   color: var(--color-alert);
 }
 
-.share-control {
-  position: relative;
-  display: inline-block;
-}
-
-/* A plain text action, styled the same as every other button in the
-   action bar it lives in (Edit/Delete/Pin/...) - not a bordered box calling
-   extra attention to itself. */
-.share-control-trigger {
-  color: var(--color-accent);
-}
-
-.share-control-trigger:hover {
-  text-decoration: underline;
-}
-
-/* Mobile-first: a bottom sheet is the default, not a fallback. A 320px
-   dropdown anchored under a small trigger is unreachable/unusable on a
-   phone - full-width, thumb-reachable at the bottom of the screen, with
-   its own scroll for a tall form, is the actual common case here. Desktop
-   gets the anchored-dropdown treatment below as the enhancement. */
-.share-control-popover {
-  position: fixed;
-  z-index: 20;
-  left: 0;
-  right: 0;
-  /* Sits directly above the fixed bottom nav instead of underneath it - 0
-     put the sheet's own lower rows in the same screen space the nav bars
-     occupy, so the (higher-z-index) nav visually covered them no matter how
-     the sheet itself was sized. Ending the sheet's box exactly where the
-     nav begins gives it the actual remaining space to fit in, rather than
-     fighting the nav for the same space. */
-  bottom: var(--mobile-nav-height, 0px);
-  width: auto;
-  max-width: none;
-  /* The available space above the nav, not an independent vh guess -
-     shrinks automatically as --mobile-nav-height grows (e.g. taller safe
-     area), so the sheet always fits below the top of the screen. */
-  max-height: calc(100vh - var(--mobile-nav-height, 0px) - 1rem);
-  overflow-y: auto;
-  border: 1px solid var(--color-dust);
-  background: var(--color-parchment);
-  padding: 0.75rem;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
-  /* Anchored to the root size, not inherited - .share-control mounts inside
-     wildly different ambient font-sizes (a small uppercase action bar for
-     ShareControl's own trigger, a 3xl title for ExhibitSharingBadge's), and
-     every rule below is em-based. Without this, the same popover renders at
-     a different scale depending on which trigger opened it. */
-  font-size: 1rem;
-  /* Resets whatever text-transform the trigger button's own row applies
-     (e.g. a "uppercase tracking-wide" action bar) - only field labels
-     inside the form should be uppercase, not the whole popover. */
-  text-transform: none;
-  letter-spacing: normal;
-}
-
-@media (min-width: 641px) {
-  .share-control-popover {
-    position: absolute;
-    inset: calc(100% + 0.5rem) 0 auto auto;
-    width: 320px;
-    max-width: calc(100vw - 2rem);
-    max-height: none;
-    border-bottom: 1px solid var(--color-dust);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-    padding-bottom: 1rem;
-  }
-}
-
-.share-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-
-.share-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.share-field-nested {
-  padding-left: 1.25rem;
-  border-left: 2px solid var(--color-dust);
-}
-
-.share-field-label {
-  font-family: var(--font-mono);
-  font-size: 0.7em;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-dust);
-}
-
-.share-input,
-.share-select {
-  width: 100%;
-  border: 1px solid var(--color-dust);
-  background: var(--color-parchment);
-  color: var(--color-ink);
-  font-family: var(--font-mono);
-  /* Never below 16px - see .global-search-input's comment. */
-  font-size: max(16px, 0.9em);
-  padding: 0.4em 0.6em;
-}
-
-.share-input:focus,
-.share-select:focus {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
-}
-
-.share-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
-  font-family: var(--font-mono);
-  font-size: 0.85em;
-  color: var(--color-ink);
-}
-
-.share-fixed-root {
-  border: 1px solid var(--color-dust);
-  padding: 0.4em 0.6em;
-  font-family: var(--font-mono);
-  font-size: 0.9em;
-  color: var(--color-ink);
-}
-
-.share-submit {
-  align-self: flex-start;
-  font-family: var(--font-mono);
-  font-size: 0.75em;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.5em 1em;
-  border: 1px solid var(--color-accent);
-  color: var(--color-accent);
-  background: transparent;
-}
-
-.share-submit:hover:not(:disabled) {
-  background: var(--color-accent);
-  color: var(--color-parchment);
-}
-
-.share-submit:disabled {
-  opacity: 0.5;
-}
-
-.share-edit-actions {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-}
-
-.share-revoke {
-  font-family: var(--font-mono);
-  font-size: 0.75em;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-alert);
-}
-
-.share-revoke:hover:not(:disabled) {
-  text-decoration: underline;
-}
-
-.share-revoke:disabled {
-  opacity: 0.5;
-}
-
-.share-error {
-  font-family: var(--font-mono);
-  font-size: 0.85em;
-  color: var(--color-alert);
-}
-
-.share-result {
-  border: 1px solid var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
-  padding: 0.6em;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.share-result-link {
-  font-family: var(--font-mono);
-  font-size: 0.85em;
-  color: var(--color-accent);
-  word-break: break-all;
-}
-
-.share-result-link:hover {
-  text-decoration: underline;
-}
-
-.share-picker {
-  position: relative;
-}
-
-.share-picker-list {
-  position: absolute;
-  z-index: 10;
-  margin-top: 0.25rem;
-  width: 100%;
-  max-height: 12rem;
-  overflow-y: auto;
-  border: 1px solid var(--color-dust);
-  background: var(--color-parchment);
-}
-
-.share-picker-empty {
-  padding: 0.5em 0.75em;
-  font-family: var(--font-mono);
-  font-size: 0.8em;
-  color: var(--color-dust);
-}
-
-.share-picker-option {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 0.5em 0.75em;
-  font-family: var(--font-mono);
-  font-size: 0.85em;
-  color: var(--color-ink);
-}
-
-.share-picker-option:hover {
-  background: color-mix(in srgb, var(--color-ink) 5%, transparent);
-}
-
-.share-picker-chamber {
-  font-size: 0.85em;
-  text-transform: uppercase;
-  color: var(--color-dust);
-}
-
-.share-picker-selected {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border: 1px solid var(--color-dust);
-  padding: 0.4em 0.6em;
-  font-family: var(--font-mono);
-  font-size: 0.9em;
-  color: var(--color-ink);
-}
-
-.share-picker-clear {
-  display: inline-block;
-  padding: 0.5em;
-  margin: -0.5em;
-  color: var(--color-dust);
-}
-
-.share-picker-clear:hover {
-  color: var(--color-alert);
-}
-
-.share-row-link {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.share-copy-button {
-  flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: 0.7em;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.2em 0.5em;
-  border: 1px solid var(--color-dust);
-  color: var(--color-ink);
-  background: transparent;
-}
-
-.share-copy-button:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-
 /* Capitol's shell (ChamberHost): shown while a Chamber's remote entry is
    being fetched for the first time in this tab - subsequent visits to an
    already-loaded Chamber skip this entirely, since the module stays cached.
@@ -1496,7 +1144,7 @@ html[data-theme="dark"] {
 }
 
 /* ConfirmSheet - native-feeling stand-in for window.confirm(). Unlike the
-   other docked sheets (share popover, exhibit pickers) it has no trigger
+   other docked sheets (exhibit pickers) it has no trigger
    element to anchor to or dismiss-by-tapping-outside, hence the backdrop. */
 .confirm-sheet-backdrop {
   position: fixed;

@@ -77,9 +77,9 @@ export async function forwardToChamber(c: Context): Promise<Response> {
 
 // Proxies to an explicit path on a named Chamber's apiBase, rather than
 // deriving the path by stripping a fixed prefix off the incoming request
-// (as forwardToChamber does for "/api/:chamber/*"). Used by the share
-// routes, whose own URL shape ("/congress/shared/:token/exhibits/:id") has
-// nothing to do with the target Chamber route ("/exhibits/:id/content").
+// (as forwardToChamber does for "/api/:chamber/*"). Used by the manual-refs
+// routes, whose own URL shape ("/congress/exhibits/:id/refs") has nothing to
+// do with the target Chamber route ("/exhibits/:id/refs").
 export async function proxyToChamberPath(c: Context, chamberName: string, path: string): Promise<Response> {
   const chamber = getChamber(chamberName);
 
@@ -105,9 +105,8 @@ export async function proxyToChamberPath(c: Context, chamberName: string, path: 
 // that Chamber's own source tree, built into its dist/ root like every
 // other public/ asset regardless of Vite `base`) - the mechanism that lets
 // every Chamber own its icon instead of a shared package hardcoding one SVG
-// per Chamber name. Public/unauthenticated: exhibit chips render this on
-// the logged-out Exhibit Sharing viewer too (SharedViewPage.tsx), and an
-// icon carries nothing sensitive - same openness as /health and /manifest.
+// per Chamber name. Public/unauthenticated: an icon carries nothing
+// sensitive - same openness as /health and /manifest.
 // A missing/offline Chamber or a Chamber that never shipped an icon both
 // resolve to a non-2xx response; callers fall back to a generic mark
 // locally rather than treating this as an error worth surfacing.

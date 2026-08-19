@@ -3,9 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ExhibitAnnotatedText,
   ExhibitActionBar,
-  ExhibitSharingBadge,
   ExhibitLinksLayout,
-  ShareControl,
   navigateToExhibit,
   getChamberIcon,
   useShellHosted,
@@ -42,7 +40,6 @@ export function EventViewPage() {
       <div className="mb-6 border-b border-dust pb-4">
         <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
           {event.title}
-          <ExhibitSharingBadge exhibitId={exhibitId} className="exhibit-sharing-badge" />
         </h2>
       </div>
 
@@ -53,7 +50,6 @@ export function EventViewPage() {
         editable
         actions={
           <ExhibitActionBar>
-            <ShareControl chamber="calendar" exhibitId={exhibitId} exhibitName={event.title} />
             <Link
               to={resolveChamberPath(
                 `/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}/edit`,

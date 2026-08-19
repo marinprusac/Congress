@@ -5,9 +5,7 @@ import {
   ExhibitTextarea,
   ExhibitActionBar,
   ExhibitAnnotatedText,
-  ExhibitSharingBadge,
   ExhibitLinksLayout,
-  ShareControl,
   navigateToExhibit,
   getChamberIcon,
   useShellHosted,
@@ -104,7 +102,6 @@ export function TaskViewPage() {
         ) : (
           <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
             <span className={task.completed ? "line-through text-dust" : ""}>{task.name}</span>
-            <ExhibitSharingBadge exhibitId={`task-${taskId}`} className="exhibit-sharing-badge" />
           </h2>
         )}
       </div>
@@ -154,7 +151,6 @@ export function TaskViewPage() {
                 >
                   {task.completed ? "Reopen" : "Complete"}
                 </button>
-                <ShareControl chamber="tasks" exhibitId={`task-${taskId}`} exhibitName={task.name} />
                 <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
                   Edit
                 </button>

@@ -5,7 +5,6 @@ import { updateDocumentRequestSchema } from "./types.js";
 import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,
-  mountExhibitContentRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
 } from "@congress/chamber-kit";
@@ -24,13 +23,7 @@ import {
   removeManualRefByExhibitId,
   resyncDocumentExhibitByExhibitId,
 } from "./documents.js";
-import {
-  searchDocumentExhibits,
-  resolveDocumentExhibits,
-  getDocumentExhibitContent,
-  updateDocumentExhibitContent,
-  parseDocumentId,
-} from "./exhibits.js";
+import { searchDocumentExhibits, resolveDocumentExhibits } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -126,19 +119,11 @@ app.get("/api/documents/:id/download", async (c) => {
 
 mountExhibitSearchRoutes(app, { search: searchDocumentExhibits, resolve: resolveDocumentExhibits });
 
-mountExhibitContentRoutes(app, { getContent: getDocumentExhibitContent, updateContent: updateDocumentExhibitContent });
-
 mountManualRefsRoutes(
   app,
   { list: listManualRefsByExhibitId, add: addManualRefByExhibitId, remove: removeManualRefByExhibitId },
   resyncDocumentExhibitByExhibitId
 );
-
-app.get("/api/exhibits/:id/content/download", async (c) => {
-  const documentId = parseDocumentId(c.req.param("id"));
-  if (documentId === null) return c.json({ error: "not_found" }, 404);
-  return serveDocumentFile(c, documentId);
-});
 
 app.route("/mcp", mcpApp);
 

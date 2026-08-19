@@ -1,10 +1,4 @@
-import type {
-  ExhibitSearchResult,
-  ExhibitResolveResult,
-  ExhibitSyncRequest,
-  SharedExhibitContent,
-  UpdateSharedExhibitContentRequest,
-} from "@congress/shared-types";
+import type { ExhibitSearchResult, ExhibitResolveResult, ExhibitSyncRequest } from "@congress/shared-types";
 
 function createExhibitIdCodec(prefix: string) {
   function toExhibitId(id: number): string {
@@ -39,23 +33,12 @@ export function createPushExhibitSync(opts: { chamber: string; capitolUrl: strin
   };
 }
 
-// The generic content contract behind Exhibit Sharing - a share recipient
-// only ever knows an exhibit id, never that it's specifically a "note" or a
-// "document", so every chamber maps its own detail shape into the same
-// canonical envelope. This factory covers the shape shared by any Chamber
-// whose exhibits are rows in one local table with an integer id and a
-// title (notes, documents) - a Chamber whose exhibits come from elsewhere
-// (e.g. calendar's events, fetched live from Google) doesn't fit this and
-// implements the search/resolve/content contract directly instead.
-//
-// TSearchRow/TContentRow are separate type params because a Chamber's raw DB
-// row (used for search/resolve) and its domain "detail" type (returned by
-// get/update, e.g. NoteDetail) commonly differ - notes.body (the DB column)
-// vs. NoteDetail.content (the parsed field), for instance.
-export interface TableBackedExhibitsConfig<
-  TSearchRow extends { id: number; title: string },
-  TContentRow,
-> {
+// This factory covers the shape shared by any Chamber whose exhibits are
+// rows in one local table with an integer id and a title (notes, documents)
+// - a Chamber whose exhibits come from elsewhere (e.g. calendar's events,
+// fetched live from Google) doesn't fit this and implements the
+// search/resolve contract directly instead.
+export interface TableBackedExhibitsConfig<TSearchRow extends { id: number; title: string }> {
   idPrefix: string;
   type: string;
   urlFor: (id: number) => string;
@@ -63,15 +46,11 @@ export interface TableBackedExhibitsConfig<
   // has to genericize over Drizzle's own table/column types.
   searchRows: (pattern: string, limit: number) => TSearchRow[];
   resolveRows: (ids: number[]) => TSearchRow[];
-  get: (id: number) => Promise<TContentRow | null>;
-  update: (id: number, input: UpdateSharedExhibitContentRequest) => Promise<TContentRow | null>;
-  toContent: (exhibitId: string, row: TContentRow) => SharedExhibitContent;
 }
 
-export function createTableBackedExhibits<
-  TSearchRow extends { id: number; title: string },
-  TContentRow,
->(config: TableBackedExhibitsConfig<TSearchRow, TContentRow>) {
+export function createTableBackedExhibits<TSearchRow extends { id: number; title: string }>(
+  config: TableBackedExhibitsConfig<TSearchRow>
+) {
   const { toExhibitId, parseId } = createExhibitIdCodec(config.idPrefix);
 
   // An empty query matches everything ("%%"), which combined with the
@@ -108,24 +87,5 @@ export function createTableBackedExhibits<
     });
   }
 
-  async function getContent(id: string): Promise<SharedExhibitContent | null> {
-    const rowId = parseId(id);
-    if (rowId === null) return null;
-    const row = await config.get(rowId);
-    if (!row) return null;
-    return config.toContent(id, row);
-  }
-
-  async function updateContent(
-    id: string,
-    input: UpdateSharedExhibitContentRequest
-  ): Promise<SharedExhibitContent | null> {
-    const rowId = parseId(id);
-    if (rowId === null) return null;
-    const updated = await config.update(rowId, input);
-    if (!updated) return null;
-    return config.toContent(id, updated);
-  }
-
-  return { toExhibitId, parseId, search, resolve, getContent, updateContent };
+  return { toExhibitId, parseId, search, resolve };
 }

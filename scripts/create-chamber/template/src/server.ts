@@ -4,7 +4,6 @@ import { createItemRequestSchema, updateItemRequestSchema, updateSettingsRequest
 import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,
-  mountExhibitContentRoutes,
   mountSettingsRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
@@ -24,7 +23,7 @@ import {
   resyncItemExhibitByExhibitId,
 } from "./items.js";
 import { getSettings, updateSettings } from "./settings.js";
-import { searchItemExhibits, resolveItemExhibits, getItemExhibitContent, updateItemExhibitContent } from "./exhibits.js";
+import { searchItemExhibits, resolveItemExhibits } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -85,8 +84,6 @@ app.delete("/api/items/:id", async (c) => {
 });
 
 mountExhibitSearchRoutes(app, { search: searchItemExhibits, resolve: resolveItemExhibits });
-
-mountExhibitContentRoutes(app, { getContent: getItemExhibitContent, updateContent: updateItemExhibitContent });
 
 mountManualRefsRoutes(
   app,

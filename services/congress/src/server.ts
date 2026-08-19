@@ -6,7 +6,6 @@ import { mountManifestAndHealth, mountStaticFrontend } from "@congress/chamber-k
 import {
   manifestSchema,
   exhibitSyncRequestSchema,
-  updateShareRequestSchema,
   updateCapitolSettingsRequestSchema,
   eventPublishRequestSchema,
 } from "@congress/shared-types";
@@ -33,8 +32,6 @@ import {
   getFrontlinks,
   getCachedChamber,
 } from "./exhibits.js";
-import { createShare, createShareRequestSchema, listShares, listSharesForExhibit, updateShare, revokeShare, getExhibitSharing } from "./shares.js";
-import { requireShareToken, type ShareVariables } from "./shareAuth.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { publishEvent, listEventsSince, pruneOldEvents } from "./events.js";
 import { mcpApp } from "./mcp/server.js";
@@ -212,101 +209,6 @@ app.delete("/congress/exhibits/:id/refs/:targetExhibitId", requireSession, async
   const targetExhibitId = encodeURIComponent(c.req.param("targetExhibitId"));
   return proxyToChamberPath(c, chamber, `/exhibits/${encodeURIComponent(id)}/refs/${targetExhibitId}`);
 });
-
-app.get("/congress/exhibits/:id/sharing", requireSession, async (c) => {
-  const shares = await getExhibitSharing(c.req.param("id"));
-  return c.json({ shares });
-});
-
-app.get("/congress/exhibits/:id/shares", requireSession, async (c) => {
-  return c.json({ shares: await listSharesForExhibit(c.req.param("id")) });
-});
-
-app.post("/congress/shares", requireSession, async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = createShareRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  return c.json(createShare(parsed.data), 201);
-});
-
-app.get("/congress/shares", requireSession, (c) => c.json({ shares: listShares() }));
-
-app.patch("/congress/shares/:token", requireSession, async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = updateShareRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  const updated = updateShare(c.req.param("token"), parsed.data);
-  if (!updated) return c.json({ error: "not_found" }, 404);
-  return c.json(updated);
-});
-
-app.delete("/congress/shares/:token", requireSession, (c) => {
-  if (!revokeShare(c.req.param("token"))) {
-    return c.json({ error: "not_found" }, 404);
-  }
-  return c.json({ ok: true });
-});
-
-// Token-scoped access for share recipients - deliberately not gated by
-// requireSession, since the whole point is reaching this with no Congress
-// login. requireShareToken validates the token and computes the closure
-// once per request; every handler below checks the requested id against
-// that closure before proxying anywhere.
-const sharedApp = new Hono<{ Bindings: HttpBindings; Variables: ShareVariables }>();
-sharedApp.use("/:token", requireShareToken);
-sharedApp.use("/:token/*", requireShareToken);
-
-sharedApp.get("/:token", (c) => {
-  const share = c.get("share");
-  return c.json({
-    token: share.id,
-    rootId: share.rootId,
-    rootChamber: share.rootChamber,
-    permission: share.permission,
-    label: share.label,
-    closure: c.get("closure"),
-  });
-});
-
-sharedApp.post("/:token/exhibits/resolve", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = capitolExhibitResolveRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  const closureIds = new Set(c.get("closure").map((e) => e.id));
-  const results = await resolveExhibits(parsed.data.refs.filter((r) => closureIds.has(r.id)));
-  return c.json({ results });
-});
-
-sharedApp.get("/:token/exhibits/:id", async (c) => {
-  const id = c.req.param("id");
-  const entry = c.get("closure").find((e) => e.id === id);
-  if (!entry) return c.json({ error: "not_found" }, 404);
-  return proxyToChamberPath(c, entry.chamber, `/exhibits/${encodeURIComponent(id)}/content`);
-});
-
-sharedApp.get("/:token/exhibits/:id/download", async (c) => {
-  const id = c.req.param("id");
-  const entry = c.get("closure").find((e) => e.id === id);
-  if (!entry) return c.json({ error: "not_found" }, 404);
-  return proxyToChamberPath(c, entry.chamber, `/exhibits/${encodeURIComponent(id)}/content/download`);
-});
-
-sharedApp.patch("/:token/exhibits/:id", async (c) => {
-  const share = c.get("share");
-  if (share.permission !== "edit") return c.json({ error: "forbidden" }, 403);
-  const id = c.req.param("id");
-  const entry = c.get("closure").find((e) => e.id === id);
-  if (!entry) return c.json({ error: "not_found" }, 404);
-  return proxyToChamberPath(c, entry.chamber, `/exhibits/${encodeURIComponent(id)}/content`);
-});
-
-app.route("/congress/shared", sharedApp);
 
 app.all("/api/:chamber/*", requireSession, forwardToChamber);
 

@@ -1,5 +1,4 @@
 import type { CanvasScope, WidgetPlacement } from "../../../src/types";
-import type { ShareSummary } from "@congress/shared-types";
 import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
 const API_BASE = resolveApiBase("capitol", import.meta.env.PROD);
@@ -31,20 +30,4 @@ export async function upsertPlacement(
 export async function deletePlacement(scope: CanvasScope, chamber: string, widgetId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/layout/${scope}/${chamber}/${widgetId}`, { method: "DELETE" });
   assertDeleteOk(res, "unplace widget");
-}
-
-// Congress-owned (not this Chamber's own API) - shares live on the same
-// backbone as the registry/gateway/exhibit fan-out, so Capitol's Shares page
-// just calls it directly, same as every Chamber already does for exhibit
-// search/resolve.
-export async function fetchShares(): Promise<ShareSummary[]> {
-  const res = await fetch("/congress/shares");
-  if (!res.ok) throw new Error(`Failed to fetch shares: ${res.status}`);
-  const data = (await res.json()) as { shares: ShareSummary[] };
-  return data.shares;
-}
-
-export async function revokeShare(token: string): Promise<void> {
-  const res = await fetch(`/congress/shares/${encodeURIComponent(token)}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(`Failed to revoke share: ${res.status}`);
 }

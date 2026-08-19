@@ -5,9 +5,7 @@ import {
   ExhibitTextarea,
   ExhibitActionBar,
   ExhibitAnnotatedText,
-  ExhibitSharingBadge,
   ExhibitLinksLayout,
-  ShareControl,
   navigateToExhibit,
   getChamberIcon,
   useShellHosted,
@@ -113,7 +111,6 @@ export function LogRuleViewPage() {
         ) : (
           <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
             <span className={rule.enabled ? "" : "text-dust line-through"}>{rule.title}</span>
-            <ExhibitSharingBadge exhibitId={`logrule-${ruleId}`} className="exhibit-sharing-badge" />
           </h2>
         )}
       </div>
@@ -227,7 +224,6 @@ export function LogRuleViewPage() {
                 <button onClick={toggleEnabled} className="tap-target text-accent hover:underline">
                   {rule.enabled ? "Disable" : "Enable"}
                 </button>
-                <ShareControl chamber="logs" exhibitId={`logrule-${ruleId}`} exhibitName={rule.title} />
                 <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
                   Edit
                 </button>

@@ -3,7 +3,6 @@ import { createTableBackedExhibits, createPushExhibitSync } from "@congress/cham
 import { db } from "./db/client.js";
 import { items } from "./db/schema.js";
 import { env } from "./env.js";
-import { getItem, updateItem } from "./items.js";
 
 const exhibits = createTableBackedExhibits({
   idPrefix: "item-",
@@ -18,24 +17,12 @@ const exhibits = createTableBackedExhibits({
       .limit(limit)
       .all(),
   resolveRows: (ids) => db.select({ id: items.id, title: items.name }).from(items).where(inArray(items.id, ids)).all(),
-  get: getItem,
-  update: (id, input) => updateItem(id, { name: input.title, body: input.body }),
-  toContent: (id, row) => ({
-    id,
-    chamber: "__CHAMBER_NAME__",
-    type: "item",
-    name: row.name,
-    body: row.body,
-    isBinary: false,
-  }),
 });
 
 export const toExhibitId = exhibits.toExhibitId;
 export const parseItemId = exhibits.parseId;
 export const searchItemExhibits = exhibits.search;
 export const resolveItemExhibits = exhibits.resolve;
-export const getItemExhibitContent = exhibits.getContent;
-export const updateItemExhibitContent = exhibits.updateContent;
 
 export const pushExhibitSync = createPushExhibitSync({
   chamber: "__CHAMBER_NAME__",

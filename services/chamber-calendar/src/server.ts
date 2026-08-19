@@ -9,7 +9,6 @@ import {
 import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,
-  mountExhibitContentRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
 } from "@congress/chamber-kit";
@@ -29,8 +28,6 @@ import {
   createEvent,
   updateEvent,
   deleteEvent,
-  getEventExhibitContent,
-  updateEventExhibitContent,
   resyncEventExhibit,
   EventNotEditableError,
 } from "./google/events.js";
@@ -189,8 +186,6 @@ app.delete("/api/events/:accountId/:calendarId/:eventId", async (c) => {
 });
 
 mountExhibitSearchRoutes(app, { search: searchEventExhibits, resolve: resolveEventExhibits });
-
-mountExhibitContentRoutes(app, { getContent: getEventExhibitContent, updateContent: updateEventExhibitContent });
 
 mountManualRefsRoutes(app, { list: listManualRefs, add: addManualRef, remove: removeManualRef }, resyncEventExhibit);
 

@@ -14,9 +14,6 @@ export const manifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  // Directive bodies are Markdown/[[wikilink]] text like every other
-  // Exhibit body in this system - see Capitol's Exhibit Sharing viewer.
-  contentFormat: "markdown",
   // §12: a quick "message Deputy" box, and a recent-activity feed reading
   // deputy_runs for a lightweight "what has Deputy been doing" glance
   // without opening the full audit log/run history page.

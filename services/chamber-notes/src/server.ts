@@ -4,7 +4,6 @@ import { createNoteRequestSchema, updateNoteRequestSchema, updateNotesSettingsRe
 import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,
-  mountExhibitContentRoutes,
   mountSettingsRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
@@ -25,7 +24,7 @@ import {
   TitleConflictError,
 } from "./notes.js";
 import { getSettings, updateSettings } from "./settings.js";
-import { searchNoteExhibits, resolveNoteExhibits, getNoteExhibitContent, updateNoteExhibitContent } from "./exhibits.js";
+import { searchNoteExhibits, resolveNoteExhibits } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -100,15 +99,6 @@ app.delete("/api/notes/:id", async (c) => {
 });
 
 mountExhibitSearchRoutes(app, { search: searchNoteExhibits, resolve: resolveNoteExhibits });
-
-mountExhibitContentRoutes(
-  app,
-  { getContent: getNoteExhibitContent, updateContent: updateNoteExhibitContent },
-  {
-    onUpdateError: (c, err) =>
-      err instanceof TitleConflictError ? c.json({ error: "title_conflict", message: err.message }, 409) : undefined,
-  }
-);
 
 mountManualRefsRoutes(
   app,

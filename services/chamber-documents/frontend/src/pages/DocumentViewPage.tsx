@@ -5,9 +5,7 @@ import {
   ExhibitTextarea,
   ExhibitActionBar,
   ExhibitAnnotatedText,
-  ExhibitSharingBadge,
   ExhibitLinksLayout,
-  ShareControl,
   navigateToExhibit,
   getChamberIcon,
   useShellHosted,
@@ -99,7 +97,6 @@ export function DocumentViewPage() {
             title="Double-click to edit"
           >
             {doc.title}
-            <ExhibitSharingBadge exhibitId={`document-${doc.id}`} className="exhibit-sharing-badge" />
           </h2>
         )}
       </div>
@@ -151,7 +148,6 @@ export function DocumentViewPage() {
           editable
           actions={
             <ExhibitActionBar>
-              <ShareControl chamber="documents" exhibitId={`document-${doc.id}`} exhibitName={doc.title} />
               <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
                 Edit
               </button>

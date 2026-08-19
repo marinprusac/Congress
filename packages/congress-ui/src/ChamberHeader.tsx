@@ -22,25 +22,24 @@ interface ChamberHeaderProps {
   ownChamber?: string;
   renderIcon?: (chamber: string) => ReactNode;
   navigate?: (path: string) => void;
-  // The global search bar hits a session-gated endpoint - SharedViewPage
-  // (a token-scoped, no-login view) hides it rather than showing a search
-  // box that can only ever fail for that visitor.
+  // The global search bar hits a session-gated endpoint - a header rendered
+  // for a visitor with no session should pass false rather than showing a
+  // search box that can only ever fail for them.
   showSearch?: boolean;
-  // Where the icon+title link goes - defaults to "/". SharedViewPage passes
-  // undefined: an anonymous recipient has no session, so Capitol's own home
-  // route would just bounce them to a login form they can't use.
+  // Where the icon+title link goes - defaults to "/". Pass undefined for a
+  // visitor with no session, so it doesn't bounce them to a login form they
+  // can't use.
   titleHref?: string;
   // Same-Chamber Settings route, rendered as a gear icon button at the
   // start of the actions row (to the left of the search bar) - replaces
   // the old per-Chamber "Settings" nav-bar link now that ChamberPicker no
-  // longer renders one. Omit (SharedViewPage) to hide it entirely, same
-  // reasoning as titleHref being undefined there.
+  // longer renders one. Omit to hide it entirely.
   settingsHref?: string;
   // Extra controls rendered between the settings icon and the search bar
   // in the actions row, for a Chamber's own header-specific chrome.
   // Deliberately not baked into this shared component - kept as an escape
   // hatch for whatever a given Chamber's own header needs beyond
-  // search/settings (e.g. Capitol's Shares link, Deputy's Directives/History).
+  // search/settings (e.g. Deputy's Directives/History).
   extraActions?: ReactNode;
 }
 

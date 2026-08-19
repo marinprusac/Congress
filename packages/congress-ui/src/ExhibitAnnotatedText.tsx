@@ -11,9 +11,6 @@ interface ExhibitAnnotatedTextProps {
   renderIcon?: (chamber: string) => ReactNode;
   onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
   className?: string;
-  // See useResolvedExhibits - defaults to Congress's own-session resolve
-  // endpoint; SharedViewPage passes the token-scoped one instead.
-  resolveUrl?: string;
 }
 
 // For chambers whose content is plain text, not Markdown (e.g. Calendar's
@@ -21,9 +18,9 @@ interface ExhibitAnnotatedTextProps {
 // inline <ExhibitChip>s and leaves everything else as literal text. Notes
 // doesn't use this: its body goes through a full react-markdown pipeline
 // instead (see NoteMarkdown), which needs its own link-based approach.
-export function ExhibitAnnotatedText({ text, renderIcon, onNavigate, className, resolveUrl }: ExhibitAnnotatedTextProps) {
+export function ExhibitAnnotatedText({ text, renderIcon, onNavigate, className }: ExhibitAnnotatedTextProps) {
   const tokens = extractExhibitTokens(text);
-  const { resultsByToken, loading } = useResolvedExhibits(tokens, resolveUrl);
+  const { resultsByToken, loading } = useResolvedExhibits(tokens);
   const segments = splitExhibitText(text);
 
   return (

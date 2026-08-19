@@ -5,9 +5,7 @@ import {
   ExhibitTextarea,
   ExhibitActionBar,
   ExhibitAnnotatedText,
-  ExhibitSharingBadge,
   ExhibitLinksLayout,
-  ShareControl,
   navigateToExhibit,
   getChamberIcon,
   useShellHosted,
@@ -87,7 +85,6 @@ export function ItemViewPage() {
         ) : (
           <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
             <span>{item.name}</span>
-            <ExhibitSharingBadge exhibitId={`item-${itemId}`} className="exhibit-sharing-badge" />
           </h2>
         )}
       </div>
@@ -115,7 +112,6 @@ export function ItemViewPage() {
               </>
             ) : (
               <>
-                <ShareControl chamber="__CHAMBER_NAME__" exhibitId={`item-${itemId}`} exhibitName={item.name} />
                 <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
                   Edit
                 </button>

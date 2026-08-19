@@ -11,7 +11,6 @@ export const chambers = sqliteTable("chambers", {
   apiBase: text("api_base").notNull(),
   mcpUrl: text("mcp_url"),
   healthUrl: text("health_url").notNull(),
-  contentFormat: text("content_format", { enum: ["markdown", "plain"] }),
   status: text("status", { enum: ["active", "offline", "detached"] }).notNull().default("active"),
   lastHeartbeatAt: integer("last_heartbeat_at", { mode: "timestamp_ms" }),
   registeredAt: integer("registered_at", { mode: "timestamp_ms" }).notNull(),
@@ -52,23 +51,6 @@ export const exhibitRefs = sqliteTable(
     index("exhibit_refs_target_id_idx").on(table.targetId),
   ]
 );
-
-// A grant of view/edit access to one exhibit's closure (itself plus
-// recursively-referenced exhibits, up to maxDepth) to a holder of `id` as a
-// bearer token. One row per recipient - sharing the same root with two
-// people is two independently-revocable rows.
-export const shares = sqliteTable("shares", {
-  id: text("id").primaryKey(),
-  rootId: text("root_id").notNull(),
-  rootChamber: text("root_chamber").notNull(),
-  maxDepth: integer("max_depth").notNull(),
-  permission: text("permission", { enum: ["view", "edit"] }).notNull(),
-  label: text("label").notNull().default(""),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-  expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
-  revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
-  lastAccessedAt: integer("last_accessed_at", { mode: "timestamp_ms" }),
-});
 
 // Generic, chamber-agnostic append-only event log - any Chamber can publish
 // (POST /congress/events/publish) or poll for new entries since a cursor

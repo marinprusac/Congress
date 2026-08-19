@@ -5,9 +5,7 @@ import {
   ExhibitTextarea,
   ExhibitActionBar,
   ExhibitAnnotatedText,
-  ExhibitSharingBadge,
   ExhibitLinksLayout,
-  ShareControl,
   navigateToExhibit,
   getChamberIcon,
   useShellHosted,
@@ -121,7 +119,6 @@ export function AutomationViewPage() {
         ) : (
           <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
             <span className={automation.enabled ? "" : "text-dust line-through"}>{automation.title}</span>
-            <ExhibitSharingBadge exhibitId={`automation-${automationId}`} className="exhibit-sharing-badge" />
           </h2>
         )}
       </div>
@@ -231,7 +228,6 @@ export function AutomationViewPage() {
                 <button onClick={toggleEnabled} className="tap-target text-accent hover:underline">
                   {automation.enabled ? "Disable" : "Enable"}
                 </button>
-                <ShareControl chamber="automation" exhibitId={`automation-${automationId}`} exhibitName={automation.title} />
                 <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
                   Edit
                 </button>

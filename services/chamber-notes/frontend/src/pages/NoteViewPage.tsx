@@ -5,9 +5,7 @@ import {
   ExhibitTextarea,
   ExhibitActionBar,
   ExhibitMarkdown,
-  ExhibitSharingBadge,
   ExhibitLinksLayout,
-  ShareControl,
   navigateToExhibit,
   getChamberIcon,
   stripFrontmatter,
@@ -164,7 +162,6 @@ export function NoteViewPage() {
             title="Double-click to edit"
           >
             {note.title}
-            <ExhibitSharingBadge exhibitId={`note-${noteId}`} className="exhibit-sharing-badge" />
           </h2>
         )}
       </div>
@@ -221,7 +218,6 @@ export function NoteViewPage() {
               >
                 {note.pinned ? "Unpin" : "Pin"}
               </button>
-              <ShareControl chamber="notes" exhibitId={`note-${noteId}`} exhibitName={note.title} />
               <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
                 Edit
               </button>

@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   ChamberPicker,
   ChamberHeader,
@@ -18,12 +18,11 @@ export function Layout() {
   const { pathname } = useLocation();
   // Only the homepage's canvas needs to be a finite, unscrollable,
   // viewport-locked surface (see styles.css's .chamber-shell--canvas) -
-  // Settings/Shares stay an ordinary scrolling page. Compared through
+  // Settings stays an ordinary scrolling page. Compared through
   // resolveChamberPath, not a bare "/" check, since useLocation().pathname
   // is basename-stripped standalone ("/") but the full unstripped path
   // ("/capitol") when shell-hosted - see ShellHostContext's own comment.
   const isHome = pathname === resolveChamberPath("/", "capitol", shellHosted);
-  const sharesHref = resolveChamberPath("/shares", "capitol", shellHosted);
 
   return (
     <div className={`chamber-shell${isHome ? " chamber-shell--canvas" : ""}`}>
@@ -35,11 +34,6 @@ export function Layout() {
         renderIcon={(chamber) => <ChamberMark name={chamber} />}
         navigate={(path) => navigate(path)}
         settingsHref="/settings"
-        extraActions={
-          <Link to={sharesHref} className={pathname === sharesHref ? "chamber-header-link active" : "chamber-header-link"}>
-            Shares
-          </Link>
-        }
       />
       <main className={`chamber-main${isHome ? " chamber-main--canvas" : ""}`}>
         <Outlet />

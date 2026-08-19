@@ -14,9 +14,6 @@ export const notesManifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  // Note bodies use [[wikilink]]/Markdown syntax - see
-  // services/congress/frontend/src/pages/SharedViewPage.tsx.
-  contentFormat: "markdown",
   widgets: [{ id: "pinned", width: 3, height: 2, label: "Pinned" }],
   events: [],
 };

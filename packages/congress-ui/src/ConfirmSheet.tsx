@@ -11,7 +11,7 @@ export interface ConfirmSheetProps {
 
 // Native-feeling stand-in for window.confirm() (which renders as unstyled
 // OS chrome, jarring inside a standalone PWA) - a docked bottom sheet on
-// mobile (same idiom as SharePopover/ExhibitPickerDropdown), a centered
+// mobile (same idiom as ExhibitPickerDropdown), a centered
 // card with a backdrop on desktop, since a confirm alert has no trigger
 // element of its own to anchor a dropdown to.
 export function ConfirmSheet({ open, title, message, confirmLabel = "Delete", onConfirm, onCancel }: ConfirmSheetProps) {

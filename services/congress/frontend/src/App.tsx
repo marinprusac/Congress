@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchRegistry } from "@congress/congress-ui";
 import { LoginGate } from "@/components/LoginGate";
 import { ChamberHost, preloadChamber, ChamberWarmups } from "@/components/ChamberHost";
-import { SharedViewPage } from "@/pages/SharedViewPage";
 
 export function App() {
   // Warms every active Chamber's remote-entry.js/.css as soon as the
@@ -21,17 +20,14 @@ export function App() {
 
   // Every chamber-shaped route is "/:chamber/*" now that Capitol is an
   // ordinary registered Chamber rather than living at "/" - so the current
-  // Chamber's own name is just the URL's first segment, with "/" and
-  // "/shared/*" (neither of which ChamberHost ever renders) left
-  // undefined. Without this, ChamberWarmups has no way to exclude whichever
-  // Chamber ChamberHost is already rendering for real, and ends up
-  // rendering a redundant hidden second copy of it (see ChamberWarmups' own
-  // comment for why that's wasted work, not just a harmless no-op).
+  // Chamber's own name is just the URL's first segment, with "/" (which
+  // ChamberHost never renders) left undefined. Without this, ChamberWarmups
+  // has no way to exclude whichever Chamber ChamberHost is already
+  // rendering for real, and ends up rendering a redundant hidden second
+  // copy of it (see ChamberWarmups' own comment for why that's wasted work,
+  // not just a harmless no-op).
   const location = useLocation();
-  const currentChamberName =
-    location.pathname === "/" || location.pathname.startsWith("/shared/")
-      ? undefined
-      : location.pathname.split("/")[1];
+  const currentChamberName = location.pathname === "/" ? undefined : location.pathname.split("/")[1];
 
   return (
     <>
@@ -40,9 +36,6 @@ export function App() {
         currentChamberName={currentChamberName}
       />
       <Routes>
-        {/* Deliberately outside LoginGate - a share recipient has no Congress
-            login at all, and never should need one to reach this page. */}
-        <Route path="/shared/:token" element={<SharedViewPage />} />
         {/* Congress itself has no homepage content of its own - Capitol
             (the Chamber registered as "capitol") is the widget canvas that
             makes up the landing page, so root just hands off to it. If

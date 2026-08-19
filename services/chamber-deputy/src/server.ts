@@ -4,7 +4,6 @@ import { createDirectiveRequestSchema, updateDirectiveRequestSchema, updateSetti
 import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,
-  mountExhibitContentRoutes,
   mountSettingsRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
@@ -24,7 +23,7 @@ import {
   resyncDirectiveExhibitByExhibitId,
 } from "./directives.js";
 import { getSettings, updateSettings } from "./settings.js";
-import { searchDirectiveExhibits, resolveDirectiveExhibits, getDirectiveExhibitContent, updateDirectiveExhibitContent } from "./exhibits.js";
+import { searchDirectiveExhibits, resolveDirectiveExhibits } from "./exhibits.js";
 import { listMessages, postChatMessage } from "./chat.js";
 import { listRecentRuns, getRun, todaySpendUsd } from "./deputyRuns.js";
 import { mcpApp } from "./mcp/server.js";
@@ -87,8 +86,6 @@ app.delete("/api/directives/:id", async (c) => {
 });
 
 mountExhibitSearchRoutes(app, { search: searchDirectiveExhibits, resolve: resolveDirectiveExhibits });
-
-mountExhibitContentRoutes(app, { getContent: getDirectiveExhibitContent, updateContent: updateDirectiveExhibitContent });
 
 mountManualRefsRoutes(
   app,

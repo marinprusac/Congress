@@ -14,11 +14,6 @@ export const manifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  // Optional: set to "markdown" once this Chamber's exhibit bodies use
-  // [[wikilink]]/Markdown syntax, so Capitol's Exhibit Sharing viewer knows
-  // to render them that way for logged-out viewers - see
-  // services/congress/frontend/src/pages/SharedViewPage.tsx.
-  // contentFormat: "markdown",
   // width/height are in canvas cells, fixed by this Chamber, not
   // user-resizable. See frontend/src/widgets/ for the matching components.
   widgets: [

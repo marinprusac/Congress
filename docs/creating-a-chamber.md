@@ -34,7 +34,7 @@ hand:
   the registration/heartbeat/shutdown lifecycle, MCP transport, the Exhibit
   content contract, settings, manual references, wikilink parsing.
 - **`@congress/congress-ui`** — the shared frontend surface: page layout,
-  Exhibit chips/picker/annotated text, Exhibit Sharing UI, dark mode, global
+  Exhibit chips/picker/annotated text, dark mode, global
   search, the Chamber icon set, list/form primitives.
 
 A handful of frontend files (`Layout.tsx`, `main.tsx`, `App.tsx`,
@@ -112,13 +112,13 @@ don't reimplement them:
 | `createMcpApp(name, registerTools, internalToken)` | The full MCP transport/session/error plumbing, plus gating `/mcp` behind the same shared-secret header used for register/heartbeat/events - you only write `server.registerTool(...)` calls. |
 | `fetchRegistry(capitolUrl, internalToken)` | Server-side counterpart to congress-ui's own `fetchRegistry` - resolves another Chamber's `apiBase`/`mcpUrl` out of the live registry, e.g. before calling one of its tools. |
 | `listChamberTools(mcpUrl, internalToken)` / `callChamberTool(mcpUrl, internalToken, name, args)` | A short-lived MCP *client* against another Chamber's own `mcpUrl` - `tools/list`/`tools/call`, gated the same way. What Automation Chamber's automations use to actually do something, see §5.3. |
-| `createTableBackedExhibits(config)` | Implements the whole Exhibit content contract (search/resolve/get/update) for a table-backed entity from a handful of callbacks. |
+| `createTableBackedExhibits(config)` | Implements the whole Exhibit content contract (search/resolve) for a table-backed entity from a handful of callbacks. |
 | `createPushExhibitSync(opts)` | Fire-and-forget `POST /congress/exhibits/sync` after create/update/delete. |
 | `createPublishEvent(opts)` | Fire-and-forget `POST /congress/events/publish` for a domain event another Chamber's rules or automations might react to - see §5.2. |
 | `createSingleRowSettings(config)` | The "id is always 1, select-then-upsert" settings pattern every Chamber uses. |
 | `createManualRefs`/`createManualRefsByExhibitId` | CRUD for the "References" side-panel refs, separate from wikilinks parsed out of body text. |
 | `extractOutgoingExhibitRefs(text)` | Parses `[[...]]` tokens out of body text into an exhibit-id list. |
-| `mountManifestAndHealth`, `mountExhibitSearchRoutes`, `mountExhibitContentRoutes`, `mountSettingsRoutes`, `mountManualRefsRoutes`, `mountStaticFrontend` | One-line Hono route mounting for each of the above. Mount `mountStaticFrontend` last — it's the SPA fallback; it also serves `frontend/public/*` directly (falling through from `frontend/dist`) so assets like your icon resolve even before `build:web` has run. |
+| `mountManifestAndHealth`, `mountExhibitSearchRoutes`, `mountSettingsRoutes`, `mountManualRefsRoutes`, `mountStaticFrontend` | One-line Hono route mounting for each of the above. Mount `mountStaticFrontend` last — it's the SPA fallback; it also serves `frontend/public/*` directly (falling through from `frontend/dist`) so assets like your icon resolve even before `build:web` has run. |
 
 And `congress-ui`'s frontend surface:
 
@@ -128,7 +128,7 @@ And `congress-ui`'s frontend surface:
 | `useAppliedTheme` | Applies Congress's dark-mode setting; call once in `App()`. |
 | `useShellHosted`, `resolveChamberPath`, `navigateToExhibit` | Tell whether you're rendered standalone or shell-hosted inside Congress, and build correct links either way — use these instead of hand-writing absolute paths. |
 | `ExhibitTextarea`, `ExhibitAnnotatedText`, `ExhibitChip`, `ExhibitMarkdown` | The `[[` picker/autocomplete, rendering body text with resolved exhibit chips, and (optionally) Markdown rendering. |
-| `ExhibitActionBar`, `ExhibitLinksLayout`, `ExhibitSharingBadge`, `ShareControl` | Detail-page chrome: edit/delete/share actions, front/backlinks panel, the "Shared" badge, the share popover. |
+| `ExhibitActionBar`, `ExhibitLinksLayout` | Detail-page chrome: edit/delete actions, front/backlinks panel. |
 | `useSearchableList`, `useListRowPrefetch`, `ListSearchInput`, `ListLoadingState`, `ListErrorState`, `ListEmptyState` | List-page search + loading/error/empty states + hover-prefetch. |
 | `PageHeader`, `FormLabel`, `FormTextInput`, `FormErrorMessage`, `FormSubmitButton` | Generic page/form chrome. |
 | `WidgetPreviewShell` | Shared chrome (label, "+ New" link, loading/error/empty states) for a homepage widget's own content — see §5.1. |
@@ -147,9 +147,9 @@ is duplicated.
 
 If your Chamber's content genuinely isn't table-backed (Calendar's
 exhibits are Google Calendar events, not a local table — see
-`services/chamber-calendar/src/exhibits.ts`), implement the same four
-endpoints (`GET /api/exhibits/search`, `POST /api/exhibits/resolve`, `GET`/
-`PATCH /api/exhibits/:id/content`) by hand instead of using the factory.
+`services/chamber-calendar/src/exhibits.ts`), implement the same two
+endpoints (`GET /api/exhibits/search`, `POST /api/exhibits/resolve`) by
+hand instead of using the factory.
 
 ## 5. Plugging into Congress
 
@@ -213,17 +213,6 @@ in `services/congress/src/gateway.ts`, which proxies to whatever Chamber
 so it keeps the `currentColor` behavior. A Chamber that's offline, or one
 that never got around to shipping its own `mark.svg`, falls back to a
 generic mark everywhere its icon would appear — never broken, just plain.
-
-One thing remains genuinely optional polish, since it isn't derivable from
-the manifest alone:
-
-- **Sharing render format.** Congress's public Exhibit Sharing viewer
-  (`SharedViewPage.tsx`) renders a shared exhibit's body as either
-  Markdown-with-wikilinks or plain annotated text, based on the owning
-  Chamber's manifest `contentFormat` field. It defaults to plain; set
-  `contentFormat: "markdown"` in your `manifest.ts` (see the commented-out
-  line the scaffold leaves in place) if your body text uses Markdown/
-  `[[wikilink]]` syntax and should render that way for logged-out viewers.
 
 Everything else — including `mcpUrl`, which is what makes your Chamber's
 tools reachable at `/mcp` (gated by `CONGRESS_INTERNAL_TOKEN`, not a
@@ -319,7 +308,7 @@ pnpm -r typecheck                           # the whole repo - run before commit
 There's no test suite in this repo — `pnpm -r typecheck` is the one
 automated check, and it's expected to pass cleanly. The dev frontend proxies
 `/api`, `/manifest`, `/health`, `/mcp` to your Chamber's own backend port,
-and exhibit search/resolve/sharing calls to Congress's dev port (`3000`) —
+and exhibit search/resolve calls to Congress's dev port (`3000`) —
 see the `PROXY_TARGET`/`CAPITOL_PROXY_TARGET` constants at the top of
 `frontend/vite.config.ts` if you ever need to point dev at a non-default
 port.
@@ -378,4 +367,3 @@ deploy.
 | `chamber_unreachable` 503 from Congress's gateway | The registered `apiBase` in the manifest doesn't actually resolve (typo, wrong port, or the Chamber crashed after registering but before deregistering). |
 | Exhibit chips render as a generic diamond icon everywhere | That Chamber hasn't shipped `frontend/public/icons/mark.svg` yet, is offline, or the fetch to `/congress/chambers/<name>/icon` failed — see §5. Not a bug, just unbranded. |
 | 404s or empty responses only in production, not dev | Almost always a chamber-name-string mismatch somewhere production-only touches — `resolveApiBase("<name>", ...)` in `frontend/src/lib/api.ts`, the Vite `base: "/<name>/"` in both `vite.config.ts` and `vite.remote.config.ts`, or `ownChamber`/`ChamberMark name=` in `Layout.tsx`. The scaffold generator keeps these in sync automatically; if you're hand-editing an existing Chamber's name after the fact, grep for the old name across `src/`, `frontend/src/`, and `infra/`. |
-| Shared exhibit renders as plain text when you expected Markdown | Set `contentFormat: "markdown"` in that Chamber's `manifest.ts` (§5) and let it re-register (restart the process) — the registry only picks up manifest changes on the next registration call. |

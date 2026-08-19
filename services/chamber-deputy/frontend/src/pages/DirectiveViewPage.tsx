@@ -5,9 +5,7 @@ import {
   ExhibitTextarea,
   ExhibitActionBar,
   ExhibitAnnotatedText,
-  ExhibitSharingBadge,
   ExhibitLinksLayout,
-  ShareControl,
   navigateToExhibit,
   getChamberIcon,
   useShellHosted,
@@ -85,7 +83,6 @@ export function DirectiveViewPage() {
         ) : (
           <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
             <span className={directive.enabled ? "" : "text-dust line-through"}>{directive.title}</span>
-            <ExhibitSharingBadge exhibitId={`directive-${directiveId}`} className="exhibit-sharing-badge" />
           </h2>
         )}
       </div>
@@ -113,7 +110,6 @@ export function DirectiveViewPage() {
                 <button onClick={toggleEnabled} className="tap-target text-accent hover:underline">
                   {directive.enabled ? "Disable" : "Enable"}
                 </button>
-                <ShareControl chamber="deputy" exhibitId={`directive-${directiveId}`} exhibitName={directive.title} />
                 <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
                   Edit
                 </button>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { buildExhibitToken, parseExhibitToken } from "@congress/shared-types";
 import type { CapitolExhibitResolveResult } from "@congress/shared-types";
 
-const DEFAULT_RESOLVE_URL = "/congress/exhibits/resolve";
+const RESOLVE_URL = "/congress/exhibits/resolve";
 
 // Batch-resolves a set of `exhibit:chamber:id` tokens (see
 // extractExhibitTokens/splitExhibitText) into their current display data via
@@ -10,10 +10,7 @@ const DEFAULT_RESOLVE_URL = "/congress/exhibits/resolve";
 // up directly. Used by both NoteMarkdown (Markdown rendering) and
 // ExhibitAnnotatedText (plain-text rendering) - the fetch/resolve logic is
 // identical between them, only how the result gets rendered differs.
-export function useResolvedExhibits(
-  tokens: string[],
-  resolveUrl: string = DEFAULT_RESOLVE_URL
-): {
+export function useResolvedExhibits(tokens: string[]): {
   resultsByToken: Map<string, CapitolExhibitResolveResult>;
   loading: boolean;
 } {
@@ -32,7 +29,7 @@ export function useResolvedExhibits(
 
     const refs = tokens.map((token) => parseExhibitToken(token)).filter((t): t is NonNullable<typeof t> => t !== null);
 
-    fetch(resolveUrl, {
+    fetch(RESOLVE_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refs }),

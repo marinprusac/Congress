@@ -3,7 +3,6 @@ import { createTableBackedExhibits, createPushExhibitSync } from "@congress/cham
 import { db } from "./db/client.js";
 import { logRules } from "./db/schema.js";
 import { env } from "./env.js";
-import { getLogRule, updateLogRule } from "./logRules.js";
 
 const exhibits = createTableBackedExhibits({
   idPrefix: "logrule-",
@@ -18,24 +17,12 @@ const exhibits = createTableBackedExhibits({
       .limit(limit)
       .all(),
   resolveRows: (ids) => db.select({ id: logRules.id, title: logRules.title }).from(logRules).where(inArray(logRules.id, ids)).all(),
-  get: getLogRule,
-  update: (id, input) => updateLogRule(id, { title: input.title, body: input.body }),
-  toContent: (id, row) => ({
-    id,
-    chamber: "logs",
-    type: "log-rule",
-    name: row.title,
-    body: row.body,
-    isBinary: false,
-  }),
 });
 
 export const toExhibitId = exhibits.toExhibitId;
 export const parseLogRuleId = exhibits.parseId;
 export const searchLogRuleExhibits = exhibits.search;
 export const resolveLogRuleExhibits = exhibits.resolve;
-export const getLogRuleExhibitContent = exhibits.getContent;
-export const updateLogRuleExhibitContent = exhibits.updateContent;
 
 export const pushExhibitSync = createPushExhibitSync({
   chamber: "logs",

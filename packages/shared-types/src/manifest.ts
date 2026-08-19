@@ -60,11 +60,6 @@ export const manifestSchema = z.object({
   apiBase: z.string().url(),
   mcpUrl: z.string().url().optional(),
   healthUrl: z.string().url(),
-  // Declares how this Chamber's Exhibit bodies should be rendered by
-  // Capitol's public Exhibit Sharing viewer (services/congress/frontend/src/
-  // pages/SharedViewPage.tsx). Defaults to plain annotated text; set to
-  // "markdown" if bodies use [[wikilink]]/Markdown syntax (e.g. Notes).
-  contentFormat: z.enum(["markdown", "plain"]).optional(),
   // Homepage widgets this Chamber contributes to Capitol's canvas. Defaulted
   // so a Chamber registering against an old manifest shape (or a chamber with
   // no widgets, like Capitol itself) never has to think about this field.

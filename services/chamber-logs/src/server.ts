@@ -5,7 +5,6 @@ import { createLogRuleRequestSchema, updateLogRuleRequestSchema, updateSettingsR
 import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,
-  mountExhibitContentRoutes,
   mountSettingsRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
@@ -25,7 +24,7 @@ import {
   resyncLogRuleExhibitByExhibitId,
 } from "./logRules.js";
 import { getSettings, updateSettings } from "./settings.js";
-import { searchLogRuleExhibits, resolveLogRuleExhibits, getLogRuleExhibitContent, updateLogRuleExhibitContent } from "./exhibits.js";
+import { searchLogRuleExhibits, resolveLogRuleExhibits } from "./exhibits.js";
 import { listNotifications, markNotificationRead, markAllNotificationsRead, dismissNotification } from "./notifications.js";
 import { publicKey, saveSubscription, removeSubscription } from "./pushSubscriptions.js";
 import { listHistory } from "./eventHistory.js";
@@ -89,8 +88,6 @@ app.delete("/api/log-rules/:id", async (c) => {
 });
 
 mountExhibitSearchRoutes(app, { search: searchLogRuleExhibits, resolve: resolveLogRuleExhibits });
-
-mountExhibitContentRoutes(app, { getContent: getLogRuleExhibitContent, updateContent: updateLogRuleExhibitContent });
 
 mountManualRefsRoutes(
   app,

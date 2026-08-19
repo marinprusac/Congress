@@ -4,7 +4,6 @@ import { createTaskRequestSchema, updateTaskRequestSchema, updateTasksSettingsRe
 import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,
-  mountExhibitContentRoutes,
   mountSettingsRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
@@ -24,7 +23,7 @@ import {
   resyncTaskExhibitByExhibitId,
 } from "./tasks.js";
 import { getSettings, updateSettings } from "./settings.js";
-import { searchTaskExhibits, resolveTaskExhibits, getTaskExhibitContent, updateTaskExhibitContent } from "./exhibits.js";
+import { searchTaskExhibits, resolveTaskExhibits } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -85,8 +84,6 @@ app.delete("/api/tasks/:id", async (c) => {
 });
 
 mountExhibitSearchRoutes(app, { search: searchTaskExhibits, resolve: resolveTaskExhibits });
-
-mountExhibitContentRoutes(app, { getContent: getTaskExhibitContent, updateContent: updateTaskExhibitContent });
 
 mountManualRefsRoutes(
   app,

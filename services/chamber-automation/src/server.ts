@@ -4,7 +4,6 @@ import { createAutomationRequestSchema, updateAutomationRequestSchema, updateSet
 import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,
-  mountExhibitContentRoutes,
   mountSettingsRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
@@ -25,7 +24,7 @@ import {
   resyncAutomationExhibitByExhibitId,
 } from "./automations.js";
 import { getSettings, updateSettings } from "./settings.js";
-import { searchAutomationExhibits, resolveAutomationExhibits, getAutomationExhibitContent, updateAutomationExhibitContent } from "./exhibits.js";
+import { searchAutomationExhibits, resolveAutomationExhibits } from "./exhibits.js";
 import { listToolsForChamber } from "./remoteTools.js";
 import { mcpApp } from "./mcp/server.js";
 
@@ -93,8 +92,6 @@ app.delete("/api/automations/:id", async (c) => {
 });
 
 mountExhibitSearchRoutes(app, { search: searchAutomationExhibits, resolve: resolveAutomationExhibits });
-
-mountExhibitContentRoutes(app, { getContent: getAutomationExhibitContent, updateContent: updateAutomationExhibitContent });
 
 mountManualRefsRoutes(
   app,

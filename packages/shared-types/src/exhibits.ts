@@ -74,10 +74,9 @@ export type ExhibitRefEntry = z.infer<typeof exhibitRefEntrySchema>;
 // text-derived refs by the owning Chamber before it pushes outgoingRefs to
 // Capitol, so they show up in the same frontlinks/backlinks graph. Mounted
 // generically at "/api/exhibits/:id/refs" by every Chamber that opts in
-// (see chamber-kit's mountManualRefsRoutes), the same convention
-// mountExhibitContentRoutes uses - which is what lets Capitol proxy an add/
-// remove to whichever Chamber actually owns the target id, regardless of
-// which Chamber's page the request originated from (see
+// (see chamber-kit's mountManualRefsRoutes) - which is what lets Capitol
+// proxy an add/remove to whichever Chamber actually owns the target id,
+// regardless of which Chamber's page the request originated from (see
 // POST/DELETE /congress/exhibits/:id/refs in services/congress/src/server.ts).
 export const manualRefRequestSchema = z.object({
   targetExhibitId: z.string().min(1),

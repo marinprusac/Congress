@@ -10,9 +10,6 @@ import { toMarkdownWithExhibitLinks, decodeExhibitLinkHref } from "./wikilinks.j
 interface ExhibitMarkdownProps {
   body: string;
   onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
-  // See useResolvedExhibits - defaults to Congress's own-session resolve
-  // endpoint; SharedViewPage passes the token-scoped one instead.
-  resolveUrl?: string;
   // Called with how far through the rendered text (0 = start, 1 = end) the
   // double-click landed, so the caller can place the editor's caret roughly
   // where the reader was looking instead of always at the top.
@@ -54,14 +51,14 @@ function estimateTextFraction(container: HTMLElement, x: number, y: number): num
   return total === 0 ? 0 : Math.min(1, Math.max(0, before / total));
 }
 
-// Renders a Chamber's Markdown body (Notes, and any shared-view rendering of
-// a Note) through react-markdown, resolving `[[exhibit:...]]` tokens into
-// <ExhibitChip>s inline. Chambers whose content is plain text, not Markdown
-// (e.g. Calendar's event description), use ExhibitAnnotatedText instead.
-export function ExhibitMarkdown({ body, onNavigate, resolveUrl, onDoubleClick }: ExhibitMarkdownProps) {
+// Renders a Chamber's Markdown body (Notes) through react-markdown,
+// resolving `[[exhibit:...]]` tokens into <ExhibitChip>s inline. Chambers
+// whose content is plain text, not Markdown (e.g. Calendar's event
+// description), use ExhibitAnnotatedText instead.
+export function ExhibitMarkdown({ body, onNavigate, onDoubleClick }: ExhibitMarkdownProps) {
   const transformed = toMarkdownWithExhibitLinks(body);
   const tokens = extractExhibitTokens(body);
-  const { resultsByToken } = useResolvedExhibits(tokens, resolveUrl);
+  const { resultsByToken } = useResolvedExhibits(tokens);
 
   return (
     <div
