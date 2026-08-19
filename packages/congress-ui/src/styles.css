@@ -323,6 +323,12 @@ html[data-theme="dark"] {
      pointer-based drag and pops up the browser's "drop to open/copy link"
      affordance instead of reordering. */
   -webkit-user-drag: none;
+  /* iOS Safari's own long-press affordance on an <a> - a link-preview popup
+     with Open/Copy/Share actions - fires on the same long-press
+     useReorderableList is trying to claim for drag, and touch-action/
+     user-select above don't suppress it. Without this, holding a row shows
+     that preview instead of picking it up to reorder. */
+  -webkit-touch-callout: none;
 }
 
 .nav-panel-link:hover,
