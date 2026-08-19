@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult as textResult } from "@congress/chamber-kit";
 import { listAccounts } from "../google/accounts.js";
-import { listEvents, createEvent, updateEvent, deleteEvent } from "../google/events.js";
+import { listEvents, searchEvents, createEvent, updateEvent, deleteEvent } from "../google/events.js";
 
 export function registerTools(server: McpServer) {
   server.registerTool(
@@ -23,6 +23,17 @@ export function registerTools(server: McpServer) {
       inputSchema: { from: z.string(), to: z.string() },
     },
     async ({ from, to }) => textResult(await listEvents(from, to))
+  );
+
+  server.registerTool(
+    "search_events",
+    {
+      title: "Search Events",
+      description:
+        "Search events by title/description/location across all selected calendars, within a rolling ~6-month window centered on now.",
+      inputSchema: { query: z.string().min(1), limit: z.number().int().positive().max(50).default(20) },
+    },
+    async ({ query, limit }) => textResult(await searchEvents(query, limit))
   );
 
   server.registerTool(

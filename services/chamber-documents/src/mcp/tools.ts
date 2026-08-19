@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult as textResult } from "@congress/chamber-kit";
-import { listDocuments, getDocument } from "../documents.js";
+import { listDocuments, getDocument, createDocument, updateDocument, deleteDocument, FileTooLargeError, MAX_FILE_SIZE_BYTES } from "../documents.js";
 import { searchDocumentExhibits } from "../exhibits.js";
 
 export function registerTools(server: McpServer) {
@@ -37,6 +37,66 @@ export function registerTools(server: McpServer) {
       const document = await getDocument(id);
       if (!document) return textResult({ error: "not_found", id });
       return textResult(document);
+    }
+  );
+
+  server.registerTool(
+    "upload_document",
+    {
+      title: "Upload Document",
+      description: `Upload a new document. File content is base64-encoded, decoded server-side; the ${Math.floor(MAX_FILE_SIZE_BYTES / (1024 * 1024))}MB limit applies to the decoded file, not the base64 string.`,
+      inputSchema: {
+        title: z.string().min(1),
+        description: z.string().default(""),
+        filename: z.string().min(1),
+        mimeType: z.string().default("application/octet-stream"),
+        contentBase64: z.string().min(1),
+      },
+    },
+    async ({ title, description, filename, mimeType, contentBase64 }) => {
+      let bytes: Uint8Array;
+      try {
+        bytes = new Uint8Array(Buffer.from(contentBase64, "base64"));
+      } catch {
+        return textResult({ error: "invalid_base64" });
+      }
+      try {
+        const document = await createDocument({ title, description, file: { filename, mimeType, bytes } });
+        return textResult(document);
+      } catch (err) {
+        if (err instanceof FileTooLargeError) {
+          return textResult({ error: "file_too_large", maxBytes: MAX_FILE_SIZE_BYTES });
+        }
+        throw err;
+      }
+    }
+  );
+
+  server.registerTool(
+    "update_document_metadata",
+    {
+      title: "Update Document Metadata",
+      description: "Update a document's title and/or description by id. Does not replace the uploaded file itself.",
+      inputSchema: { id: z.number().int(), title: z.string().min(1).optional(), description: z.string().optional() },
+    },
+    async ({ id, title, description }) => {
+      const updated = await updateDocument(id, { title, description });
+      if (!updated) return textResult({ error: "not_found", id });
+      return textResult(updated);
+    }
+  );
+
+  server.registerTool(
+    "delete_document",
+    {
+      title: "Delete Document",
+      description: "Delete a document and its stored file by id.",
+      inputSchema: { id: z.number().int() },
+    },
+    async ({ id }) => {
+      const deleted = await deleteDocument(id);
+      if (!deleted) return textResult({ error: "not_found", id });
+      return textResult({ ok: true, id });
     }
   );
 }

@@ -37,7 +37,9 @@ export function registerChamber(manifest: Manifest): ChamberRegistryEntry {
         mcpUrl: manifest.mcpUrl ?? null,
         healthUrl: manifest.healthUrl,
         contentFormat: manifest.contentFormat ?? null,
-        status: "active",
+        // A re-registering Chamber (e.g. restarting) shouldn't silently
+        // undo a manual detach - only attachChamber clears it.
+        status: existing.status === "detached" ? "detached" : "active",
       })
       .where(eq(chambers.name, manifest.name))
       .run();
@@ -80,9 +82,41 @@ export function recordHeartbeat(name: string): ChamberRegistryEntry | null {
   if (!existing) return null;
 
   db.update(chambers)
-    .set({ lastHeartbeatAt: new Date(), status: "active" })
+    .set({
+      lastHeartbeatAt: new Date(),
+      // Still record freshness while detached, but a live heartbeat must
+      // not itself clear a manual detach - only attachChamber does.
+      status: existing.status === "detached" ? "detached" : "active",
+    })
     .where(eq(chambers.name, name))
     .run();
+
+  const row = db.select().from(chambers).where(eq(chambers.name, name)).get();
+  return row ? toEntry(row) : null;
+}
+
+// Manual owner override: take a Chamber out of gateway rotation (frontend
+// routing, /api/:chamber/* proxying) without deregistering it - distinct
+// from the heartbeat-driven "offline" status so it sticks even while the
+// Chamber's own process keeps heartbeating. Only attachChamber clears it.
+export function detachChamber(name: string): ChamberRegistryEntry | null {
+  const existing = db.select().from(chambers).where(eq(chambers.name, name)).get();
+  if (!existing) return null;
+
+  db.update(chambers).set({ status: "detached" }).where(eq(chambers.name, name)).run();
+
+  const row = db.select().from(chambers).where(eq(chambers.name, name)).get();
+  return row ? toEntry(row) : null;
+}
+
+// Clears a manual detach, immediately marking the Chamber active again. If
+// it isn't actually reachable, the next heartbeat sweep will flip it back
+// to "offline" same as any other Chamber.
+export function attachChamber(name: string): ChamberRegistryEntry | null {
+  const existing = db.select().from(chambers).where(eq(chambers.name, name)).get();
+  if (!existing) return null;
+
+  db.update(chambers).set({ status: "active" }).where(eq(chambers.name, name)).run();
 
   const row = db.select().from(chambers).where(eq(chambers.name, name)).get();
   return row ? toEntry(row) : null;

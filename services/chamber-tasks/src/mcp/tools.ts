@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult as textResult } from "@congress/chamber-kit";
-import { listTasks, listOpenTasks, searchTasks, getTask, createTask, updateTask } from "../tasks.js";
+import { listTasks, listOpenTasks, searchTasks, getTask, createTask, updateTask, deleteTask } from "../tasks.js";
 
 export function registerTools(server: McpServer) {
   server.registerTool(
@@ -79,16 +79,16 @@ export function registerTools(server: McpServer) {
   );
 
   server.registerTool(
-    "complete_task",
+    "delete_task",
     {
-      title: "Complete Task",
-      description: "Mark a task as completed by id.",
+      title: "Delete Task",
+      description: "Delete a task by id.",
       inputSchema: { id: z.number().int() },
     },
     async ({ id }) => {
-      const updated = await updateTask(id, { completed: true });
-      if (!updated) return textResult({ error: "not_found", id });
-      return textResult(updated);
+      const deleted = await deleteTask(id);
+      if (!deleted) return textResult({ error: "not_found", id });
+      return textResult({ ok: true, id });
     }
   );
 }

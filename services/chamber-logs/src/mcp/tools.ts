@@ -4,6 +4,7 @@ import { mcpTextResult as textResult } from "@congress/chamber-kit";
 import { priorityLevelSchema } from "@congress/shared-types";
 import { listLogRules, listRecentLogRules, searchLogRules, getLogRule, createLogRule, updateLogRule, deleteLogRule } from "../logRules.js";
 import { listHistory } from "../eventHistory.js";
+import { listNotifications, dismissNotification } from "../notifications.js";
 
 export function registerTools(server: McpServer) {
   server.registerTool(
@@ -128,5 +129,31 @@ export function registerTools(server: McpServer) {
       inputSchema: { minPriority: priorityLevelSchema.optional(), limit: z.number().int().positive().optional() },
     },
     async ({ minPriority, limit }) => textResult(listHistory({ minPriority, limit }))
+  );
+
+  server.registerTool(
+    "list_inbox",
+    {
+      title: "List Inbox",
+      description:
+        "List the owner-facing notification inbox (most recent first, capped at 50) plus the current unread count. Distinct from list_event_history: this is live current state (upserted/deduped per rule), not an append-only record.",
+      inputSchema: {},
+    },
+    async () => textResult(listNotifications())
+  );
+
+  server.registerTool(
+    "dismiss_notification",
+    {
+      title: "Dismiss Notification",
+      description:
+        "Dismiss (permanently remove) a notification from the inbox by id. If the condition that raised it still holds, the next matching event re-creates it.",
+      inputSchema: { id: z.number().int() },
+    },
+    async ({ id }) => {
+      const dismissed = dismissNotification(id);
+      if (!dismissed) return textResult({ error: "not_found", id });
+      return textResult({ ok: true, id });
+    }
   );
 }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult as textResult } from "@congress/chamber-kit";
-import { listNotes, searchNotes, getNote, createNote, updateNote } from "../notes.js";
+import { listNotes, searchNotes, getNote, createNote, updateNote, deleteNote } from "../notes.js";
 import { TitleConflictError } from "../notes.js";
 
 export function registerTools(server: McpServer) {
@@ -77,6 +77,20 @@ export function registerTools(server: McpServer) {
         }
         throw err;
       }
+    }
+  );
+
+  server.registerTool(
+    "delete_note",
+    {
+      title: "Delete Note",
+      description: "Delete a note by id.",
+      inputSchema: { id: z.number().int() },
+    },
+    async ({ id }) => {
+      const deleted = await deleteNote(id);
+      if (!deleted) return textResult({ error: "not_found", id });
+      return textResult({ ok: true, id });
     }
   );
 }

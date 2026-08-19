@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-export const chamberStatusSchema = z.enum(["active", "offline"]);
+// "detached" is a manual owner override (see congress/src/registry.ts's
+// detachChamber/attachChamber) - distinct from "offline" so an incoming
+// heartbeat from a Chamber that's still actually running doesn't silently
+// undo it. Everywhere in the frontend that gates on `status === "active"`
+// already treats "detached" the same as "offline" for free.
+export const chamberStatusSchema = z.enum(["active", "offline", "detached"]);
 export type ChamberStatus = z.infer<typeof chamberStatusSchema>;
 
 export const manifestRoutesSchema = z.object({

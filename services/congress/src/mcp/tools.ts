@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult } from "@congress/chamber-kit";
-import { listChambers, getChamber } from "../registry.js";
+import { listChambers, getChamber, detachChamber, attachChamber } from "../registry.js";
 import { searchExhibits, resolveExhibits } from "../exhibits.js";
 
 export function registerTools(server: McpServer) {
@@ -30,6 +30,35 @@ export function registerTools(server: McpServer) {
       if (!chamber) {
         return mcpTextResult({ error: "not_found", name });
       }
+      return mcpTextResult(chamber);
+    }
+  );
+
+  server.registerTool(
+    "detach_chamber",
+    {
+      title: "Detach Chamber",
+      description:
+        "Manually take a Chamber out of rotation - the gateway stops proxying its API/frontend and it disappears from the active list - without deregistering it. Sticks even if the Chamber keeps heartbeating; only attach_chamber clears it.",
+      inputSchema: { name: z.string().min(1) },
+    },
+    async ({ name }) => {
+      const chamber = detachChamber(name);
+      if (!chamber) return mcpTextResult({ error: "not_found", name });
+      return mcpTextResult(chamber);
+    }
+  );
+
+  server.registerTool(
+    "attach_chamber",
+    {
+      title: "Attach Chamber",
+      description: "Clear a manual detach and mark a Chamber active again.",
+      inputSchema: { name: z.string().min(1) },
+    },
+    async ({ name }) => {
+      const chamber = attachChamber(name);
+      if (!chamber) return mcpTextResult({ error: "not_found", name });
       return mcpTextResult(chamber);
     }
   );
