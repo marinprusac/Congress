@@ -23,6 +23,7 @@ export const toExhibitId = exhibits.toExhibitId;
 export const parseDocumentId = exhibits.parseId;
 export const searchDocumentExhibits = exhibits.search;
 export const resolveDocumentExhibits = exhibits.resolve;
+export const chipDocumentExhibit = exhibits.chip;
 
 export const pushExhibitSync = createPushExhibitSync({
   chamber: "documents",

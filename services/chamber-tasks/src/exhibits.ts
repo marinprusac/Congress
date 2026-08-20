@@ -23,6 +23,7 @@ export const toExhibitId = exhibits.toExhibitId;
 export const parseTaskId = exhibits.parseId;
 export const searchTaskExhibits = exhibits.search;
 export const resolveTaskExhibits = exhibits.resolve;
+export const chipTaskExhibit = exhibits.chip;
 
 export const pushExhibitSync = createPushExhibitSync({
   chamber: "tasks",

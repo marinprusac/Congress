@@ -48,6 +48,8 @@ export interface TableBackedExhibitsConfig<TSearchRow extends { id: number; titl
   resolveRows: (ids: number[]) => TSearchRow[];
 }
 
+export type ChipResult = { id: string; name: string; url: string } | { id: string; deleted: true };
+
 export function createTableBackedExhibits<TSearchRow extends { id: number; title: string }>(
   config: TableBackedExhibitsConfig<TSearchRow>
 ) {
@@ -87,5 +89,17 @@ export function createTableBackedExhibits<TSearchRow extends { id: number; title
     });
   }
 
-  return { toExhibitId, parseId, search, resolve };
+  // Given this Chamber's own raw row id (e.g. what create_x/get_x's own MCP
+  // tool already returns), builds the Exhibit id + name/url a caller needs to
+  // construct a chip token - without this, only a caller who already knows
+  // the idPrefix convention could turn a raw id into a valid `[[exhibit:...]]`
+  // reference. Same not-found shape as resolve() for a single id.
+  async function chip(rawId: number): Promise<ChipResult> {
+    const id = toExhibitId(rawId);
+    const row = config.resolveRows([rawId]).find((r) => r.id === rawId);
+    if (!row) return { id, deleted: true };
+    return { id, name: row.title, url: config.urlFor(rawId) };
+  }
+
+  return { toExhibitId, parseId, search, resolve, chip };
 }

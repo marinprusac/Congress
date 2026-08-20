@@ -24,7 +24,7 @@ import {
   TitleConflictError,
 } from "./notes.js";
 import { getSettings, updateSettings } from "./settings.js";
-import { searchNoteExhibits, resolveNoteExhibits } from "./exhibits.js";
+import { searchNoteExhibits, resolveNoteExhibits, chipNoteExhibit } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -98,7 +98,7 @@ app.delete("/api/notes/:id", async (c) => {
   return c.body(null, 204);
 });
 
-mountExhibitSearchRoutes(app, { search: searchNoteExhibits, resolve: resolveNoteExhibits });
+mountExhibitSearchRoutes(app, { search: searchNoteExhibits, resolve: resolveNoteExhibits, chip: chipNoteExhibit });
 
 mountManualRefsRoutes(
   app,

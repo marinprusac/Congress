@@ -6,7 +6,7 @@ import type {
   CapitolExhibitResolveResult,
   ExhibitRefEntry,
 } from "@congress/shared-types";
-import { exhibitSearchResultSchema, exhibitResolveResultSchema } from "@congress/shared-types";
+import { exhibitSearchResultSchema, exhibitResolveResultSchema, buildChipToken } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { exhibitCache, exhibitRefs } from "./db/schema.js";
 import { listChambers, getChamber } from "./registry.js";
@@ -221,4 +221,102 @@ export function getManualConnectionOwner(aId: string, bId: string): { ownerId: s
     .get();
   if (!row) return null;
   return { ownerId: row.sourceId, chamber: row.sourceChamber };
+}
+
+const exhibitChipResponseSchema = z.union([
+  z.object({ id: z.string(), name: z.string(), url: z.string() }),
+  z.object({ error: z.string() }),
+]);
+
+// Builds a ready-to-paste `[[exhibit:chamber:id|Name]]` chip for a Chamber's
+// own raw row id (e.g. what its create_x/get_x MCP tools already return) -
+// Congress has no local access to another Chamber's DB, so this always makes
+// one live HTTP call to that Chamber's own GET /exhibits/chip/:rawId,
+// mirroring resolveOneLive's chamber-lookup + fetch + typed-failure shape.
+export async function getExhibitChip(
+  chamber: string,
+  rawId: string
+): Promise<
+  | { id: string; chamber: string; name: string; url: string; token: string }
+  | { error: "chamber_not_found" | "chamber_unavailable" | "not_found" }
+> {
+  const entry = getChamber(chamber);
+  if (!entry || entry.status !== "active") return { error: "chamber_not_found" };
+
+  try {
+    const res = await fetch(`${entry.apiBase}/exhibits/chip/${encodeURIComponent(rawId)}`, {
+      signal: AbortSignal.timeout(FAN_OUT_TIMEOUT_MS),
+    });
+    if (res.status === 404) return { error: "not_found" };
+    if (!res.ok) return { error: "chamber_unavailable" };
+
+    const parsed = exhibitChipResponseSchema.safeParse(await res.json());
+    if (!parsed.success || "error" in parsed.data) return { error: "not_found" };
+
+    const { id, name, url } = parsed.data;
+    return { id, chamber, name, url, token: buildChipToken({ chamber, id, name }) };
+  } catch {
+    return { error: "chamber_unavailable" };
+  }
+}
+
+// Adds a manual Connection from `id` to `targetExhibitId`, proxying to `id`'s
+// owning Chamber's own "/api/exhibits/:id/refs" (see mountManualRefsRoutes in
+// @congress/chamber-kit). A plain fetch rather than gateway.ts's
+// proxyToChamberPath, since that needs a Hono Context this function (callable
+// from both an HTTP route and an MCP tool handler) doesn't have.
+export async function addManualConnection(
+  id: string,
+  targetExhibitId: string,
+  targetChamber?: string
+): Promise<{ refs: string[] } | { error: "not_found" }> {
+  const chamber = getCachedChamber(id);
+  if (!chamber) return { error: "not_found" };
+
+  // Best-effort eager cache of the target - see manualRefRequestSchema's own
+  // comment on `targetChamber` for why: without it, a connection pointing at
+  // something never created/edited within Congress saves fine but never
+  // shows up in the panel, since getConnections silently skips an uncached,
+  // chamber-unknown target.
+  if (targetChamber) {
+    await resolveOneLive(targetExhibitId, targetChamber);
+  }
+
+  const entry = getChamber(chamber);
+  if (!entry || entry.status !== "active") return { error: "not_found" };
+  try {
+    const res = await fetch(`${entry.apiBase}/exhibits/${encodeURIComponent(id)}/refs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetExhibitId, targetChamber }),
+      signal: AbortSignal.timeout(FAN_OUT_TIMEOUT_MS),
+    });
+    if (!res.ok) return { error: "not_found" };
+    return (await res.json()) as { refs: string[] };
+  } catch {
+    return { error: "not_found" };
+  }
+}
+
+// Removes a manual Connection between `id` and `otherExhibitId`, regardless
+// of which side the underlying row is stored on (see getManualConnectionOwner).
+export async function removeManualConnection(
+  id: string,
+  otherExhibitId: string
+): Promise<{ refs: string[] } | { error: "not_found" }> {
+  const owner = getManualConnectionOwner(id, otherExhibitId);
+  if (!owner) return { error: "not_found" };
+  const otherId = owner.ownerId === id ? otherExhibitId : id;
+  const entry = getChamber(owner.chamber);
+  if (!entry || entry.status !== "active") return { error: "not_found" };
+  try {
+    const res = await fetch(
+      `${entry.apiBase}/exhibits/${encodeURIComponent(owner.ownerId)}/refs/${encodeURIComponent(otherId)}`,
+      { method: "DELETE", signal: AbortSignal.timeout(FAN_OUT_TIMEOUT_MS) }
+    );
+    if (!res.ok) return { error: "not_found" };
+    return (await res.json()) as { refs: string[] };
+  } catch {
+    return { error: "not_found" };
+  }
 }

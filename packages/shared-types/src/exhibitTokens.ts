@@ -23,3 +23,13 @@ export function parseExhibitToken(target: string): ExhibitToken | null {
   if (!chamber || !id) return null;
   return { chamber, id };
 }
+
+// The full `[[exhibit:chamber:id|Name]]` bracket token ready to paste into a
+// note/task/document body - buildExhibitToken only builds the inner
+// `exhibit:chamber:id` target half; this wraps it in the same `[[target|alias]]`
+// syntax the "[[" picker hand-rolls on insert (see congress-ui's
+// useExhibitPicker.ts), so there is one named place defining what a pasted
+// chip looks like.
+export function buildChipToken({ chamber, id, name }: ExhibitToken & { name: string }): string {
+  return `[[${buildExhibitToken({ chamber, id })}|${name}]]`;
+}

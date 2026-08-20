@@ -19,6 +19,11 @@ export function mountManifestAndHealth(app: ChamberApp, manifest: Manifest): voi
 export interface ExhibitSearchApi {
   search: (query: string, limit?: number) => Promise<ExhibitSearchResult[]>;
   resolve: (ids: string[]) => Promise<ExhibitResolveResult[]>;
+  // Turns this Chamber's own raw row id into a chip-ready Exhibit id +
+  // name/url - optional since only table-backed Chambers (createTableBackedExhibits)
+  // support it today; a hand-rolled ExhibitSearchApi (e.g. calendar's compound
+  // ids) can omit it and the route below answers "not_supported" instead.
+  chip?: (rawId: number) => Promise<{ id: string; name: string; url: string } | { id: string; deleted: true }>;
 }
 
 // The cross-Chamber "[[" picker and Capitol's global search both hit these -
@@ -38,6 +43,15 @@ export function mountExhibitSearchRoutes(app: ChamberApp, exhibits: ExhibitSearc
       return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
     }
     return c.json({ results: await exhibits.resolve(parsed.data.ids) });
+  });
+
+  app.get("/api/exhibits/chip/:rawId", async (c) => {
+    if (!exhibits.chip) return c.json({ error: "not_supported" }, 404);
+    const rawId = Number(c.req.param("rawId"));
+    if (!Number.isInteger(rawId)) return c.json({ error: "invalid_id" }, 400);
+    const result = await exhibits.chip(rawId);
+    if ("deleted" in result) return c.json({ error: "not_found" }, 404);
+    return c.json(result);
   });
 }
 

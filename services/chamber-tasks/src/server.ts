@@ -23,7 +23,7 @@ import {
   resyncTaskExhibitByExhibitId,
 } from "./tasks.js";
 import { getSettings, updateSettings } from "./settings.js";
-import { searchTaskExhibits, resolveTaskExhibits } from "./exhibits.js";
+import { searchTaskExhibits, resolveTaskExhibits, chipTaskExhibit } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -83,7 +83,7 @@ app.delete("/api/tasks/:id", async (c) => {
   return c.body(null, 204);
 });
 
-mountExhibitSearchRoutes(app, { search: searchTaskExhibits, resolve: resolveTaskExhibits });
+mountExhibitSearchRoutes(app, { search: searchTaskExhibits, resolve: resolveTaskExhibits, chip: chipTaskExhibit });
 
 mountManualRefsRoutes(
   app,

@@ -23,7 +23,7 @@ import {
   removeManualRefByExhibitId,
   resyncDocumentExhibitByExhibitId,
 } from "./documents.js";
-import { searchDocumentExhibits, resolveDocumentExhibits } from "./exhibits.js";
+import { searchDocumentExhibits, resolveDocumentExhibits, chipDocumentExhibit } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -117,7 +117,7 @@ app.get("/api/documents/:id/download", async (c) => {
   return serveDocumentFile(c, id);
 });
 
-mountExhibitSearchRoutes(app, { search: searchDocumentExhibits, resolve: resolveDocumentExhibits });
+mountExhibitSearchRoutes(app, { search: searchDocumentExhibits, resolve: resolveDocumentExhibits, chip: chipDocumentExhibit });
 
 mountManualRefsRoutes(
   app,

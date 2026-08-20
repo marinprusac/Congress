@@ -9,6 +9,7 @@ import {
   updateCapitolSettingsRequestSchema,
   eventPublishRequestSchema,
   chamberSubscriptionSchema,
+  manualRefRequestSchema,
 } from "@congress/shared-types";
 import { env } from "./env.js";
 import { requireInternalToken, requireSessionOrInternalToken } from "./auth.js";
@@ -22,16 +23,15 @@ import {
   sweepStaleChambers,
   getChamber,
 } from "./registry.js";
-import { forwardToChamber, forwardToChamberFrontend, proxyToChamberIcon, proxyToChamberPath } from "./gateway.js";
+import { forwardToChamber, forwardToChamberFrontend, proxyToChamberIcon } from "./gateway.js";
 import { hasValidSession } from "./sessionAuth.js";
 import {
   syncExhibit,
   searchExhibits,
   resolveExhibits,
-  resolveOneLive,
   getConnections,
-  getCachedChamber,
-  getManualConnectionOwner,
+  addManualConnection,
+  removeManualConnection,
 } from "./exhibits.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { publishEvent } from "./events.js";
@@ -165,47 +165,29 @@ app.get("/congress/exhibits/:id/connections", requireSession, async (c) => {
 // always already-cached - it's the record on screen) to a picked Exhibit
 // (`targetExhibitId`) - proxies to `:id`'s own Chamber's
 // "/api/exhibits/:id/refs" (see mountManualRefsRoutes in @congress/chamber-kit).
+// Shares its logic with the create_exhibit_connection MCP tool via
+// addManualConnection, since an MCP tool handler has no Hono Context to hand
+// proxyToChamberPath (which this route used to call directly).
 app.post("/congress/exhibits/:id/connections", requireSession, async (c) => {
-  const id = c.req.param("id");
-  const chamber = getCachedChamber(id);
-  if (!chamber) return c.json({ error: "not_found" }, 404);
-
-  // Best-effort eager cache of the target, using the clone so the body
-  // stream proxyToChamberPath forwards below is untouched - see
-  // manualRefRequestSchema's own comment on `targetChamber` for why this
-  // matters: without it, a connection pointing at something never
-  // created/edited within Congress (e.g. a pre-existing Google Calendar
-  // event) saves fine but never shows up in the panel, since getConnections
-  // silently skips an uncached, chamber-unknown target.
-  try {
-    const body: unknown = await c.req.raw.clone().json();
-    const targetExhibitId = (body as { targetExhibitId?: unknown })?.targetExhibitId;
-    const targetChamber = (body as { targetChamber?: unknown })?.targetChamber;
-    if (typeof targetExhibitId === "string" && typeof targetChamber === "string") {
-      await resolveOneLive(targetExhibitId, targetChamber);
-    }
-  } catch {
-    // Malformed body - the owning Chamber's own parse (after proxying)
-    // is what should surface a 400 for this request, not this step.
+  const body = await c.req.json().catch(() => null);
+  const parsed = manualRefRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
-
-  return proxyToChamberPath(c, chamber, `/exhibits/${encodeURIComponent(id)}/refs`);
+  const result = await addManualConnection(c.req.param("id"), parsed.data.targetExhibitId, parsed.data.targetChamber);
+  if ("error" in result) return c.json(result, 404);
+  return c.json(result);
 });
 
 // Removes a manual connection between `:id` (the Exhibit currently being
 // viewed) and `:otherExhibitId`, regardless of which of the two the
 // underlying row happens to be stored on - see getManualConnectionOwner.
+// Shares its logic with the delete_exhibit_connection MCP tool via
+// removeManualConnection, same reasoning as the POST route above.
 app.delete("/congress/exhibits/:id/connections/:otherExhibitId", requireSession, async (c) => {
-  const id = c.req.param("id");
-  const otherExhibitId = c.req.param("otherExhibitId");
-  const owner = getManualConnectionOwner(id, otherExhibitId);
-  if (!owner) return c.json({ error: "not_found" }, 404);
-  const otherId = owner.ownerId === id ? otherExhibitId : id;
-  return proxyToChamberPath(
-    c,
-    owner.chamber,
-    `/exhibits/${encodeURIComponent(owner.ownerId)}/refs/${encodeURIComponent(otherId)}`
-  );
+  const result = await removeManualConnection(c.req.param("id"), c.req.param("otherExhibitId"));
+  if ("error" in result) return c.json(result, 404);
+  return c.json(result);
 });
 
 app.all("/api/:chamber/*", requireSession, forwardToChamber);
