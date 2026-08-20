@@ -6,6 +6,7 @@ import { automations, automationRuns } from "./db/schema.js";
 import { toExhibitId, parseAutomationId, pushExhibitSync } from "./exhibits.js";
 import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForAutomation } from "./refs.js";
 import { notifySubscriptionsChanged } from "./subscriptions.js";
+import { publishEvent } from "./events.js";
 
 // The set of Exhibits an automation points at is the union of what's
 // embedded in its body ("[[" tokens) and what was added explicitly via the
@@ -124,6 +125,7 @@ export async function createAutomation(input: CreateAutomationRequest): Promise<
 
   await syncAutomationExhibit(inserted.id, inserted.title, inserted.body);
   notifySubscriptionsChanged();
+  void publishEvent({ type: "automation.created", payload: { automationId: inserted.id, title: inserted.title } });
 
   return toSummary(inserted);
 }
@@ -149,6 +151,7 @@ export async function updateAutomation(id: number, input: UpdateAutomationReques
 
   await syncAutomationExhibit(id, next.title, next.body);
   notifySubscriptionsChanged();
+  void publishEvent({ type: "automation.updated", payload: { automationId: id, title: next.title } });
 
   return getAutomation(id);
 }
@@ -167,6 +170,7 @@ export async function deleteAutomation(id: number): Promise<boolean> {
       deleted: true,
     });
     notifySubscriptionsChanged();
+    void publishEvent({ type: "automation.deleted", payload: { automationId: id, title: existing.title } });
   }
   return result.changes > 0;
 }

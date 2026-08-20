@@ -5,7 +5,7 @@ import { db } from "./db/client.js";
 import { tasks } from "./db/schema.js";
 import { toExhibitId, parseTaskId, pushExhibitSync } from "./exhibits.js";
 import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForTask } from "./refs.js";
-import { reschedule } from "./notifications.js";
+import { reschedule, publishEvent } from "./notifications.js";
 
 // The set of Exhibits this task points at is the union of what's embedded
 // in its description ("[[" tokens) and what was added explicitly via the
@@ -111,6 +111,10 @@ export async function createTask(input: CreateTaskRequest): Promise<TaskDetail> 
 
   await syncTaskExhibit(inserted.id, inserted.name, inserted.description);
   reschedule();
+  void publishEvent({
+    type: "tasks.created",
+    payload: { taskId: inserted.id, name: inserted.name, url: `/t/${inserted.id}` },
+  });
 
   return toSummary(inserted);
 }
@@ -132,6 +136,14 @@ export async function updateTask(id: number, input: UpdateTaskRequest): Promise<
   await syncTaskExhibit(id, next.name, next.description);
   reschedule();
 
+  const url = `/t/${id}`;
+  void publishEvent({ type: "tasks.updated", payload: { taskId: id, name: next.name, url } });
+  if (!existing.completed && next.completed) {
+    void publishEvent({ type: "tasks.completed", payload: { taskId: id, name: next.name, url } });
+  } else if (existing.completed && !next.completed) {
+    void publishEvent({ type: "tasks.reopened", payload: { taskId: id, name: next.name, url } });
+  }
+
   return getTask(id);
 }
 
@@ -149,6 +161,7 @@ export async function deleteTask(id: number): Promise<boolean> {
       deleted: true,
     });
     reschedule();
+    void publishEvent({ type: "tasks.deleted", payload: { taskId: id, name: existing.name } });
   }
   return result.changes > 0;
 }

@@ -15,5 +15,9 @@ export const documentsManifest: Manifest = {
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
   widgets: [{ id: "recent", width: 3, height: 2, label: "Recent" }],
-  events: [],
+  events: [
+    { type: "documents.created", label: "Document created", description: "A new document was uploaded." },
+    { type: "documents.updated", label: "Document updated", description: "A document's title or description changed." },
+    { type: "documents.deleted", label: "Document deleted", description: "A document was deleted." },
+  ],
 };

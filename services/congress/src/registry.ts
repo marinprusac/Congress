@@ -2,6 +2,7 @@ import { eq, and, lt, sql } from "drizzle-orm";
 import type { Manifest, ChamberRegistryEntry, ChamberStatus, ChamberSubscription } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { chambers } from "./db/schema.js";
+import { publishEvent } from "./events.js";
 
 function toEntry(row: typeof chambers.$inferSelect): ChamberRegistryEntry {
   return {
@@ -64,6 +65,9 @@ export function registerChamber(manifest: Manifest, subscriptions: ChamberSubscr
 
   const row = db.select().from(chambers).where(eq(chambers.name, manifest.name)).get();
   if (!row) throw new Error("Failed to read back registered chamber");
+  if (existing && existing.status === "offline") {
+    publishEvent({ chamber: "congress", type: "congress.chamber_online", payload: { chamberName: manifest.name } });
+  }
   return toEntry(row);
 }
 
@@ -96,6 +100,9 @@ export function recordHeartbeat(name: string, subscriptions?: ChamberSubscriptio
     .run();
 
   const row = db.select().from(chambers).where(eq(chambers.name, name)).get();
+  if (existing.status === "offline") {
+    publishEvent({ chamber: "congress", type: "congress.chamber_online", payload: { chamberName: name } });
+  }
   return row ? toEntry(row) : null;
 }
 
@@ -153,6 +160,11 @@ export function sweepStaleChambers(timeoutMs: number): string[] {
 
   for (const row of stale) {
     db.update(chambers).set({ status: "offline" }).where(eq(chambers.name, row.name)).run();
+    publishEvent({
+      chamber: "congress",
+      type: "congress.chamber_offline",
+      payload: { chamberName: row.name, priority: "high" },
+    });
   }
 
   return stale.map((row) => row.name);

@@ -9,6 +9,7 @@ import { documents } from "./db/schema.js";
 import { env } from "./env.js";
 import { toExhibitId, parseDocumentId, pushExhibitSync } from "./exhibits.js";
 import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForDocument } from "./refs.js";
+import { publishEvent } from "./events.js";
 
 export const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // "modest documents," not a config knob
 
@@ -118,6 +119,10 @@ export async function createDocument(input: CreateDocumentInput): Promise<Docume
     .get();
 
   await syncDocumentExhibit(inserted.id, inserted.title, inserted.description);
+  void publishEvent({
+    type: "documents.created",
+    payload: { documentId: inserted.id, title: inserted.title, url: `/d/${inserted.id}` },
+  });
 
   return toDetail(inserted);
 }
@@ -135,6 +140,7 @@ export async function updateDocument(id: number, input: UpdateDocumentRequest): 
     .run();
 
   await syncDocumentExhibit(id, title, description);
+  void publishEvent({ type: "documents.updated", payload: { documentId: id, title, url: `/d/${id}` } });
 
   return getDocument(id);
 }
@@ -157,6 +163,7 @@ export async function deleteDocument(id: number): Promise<boolean> {
       outgoingRefs: [],
       deleted: true,
     });
+    void publishEvent({ type: "documents.deleted", payload: { documentId: id, title: existing.title } });
   }
   return result.changes > 0;
 }

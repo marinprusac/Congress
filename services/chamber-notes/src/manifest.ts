@@ -15,5 +15,9 @@ export const notesManifest: Manifest = {
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
   widgets: [{ id: "pinned", width: 3, height: 2, label: "Pinned" }],
-  events: [],
+  events: [
+    { type: "notes.created", label: "Note created", description: "A new note was created." },
+    { type: "notes.updated", label: "Note updated", description: "A note's title or content changed." },
+    { type: "notes.deleted", label: "Note deleted", description: "A note was deleted." },
+  ],
 };

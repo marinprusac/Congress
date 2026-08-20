@@ -5,6 +5,7 @@ import { db } from "./db/client.js";
 import { automationRuns } from "./db/schema.js";
 import { env } from "./env.js";
 import { listEnabledAutomationsForTrigger, markAutomationFired } from "./automations.js";
+import { publishEvent } from "./events.js";
 
 const RUNS_PER_AUTOMATION = 20;
 
@@ -93,7 +94,19 @@ async function runAutomation(automation: ReturnType<typeof listEnabledAutomation
 
   const target = registry.find((c) => c.name === automation.targetChamber);
   if (!target || !target.mcpUrl) {
-    recordRun(automation.id, event.payload, automation.targetChamber, automation.toolName, false, null, `Chamber "${automation.targetChamber}" is not registered or has no MCP server`);
+    const errorMessage = `Chamber "${automation.targetChamber}" is not registered or has no MCP server`;
+    recordRun(automation.id, event.payload, automation.targetChamber, automation.toolName, false, null, errorMessage);
+    void publishEvent({
+      type: "automation.run_failed",
+      payload: {
+        automationId: automation.id,
+        title: automation.title,
+        targetChamber: automation.targetChamber,
+        toolName: automation.toolName,
+        error: errorMessage,
+        priority: "high",
+      },
+    });
     await markAutomationFired(automation.id);
     return;
   }
@@ -103,8 +116,30 @@ async function runAutomation(automation: ReturnType<typeof listEnabledAutomation
   try {
     const result = await callChamberTool(target.mcpUrl, env.CONGRESS_INTERNAL_TOKEN, automation.toolName, args);
     recordRun(automation.id, event.payload, automation.targetChamber, automation.toolName, true, JSON.stringify(result), null);
+    void publishEvent({
+      type: "automation.run_succeeded",
+      payload: {
+        automationId: automation.id,
+        title: automation.title,
+        targetChamber: automation.targetChamber,
+        toolName: automation.toolName,
+        priority: "low",
+      },
+    });
   } catch (err) {
-    recordRun(automation.id, event.payload, automation.targetChamber, automation.toolName, false, null, (err as Error).message);
+    const errorMessage = (err as Error).message;
+    recordRun(automation.id, event.payload, automation.targetChamber, automation.toolName, false, null, errorMessage);
+    void publishEvent({
+      type: "automation.run_failed",
+      payload: {
+        automationId: automation.id,
+        title: automation.title,
+        targetChamber: automation.targetChamber,
+        toolName: automation.toolName,
+        error: errorMessage,
+        priority: "high",
+      },
+    });
   }
 
   await markAutomationFired(automation.id);

@@ -7,6 +7,7 @@ import { notes } from "./db/schema.js";
 import { makeExcerpt } from "./wikilinks.js";
 import { toExhibitId, parseNoteId, pushExhibitSync } from "./exhibits.js";
 import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForNote } from "./refs.js";
+import { publishEvent } from "./events.js";
 
 // The set of Exhibits this note connects to is the union of what's embedded
 // in its body ("[[" tokens) and what was added explicitly via the
@@ -152,6 +153,10 @@ export async function createNote(input: CreateNoteRequest): Promise<NoteDetail> 
     .get();
 
   await syncNoteExhibit(inserted.id, inserted.title, body);
+  void publishEvent({
+    type: "notes.created",
+    payload: { noteId: inserted.id, title: inserted.title, url: `/n/${inserted.id}` },
+  });
 
   const created = await getNote(inserted.id);
   if (!created) throw new Error("Failed to read back created note");
@@ -187,6 +192,7 @@ export async function updateNote(id: number, input: UpdateNoteRequest): Promise<
 
   const finalTitle = input.title ?? existing.title;
   await syncNoteExhibit(id, finalTitle, body);
+  void publishEvent({ type: "notes.updated", payload: { noteId: id, title: finalTitle, url: `/n/${id}` } });
 
   return getNote(id);
 }
@@ -204,6 +210,7 @@ export async function deleteNote(id: number): Promise<boolean> {
       outgoingRefs: [],
       deleted: true,
     });
+    void publishEvent({ type: "notes.deleted", payload: { noteId: id, title: existing.title } });
   }
   return result.changes > 0;
 }

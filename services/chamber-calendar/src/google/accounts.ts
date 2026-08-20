@@ -3,6 +3,7 @@ import type { GoogleAccount } from "../types.js";
 import { db } from "../db/client.js";
 import { googleAccounts } from "../db/schema.js";
 import { refreshAccessToken, revokeToken, RevokedTokenError } from "./oauth.js";
+import { publishEvent } from "../events.js";
 
 export class AccountNeedsReconnectError extends Error {
   accountId: number;
@@ -95,6 +96,7 @@ export function upsertAccountFromOAuth(input: {
     })
     .returning()
     .get();
+  void publishEvent({ type: "calendar.account_connected", payload: { accountId: row.id, label: row.label } });
   return toDTO(row);
 }
 
@@ -113,6 +115,9 @@ export async function disconnectAccount(id: number): Promise<boolean> {
   if (!existing) return false;
   await revokeToken(existing.refreshToken);
   const result = db.delete(googleAccounts).where(eq(googleAccounts.id, id)).run();
+  if (result.changes > 0) {
+    void publishEvent({ type: "calendar.account_disconnected", payload: { accountId: id, label: existing.label } });
+  }
   return result.changes > 0;
 }
 

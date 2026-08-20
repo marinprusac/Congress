@@ -9,7 +9,7 @@ import { env } from "./env.js";
 // should happen about it or what that should say; the notifications
 // Chamber's own rules decide that. See chamber-kit's createPublishEvent and
 // this Chamber's manifest.ts for the event catalog.
-const publishEvent = createPublishEvent({
+export const publishEvent = createPublishEvent({
   chamber: "tasks",
   capitolUrl: env.CAPITOL_URL,
   internalToken: env.CONGRESS_INTERNAL_TOKEN,

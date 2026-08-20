@@ -19,5 +19,10 @@ export const tasksManifest: Manifest = {
     { type: "tasks.due_soon", label: "Task due soon", description: "An incomplete task's due date is within 24 hours." },
     { type: "tasks.overdue", label: "Task overdue", description: "An incomplete task's due date has passed." },
     { type: "tasks.due_cleared", label: "Task no longer due", description: "A previously due/overdue task was completed or its due date moved out of range." },
+    { type: "tasks.created", label: "Task created", description: "A new task was created." },
+    { type: "tasks.updated", label: "Task updated", description: "A task's fields changed." },
+    { type: "tasks.deleted", label: "Task deleted", description: "A task was deleted." },
+    { type: "tasks.completed", label: "Task completed", description: "A task was marked complete." },
+    { type: "tasks.reopened", label: "Task reopened", description: "A previously completed task was marked incomplete again." },
   ],
 };

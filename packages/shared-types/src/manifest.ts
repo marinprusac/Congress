@@ -46,6 +46,27 @@ export const manifestEventSchema = z.object({
 });
 export type ManifestEvent = z.infer<typeof manifestEventSchema>;
 
+// Congress is the one publisher with no manifest of its own to declare these
+// in - it's the registry owner, not a registrant (see CLAUDE.md), so it never
+// appears in the live registry chamber-logs' eventCatalogSync.ts iterates to
+// auto-derive event_settings rows. This is that catalog entry, hand-written
+// here instead, so Congress's own chamber-health events are still
+// configurable (notify/record toggles) from the Logs UI like any other
+// Chamber's declared events - see eventCatalogSync.ts's synthetic-chamber
+// merge and registry.ts's actual publish sites.
+export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
+  {
+    type: "congress.chamber_offline",
+    label: "Chamber went offline",
+    description: "A registered Chamber missed its heartbeat threshold and was marked offline.",
+  },
+  {
+    type: "congress.chamber_online",
+    label: "Chamber came back online",
+    description: "A previously-offline Chamber registered or heartbeated again.",
+  },
+];
+
 export const manifestSchema = z.object({
   name: z.string().min(1),
   displayName: z.string().min(1),

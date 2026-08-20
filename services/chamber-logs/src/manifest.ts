@@ -26,7 +26,11 @@ export const manifest: Manifest = {
     // own comment for why this replaced the old Capitol-header-mounted bell.
     { id: "bell", width: 1, height: 1, label: "Notifications" },
   ],
-  // This Chamber only ever consumes other Chambers' events (see events.ts),
-  // it doesn't publish any of its own.
-  events: [],
+  events: [
+    {
+      type: "logs.rule_updated",
+      label: "Log rule updated",
+      description: "The owner changed a per-event-type record/notify setting - useful for spotting why an expected notification went quiet.",
+    },
+  ],
 };

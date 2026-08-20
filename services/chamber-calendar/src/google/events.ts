@@ -15,6 +15,7 @@ import { AccountNeedsReconnectError } from "./accounts.js";
 import { toExhibitId, pushExhibitSync, parseExhibitId } from "../exhibits.js";
 import { extractOutgoingExhibitRefs } from "@congress/chamber-kit";
 import { listManualRefs, deleteManualRefsForEvent } from "../refs.js";
+import { publishEvent } from "../events.js";
 
 interface GoogleEventTime {
   date?: string;
@@ -276,6 +277,16 @@ export async function createEvent(input: CreateEventRequest): Promise<CalendarEv
   const { summary, colorHex } = calendarMeta(input.accountId, input.calendarId);
   const result = normalizeGoogleEvent(raw, input.accountId, input.calendarId, summary, colorHex);
   await syncEventExhibit(result);
+  void publishEvent({
+    type: "calendar.event_created",
+    payload: {
+      accountId: result.accountId,
+      calendarId: result.calendarId,
+      eventId: result.id,
+      title: result.title,
+      url: `/e/${result.accountId}/${encodeURIComponent(result.calendarId)}/${encodeURIComponent(result.id)}`,
+    },
+  });
   return result;
 }
 
@@ -311,6 +322,16 @@ export async function updateEvent(
   const { summary, colorHex } = calendarMeta(accountId, calendarId);
   const result = normalizeGoogleEvent(raw, accountId, calendarId, summary, colorHex);
   await syncEventExhibit(result);
+  void publishEvent({
+    type: "calendar.event_updated",
+    payload: {
+      accountId: result.accountId,
+      calendarId: result.calendarId,
+      eventId: result.id,
+      title: result.title,
+      url: `/e/${result.accountId}/${encodeURIComponent(result.calendarId)}/${encodeURIComponent(result.id)}`,
+    },
+  });
   return result;
 }
 
@@ -333,5 +354,9 @@ export async function deleteEvent(accountId: number, calendarId: string, eventId
     url: `/e/${accountId}/${encodeURIComponent(calendarId)}/${encodeURIComponent(eventId)}`,
     outgoingRefs: [],
     deleted: true,
+  });
+  void publishEvent({
+    type: "calendar.event_deleted",
+    payload: { accountId, calendarId, eventId, title: existing.title },
   });
 }

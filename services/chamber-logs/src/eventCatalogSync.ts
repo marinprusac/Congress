@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { fetchRegistry } from "@congress/chamber-kit";
+import { CONGRESS_SYNTHETIC_EVENTS } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { eventSettings } from "./db/schema.js";
 import { env } from "./env.js";
@@ -27,7 +28,13 @@ export async function syncEventCatalog(): Promise<void> {
   const now = new Date();
   let insertedAny = false;
 
-  for (const chamber of registry) {
+  // Congress itself never registers (it's the registry owner, not a
+  // registrant - CLAUDE.md), so its own chamber-health events would
+  // otherwise never get an auto-derived settings row here. This is the one
+  // hand-written entry alongside the live registry loop below.
+  const syntheticChambers = [{ name: "congress", events: CONGRESS_SYNTHETIC_EVENTS }];
+
+  for (const chamber of [...registry, ...syntheticChambers]) {
     for (const event of chamber.events) {
       if (knownTypes.has(event.type)) {
         db.update(eventSettings)
