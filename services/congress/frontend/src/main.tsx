@@ -13,6 +13,25 @@ import "./index.css";
 markShellHosted();
 preventPinchZoom();
 
+// sw.ts calls skipWaiting()+clients.claim() unconditionally, so a new
+// deploy's service worker takes over as soon as the browser's own
+// background update check finds it - but claiming control doesn't touch
+// JS this page already loaded and ran. Without a reload here, an installed
+// PWA that's relaunched (not freshly network-navigated - see the SW's own
+// NavigationRoute, which serves "/" from precache) can keep rendering an
+// old cached bundle indefinitely across deploys, even across a full
+// force-quit/reopen, since each relaunch races the update check rather
+// than waiting on it. `registerSW.js`'s injected registration is the bare
+// vite-plugin-pwa default with no reload-on-update logic of its own.
+if ("serviceWorker" in navigator) {
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloaded) return;
+    reloaded = true;
+    window.location.reload();
+  });
+}
+
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Root element not found");
 
