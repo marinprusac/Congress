@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PageHeader, FormLabel, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
+import { FormLabel, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchSettings, updateSettings, fetchSpend } from "@/lib/api";
 import type { UpdateSettingsRequest } from "../../../src/types";
 
@@ -50,8 +50,6 @@ export function SettingsPage() {
 
   return (
     <section>
-      <PageHeader title="Settings" />
-
       <div className="mb-6 border border-dust p-4">
         <div className="flex items-center justify-between gap-4">
           <div>

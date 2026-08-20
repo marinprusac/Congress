@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { createQueryClient, PersistedQueryProvider } from "@congress/congress-ui";
 import { App } from "@/App";
 import { widgets as rawWidgets } from "@/widgets";
+import { SettingsPage } from "@/pages/SettingsPage";
 import "./index.css";
 
 const queryClient = createQueryClient();
@@ -43,3 +44,8 @@ function withQueryClient(Widget: ComponentType): ComponentType {
 export const widgets: Record<string, ComponentType> = Object.fromEntries(
   Object.entries(rawWidgets).map(([id, Widget]) => [id, withQueryClient(Widget)])
 );
+
+// This Chamber's own settings content, resolved the same way as a widget
+// (see above) and mounted as one tab of Congress's unified Settings page
+// instead of a route this Chamber hosts itself.
+export const settings: ComponentType = withQueryClient(SettingsPage);
