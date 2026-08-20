@@ -9,8 +9,8 @@ import { fetchHistory } from "@/lib/api";
 // "declare N fixed widgets, the owner places what they want" approach
 // rather than building general per-widget configuration into Capitol's
 // canvas (which has none today) just for this one filter. Each history
-// entry links to the log rule that recorded it, not a page of its own -
-// history rows aren't independently addressable Exhibits, only rules are.
+// entry links to the event type's own settings page, not a page of its
+// own - history rows aren't independently addressable Exhibits.
 export function HistoryFeed({ label, minPriority, emptyLabel }: { label: string; minPriority?: PriorityLevel; emptyLabel: string }) {
   const shellHosted = useShellHosted();
   const { data, isLoading, isError } = useQuery({
@@ -21,7 +21,8 @@ export function HistoryFeed({ label, minPriority, emptyLabel }: { label: string;
   return (
     <WidgetPreviewShell
       label={label}
-      addHref="/new"
+      addHref="/"
+      addLabel="View all"
       ownChamber="logs"
       isLoading={isLoading}
       isError={isError}
@@ -32,11 +33,11 @@ export function HistoryFeed({ label, minPriority, emptyLabel }: { label: string;
       {data?.map((entry) => (
         <Link
           key={entry.id}
-          to={resolveChamberPath(`/r/${entry.ruleId}`, "logs", shellHosted)}
+          to={resolveChamberPath(`/events/${encodeURIComponent(entry.type)}`, "logs", shellHosted)}
           className="flex items-baseline gap-2 border-b border-dust py-1.5 font-display text-sm text-ink first:pt-0 last:border-b-0 hover:text-accent"
         >
           {getChamberIcon(entry.chamber, { className: "h-4 w-4 shrink-0 text-dust" })}
-          <span className="min-w-0 truncate">{entry.ruleTitle}</span>
+          <span className="min-w-0 truncate">{entry.label}</span>
         </Link>
       ))}
     </WidgetPreviewShell>

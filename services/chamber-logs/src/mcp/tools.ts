@@ -2,122 +2,59 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult as textResult } from "@congress/chamber-kit";
 import { priorityLevelSchema } from "@congress/shared-types";
-import { listLogRules, listRecentLogRules, searchLogRules, getLogRule, createLogRule, updateLogRule, deleteLogRule } from "../logRules.js";
+import { listEventSettings, getEventSettingsByType, updateEventSettings } from "../eventSettings.js";
 import { listHistory } from "../eventHistory.js";
 import { listNotifications, dismissNotification } from "../notifications.js";
 
 export function registerTools(server: McpServer) {
   server.registerTool(
-    "list_log_rules",
+    "list_event_settings",
     {
-      title: "List Log Rules",
-      description: "List all log rules, most recently updated first.",
+      title: "List Event Settings",
+      description:
+        "List every known event type (auto-derived from the live Chamber registry) and its current record-to-history/notify configuration.",
       inputSchema: {},
     },
-    async () => textResult(await listLogRules())
+    async () => textResult(await listEventSettings())
   );
 
   server.registerTool(
-    "list_recent_log_rules",
+    "get_event_settings",
     {
-      title: "List Recent Log Rules",
-      description: "List the most recently updated log rules.",
-      inputSchema: {},
+      title: "Get Event Settings",
+      description: "Get a single event type's settings by its event type string (e.g. \"tasks.due_soon\").",
+      inputSchema: { eventType: z.string().min(1) },
     },
-    async () => textResult(await listRecentLogRules())
-  );
-
-  server.registerTool(
-    "search_log_rules",
-    {
-      title: "Search Log Rules",
-      description: "Search log rules by title or body.",
-      inputSchema: { query: z.string().min(1) },
-    },
-    async ({ query }) => textResult(await searchLogRules(query))
-  );
-
-  server.registerTool(
-    "get_log_rule",
-    {
-      title: "Get Log Rule",
-      description: "Get a single log rule by id.",
-      inputSchema: { id: z.number().int() },
-    },
-    async ({ id }) => {
-      const rule = await getLogRule(id);
-      if (!rule) return textResult({ error: "not_found", id });
-      return textResult(rule);
+    async ({ eventType }) => {
+      const row = await getEventSettingsByType(eventType);
+      if (!row) return textResult({ error: "not_found", eventType });
+      return textResult(row);
     }
   );
 
   server.registerTool(
-    "create_log_rule",
+    "update_event_settings",
     {
-      title: "Create Log Rule",
+      title: "Update Event Settings",
       description:
-        "Create a new log rule - listens for a Congress event type and, when it fires (and the optional condition/minPriority both match), records it to this Chamber's durable history and/or pushes a templated notification.",
+        "Update an event type's settings - whether to record firings to this Chamber's durable history and/or push a templated notification, each independently gated by its own minimum priority threshold. There is no create/delete: every known event type already has a row.",
       inputSchema: {
-        title: z.string().min(1),
-        body: z.string().default(""),
-        triggerEventType: z.string().min(1),
-        conditionField: z.string().optional(),
-        conditionEquals: z.string().optional(),
-        minPriority: priorityLevelSchema.optional(),
-        recordToHistory: z.boolean().default(true),
-        historyRetentionMs: z.number().int().positive().optional(),
-        notify: z.boolean().default(false),
-        notifyTitleTemplate: z.string().optional(),
-        notifyBodyTemplate: z.string().optional(),
-        notifyUrlTemplate: z.string().optional(),
-        notifyDedupeKeyTemplate: z.string().optional(),
-        enabled: z.boolean().default(true),
-      },
-    },
-    async (input) => textResult(await createLogRule(input))
-  );
-
-  server.registerTool(
-    "update_log_rule",
-    {
-      title: "Update Log Rule",
-      description: "Update an existing log rule's fields by id.",
-      inputSchema: {
-        id: z.number().int(),
-        title: z.string().min(1).optional(),
-        body: z.string().optional(),
-        triggerEventType: z.string().min(1).optional(),
-        conditionField: z.string().nullable().optional(),
-        conditionEquals: z.string().nullable().optional(),
-        minPriority: priorityLevelSchema.nullable().optional(),
+        eventType: z.string().min(1),
         recordToHistory: z.boolean().optional(),
+        historyMinPriority: priorityLevelSchema.nullable().optional(),
         historyRetentionMs: z.number().int().positive().nullable().optional(),
         notify: z.boolean().optional(),
+        notifyMinPriority: priorityLevelSchema.nullable().optional(),
         notifyTitleTemplate: z.string().nullable().optional(),
         notifyBodyTemplate: z.string().nullable().optional(),
         notifyUrlTemplate: z.string().nullable().optional(),
         notifyDedupeKeyTemplate: z.string().nullable().optional(),
-        enabled: z.boolean().optional(),
       },
     },
-    async ({ id, ...input }) => {
-      const updated = await updateLogRule(id, input);
-      if (!updated) return textResult({ error: "not_found", id });
+    async ({ eventType, ...input }) => {
+      const updated = await updateEventSettings(eventType, input);
+      if (!updated) return textResult({ error: "not_found", eventType });
       return textResult(updated);
-    }
-  );
-
-  server.registerTool(
-    "delete_log_rule",
-    {
-      title: "Delete Log Rule",
-      description: "Delete a log rule by id.",
-      inputSchema: { id: z.number().int() },
-    },
-    async ({ id }) => {
-      const deleted = await deleteLogRule(id);
-      if (!deleted) return textResult({ error: "not_found", id });
-      return textResult({ ok: true });
     }
   );
 
@@ -136,7 +73,7 @@ export function registerTools(server: McpServer) {
     {
       title: "List Inbox",
       description:
-        "List the owner-facing notification inbox (most recent first, capped at 50) plus the current unread count. Distinct from list_event_history: this is live current state (upserted/deduped per rule), not an append-only record.",
+        "List the owner-facing notification inbox (most recent first, capped at 50) plus the current unread count. Distinct from list_event_history: this is live current state (upserted/deduped per event type), not an append-only record.",
       inputSchema: {},
     },
     async () => textResult(listNotifications())

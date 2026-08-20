@@ -1,84 +1,61 @@
 import { sqliteTable, text, integer, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 import { PRIORITY_LEVELS } from "@congress/shared-types";
 
-// A log rule: listens for one event type (from Congress's generic event
-// log, see eventPoller.ts) and, when it fires and the optional condition
-// and minPriority threshold both match, records it to this Chamber's own
-// durable history and/or pushes a notification - independently, either or
-// both. No matching rule (or a rule that does neither) means the event is
-// simply discarded, same as Congress's own log treats anything unconsumed.
-// Title and body are this row's Exhibit surface (searchable,
-// [[wikilink]]-able, referenceable from notes) via createTableBackedExhibits
-// in exhibits.ts; the trigger/condition/action fields are structured
-// sidecars edited through their own form, not the body text - same split
-// chamber-tasks uses for its own dueDate/completed fields.
-export const logRules = sqliteTable(
-  "log_rules",
+// One row per event type any registered Chamber declares in its own
+// manifest (manifest.events, shared-types) - auto-populated and kept
+// current by eventCatalogSync.ts, never user-created or user-deleted.
+// `chamber`/`label`/`description` are a display-only cache of that
+// Chamber's own declared catalog entry, refreshed on every sync; everything
+// else is the owner's own configuration for what to do when this event type
+// fires (eventReceive.ts): record to this Chamber's own durable history
+// and/or push a notification, independently, either or both, each gated by
+// its own separate priority floor. A row with both actions off is simply a
+// known-but-inert event type, same as no matching row ever existed.
+export const eventSettings = sqliteTable(
+  "event_settings",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    title: text("title").notNull(),
-    body: text("body").notNull().default(""),
-    triggerEventType: text("trigger_event_type").notNull(),
-    // Optional single-field-equality filter beyond the event type match -
-    // e.g. only fire if payload.taskId == "42". No expression language by
-    // design: this is the only condition shape v1 supports.
-    conditionField: text("condition_field"),
-    conditionEquals: text("condition_equals"),
+    eventType: text("event_type").notNull().unique(),
+    chamber: text("chamber").notNull(),
+    label: text("label").notNull(),
+    description: text("description"),
+    recordToHistory: integer("record_to_history", { mode: "boolean" }).notNull().default(true),
     // Ordered low < normal < high < urgent (PRIORITY_LEVELS, shared-types) -
     // null means no threshold, every firing matches regardless of the
     // event's own declared payload.priority. ">=" is deliberately the only
-    // comparison this supports (see eventPoller.ts's minPriorityMatches) -
-    // same no-expression-language restraint as conditionField/
-    // conditionEquals, just for an ordered field instead of an arbitrary
-    // one.
-    minPriority: text("min_priority", { enum: PRIORITY_LEVELS }),
-    recordToHistory: integer("record_to_history", { mode: "boolean" }).notNull().default(true),
-    // Per-rule, not global - how long a history row this rule writes sticks
-    // around before being pruned. Null means "use eventHistory.ts's own
+    // comparison this supports (see eventReceive.ts's minPriorityMatches).
+    // Kept separate from notifyMinPriority below so recording and notifying
+    // can be tuned to different noise levels for the same event type.
+    historyMinPriority: text("history_min_priority", { enum: PRIORITY_LEVELS }),
+    // How long a history row this event type writes sticks around before
+    // being pruned. Null means "use eventHistory.ts's own
     // DEFAULT_HISTORY_RETENTION_MS" - deliberately not a single global
     // constant like Congress's own (short-lived) event switch, since a
     // durable record is exactly the thing Congress's own log isn't meant to
     // be.
     historyRetentionMs: integer("history_retention_ms"),
     notify: integer("notify", { mode: "boolean" }).notNull().default(false),
-    // Required when notify is true (enforced at the request-schema level,
-    // not here) - {{payload.x}} interpolated against the firing event's
-    // payload, see eventPoller.ts's interpolate().
+    notifyMinPriority: text("notify_min_priority", { enum: PRIORITY_LEVELS }),
+    // {{payload.x}} interpolated against the firing event's payload (see
+    // eventReceive.ts's interpolate()); unset falls back to the cached
+    // label/description above.
     notifyTitleTemplate: text("notify_title_template"),
     notifyBodyTemplate: text("notify_body_template"),
     notifyUrlTemplate: text("notify_url_template"),
-    // Also required when notify is true - needed to upsert without
-    // duplicating a notification on every re-fire of the same still-true
-    // condition, see notifications.ts's pushNotification. Unlike
-    // recordToHistory, notify always dedupes: an inbox is meant to show
-    // current state, not a growing feed of repeats the way history is.
+    // Needed to upsert without duplicating a notification on every re-fire
+    // of the same still-true condition, see notifications.ts's
+    // pushNotification. Unset falls back to a fixed per-event-type key
+    // (eventReceive.ts) - an owner who wants per-entity notifications (e.g.
+    // one per overdue task) templates this explicitly.
     notifyDedupeKeyTemplate: text("notify_dedupe_key_template"),
-    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
     lastFiredAt: integer("last_fired_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
-  (table) => [index("log_rules_trigger_event_type_idx").on(table.triggerEventType)]
+  (table) => [index("event_settings_chamber_idx").on(table.chamber)]
 );
 
-// Explicit references added from a log rule's "References" side panel, kept
-// separate from the wikilinks parsed out of `logRules.body` - see
-// extractOutgoingExhibitRefs/syncLogRuleExhibit in logRules.ts, which unions
-// both into the set actually pushed to Capitol. Same shape as every other
-// Chamber's own "<entity>Refs" table (see e.g. chamber-notes/src/db/
-// schema.ts's noteRefs).
-export const logRuleRefs = sqliteTable(
-  "log_rule_refs",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    logRuleId: integer("log_rule_id").notNull(),
-    targetExhibitId: text("target_exhibit_id").notNull(),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-  },
-  (table) => [uniqueIndex("log_rule_refs_rule_target_idx").on(table.logRuleId, table.targetExhibitId)]
-);
-
-// The durable record a "recordToHistory" rule writes to - genuinely
+// The durable record a "recordToHistory" event type writes to - genuinely
 // append-only, unlike `notifications` below: every matching firing gets its
 // own row, including repeats of a still-true condition, since a history is
 // meant to show what actually happened over time, not just current state.
@@ -86,13 +63,14 @@ export const logRuleRefs = sqliteTable(
 // (defaulting to "normal" when the publishing Chamber didn't set one) so
 // the "urgent-logs" widget can filter on it without re-parsing
 // `payloadJson` per query. `expiresAt` is computed once at record time from
-// the recording rule's own `historyRetentionMs` (or eventHistory.ts's
-// default), same pattern as Congress's own events.expiresAt.
+// the recording event type's own `historyRetentionMs` (or eventHistory.ts's
+// default), same pattern as Congress's own events.expiresAt. `type` is
+// enough to join back to `eventSettings` for display (one row per event
+// type, no separate rule id needed).
 export const eventHistory = sqliteTable(
   "event_history",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    ruleId: integer("rule_id").notNull(),
     chamber: text("chamber").notNull(),
     type: text("type").notNull(),
     // An index into PRIORITY_LEVELS (shared-types), not the text label -
@@ -107,6 +85,7 @@ export const eventHistory = sqliteTable(
     expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [
+    index("event_history_type_idx").on(table.type),
     index("event_history_occurred_at_idx").on(table.occurredAt),
     index("event_history_priority_rank_idx").on(table.priorityRank),
     index("event_history_expires_at_idx").on(table.expiresAt),

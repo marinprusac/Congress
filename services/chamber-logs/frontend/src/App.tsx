@@ -1,9 +1,8 @@
 import { Route, Routes } from "react-router-dom";
 import { useAppliedTheme } from "@congress/congress-ui";
 import { Layout } from "@/components/Layout";
-import { LogRulesListPage } from "@/pages/LogRulesListPage";
-import { LogRuleViewPage } from "@/pages/LogRuleViewPage";
-import { NewLogRulePage } from "@/pages/NewLogRulePage";
+import { EventSettingsListPage } from "@/pages/EventSettingsListPage";
+import { EventSettingsDetailPage } from "@/pages/EventSettingsDetailPage";
 
 export function App() {
   useAppliedTheme();
@@ -11,9 +10,8 @@ export function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<LogRulesListPage />} />
-        <Route path="r/:id" element={<LogRuleViewPage />} />
-        <Route path="new" element={<NewLogRulePage />} />
+        <Route index element={<EventSettingsListPage />} />
+        <Route path="events/:eventType" element={<EventSettingsDetailPage />} />
       </Route>
     </Routes>
   );

@@ -1,24 +1,15 @@
 import { priorityLevelSchema, type EventDelivery, type PriorityLevel } from "@congress/shared-types";
-import { listEnabledLogRulesForTrigger, markLogRuleFired } from "./logRules.js";
+import { getEventSettingsRowByType, markEventSettingsFired } from "./eventSettings.js";
 import { pushNotification } from "./notifications.js";
 import { recordHistory, priorityRankFor } from "./eventHistory.js";
 
 // Reads a dotted path ("a.b.c") out of a plain object, returning undefined
-// for any missing/non-object segment - used by the condition check,
-// priority extraction, and template interpolation below.
+// for any missing/non-object segment - used by priority extraction and
+// template interpolation below.
 function getPath(payload: Record<string, unknown>, path: string): unknown {
   return path
     .split(".")
     .reduce<unknown>((acc, key) => (acc && typeof acc === "object" ? (acc as Record<string, unknown>)[key] : undefined), payload);
-}
-
-// v1's only equality condition shape: an optional single-field exact-match
-// filter beyond the event type match already selecting this rule. No
-// expression language by design - see logRules table's own comment.
-function conditionMatches(rule: { conditionField: string | null; conditionEquals: string | null }, payload: Record<string, unknown>): boolean {
-  if (!rule.conditionField) return true;
-  const value = getPath(payload, rule.conditionField);
-  return String(value ?? "") === (rule.conditionEquals ?? "");
 }
 
 // payload.priority is a convention (PRIORITY_LEVELS, shared-types), not
@@ -29,11 +20,11 @@ function priorityOf(payload: Record<string, unknown>): PriorityLevel {
   return parsed.success ? parsed.data : "normal";
 }
 
-// ">=" is deliberately the only comparison minPriority supports - see
-// logRules table's own comment.
-function minPriorityMatches(rule: { minPriority: PriorityLevel | null }, priority: PriorityLevel): boolean {
-  if (!rule.minPriority) return true;
-  return priorityRankFor(priority) >= priorityRankFor(rule.minPriority);
+// ">=" is deliberately the only comparison a threshold supports - see
+// eventSettings table's own comment.
+function priorityMatches(threshold: PriorityLevel | null, priority: PriorityLevel): boolean {
+  if (!threshold) return true;
+  return priorityRankFor(priority) >= priorityRankFor(threshold);
 }
 
 // Plain {{payload.x}}/{{payload.a.b}} interpolation - no templating library,
@@ -46,52 +37,43 @@ function interpolate(template: string, payload: Record<string, unknown>): string
   });
 }
 
-async function runRule(rule: ReturnType<typeof listEnabledLogRulesForTrigger>[number], event: EventDelivery): Promise<void> {
-  if (!conditionMatches(rule, event.payload)) return;
-  const priority = priorityOf(event.payload);
-  if (!minPriorityMatches(rule, priority)) return;
+// Handed to mountEventReceiveRoute (@congress/chamber-kit) - looks up the
+// single settings row for this event type (auto-derived by
+// eventCatalogSync.ts, one row per type) and runs its two independent
+// actions, each gated by its own priority threshold.
+export async function handleReceivedEvent(event: EventDelivery): Promise<void> {
+  const row = getEventSettingsRowByType(event.type);
+  if (!row) return;
 
-  if (rule.recordToHistory) {
+  const priority = priorityOf(event.payload);
+  let fired = false;
+
+  if (row.recordToHistory && priorityMatches(row.historyMinPriority, priority)) {
     recordHistory({
-      ruleId: rule.id,
       chamber: event.chamber,
       type: event.type,
       priority,
       payload: event.payload,
       occurredAt: new Date(event.occurredAt),
-      retentionMs: rule.historyRetentionMs,
+      retentionMs: row.historyRetentionMs,
     });
+    fired = true;
   }
 
-  if (rule.notify) {
+  if (row.notify && priorityMatches(row.notifyMinPriority, priority)) {
     // The dedupe key template is an optional field the owner rarely fills
-    // in - default to a key scoped to this rule so repeat firings still
-    // update the one notification in place instead of colliding with
-    // another rule's own default-keyed notification for the same chamber.
-    const dedupeKey = rule.notifyDedupeKeyTemplate ? interpolate(rule.notifyDedupeKeyTemplate, event.payload) : `rule-${rule.id}`;
-    const title = rule.notifyTitleTemplate ? interpolate(rule.notifyTitleTemplate, event.payload) : rule.title;
-    const body = rule.notifyBodyTemplate ? interpolate(rule.notifyBodyTemplate, event.payload) : undefined;
-    const chamberUrl = rule.notifyUrlTemplate ? interpolate(rule.notifyUrlTemplate, event.payload) : undefined;
+    // in - default to a key scoped to this event type so repeat firings
+    // still update the one notification in place instead of piling up.
+    const dedupeKey = row.notifyDedupeKeyTemplate ? interpolate(row.notifyDedupeKeyTemplate, event.payload) : `type-${row.eventType}`;
+    const title = row.notifyTitleTemplate ? interpolate(row.notifyTitleTemplate, event.payload) : row.label;
+    const body = row.notifyBodyTemplate ? interpolate(row.notifyBodyTemplate, event.payload) : (row.description ?? undefined);
+    const chamberUrl = row.notifyUrlTemplate ? interpolate(row.notifyUrlTemplate, event.payload) : undefined;
     // Preserve the original emitting chamber's identity (e.g. "tasks") so
     // the notification bell attributes/icons it correctly - this Chamber
     // is just the one deciding whether/what to push, not the source.
     pushNotification({ chamber: event.chamber, dedupeKey, title, body, chamberUrl });
+    fired = true;
   }
 
-  await markLogRuleFired(rule.id);
-}
-
-// Handed to mountEventReceiveRoute (@congress/chamber-kit) - runs every
-// enabled rule whose triggerEventType matches this one delivered event,
-// same logic the old poll loop ran per batched event, just invoked directly
-// per push instead of on a 30s tick.
-export async function handleReceivedEvent(event: EventDelivery): Promise<void> {
-  const matches = listEnabledLogRulesForTrigger(event.type);
-  for (const rule of matches) {
-    try {
-      await runRule(rule, event);
-    } catch (err) {
-      console.warn(`Log rule ${rule.id} failed on event ${event.chamber}.${event.type}: ${(err as Error).message}`);
-    }
-  }
+  if (fired) await markEventSettingsFired(event.type);
 }
