@@ -19,7 +19,7 @@ CREATE TABLE `__new_event_settings` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-INSERT INTO `__new_event_settings`("id", "event_type", "chamber", "label", "description", "record_to_history", "history_min_priority", "history_retention_ms", "notify", "notify_min_priority", "notify_title_template", "notify_body_template", "notify_url_template", "notify_dedupe_key_template", "last_fired_at", "created_at", "updated_at") SELECT "id", "event_type", "chamber", "label", "description", "record_to_history", "history_min_priority", "history_retention_ms", "notify", "notify_min_priority", "notify_title_template", "notify_body_template", "notify_url_template", "notify_dedupe_key_template", "last_fired_at", "created_at", "updated_at" FROM `event_settings`;--> statement-breakpoint
+INSERT INTO `__new_event_settings`("id", "event_type", "chamber", "label", "description", "record_to_history", "history_min_priority", "history_retention_ms", "notify", "notify_min_priority", "notify_title_template", "notify_body_template", "notify_url_template", "notify_dedupe_key_template", "last_fired_at", "created_at", "updated_at") SELECT "id", "event_type", "chamber", "label", "description", "record_to_history", COALESCE("history_min_priority", 'low'), "history_retention_ms", "notify", COALESCE("notify_min_priority", 'low'), "notify_title_template", "notify_body_template", "notify_url_template", "notify_dedupe_key_template", "last_fired_at", "created_at", "updated_at" FROM `event_settings`;--> statement-breakpoint
 DROP TABLE `event_settings`;--> statement-breakpoint
 ALTER TABLE `__new_event_settings` RENAME TO `event_settings`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint
