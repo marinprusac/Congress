@@ -134,5 +134,18 @@ export function mountStaticFrontend(app: ChamberApp): void {
       root: "./frontend/public",
     })
   );
-  app.get("*", serveStatic({ path: "./frontend/dist/index.html" }));
+  // Only a navigation-shaped miss (no file extension on the last path
+  // segment - "/settings", "/notes/n42", ...) falls back to the SPA shell.
+  // Anything that looks like a static asset request (remote-entry.js,
+  // vendor/react-query.js, a mistyped asset URL, ...) 404s instead of
+  // silently getting index.html's markup back with a 200 - without this, a
+  // build step that never ran (e.g. a skipped `build:vendor`) failed
+  // completely silently: the browser got a 200 for a `.js` URL whose body
+  // was actually index.html, which fails ES module parsing with no console
+  // error and no failing network request pointing at the real cause.
+  app.get("*", (c, next) => {
+    const lastSegment = c.req.path.slice(c.req.path.lastIndexOf("/") + 1);
+    if (lastSegment.includes(".")) return next();
+    return serveStatic({ path: "./frontend/dist/index.html" })(c, next);
+  });
 }
