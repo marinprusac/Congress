@@ -1,5 +1,4 @@
-import { QueryClientProvider } from "@tanstack/react-query";
-import { createQueryClient } from "@congress/congress-ui";
+import { createQueryClient, PersistedQueryProvider } from "@congress/congress-ui";
 import { App } from "@/App";
 import "./index.css";
 
@@ -16,8 +15,8 @@ const queryClient = createQueryClient();
 // every other Chamber's.
 export default function Remote() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistedQueryProvider client={queryClient} namespace="capitol">
       <App />
-    </QueryClientProvider>
+    </PersistedQueryProvider>
   );
 }

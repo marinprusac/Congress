@@ -12,6 +12,13 @@ export function createQueryClient(): QueryClient {
       queries: {
         staleTime: 5_000,
         retry: 1,
+        // Serves persisted cached data immediately (even offline) instead of
+        // the default "online" mode's indefinite pause when there's no
+        // network - queries still attempt a real fetch first whenever a
+        // connection exists, this only changes what happens when one
+        // doesn't. See PersistedQueryProvider for the cache this rehydrates
+        // from.
+        networkMode: "offlineFirst",
       },
     },
   });

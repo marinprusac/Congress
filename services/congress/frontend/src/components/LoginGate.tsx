@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsRestoring, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchAuthStatus, login, logout } from "@/lib/api";
 
 export function LoginGate({ children }: { children: ReactNode }) {
@@ -12,7 +12,13 @@ export function LoginGate({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  if (isLoading) {
+  // isRestoring covers the brief window before PersistedQueryProvider (see
+  // main.tsx) finishes reading this query's last-known result back out of
+  // IndexedDB - without waiting for it too, a cold/offline load would flash
+  // the password form (no data yet) before the persisted "authenticated"
+  // result has had a chance to land.
+  const isRestoring = useIsRestoring();
+  if (isRestoring || isLoading) {
     return null;
   }
 

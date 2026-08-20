@@ -1,8 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { createQueryClient, preventPinchZoom, ToastHost } from "@congress/congress-ui";
+import { createQueryClient, preventPinchZoom, ToastHost, PersistedQueryProvider } from "@congress/congress-ui";
 import { App } from "@/App";
 import "./index.css";
 
@@ -15,11 +14,11 @@ if (!rootElement) throw new Error("Root element not found");
 
 createRoot(rootElement).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
+    <PersistedQueryProvider client={queryClient} namespace="tasks">
       <BrowserRouter basename={import.meta.env.PROD ? "/tasks" : "/"}>
         <App />
       </BrowserRouter>
       <ToastHost />
-    </QueryClientProvider>
+    </PersistedQueryProvider>
   </StrictMode>
 );

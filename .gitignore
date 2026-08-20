@@ -6,6 +6,10 @@ node_modules/
 **/*.sqlite3-*
 services/*/data/
 
+# Written by infra/deploy/sync-deploy.sh on every deploy (see its own
+# comment) - a generated artifact, not source.
+services/congress/frontend/public/build-info.json
+
 # design-sync (see .design-sync/config.json) - staged converter scripts,
 # build output, and machine-local verification state. The durable set
 # (config.json, NOTES.md, conventions.md, previews/, overrides/) is

@@ -29,6 +29,17 @@ pnpm install --frozen-lockfile
 # infra/systemd/congress-chamber-<name>.service unit already installed on
 # the server (see docs/creating-a-chamber.md).
 SERVICES=(congress-core)
+
+# Read by frontend/vite.config.ts's `define` to bake this deploy's commit
+# into both the app bundle and the service worker (see sw.ts) - lets the
+# worker name its runtime caches per-build and evict the previous deploy's
+# on activate, since remote-entry.js/vendor bundle filenames are otherwise
+# stable/unhashed. Also written to a static, always-fetch-fresh file so it's
+# a cheap `curl`-able "what's actually live" signal independent of any of
+# that - useful given this pipeline has no other visible deploy step.
+export VITE_BUILD_ID="$remote_sha"
+echo "{\"buildId\": \"$remote_sha\", \"builtAt\": \"$(date -Is)\"}" > services/congress/frontend/public/build-info.json
+
 pnpm --filter congress build:web
 pnpm --filter congress build:vendor
 

@@ -59,6 +59,15 @@ importers:
       '@fontsource/ibm-plex-sans':
         specifier: ^5.1.0
         version: 5.3.0
+      '@tanstack/query-async-storage-persister':
+        specifier: ^5.101.4
+        version: 5.101.4
+      '@tanstack/react-query-persist-client':
+        specifier: ^5.101.4
+        version: 5.101.4(@tanstack/react-query@5.101.4(react@19.2.8))(react@19.2.8)
+      idb-keyval:
+        specifier: ^6.3.0
+        version: 6.3.0
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -936,6 +945,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.101.4
         version: 5.101.4(react@19.2.8)
+      '@tanstack/react-query-persist-client':
+        specifier: ^5.101.4
+        version: 5.101.4(@tanstack/react-query@5.101.4(react@19.2.8))(react@19.2.8)
       better-sqlite3:
         specifier: ^13.0.3
         version: 13.0.3
@@ -969,10 +981,19 @@ importers:
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
+      workbox-cacheable-response:
+        specifier: ^7.4.1
+        version: 7.4.1
+      workbox-expiration:
+        specifier: ^7.4.1
+        version: 7.4.1
       workbox-precaching:
         specifier: ^7.4.1
         version: 7.4.1
       workbox-routing:
+        specifier: ^7.4.1
+        version: 7.4.1
+      workbox-strategies:
         specifier: ^7.4.1
         version: 7.4.1
       zod:
@@ -2412,8 +2433,20 @@ packages:
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7 || ^8
 
+  '@tanstack/query-async-storage-persister@5.101.4':
+    resolution: {integrity: sha512-ROenNOVvxIZ1zKsBAiIvvslLo2xD8Me/vFz/tChdmuI7ciU+ET63yRrQ01W899Tx1ayQXdsGQJqYqjjVZk+OBQ==}
+
   '@tanstack/query-core@5.101.4':
     resolution: {integrity: sha512-gNwcvOJcRbLWPOLG/2OBm+zM+Yv+MKsXKEOWC57USuZDEsI71hEErQsiEGx5wX9rzWWkfwM0fVSPoiIFSsxfiw==}
+
+  '@tanstack/query-persist-client-core@5.101.4':
+    resolution: {integrity: sha512-Bmu+RfWhwYEyYZEwSeKC0gX4+KTkiEB3yO8oz9BfAY/Jfe3ndz9EnYVhihIZPmWIr8NXayF7JuraNQcrXQQCCg==}
+
+  '@tanstack/react-query-persist-client@5.101.4':
+    resolution: {integrity: sha512-CY5i7PPKS/5B8OR2zAs9nCbLpgqI4jN8eBhtAxKRMNHyGcQhmyOy4PkkJrAAXT+ecGj++fBJTgQw6OpyCt/2SQ==}
+    peerDependencies:
+      '@tanstack/react-query': ^5.101.4
+      react: ^18 || ^19
 
   '@tanstack/react-query@5.101.4':
     resolution: {integrity: sha512-yRg2pfOCxIs4ZJW3XYYHU/WgtD04FHSnfHlpRT7h7pR77hwkdRG4wxbKe4aq6P0RvXUTBSQpQeadS1SUYUe+KA==}
@@ -3133,6 +3166,9 @@ packages:
   iconv-lite@0.7.3:
     resolution: {integrity: sha512-IKXpvIzjnC9XTAUbVBcMfGS0EPaIXtW6v+zr+RRp+hqULEpo0owZax6wyRwPOJbWbzjYspQwusTsfVr0ifh4uQ==}
     engines: {node: '>=0.10.0'}
+
+  idb-keyval@6.3.0:
+    resolution: {integrity: sha512-um+2dgAWmYsu615EXpWVwSmapJhON0G43t3Ka/EVaohzPQXSMqKEqeDK/oIW3Ow+BXaF2PvSc+oBTFp793A5Ow==}
 
   idb@7.1.1:
     resolution: {integrity: sha512-gchesWBzyvGHRO9W8tzUWFDycow5gwjvFKfyV9FF32Y7F50yZMp7mP+T2mJIWFx49zicqyC4uefHM17o6xKIVQ==}
@@ -5553,7 +5589,22 @@ snapshots:
       tailwindcss: 4.3.3
       vite: 8.2.1(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.2)(tsx@4.23.11)
 
+  '@tanstack/query-async-storage-persister@5.101.4':
+    dependencies:
+      '@tanstack/query-core': 5.101.4
+      '@tanstack/query-persist-client-core': 5.101.4
+
   '@tanstack/query-core@5.101.4': {}
+
+  '@tanstack/query-persist-client-core@5.101.4':
+    dependencies:
+      '@tanstack/query-core': 5.101.4
+
+  '@tanstack/react-query-persist-client@5.101.4(@tanstack/react-query@5.101.4(react@19.2.8))(react@19.2.8)':
+    dependencies:
+      '@tanstack/query-persist-client-core': 5.101.4
+      '@tanstack/react-query': 5.101.4(react@19.2.8)
+      react: 19.2.8
 
   '@tanstack/react-query@5.101.4(react@19.2.8)':
     dependencies:
@@ -6348,6 +6399,8 @@ snapshots:
   iconv-lite@0.7.3:
     dependencies:
       safer-buffer: 2.1.2
+
+  idb-keyval@6.3.0: {}
 
   idb@7.1.1: {}
 
