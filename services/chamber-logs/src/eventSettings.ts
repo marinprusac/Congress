@@ -54,10 +54,10 @@ export async function updateEventSettings(eventType: string, input: UpdateEventS
 
   const next = {
     recordToHistory: input.recordToHistory ?? existing.recordToHistory,
-    historyMinPriority: input.historyMinPriority !== undefined ? input.historyMinPriority : existing.historyMinPriority,
+    historyMinPriority: input.historyMinPriority ?? existing.historyMinPriority,
     historyRetentionMs: input.historyRetentionMs !== undefined ? input.historyRetentionMs : existing.historyRetentionMs,
     notify: input.notify ?? existing.notify,
-    notifyMinPriority: input.notifyMinPriority !== undefined ? input.notifyMinPriority : existing.notifyMinPriority,
+    notifyMinPriority: input.notifyMinPriority ?? existing.notifyMinPriority,
     notifyTitleTemplate: input.notifyTitleTemplate !== undefined ? input.notifyTitleTemplate : existing.notifyTitleTemplate,
     notifyBodyTemplate: input.notifyBodyTemplate !== undefined ? input.notifyBodyTemplate : existing.notifyBodyTemplate,
     notifyUrlTemplate: input.notifyUrlTemplate !== undefined ? input.notifyUrlTemplate : existing.notifyUrlTemplate,

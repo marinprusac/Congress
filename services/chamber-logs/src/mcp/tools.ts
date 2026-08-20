@@ -41,10 +41,10 @@ export function registerTools(server: McpServer) {
       inputSchema: {
         eventType: z.string().min(1),
         recordToHistory: z.boolean().optional(),
-        historyMinPriority: priorityLevelSchema.nullable().optional(),
+        historyMinPriority: priorityLevelSchema.optional(),
         historyRetentionMs: z.number().int().positive().nullable().optional(),
         notify: z.boolean().optional(),
-        notifyMinPriority: priorityLevelSchema.nullable().optional(),
+        notifyMinPriority: priorityLevelSchema.optional(),
         notifyTitleTemplate: z.string().nullable().optional(),
         notifyBodyTemplate: z.string().nullable().optional(),
         notifyUrlTemplate: z.string().nullable().optional(),

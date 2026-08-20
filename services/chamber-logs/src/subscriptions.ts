@@ -3,10 +3,7 @@ import { PRIORITY_LEVELS, type ChamberSubscription, type PriorityLevel } from "@
 import { db } from "./db/client.js";
 import { eventSettings } from "./db/schema.js";
 
-function loosest(a: PriorityLevel | null, b: PriorityLevel | null): PriorityLevel | null {
-  // null means "no threshold at all" - already the loosest possible, wins
-  // over any concrete level.
-  if (a === null || b === null) return null;
+function loosest(a: PriorityLevel, b: PriorityLevel): PriorityLevel {
   return PRIORITY_LEVELS.indexOf(a) <= PRIORITY_LEVELS.indexOf(b) ? a : b;
 }
 
@@ -31,11 +28,13 @@ export function computeSubscriptions(): ChamberSubscription[] {
     .all();
 
   return rows.map((row) => {
-    const active: (PriorityLevel | null)[] = [];
+    const active: PriorityLevel[] = [];
     if (row.recordToHistory) active.push(row.historyMinPriority);
     if (row.notify) active.push(row.notifyMinPriority);
-    const minPriority = active.reduce<PriorityLevel | null>((acc, cur) => loosest(acc, cur), active[0] ?? null);
-    return minPriority ? { type: row.eventType, minPriority } : { type: row.eventType };
+    // `active` always has at least one entry - a row is only selected above
+    // because recordToHistory or notify (or both) is true.
+    const minPriority = active.reduce((acc, cur) => loosest(acc, cur));
+    return { type: row.eventType, minPriority };
   });
 }
 

@@ -21,9 +21,10 @@ function priorityOf(payload: Record<string, unknown>): PriorityLevel {
 }
 
 // ">=" is deliberately the only comparison a threshold supports - see
-// eventSettings table's own comment.
-function priorityMatches(threshold: PriorityLevel | null, priority: PriorityLevel): boolean {
-  if (!threshold) return true;
+// eventSettings table's own comment. "low" (the bottom of PRIORITY_LEVELS)
+// already matches every firing, so there's no separate "no threshold" case
+// to special-case here.
+function priorityMatches(threshold: PriorityLevel, priority: PriorityLevel): boolean {
   return priorityRankFor(priority) >= priorityRankFor(threshold);
 }
 

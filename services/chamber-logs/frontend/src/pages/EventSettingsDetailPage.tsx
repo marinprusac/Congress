@@ -15,10 +15,12 @@ function fieldLabel(children: React.ReactNode) {
   return <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">{children}</label>;
 }
 
-function PriorityThresholdSelect({ value, onChange }: { value: PriorityLevel | ""; onChange: (v: PriorityLevel | "") => void }) {
+// No "no threshold" option - "low" is already the bottom of PRIORITY_LEVELS,
+// so it already matches every firing; a separate null/unset state would
+// just be a second spelling of the same thing.
+function PriorityThresholdSelect({ value, onChange }: { value: PriorityLevel; onChange: (v: PriorityLevel) => void }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value as PriorityLevel | "")} className={inputClass}>
-      <option value="">— No threshold (fires at any priority) —</option>
+    <select value={value} onChange={(e) => onChange(e.target.value as PriorityLevel)} className={inputClass}>
       {PRIORITY_LEVELS.map((level) => (
         <option key={level} value={level}>
           {level}
@@ -121,8 +123,8 @@ export function EventSettingsDetailPage() {
               <div>
                 {fieldLabel("Minimum priority")}
                 <PriorityThresholdSelect
-                  value={draft.historyMinPriority ?? ""}
-                  onChange={(v) => set("historyMinPriority", v || null)}
+                  value={draft.historyMinPriority ?? "low"}
+                  onChange={(v) => set("historyMinPriority", v)}
                 />
               </div>
               <div>
@@ -149,7 +151,7 @@ export function EventSettingsDetailPage() {
             <div className="mt-3 flex flex-col gap-4 pl-6">
               <div>
                 {fieldLabel("Minimum priority")}
-                <PriorityThresholdSelect value={draft.notifyMinPriority ?? ""} onChange={(v) => set("notifyMinPriority", v || null)} />
+                <PriorityThresholdSelect value={draft.notifyMinPriority ?? "low"} onChange={(v) => set("notifyMinPriority", v)} />
               </div>
               <div>
                 {fieldLabel(`Title (optional — defaults to "${row.label}")`)}

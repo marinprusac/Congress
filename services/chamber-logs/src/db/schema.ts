@@ -20,13 +20,14 @@ export const eventSettings = sqliteTable(
     label: text("label").notNull(),
     description: text("description"),
     recordToHistory: integer("record_to_history", { mode: "boolean" }).notNull().default(true),
-    // Ordered low < normal < high < urgent (PRIORITY_LEVELS, shared-types) -
-    // null means no threshold, every firing matches regardless of the
-    // event's own declared payload.priority. ">=" is deliberately the only
-    // comparison this supports (see eventReceive.ts's minPriorityMatches).
+    // Ordered low < normal < high < urgent (PRIORITY_LEVELS, shared-types).
+    // No "no threshold" option - "low" already matches every firing (it's
+    // the bottom of the order), so a separate null/unset state would just
+    // be a second spelling of the same thing. ">=" is deliberately the only
+    // comparison this supports (see eventReceive.ts's priorityMatches).
     // Kept separate from notifyMinPriority below so recording and notifying
     // can be tuned to different noise levels for the same event type.
-    historyMinPriority: text("history_min_priority", { enum: PRIORITY_LEVELS }),
+    historyMinPriority: text("history_min_priority", { enum: PRIORITY_LEVELS }).notNull().default("low"),
     // How long a history row this event type writes sticks around before
     // being pruned. Null means "use eventHistory.ts's own
     // DEFAULT_HISTORY_RETENTION_MS" - deliberately not a single global
@@ -35,7 +36,7 @@ export const eventSettings = sqliteTable(
     // be.
     historyRetentionMs: integer("history_retention_ms"),
     notify: integer("notify", { mode: "boolean" }).notNull().default(false),
-    notifyMinPriority: text("notify_min_priority", { enum: PRIORITY_LEVELS }),
+    notifyMinPriority: text("notify_min_priority", { enum: PRIORITY_LEVELS }).notNull().default("low"),
     // {{payload.x}} interpolated against the firing event's payload (see
     // eventReceive.ts's interpolate()); unset falls back to the cached
     // label/description above.
