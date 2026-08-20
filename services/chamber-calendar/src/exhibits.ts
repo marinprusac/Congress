@@ -1,84 +1,26 @@
 import type { ExhibitSearchResult, ExhibitResolveResult } from "@congress/shared-types";
 import { createPushExhibitSync } from "@congress/chamber-kit";
 import { env } from "./env.js";
+import { toExhibitId, parseExhibitId, eventUrl } from "./google/eventId.js";
+import { searchCachedEvents, getCachedEvent, upsertCachedEventFromGoogle, type RawGoogleEvent } from "./google/cache.js";
 import { googleCalendarFetch } from "./google/client.js";
 import { getAccountRow } from "./google/accounts.js";
-import { listSelectedCalendarsInternal } from "./google/calendars.js";
 
 // Deliberately talks directly to the low-level Google client/account
-// lookups, not to google/events.ts's getEvent/listEvents - events.ts already
-// depends on this module (to push a sync on create/update/delete), and
-// having this module call back into events.ts would create a cycle.
+// lookups on a cache miss, not to google/events.ts's own getEvent -
+// events.ts already depends on this module (to push a sync on
+// create/update/delete), and having this module call back into events.ts
+// would create a cycle.
 
-const EVENT_ID_PREFIX = "event-";
-const SEARCH_WINDOW_DAYS = 180;
-
-export function toExhibitId(accountId: number, calendarId: string, eventId: string): string {
-  return `${EVENT_ID_PREFIX}${accountId}:${encodeURIComponent(calendarId)}:${encodeURIComponent(eventId)}`;
-}
-
-export function parseExhibitId(id: string): { accountId: number; calendarId: string; eventId: string } | null {
-  if (!id.startsWith(EVENT_ID_PREFIX)) return null;
-  const parts = id.slice(EVENT_ID_PREFIX.length).split(":");
-  if (parts.length !== 3) return null;
-  const [accountIdStr, encCalendarId, encEventId] = parts;
-  const accountId = Number(accountIdStr);
-  if (!Number.isInteger(accountId)) return null;
-  return { accountId, calendarId: decodeURIComponent(encCalendarId!), eventId: decodeURIComponent(encEventId!) };
-}
-
-export function eventUrl(accountId: number, calendarId: string, eventId: string): string {
-  return `/e/${accountId}/${encodeURIComponent(calendarId)}/${encodeURIComponent(eventId)}`;
-}
-
-interface GoogleEventListItem {
-  id: string;
-  summary?: string;
-}
+export { toExhibitId, parseExhibitId, eventUrl };
 
 export async function searchEventExhibits(query: string, limit = 10): Promise<ExhibitSearchResult[]> {
-  const trimmed = query.trim();
-  const now = Date.now();
-  const dayMs = 24 * 60 * 60 * 1000;
-  // A non-empty query also looks slightly into the past (someone referencing
-  // a recent meeting), an empty query ("show me what's there") only looks
-  // forward - matching the picker's upcoming-agenda-like default.
-  const timeMin = new Date(trimmed ? now - SEARCH_WINDOW_DAYS * dayMs : now).toISOString();
-  const timeMax = new Date(now + SEARCH_WINDOW_DAYS * dayMs).toISOString();
-
-  const results: ExhibitSearchResult[] = [];
-  for (const sel of listSelectedCalendarsInternal()) {
-    if (results.length >= limit) break;
-    const account = getAccountRow(sel.accountId);
-    if (!account) continue;
-    try {
-      const params = new URLSearchParams({
-        timeMin,
-        timeMax,
-        singleEvents: "true",
-        orderBy: "startTime",
-        maxResults: String(limit),
-      });
-      if (trimmed) params.set("q", trimmed);
-      const body = (await googleCalendarFetch(
-        account,
-        `/calendars/${encodeURIComponent(sel.googleCalendarId)}/events?${params.toString()}`
-      )) as { items?: GoogleEventListItem[] };
-      for (const raw of body.items ?? []) {
-        results.push({
-          id: toExhibitId(sel.accountId, sel.googleCalendarId, raw.id),
-          type: "event",
-          name: raw.summary ?? "(untitled)",
-          url: eventUrl(sel.accountId, sel.googleCalendarId, raw.id),
-        });
-      }
-    } catch {
-      // A single calendar/account being unreachable (needs reconnect, API
-      // error) shouldn't fail the whole search - same per-account isolation
-      // as listEvents in google/events.ts.
-    }
-  }
-  return results.slice(0, limit);
+  return searchCachedEvents(query, limit).map((event) => ({
+    id: toExhibitId(event.accountId, event.calendarId, event.id),
+    type: "event",
+    name: event.title,
+    url: eventUrl(event.accountId, event.calendarId, event.id),
+  }));
 }
 
 export async function resolveEventExhibits(ids: string[]): Promise<ExhibitResolveResult[]> {
@@ -87,20 +29,22 @@ export async function resolveEventExhibits(ids: string[]): Promise<ExhibitResolv
       const parsed = parseExhibitId(id);
       if (!parsed) return { id, deleted: true };
 
+      const cached = getCachedEvent(id);
+      if (cached) return { id, name: cached.title, url: eventUrl(parsed.accountId, parsed.calendarId, parsed.eventId) };
+
+      // Cache miss - outside the cache window, or not yet synced. Live-fetch
+      // and opportunistically write it into the cache (read-through), same
+      // tolerance google/events.ts's own getEvent applies for a direct lookup.
       const account = getAccountRow(parsed.accountId);
       if (!account) return { id, deleted: true };
-
       try {
         const raw = (await googleCalendarFetch(
           account,
           `/calendars/${encodeURIComponent(parsed.calendarId)}/events/${encodeURIComponent(parsed.eventId)}`
-        )) as { summary?: string; status?: string };
+        )) as RawGoogleEvent;
         if (raw.status === "cancelled") return { id, deleted: true };
-        return {
-          id,
-          name: raw.summary ?? "(untitled)",
-          url: eventUrl(parsed.accountId, parsed.calendarId, parsed.eventId),
-        };
+        const event = upsertCachedEventFromGoogle(raw, parsed.accountId, parsed.calendarId);
+        return { id, name: event.title, url: eventUrl(parsed.accountId, parsed.calendarId, parsed.eventId) };
       } catch {
         // Covers a real 404 and an account needing reconnect alike - the
         // per-chamber resolve contract only distinguishes resolved/deleted,

@@ -49,3 +49,38 @@ export const eventRefs = sqliteTable(
   },
   (table) => [uniqueIndex("event_refs_exhibit_target_idx").on(table.exhibitId, table.targetExhibitId)]
 );
+
+// A disposable, rebuildable local mirror of a bounded window of Google
+// Calendar's own event data - Google stays the source of truth, this just
+// avoids a live Google API round-trip on every read. Keyed by the same
+// exhibit-id string exhibits.ts's toExhibitId() produces. googleUpdatedAt is
+// Google's own "updated" timestamp - the cheap diff key google/cache.ts's
+// poll-and-diff sync compares against to detect real changes (including
+// ones made outside this Chamber, directly in Google Calendar).
+export const cachedEvents = sqliteTable(
+  "cached_events",
+  {
+    id: text("id").primaryKey(),
+    accountId: integer("account_id")
+      .notNull()
+      .references(() => googleAccounts.id, { onDelete: "cascade" }),
+    calendarId: text("calendar_id").notNull(),
+    eventId: text("event_id").notNull(),
+    calendarSummary: text("calendar_summary").notNull(),
+    calendarColor: text("calendar_color"),
+    title: text("title").notNull(),
+    description: text("description"),
+    location: text("location"),
+    allDay: integer("all_day", { mode: "boolean" }).notNull(),
+    start: text("start").notNull(),
+    end: text("end").notNull(),
+    htmlLink: text("html_link"),
+    editable: integer("editable", { mode: "boolean" }).notNull(),
+    googleUpdatedAt: text("google_updated_at").notNull(),
+    syncedAt: integer("synced_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("cached_events_account_calendar_idx").on(table.accountId, table.calendarId),
+    index("cached_events_start_idx").on(table.start),
+  ]
+);

@@ -51,6 +51,21 @@ export function listSelectedCalendarsInternal(): { accountId: number; googleCale
     .all();
 }
 
+// Shared by google/events.ts (normalizing a live/write-path response) and
+// google/cache.ts (normalizing a poll-sync response) - falls back to the
+// raw calendar id/no color if the calendar was deselected between the
+// event being cached and this lookup running.
+export function calendarMeta(accountId: number, googleCalendarId: string): { summary: string; colorHex: string | null } {
+  const row = db
+    .select({ summary: selectedCalendars.summary, colorHex: selectedCalendars.colorHex })
+    .from(selectedCalendars)
+    .where(
+      and(eq(selectedCalendars.accountId, accountId), eq(selectedCalendars.googleCalendarId, googleCalendarId))
+    )
+    .get();
+  return row ?? { summary: googleCalendarId, colorHex: null };
+}
+
 export function setCalendarSelection(
   accountId: number,
   googleCalendarId: string,

@@ -5,14 +5,20 @@ import type {
   CreateEventRequest,
   UpdateEventRequest,
 } from "../types.js";
-import { googleAccounts, selectedCalendars } from "../db/schema.js";
-import { db } from "../db/client.js";
-import { eq, and } from "drizzle-orm";
 import { googleCalendarFetch, GoogleApiError } from "./client.js";
 import { getAccountRow } from "./accounts.js";
-import { listSelectedCalendarsInternal } from "./calendars.js";
+import { listSelectedCalendarsInternal, calendarMeta } from "./calendars.js";
 import { AccountNeedsReconnectError } from "./accounts.js";
-import { toExhibitId, pushExhibitSync, parseExhibitId } from "../exhibits.js";
+import {
+  isWithinCacheWindow,
+  listCachedEvents,
+  searchCachedEvents,
+  getCachedEvent,
+  upsertCachedEventFromGoogle,
+  deleteCachedEvent,
+} from "./cache.js";
+import { toExhibitId, parseExhibitId } from "./eventId.js";
+import { pushExhibitSync } from "../exhibits.js";
 import { extractOutgoingExhibitRefs } from "@congress/chamber-kit";
 import { listManualRefs, deleteManualRefsForEvent } from "../refs.js";
 import { publishEvent } from "../events.js";
@@ -25,6 +31,8 @@ interface GoogleEventTime {
 
 interface GoogleEvent {
   id: string;
+  status?: string;
+  updated?: string;
   summary?: string;
   description?: string;
   location?: string;
@@ -116,18 +124,14 @@ function requireAccount(accountId: number) {
   return account;
 }
 
-function calendarMeta(accountId: number, googleCalendarId: string): { summary: string; colorHex: string | null } {
-  const row = db
-    .select({ summary: selectedCalendars.summary, colorHex: selectedCalendars.colorHex })
-    .from(selectedCalendars)
-    .where(
-      and(eq(selectedCalendars.accountId, accountId), eq(selectedCalendars.googleCalendarId, googleCalendarId))
-    )
-    .get();
-  return row ?? { summary: googleCalendarId, colorHex: null };
-}
-
 export async function listEvents(fromISO: string, toISO: string): Promise<ListEventsResponse> {
+  if (isWithinCacheWindow(fromISO, toISO)) {
+    return { events: listCachedEvents(fromISO, toISO), accountErrors: [] };
+  }
+
+  // A range outside the cache window (paging the agenda far enough back or
+  // forward) falls back to a live fetch, same as before this cache existed -
+  // the cache is a read-through optimization, never authoritative on its own.
   const selections = listSelectedCalendarsInternal();
   const byAccount = new Map<number, string[]>();
   for (const sel of selections) {
@@ -172,65 +176,29 @@ export async function listEvents(fromISO: string, toISO: string): Promise<ListEv
   return { events, accountErrors };
 }
 
-// A non-empty query also looks slightly into the past (someone referencing
-// a recent meeting), an empty query only looks forward - same window/intent
-// split as exhibits.ts's searchEventExhibits, which this duplicates the
-// window size from rather than importing (that module deliberately avoids
-// depending back on this one to dodge a cycle).
-const SEARCH_WINDOW_DAYS = 180;
-
+// Delegates straight to the cache table - the cache window is sized (see
+// google/cache.ts's CACHE_WINDOW_DAYS) to always fully cover this "rolling
+// ~6-month window centered on now" search contract, so there's no live
+// fallback branch here the way listEvents has for out-of-window ranges.
 export async function searchEvents(query: string, limit = 20): Promise<ListEventsResponse> {
-  const trimmed = query.trim();
-  const now = Date.now();
-  const dayMs = 24 * 60 * 60 * 1000;
-  const timeMin = new Date(trimmed ? now - SEARCH_WINDOW_DAYS * dayMs : now).toISOString();
-  const timeMax = new Date(now + SEARCH_WINDOW_DAYS * dayMs).toISOString();
-
-  const events: CalendarEvent[] = [];
-  const accountErrors: AccountError[] = [];
-
-  for (const sel of listSelectedCalendarsInternal()) {
-    if (events.length >= limit) break;
-    const account = getAccountRow(sel.accountId);
-    if (!account) continue;
-    try {
-      const params = new URLSearchParams({
-        timeMin,
-        timeMax,
-        singleEvents: "true",
-        orderBy: "startTime",
-        maxResults: String(limit),
-      });
-      if (trimmed) params.set("q", trimmed);
-      const body = (await googleCalendarFetch(
-        account,
-        `/calendars/${encodeURIComponent(sel.googleCalendarId)}/events?${params.toString()}`
-      )) as { items?: GoogleEvent[] };
-      const { summary, colorHex } = calendarMeta(sel.accountId, sel.googleCalendarId);
-      for (const raw of body.items ?? []) {
-        events.push(normalizeGoogleEvent(raw, sel.accountId, sel.googleCalendarId, summary, colorHex));
-      }
-    } catch (err) {
-      if (err instanceof AccountNeedsReconnectError) {
-        accountErrors.push({ accountId: err.accountId, label: err.label, reason: "needs_reconnect" });
-      }
-      // Otherwise: same per-account isolation as searchEventExhibits - one
-      // unreachable calendar/account shouldn't fail the whole search.
-    }
-  }
-
-  events.sort((a, b) => a.start.localeCompare(b.start));
-  return { events: events.slice(0, limit), accountErrors };
+  return { events: searchCachedEvents(query, limit), accountErrors: [] };
 }
 
 export async function getEvent(accountId: number, calendarId: string, eventId: string): Promise<CalendarEvent> {
+  const cached = getCachedEvent(toExhibitId(accountId, calendarId, eventId));
+  if (cached) return cached;
+
+  // Cache miss - an event outside the cache window, or one the sync hasn't
+  // picked up yet. Live-fetch and opportunistically write it into the cache
+  // (read-through), same "missing rows fall back to a live call" tolerance
+  // exhibit_cache already documents.
   const account = requireAccount(accountId);
   const raw = (await googleCalendarFetch(
     account,
     `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`
   )) as GoogleEvent;
-  const { summary, colorHex } = calendarMeta(accountId, calendarId);
-  return normalizeGoogleEvent(raw, accountId, calendarId, summary, colorHex);
+  if (raw.status === "cancelled") throw new GoogleApiError(404, "Event not found");
+  return upsertCachedEventFromGoogle(raw, accountId, calendarId);
 }
 
 // The set of Exhibits this event points at is the union of what's embedded
@@ -274,8 +242,7 @@ export async function createEvent(input: CreateEventRequest): Promise<CalendarEv
     method: "POST",
     body: JSON.stringify(toGoogleEventBody(input)),
   })) as GoogleEvent;
-  const { summary, colorHex } = calendarMeta(input.accountId, input.calendarId);
-  const result = normalizeGoogleEvent(raw, input.accountId, input.calendarId, summary, colorHex);
+  const result = upsertCachedEventFromGoogle(raw, input.accountId, input.calendarId);
   await syncEventExhibit(result);
   void publishEvent({
     type: "calendar.event_created",
@@ -319,8 +286,7 @@ export async function updateEvent(
     }
     throw err;
   }
-  const { summary, colorHex } = calendarMeta(accountId, calendarId);
-  const result = normalizeGoogleEvent(raw, accountId, calendarId, summary, colorHex);
+  const result = upsertCachedEventFromGoogle(raw, accountId, calendarId);
   await syncEventExhibit(result);
   void publishEvent({
     type: "calendar.event_updated",
@@ -346,6 +312,7 @@ export async function deleteEvent(accountId: number, calendarId: string, eventId
     { method: "DELETE" }
   );
   const exhibitId = toExhibitId(accountId, calendarId, eventId);
+  deleteCachedEvent(exhibitId);
   deleteManualRefsForEvent(exhibitId);
   await pushExhibitSync({
     id: exhibitId,

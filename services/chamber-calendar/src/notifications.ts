@@ -1,6 +1,6 @@
 import { createPublishEvent } from "@congress/chamber-kit";
-import { listEvents } from "./google/events.js";
-import { eventUrl } from "./exhibits.js";
+import { listCachedEvents } from "./google/cache.js";
+import { eventUrl } from "./google/eventId.js";
 import { env } from "./env.js";
 
 // Publishes to Congress's push relay rather than pushing a notification
@@ -83,15 +83,12 @@ function scheduleFire(key: string, fireAtMs: number, fire: () => void): void {
   scheduled.set(key, { timer, fireAtMs });
 }
 
-async function pollUpcomingEvents(): Promise<void> {
+// A local cache read now, not a live Google call - the calendar cache sync
+// (google/cache.ts) is what actually talks to Google on its own interval;
+// this just re-arms timers off whatever it last synced.
+function pollUpcomingEvents(): void {
   const now = Date.now();
-  let events;
-  try {
-    ({ events } = await listEvents(new Date(now).toISOString(), new Date(now + LOOKAHEAD_MS).toISOString()));
-  } catch (err) {
-    console.warn(`Upcoming-event poll failed: ${(err as Error).message}`);
-    return;
-  }
+  const events = listCachedEvents(new Date(now).toISOString(), new Date(now + LOOKAHEAD_MS).toISOString());
 
   for (const event of events) {
     if (event.allDay) continue;
@@ -108,8 +105,8 @@ async function pollUpcomingEvents(): Promise<void> {
 let pollInterval: ReturnType<typeof setInterval> | undefined;
 
 export function startUpcomingEventNotifications(): void {
-  void pollUpcomingEvents();
-  pollInterval = setInterval(() => void pollUpcomingEvents(), POLL_INTERVAL_MS);
+  pollUpcomingEvents();
+  pollInterval = setInterval(pollUpcomingEvents, POLL_INTERVAL_MS);
 }
 
 export function stopUpcomingEventNotifications(): void {
