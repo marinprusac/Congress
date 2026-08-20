@@ -4,6 +4,15 @@ import { getChamber } from "./registry.js";
 
 const FORWARD_TIMEOUT_MS = 10_000;
 
+// Deputy's chat POST blocks on a full headless `claude` run (chat.ts) before
+// responding - unlike every other Chamber route, which answers in
+// milliseconds, this one can legitimately take minutes (multiple cross-
+// Chamber MCP tool calls). The default FORWARD_TIMEOUT_MS would abort the
+// proxy well before that run finishes, surfacing a false "chamber
+// unreachable" to the owner even though the run itself completes fine and
+// gets persisted - the reload-and-it's-there symptom this constant fixes.
+const DEPUTY_CHAT_TIMEOUT_MS = 5 * 60 * 1000;
+
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
   "keep-alive",
@@ -16,7 +25,7 @@ const HOP_BY_HOP_HEADERS = new Set([
   "host",
 ]);
 
-async function proxyRequest(c: Context, targetUrl: string): Promise<Response> {
+async function proxyRequest(c: Context, targetUrl: string, timeoutMs: number = FORWARD_TIMEOUT_MS): Promise<Response> {
   const forwardHeaders = new Headers();
   for (const [key, value] of c.req.raw.headers.entries()) {
     if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
@@ -36,7 +45,7 @@ async function proxyRequest(c: Context, targetUrl: string): Promise<Response> {
     // fetch() would otherwise silently resolve the redirect target itself
     // and hand back that page's body under this request's original status.
     redirect: "manual",
-    signal: AbortSignal.timeout(FORWARD_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 
   const responseHeaders = new Headers();
@@ -68,8 +77,13 @@ export async function forwardToChamber(c: Context): Promise<Response> {
   const search = new URL(c.req.url).search;
   const targetUrl = `${chamber.apiBase}${remainder}${search}`;
 
+  const timeoutMs =
+    chamberName === "deputy" && c.req.method === "POST" && remainder === "/chat/messages"
+      ? DEPUTY_CHAT_TIMEOUT_MS
+      : FORWARD_TIMEOUT_MS;
+
   try {
-    return await proxyRequest(c, targetUrl);
+    return await proxyRequest(c, targetUrl, timeoutMs);
   } catch {
     return c.json({ error: "chamber_unreachable", chamber: chamberName }, 503);
   }
