@@ -18,7 +18,13 @@ const MOVE_CANCEL_PX = 10;
 // real layout positions instead of assuming a fixed row height.
 export function useReorderableList<T extends string>(
   order: T[],
-  onReorder: (next: T[]) => void
+  // Fires on every slot crossing while actively dragging - cheap, state-only
+  // update so the list visibly reflows as the row moves.
+  onReorder: (next: T[]) => void,
+  // Fires once, on drop, with the final order - the place to do anything
+  // more expensive than a state update (useChamberOrder's commitOrder
+  // writes to localStorage here instead of on every crossing).
+  onDrop: (next: T[]) => void
 ): {
   draggingName: T | null;
   setRowRef: (name: T) => (el: HTMLElement | null) => void;
@@ -34,6 +40,17 @@ export function useReorderableList<T extends string>(
   orderRef.current = order;
   const onReorderRef = useRef(onReorder);
   onReorderRef.current = onReorder;
+  const onDropRef = useRef(onDrop);
+  onDropRef.current = onDrop;
+
+  // Measured once when a drag actually starts, not re-measured on every
+  // pointermove - rows are fixed-height and the list doesn't scroll during
+  // a drag, so a row's live bounding rect never actually changes over the
+  // course of one gesture except as a *result* of the reordering itself
+  // (which visually shifts other rows), and the target slot is fully
+  // determined by these two numbers plus arithmetic.
+  const rowHeightRef = useRef(0);
+  const firstTopRef = useRef(0);
 
   const setRowRef = useCallback(
     (name: T) => (el: HTMLElement | null) => {
@@ -57,6 +74,10 @@ export function useReorderableList<T extends string>(
     clearTimer();
     timerRef.current = window.setTimeout(() => {
       didDragRef.current = true;
+      const firstName = orderRef.current[0];
+      const firstRect = firstName ? rowRefs.current.get(firstName)?.getBoundingClientRect() : undefined;
+      rowHeightRef.current = firstRect?.height ?? 0;
+      firstTopRef.current = firstRect?.top ?? 0;
       setDraggingName(name);
     }, LONG_PRESS_MS);
   }, []);
@@ -101,20 +122,20 @@ export function useReorderableList<T extends string>(
     }
 
     // Actively dragging: move the held row to whichever slot the pointer is
-    // currently over, using each row's own live bounding rect (not an
-    // assumed fixed height) - reordering fires live, not just on drop, so
-    // the list visibly reflows as the row moves. Captured into a local so
-    // TS can narrow it to non-null once for the rest of this closure -
-    // `draggingName` itself is a useState value, not something TS treats as
-    // const across nested function bodies.
+    // currently over. Target slot is computed from the row height/first-row
+    // top measured once at drag start, not from a fresh getBoundingClientRect
+    // per row per frame - equivalent to the old "first row whose midpoint is
+    // below the pointer" scan for a uniformly-spaced list (rounding to the
+    // nearest slot center is the same comparison, just arithmetic instead of
+    // N forced layout reads). Reordering fires live, not just on drop, so
+    // the list visibly reflows as the row moves.
     const name = draggingName;
     function moveToPointer(clientY: number) {
-      const entries = orderRef.current.map((n) => {
-        const rect = rowRefs.current.get(n)?.getBoundingClientRect();
-        return { n, mid: rect ? rect.top + rect.height / 2 : 0 };
-      });
-      let targetIndex = entries.findIndex((entry) => clientY < entry.mid);
-      if (targetIndex === -1) targetIndex = entries.length - 1;
+      const rowHeight = rowHeightRef.current;
+      if (rowHeight <= 0) return;
+      const count = orderRef.current.length;
+      const raw = (clientY - firstTopRef.current) / rowHeight;
+      const targetIndex = Math.min(count - 1, Math.max(0, Math.round(raw)));
       const currentIndex = orderRef.current.indexOf(name);
       if (targetIndex === currentIndex || currentIndex === -1) return;
       const next = orderRef.current.filter((n) => n !== name);
@@ -130,6 +151,7 @@ export function useReorderableList<T extends string>(
     function onUp() {
       startRef.current = null;
       setDraggingName(null);
+      onDropRef.current(orderRef.current);
     }
     window.addEventListener("pointermove", onMove, { passive: false });
     window.addEventListener("pointerup", onUp);

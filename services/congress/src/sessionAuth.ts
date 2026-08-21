@@ -38,7 +38,21 @@ function isLockedOut(ip: string): boolean {
   return entry !== undefined && entry.count >= MAX_ATTEMPTS && Date.now() < entry.lockedUntil;
 }
 
+// Entries are only ever added here and removed on a successful login from
+// that same IP - on a public endpoint, drive-by scanners from IPs that never
+// come back and never succeed would otherwise accumulate for the process's
+// whole lifetime. Swept opportunistically on every failure instead of on a
+// separate timer - self-bounding to roughly the number of IPs that have
+// actually failed within the last lockout window.
+function sweepExpiredAttempts(): void {
+  const now = Date.now();
+  for (const [ip, entry] of attemptsByIp) {
+    if (now >= entry.lockedUntil) attemptsByIp.delete(ip);
+  }
+}
+
 function recordFailure(ip: string): void {
+  sweepExpiredAttempts();
   const entry = attemptsByIp.get(ip) ?? { count: 0, lockedUntil: 0 };
   entry.count += 1;
   entry.lockedUntil = Date.now() + LOCKOUT_MS;

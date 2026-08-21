@@ -197,13 +197,13 @@ export function NavPanel({ current, currentLabel }: NavPanelProps) {
 
   const registryChambers = (data ?? []).filter((c) => c.status === "active");
   const chambers = buildChamberList(registryChambers, current, currentLabel);
-  const { order, setOrder } = useChamberOrder(chambers.map((c) => c.name));
+  const { order, setOrder, commitOrder } = useChamberOrder(chambers.map((c) => c.name));
   const orderedChambers = order
     .map((name) => chambers.find((c) => c.name === name))
     .filter((c): c is PanelChamber => Boolean(c));
 
-  const desktopReorder = useReorderableList(order, setOrder);
-  const mobileReorder = useReorderableList(order, setOrder);
+  const desktopReorder = useReorderableList(order, setOrder, commitOrder);
+  const mobileReorder = useReorderableList(order, setOrder, commitOrder);
 
   function renderChamberRows(variant: "desktop" | "mobile") {
     const reorder = variant === "desktop" ? desktopReorder : mobileReorder;

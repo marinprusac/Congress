@@ -66,6 +66,26 @@ export function calendarMeta(accountId: number, googleCalendarId: string): { sum
   return row ?? { summary: googleCalendarId, colorHex: null };
 }
 
+export function getCalendarSyncToken(accountId: number, googleCalendarId: string): string | null {
+  const row = db
+    .select({ syncToken: selectedCalendars.syncToken })
+    .from(selectedCalendars)
+    .where(
+      and(eq(selectedCalendars.accountId, accountId), eq(selectedCalendars.googleCalendarId, googleCalendarId))
+    )
+    .get();
+  return row?.syncToken ?? null;
+}
+
+export function setCalendarSyncToken(accountId: number, googleCalendarId: string, syncToken: string | null): void {
+  db.update(selectedCalendars)
+    .set({ syncToken })
+    .where(
+      and(eq(selectedCalendars.accountId, accountId), eq(selectedCalendars.googleCalendarId, googleCalendarId))
+    )
+    .run();
+}
+
 export function setCalendarSelection(
   accountId: number,
   googleCalendarId: string,

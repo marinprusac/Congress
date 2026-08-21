@@ -47,24 +47,34 @@ async function checkDueTasks(): Promise<void> {
     .all();
 
   const currentlyDue = new Map<number, "due_soon" | "overdue">();
+  // Collected and awaited together rather than one at a time in the loop -
+  // due dates cluster on hour boundaries, so several thresholds crossing at
+  // once used to serialize their publishes for no reason (each is already
+  // its own best-effort, fire-and-forget POST on Congress's side - see
+  // createPublishEvent - so none of them can reject and short-circuit this).
+  const publishes: Promise<void>[] = [];
 
   for (const row of rows) {
     if (!row.dueDate || row.dueDate.getTime() - now > LOOKAHEAD_MS) continue;
     const state = row.dueDate.getTime() < now ? "overdue" : "due_soon";
     currentlyDue.set(row.id, state);
     if (lastNotifiedState.get(row.id) !== state) {
-      await publishEvent({
-        type: state === "overdue" ? "tasks.overdue" : "tasks.due_soon",
-        payload: { taskId: row.id, name: row.name, url: `/t/${row.id}` },
-      });
+      publishes.push(
+        publishEvent({
+          type: state === "overdue" ? "tasks.overdue" : "tasks.due_soon",
+          payload: { taskId: row.id, name: row.name, url: `/t/${row.id}` },
+        })
+      );
     }
   }
 
   for (const id of lastNotifiedState.keys()) {
     if (!currentlyDue.has(id)) {
-      await publishEvent({ type: "tasks.due_cleared", payload: { taskId: id } });
+      publishes.push(publishEvent({ type: "tasks.due_cleared", payload: { taskId: id } }));
     }
   }
+
+  await Promise.all(publishes);
 
   lastNotifiedState.clear();
   for (const [id, state] of currentlyDue) lastNotifiedState.set(id, state);

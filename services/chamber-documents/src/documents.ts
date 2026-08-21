@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import { writeFile, unlink } from "node:fs/promises";
+import { unlink } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { desc, eq } from "drizzle-orm";
 import type { DocumentSummary, DocumentDetail, UpdateDocumentRequest } from "./types.js";
 import { extractOutgoingExhibitRefs, createManualRefsByExhibitId } from "@congress/chamber-kit";
@@ -78,9 +81,33 @@ function toDetail(row: typeof documents.$inferSelect): DocumentDetail {
   return { ...toSummary(row), description: row.description };
 }
 
+// Explicit columns rather than `db.select()` - a list view never renders
+// `description` (can be as long as a note body) or the internal
+// `storageKey`, so there's no reason to read either out of SQLite and
+// serialize it into the response just to build a title/size/date row.
 export async function listDocuments(): Promise<DocumentSummary[]> {
-  const rows = db.select().from(documents).orderBy(desc(documents.updatedAt)).all();
-  return rows.map(toSummary);
+  const rows = db
+    .select({
+      id: documents.id,
+      title: documents.title,
+      filename: documents.filename,
+      mimeType: documents.mimeType,
+      sizeBytes: documents.sizeBytes,
+      createdAt: documents.createdAt,
+      updatedAt: documents.updatedAt,
+    })
+    .from(documents)
+    .orderBy(desc(documents.updatedAt))
+    .all();
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    filename: row.filename,
+    mimeType: row.mimeType,
+    sizeBytes: row.sizeBytes,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }));
 }
 
 export async function getDocument(id: number): Promise<DocumentDetail | null> {
@@ -91,16 +118,21 @@ export async function getDocument(id: number): Promise<DocumentDetail | null> {
 export interface CreateDocumentInput {
   title: string;
   description: string;
-  file: { filename: string; mimeType: string; bytes: Uint8Array };
+  file: { filename: string; mimeType: string; sizeBytes: number; stream: () => ReadableStream<Uint8Array> };
 }
 
 export async function createDocument(input: CreateDocumentInput): Promise<DocumentDetail> {
-  if (input.file.bytes.byteLength > MAX_FILE_SIZE_BYTES) {
-    throw new FileTooLargeError(input.file.bytes.byteLength);
+  if (input.file.sizeBytes > MAX_FILE_SIZE_BYTES) {
+    throw new FileTooLargeError(input.file.sizeBytes);
   }
 
   const storageKey = randomUUID();
-  await writeFile(join(env.FILES_DIR, storageKey), input.file.bytes);
+  // Piped straight to disk rather than buffered into a Uint8Array first (the
+  // caller already validated size against MAX_FILE_SIZE_BYTES from the
+  // upload's own reported size, without needing to read a single byte) - a
+  // large-but-still-"modest" document no longer has to exist wholly in this
+  // process's memory before a byte of it is written.
+  await pipeline(Readable.fromWeb(input.file.stream()), createWriteStream(join(env.FILES_DIR, storageKey)));
 
   const now = new Date();
   const inserted = db
@@ -109,7 +141,7 @@ export async function createDocument(input: CreateDocumentInput): Promise<Docume
       title: input.title,
       filename: input.file.filename,
       mimeType: input.file.mimeType,
-      sizeBytes: input.file.bytes.byteLength,
+      sizeBytes: input.file.sizeBytes,
       storageKey,
       description: input.description,
       createdAt: now,

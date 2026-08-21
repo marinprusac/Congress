@@ -16,6 +16,16 @@ export const directives = sqliteTable("directives", {
   title: text("title").notNull(),
   body: text("body").notNull().default(""),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  // Separate from the free-text body (still not structurally parsed - see
+  // the comment above) - an explicit owner toggle for whether this
+  // directive needs the periodic checkup to actually fire even when no new
+  // event arrived (a purely time-based directive like "every morning...")
+  // versus one that only ever needs to react to an event Deputy already
+  // received (checkup.ts's runPeriodicCheckup skips the run when there's
+  // nothing pending and no enabled directive has this set). Defaults true
+  // so an existing directive keeps firing on schedule exactly as before
+  // this flag existed, until its owner narrows it.
+  timeBased: integer("time_based", { mode: "boolean" }).notNull().default(true),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });

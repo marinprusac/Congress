@@ -50,6 +50,13 @@ for dir in "$REPO_DIR"/services/chamber-*/; do
   SERVICES+=("congress-$name")
 done
 
+# Emits .br/.gz siblings for every service's build output - see the script's
+# own comment and chamber-kit's mountStaticFrontend (precompressed: true).
+# Runs once here, after every dist/ this deploy touches is final, rather
+# than per-service, since it has to see the same directories the build loop
+# above just populated.
+node scripts/compress-dist.mjs
+
 for svc in "${SERVICES[@]}"; do
   sudo /usr/bin/systemctl restart "$svc"
 done

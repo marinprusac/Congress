@@ -1,4 +1,4 @@
-import { desc, eq, gte } from "drizzle-orm";
+import { desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "./db/client.js";
 import { deputyRuns } from "./db/schema.js";
 import type { DeputyRun, DeputyRunTrigger, DeputyTranscriptEntry } from "./types.js";
@@ -77,6 +77,10 @@ export async function getRun(id: number): Promise<DeputyRun | null> {
 export async function todaySpendUsd(): Promise<number> {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
-  const rows = db.select({ costUsd: deputyRuns.costUsd }).from(deputyRuns).where(gte(deputyRuns.createdAt, start)).all();
-  return rows.reduce((sum, row) => sum + (row.costUsd ?? 0), 0);
+  const row = db
+    .select({ total: sql<number>`coalesce(sum(${deputyRuns.costUsd}), 0)` })
+    .from(deputyRuns)
+    .where(gte(deputyRuns.createdAt, start))
+    .get();
+  return row?.total ?? 0;
 }

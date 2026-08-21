@@ -1,4 +1,4 @@
-import { Component, Suspense, type ReactNode } from "react";
+import { Component, Suspense, memo, useCallback, type ReactNode } from "react";
 import { ChamberMark } from "@congress/congress-ui";
 import { getWidgetComponent, evictWidgetComponent } from "./widgetComponent";
 import type { ManifestWidget, ChamberRegistryEntry } from "@congress/shared-types";
@@ -64,30 +64,56 @@ export interface WidgetCellProps {
   x: number;
   y: number;
   editing: boolean;
-  onRemove: () => void;
-  onDragHandlePointerDown: (e: React.PointerEvent) => void;
-  // Live pixel offset while this cell is being dragged (see useWidgetDrag) -
-  // null the rest of the time. Applied as an additional transform on this
-  // same grid item rather than a separate wrapper div, since only a direct
-  // child of the .grid container's gridColumn/gridRow actually positions it.
-  dragOffset: { dx: number; dy: number } | null;
+  // True only for the single cell actively being dragged or settling after
+  // a drop - the live pixel offset itself is written straight to this
+  // cell's own DOM node by useWidgetDrag (see `cellRef` below), never
+  // passed through a prop, so a drag gesture's own per-frame pointermoves
+  // never change this component's props at all.
+  isDragging: boolean;
+  // Registers this cell's root node with useWidgetDrag so it can write
+  // `transform` directly during a drag - stable per (chamber, widget) pair
+  // (see useWidgetDrag's registerCellElement), so attaching it doesn't
+  // itself cause a detach/reattach on every unrelated render.
+  cellRef: (el: HTMLDivElement | null) => void;
+  onRemove: (args: { chamber: string; widgetId: string }) => void;
+  onDragStart: (
+    e: React.PointerEvent,
+    chamber: string,
+    widgetId: string,
+    width: number,
+    height: number,
+    x: number,
+    y: number
+  ) => void;
 }
 
-export function WidgetCell({ chamber, widget, x, y, editing, onRemove, onDragHandlePointerDown, dragOffset }: WidgetCellProps) {
+// memo()'d, with every prop above either a primitive or stable across a
+// drag-only Canvas re-render (see useWidgetDrag and Canvas.tsx) - a canvas
+// re-render for any reason now only actually re-renders the one cell whose
+// props genuinely changed, rather than reconciling all nine placed widgets'
+// own mounted subtrees (each hosting a live component from another Chamber)
+// on every pointermove of an unrelated drag.
+function WidgetCellImpl({ chamber, widget, x, y, editing, isDragging, cellRef, onRemove, onDragStart }: WidgetCellProps) {
   const active = chamber.status === "active";
   const Widget = active ? getWidgetComponent(chamber.name, widget.id) : null;
 
+  const handleRemove = useCallback(
+    () => onRemove({ chamber: chamber.name, widgetId: widget.id }),
+    [onRemove, chamber.name, widget.id]
+  );
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => onDragStart(e, chamber.name, widget.id, widget.width, widget.height, x, y),
+    [onDragStart, chamber.name, widget.id, widget.width, widget.height, x, y]
+  );
+
   return (
     <div
+      ref={cellRef}
       className="relative overflow-hidden border border-dust bg-parchment"
       style={{
         gridColumn: `${x + 1} / span ${widget.width}`,
         gridRow: `${y + 1} / span ${widget.height}`,
-        ...(dragOffset && {
-          transform: `translate(${dragOffset.dx}px, ${dragOffset.dy}px)`,
-          zIndex: 20,
-          opacity: 0.85,
-        }),
+        ...(isDragging && { zIndex: 20, opacity: 0.85 }),
       }}
     >
       {active && Widget ? (
@@ -102,7 +128,7 @@ export function WidgetCell({ chamber, widget, x, y, editing, onRemove, onDragHan
 
       {editing && (
         <div
-          onPointerDown={onDragHandlePointerDown}
+          onPointerDown={handlePointerDown}
           className="absolute inset-x-0 top-0 z-10 flex touch-none select-none items-center justify-between gap-1 bg-parchment/95 px-1.5 py-1"
         >
           <span className="flex min-w-0 items-center gap-1">
@@ -112,7 +138,7 @@ export function WidgetCell({ chamber, widget, x, y, editing, onRemove, onDragHan
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
-            onClick={onRemove}
+            onClick={handleRemove}
             className="shrink-0 font-mono text-xs leading-none text-dust hover:text-alert"
             aria-label={`Remove ${widget.label} from canvas`}
           >
@@ -123,3 +149,5 @@ export function WidgetCell({ chamber, widget, x, y, editing, onRemove, onDragHan
     </div>
   );
 }
+
+export const WidgetCell = memo(WidgetCellImpl);

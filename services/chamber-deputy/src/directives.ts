@@ -1,4 +1,4 @@
-import { desc, eq, like, or } from "drizzle-orm";
+import { and, desc, eq, like, or } from "drizzle-orm";
 import type { DirectiveSummary, DirectiveDetail, CreateDirectiveRequest, UpdateDirectiveRequest } from "./types.js";
 import { extractOutgoingExhibitRefs, createManualRefsByExhibitId } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
@@ -50,9 +50,23 @@ function toSummary(row: typeof directives.$inferSelect): DirectiveSummary {
     title: row.title,
     body: row.body,
     enabled: row.enabled,
+    timeBased: row.timeBased,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+// checkup.ts's runPeriodicCheckup skips the periodic run entirely when this
+// is false for every enabled directive and nothing else is pending -
+// `limit(1)` since only existence matters, not which directive or how many.
+export async function hasEnabledTimeBasedDirective(): Promise<boolean> {
+  const row = db
+    .select({ id: directives.id })
+    .from(directives)
+    .where(and(eq(directives.enabled, true), eq(directives.timeBased, true)))
+    .limit(1)
+    .get();
+  return Boolean(row);
 }
 
 export async function listDirectives(): Promise<DirectiveSummary[]> {
@@ -98,6 +112,7 @@ export async function createDirective(input: CreateDirectiveRequest): Promise<Di
       title: input.title,
       body: input.body,
       enabled: input.enabled,
+      timeBased: input.timeBased,
       createdAt: now,
       updatedAt: now,
     })
@@ -117,6 +132,7 @@ export async function updateDirective(id: number, input: UpdateDirectiveRequest)
     title: input.title ?? existing.title,
     body: input.body ?? existing.body,
     enabled: input.enabled ?? existing.enabled,
+    timeBased: input.timeBased ?? existing.timeBased,
     updatedAt: new Date(),
   };
 

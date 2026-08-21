@@ -98,30 +98,66 @@ function toSummary(row: typeof notes.$inferSelect): NoteSummary {
   };
 }
 
+// makeExcerpt caps at 180 chars after stripping wikilinks/markdown syntax
+// (which only ever shortens the text), so 400 raw chars is comfortable
+// headroom. Selecting this instead of the full `body` column means a note's
+// entire content - which can be many KB, and which list views never render -
+// no longer has to be read out of SQLite, deserialized by Drizzle and
+// JSON-serialized into the response just to build a one-line preview.
+const summaryColumns = {
+  id: notes.id,
+  title: notes.title,
+  frontmatterJson: notes.frontmatterJson,
+  pinned: notes.pinned,
+  createdAt: notes.createdAt,
+  updatedAt: notes.updatedAt,
+  bodyPrefix: sql<string>`substr(${notes.body}, 1, 400)`,
+};
+
+function toSummaryFromExcerptRow(row: {
+  id: number;
+  title: string;
+  frontmatterJson: string;
+  pinned: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  bodyPrefix: string;
+}): NoteSummary {
+  return {
+    id: row.id,
+    title: row.title,
+    frontmatter: JSON.parse(row.frontmatterJson),
+    excerpt: makeExcerpt(row.bodyPrefix),
+    pinned: row.pinned,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
 export async function listNotes(): Promise<NoteSummary[]> {
-  const rows = db.select().from(notes).orderBy(desc(notes.updatedAt)).all();
-  return rows.map(toSummary);
+  const rows = db.select(summaryColumns).from(notes).orderBy(desc(notes.updatedAt)).all();
+  return rows.map(toSummaryFromExcerptRow);
 }
 
 export async function listPinnedNotes(): Promise<NoteSummary[]> {
   const rows = db
-    .select()
+    .select(summaryColumns)
     .from(notes)
     .where(eq(notes.pinned, true))
     .orderBy(desc(notes.updatedAt))
     .all();
-  return rows.map(toSummary);
+  return rows.map(toSummaryFromExcerptRow);
 }
 
 export async function searchNotes(query: string): Promise<NoteSummary[]> {
   const pattern = `%${query}%`;
   const rows = db
-    .select()
+    .select(summaryColumns)
     .from(notes)
     .where(or(like(notes.title, pattern), like(notes.body, pattern)))
     .orderBy(desc(notes.updatedAt))
     .all();
-  return rows.map(toSummary);
+  return rows.map(toSummaryFromExcerptRow);
 }
 
 export async function getNote(id: number): Promise<NoteDetail | null> {

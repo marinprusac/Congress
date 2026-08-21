@@ -11,23 +11,27 @@ export interface SearchableListOptions<T> {
   filterClient?: (item: T, query: string) => boolean;
 }
 
-// A given call site always passes the same fetchSearch/filterClient shape
-// across renders (it's determined by which page is calling, not by props
-// that vary render-to-render), so branching before the hook call below is
-// stable per component instance despite looking conditional.
+// One unconditional useQuery call regardless of which mode this call site
+// uses - the query key/fn are simply computed differently going in. The
+// previous version called useQuery from inside an `if (fetchSearch)` branch
+// and returned early, which is safe only because a given call site always
+// passes the same fetchSearch/filterClient shape across renders (it's
+// determined by which page is calling, not by props that vary
+// render-to-render) - but it's a hooks-order violation waiting for the
+// first call site that doesn't hold that invariant, and React gives no
+// warning until it does.
 export function useSearchableList<T>(opts: SearchableListOptions<T>) {
   const { queryKeyBase, query, fetchAll, fetchSearch, filterClient } = opts;
 
-  if (fetchSearch) {
-    return useQuery({
-      queryKey: query ? [queryKeyBase, "search", query] : [queryKeyBase],
-      queryFn: () => (query ? fetchSearch(query) : fetchAll()),
-    });
-  }
+  const searching = Boolean(fetchSearch && query);
+  const result = useQuery({
+    queryKey: searching ? [queryKeyBase, "search", query] : [queryKeyBase],
+    queryFn: searching ? () => fetchSearch!(query) : fetchAll,
+  });
 
-  const result = useQuery({ queryKey: [queryKeyBase], queryFn: fetchAll });
   const q = query.trim().toLowerCase();
-  const data = result.data && filterClient && q ? result.data.filter((item) => filterClient(item, q)) : result.data;
+  const data =
+    !fetchSearch && result.data && filterClient && q ? result.data.filter((item) => filterClient(item, q)) : result.data;
   return { ...result, data };
 }
 

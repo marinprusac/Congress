@@ -122,7 +122,7 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
     upsertMutation.mutate({ chamber, widgetId, x: spot.x, y: spot.y });
   }
 
-  const { drag, startDrag } = useWidgetDrag({
+  const { drag, startDrag, registerCellElement } = useWidgetDrag({
     cellPx,
     gapPx: GAP_PX,
     dims,
@@ -181,11 +181,10 @@ export function Canvas({ editing, onToggleEditing }: { editing: boolean; onToggl
                     x={placement.x}
                     y={placement.y}
                     editing={editing}
-                    onRemove={() => deleteMutation.mutate({ chamber: entry.chamber.name, widgetId: entry.widget.id })}
-                    onDragHandlePointerDown={(e) =>
-                      startDrag(e, entry.chamber.name, entry.widget.id, entry.widget.width, entry.widget.height, placement.x, placement.y)
-                    }
-                    dragOffset={isDragging ? { dx: drag.currentX - drag.pointerStartX, dy: drag.currentY - drag.pointerStartY } : null}
+                    isDragging={isDragging}
+                    cellRef={registerCellElement(key)}
+                    onRemove={deleteMutation.mutate}
+                    onDragStart={startDrag}
                   />
                 );
               })}

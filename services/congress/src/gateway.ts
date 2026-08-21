@@ -73,7 +73,12 @@ export async function forwardToChamber(c: Context): Promise<Response> {
     return c.json({ error: "chamber_offline", chamber: chamberName }, 503);
   }
 
-  const remainder = c.req.path.replace(new RegExp(`^/api/${chamberName}`), "");
+  // Compiling a RegExp (and treating chamberName as a pattern) on every
+  // proxied request is needless work for a fixed-prefix strip - the route is
+  // registered as "/api/:chamber/*", so the path is always known to start
+  // with this exact prefix.
+  const apiPrefix = `/api/${chamberName}`;
+  const remainder = c.req.path.slice(apiPrefix.length);
   const search = new URL(c.req.url).search;
   const targetUrl = `${chamber.apiBase}${remainder}${search}`;
 
@@ -154,7 +159,10 @@ export async function forwardToChamberFrontend(
   }
 
   const frontendBase = chamber.apiBase.replace(/\/api$/, "");
-  const remainder = c.req.path.replace(new RegExp(`^/${chamber.name}`), "") || "/";
+  // Same fixed-prefix strip as forwardToChamber above - the path is always
+  // known to start with "/<chamber.name>" here too.
+  const frontendPrefix = `/${chamber.name}`;
+  const remainder = c.req.path.slice(frontendPrefix.length) || "/";
   const search = new URL(c.req.url).search;
   const targetUrl = `${frontendBase}${remainder}${search}`;
 

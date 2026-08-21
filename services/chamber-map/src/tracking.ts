@@ -10,8 +10,10 @@ import {
   closeVisit,
   markPendingNotified,
   createTrip,
+  createTripFixAccumulator,
+  accumulateTripFix,
   type VisitRow,
-  type BufferedFix,
+  type TripFixAccumulator,
 } from "./visits.js";
 
 const KNOTS_TO_KMH = 1.852;
@@ -48,12 +50,13 @@ function findMatchingPlace(fix: TraccarPosition, candidates: PlaceCandidate[]): 
   return best?.place ?? null;
 }
 
-// Raw fixes collected since the last visit closed - the only place raw
-// coordinates live even transiently (see db/schema.ts's comment on why
-// visits/trips, not positions, are the durable record). Module-level and
-// restart-losing by design, same accepted gap as chamber-calendar's own
-// in-memory "scheduled" map.
-let inTransitBuffer: BufferedFix[] = [];
+// Running distance/max-speed accumulator for fixes seen since the last
+// visit closed - the only place raw coordinates even transiently factor in
+// (see db/schema.ts's comment on why visits/trips, not positions, are the
+// durable record). Module-level and restart-losing by design, same accepted
+// gap as chamber-calendar's own in-memory "scheduled" map. O(1) regardless
+// of how long a trip runs, unlike the raw-fix array this replaced.
+let inTransitAcc: TripFixAccumulator = createTripFixAccumulator();
 
 async function handleTransition(
   previous: VisitRow | null,
@@ -63,7 +66,7 @@ async function handleTransition(
 ): Promise<void> {
   if (previous) {
     closeVisit(previous.id, atFixTime);
-    const trip = await createTrip(previous.id, next.id, previous.arrivedAt, atFixTime, inTransitBuffer);
+    const trip = await createTrip(previous.id, next.id, previous.arrivedAt, atFixTime, inTransitAcc);
     await publishEvent({
       type: "map.trip_completed",
       payload: {
@@ -89,7 +92,7 @@ async function handleTransition(
       });
     }
   }
-  inTransitBuffer = [];
+  inTransitAcc = createTripFixAccumulator();
 
   if (next.placeId) {
     const place = placeById.get(next.placeId);
@@ -176,6 +179,6 @@ export async function processPositions(positions: TraccarPosition[]): Promise<vo
       continue;
     }
 
-    inTransitBuffer.push({ latitude: fix.latitude, longitude: fix.longitude, speedKnots: fix.speed, fixTime });
+    accumulateTripFix(inTransitAcc, { latitude: fix.latitude, longitude: fix.longitude, speedKnots: fix.speed });
   }
 }

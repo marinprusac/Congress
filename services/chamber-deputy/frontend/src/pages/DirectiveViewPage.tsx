@@ -53,7 +53,7 @@ export function DirectiveViewPage() {
   useEffect(() => {
     if (directiveQuery.data && !editing) {
       const d = directiveQuery.data;
-      setDraft({ title: d.title, body: d.body, enabled: d.enabled });
+      setDraft({ title: d.title, body: d.body, enabled: d.enabled, timeBased: d.timeBased });
     }
   }, [directiveQuery.data, editing]);
 
@@ -122,13 +122,23 @@ export function DirectiveViewPage() {
         }
       >
         {editing ? (
-          <ExhibitTextarea
-            value={draft.body ?? ""}
-            onChange={(value) => setDraft((d) => ({ ...d, body: value }))}
-            rows={10}
-            className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-            renderIcon={(chamber) => getChamberIcon(chamber)}
-          />
+          <>
+            <ExhibitTextarea
+              value={draft.body ?? ""}
+              onChange={(value) => setDraft((d) => ({ ...d, body: value }))}
+              rows={10}
+              className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+              renderIcon={(chamber) => getChamberIcon(chamber)}
+            />
+            <label className="mt-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-slate">
+              <input
+                type="checkbox"
+                checked={draft.timeBased ?? true}
+                onChange={(e) => setDraft((d) => ({ ...d, timeBased: e.target.checked }))}
+              />
+              Wake on schedule, even with no new events
+            </label>
+          </>
         ) : directive.body ? (
           <ExhibitAnnotatedText
             text={directive.body}

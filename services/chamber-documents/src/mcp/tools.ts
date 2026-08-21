@@ -61,7 +61,23 @@ export function registerTools(server: McpServer) {
         return textResult({ error: "invalid_base64" });
       }
       try {
-        const document = await createDocument({ title, description, file: { filename, mimeType, bytes } });
+        // An MCP tool call already carries the whole payload inline in one
+        // JSON request, so there's no genuinely streaming source here the
+        // way an HTTP multipart upload has - this just adapts the
+        // already-in-memory bytes to createDocument's stream-based input so
+        // the one real upload path (the HTTP route) gets to stay streaming.
+        const stream = () =>
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(bytes);
+              controller.close();
+            },
+          });
+        const document = await createDocument({
+          title,
+          description,
+          file: { filename, mimeType, sizeBytes: bytes.byteLength, stream },
+        });
         return textResult(document);
       } catch (err) {
         if (err instanceof FileTooLargeError) {

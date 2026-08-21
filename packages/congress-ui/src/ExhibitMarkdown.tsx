@@ -1,4 +1,5 @@
-import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
+import { useMemo } from "react";
+import ReactMarkdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { CapitolExhibitResolveResult } from "@congress/shared-types";
 import { extractExhibitTokens } from "./textSegments.js";
@@ -55,10 +56,62 @@ function estimateTextFraction(container: HTMLElement, x: number, y: number): num
 // resolving `[[exhibit:...]]` tokens into <ExhibitChip>s inline. Chambers
 // whose content is plain text, not Markdown (e.g. Calendar's event
 // description), use ExhibitAnnotatedText instead.
+// Stable across every render - doesn't reference any prop/state, so it lives
+// outside the memoized `components` object below rather than inside it.
+function TableWrapper({ node: _node, ...props }: React.ComponentPropsWithoutRef<"table"> & { node?: unknown }) {
+  return (
+    <div className="note-table-wrapper">
+      <table {...props} />
+    </div>
+  );
+}
+
 export function ExhibitMarkdown({ body, onNavigate, onDoubleClick }: ExhibitMarkdownProps) {
-  const transformed = toMarkdownWithExhibitLinks(body);
-  const tokens = extractExhibitTokens(body);
+  // Both are full parses of the body (a regex pass, and react-markdown's own
+  // remark pipeline below) - memoized on `body` so a re-render triggered by
+  // something else entirely (e.g. a resolve settling, or a new onDoubleClick
+  // closure from the caller) doesn't redo either.
+  const transformed = useMemo(() => toMarkdownWithExhibitLinks(body), [body]);
+  const tokens = useMemo(() => extractExhibitTokens(body), [body]);
   const { resultsByToken } = useResolvedExhibits(tokens);
+
+  // Recreated only when what it actually reads changes - passing a fresh
+  // object (and fresh `a`/`table` renderers) to react-markdown on every
+  // render defeats its own internal memoization and forces the whole
+  // parse -> transform -> render pipeline to redo the render step.
+  const components: Components = useMemo(
+    () => ({
+      // A wide table has no reason to shrink its columns to fit a phone
+      // screen - scrolling horizontally within its own bounds reads better
+      // than either overflowing the page or squashing cells.
+      table: TableWrapper,
+      a: ({ href, children, node: _node, ...props }) => {
+        const token = href ? decodeExhibitLinkHref(href) : null;
+        if (token) {
+          const result = resultsByToken.get(token);
+          const fallbackLabel = typeof children === "string" ? children : undefined;
+          if (!result) {
+            return <span className="exhibit-chip-loading">{fallbackLabel ?? token}</span>;
+          }
+          return (
+            <ExhibitChip
+              result={result}
+              fallbackLabel={fallbackLabel}
+              renderIcon={(chamber) => getChamberIcon(chamber)}
+              onNavigate={onNavigate}
+              className="exhibit-chip"
+            />
+          );
+        }
+        return (
+          <a {...props} href={href} target="_blank" rel="noopener noreferrer" className="note-link">
+            {children}
+          </a>
+        );
+      },
+    }),
+    [resultsByToken, onNavigate]
+  );
 
   return (
     <div
@@ -73,40 +126,7 @@ export function ExhibitMarkdown({ body, onNavigate, onDoubleClick }: ExhibitMark
         // exhibit-ref: marker needs an explicit pass-through, everything
         // else keeps the default rule.
         urlTransform={(url) => (url.startsWith("exhibit-ref:") ? url : defaultUrlTransform(url))}
-        components={{
-          // A wide table has no reason to shrink its columns to fit a phone
-          // screen - scrolling horizontally within its own bounds reads
-          // better than either overflowing the page or squashing cells.
-          table: ({ node: _node, ...props }) => (
-            <div className="note-table-wrapper">
-              <table {...props} />
-            </div>
-          ),
-          a: ({ href, children, node: _node, ...props }) => {
-            const token = href ? decodeExhibitLinkHref(href) : null;
-            if (token) {
-              const result = resultsByToken.get(token);
-              const fallbackLabel = typeof children === "string" ? children : undefined;
-              if (!result) {
-                return <span className="exhibit-chip-loading">{fallbackLabel ?? token}</span>;
-              }
-              return (
-                <ExhibitChip
-                  result={result}
-                  fallbackLabel={fallbackLabel}
-                  renderIcon={(chamber) => getChamberIcon(chamber)}
-                  onNavigate={onNavigate}
-                  className="exhibit-chip"
-                />
-              );
-            }
-            return (
-              <a {...props} href={href} target="_blank" rel="noopener noreferrer" className="note-link">
-                {children}
-              </a>
-            );
-          },
-        }}
+        components={components}
       >
         {transformed}
       </ReactMarkdown>
