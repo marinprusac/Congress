@@ -7,6 +7,15 @@
 // version (19.2.8), minus a few internal/unstable members @types/react
 // doesn't declare (and nothing should be importing anyway) - re-run that
 // if the version bumps and something's missing.
+//
+// A default export is needed on top of that named list for any dependency
+// still doing `import React from "react"` (react-leaflet's own internals,
+// at minimum) - `import * as React from "react"` at a real import site (as
+// opposed to a blind `export *` re-export) is something Rollup's CJS
+// interop *can* resolve, since it's synthesizing a namespace object here
+// rather than statically enumerating names to re-export.
+import * as React from "react";
+export default React;
 export {
   Activity,
   Children,
