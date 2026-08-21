@@ -54,6 +54,17 @@ async function proxyRequest(c: Context, targetUrl: string, timeoutMs: number = F
       responseHeaders.set(key, value);
     }
   }
+  // fetch() (undici) transparently decompresses a gzip/br/deflate response
+  // before we ever see `response.body` - it does not update `content-encoding`
+  // or `content-length` to match, since those reflect the wire response, not
+  // the decoded body it hands back. Relaying those two headers as-is while
+  // piping the already-decoded body lies to the browser about both the
+  // encoding and the length of what's actually being sent, which fails with
+  // ERR_CONTENT_DECODING_FAILED - this only started biting once a Chamber's
+  // own static serving began returning compressed responses at all (see
+  // chamber-kit routes.ts's `precompressed: true`).
+  responseHeaders.delete("content-encoding");
+  responseHeaders.delete("content-length");
 
   return new Response(response.body, {
     status: response.status,
