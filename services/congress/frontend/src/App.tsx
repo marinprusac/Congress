@@ -12,7 +12,16 @@ export function App() {
   // on first - so ChamberHost's lazy import later resolves an
   // already-settled promise instead of a fresh fetch, and no Chamber ever
   // shows its loading bar on a first-ever visit within this tab.
-  const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
+  // The registry changes when a Chamber (re)starts or goes stale, not on any
+  // predictable cadence - this interval exists only as a safety net between
+  // registrations/heartbeats, not as the primary way this data stays fresh
+  // (refetchOnWindowFocus, on by default, covers the common case of coming
+  // back to a backgrounded tab).
+  const { data: registry } = useQuery({
+    queryKey: ["congress", "registry"],
+    queryFn: fetchRegistry,
+    refetchInterval: 5 * 60_000,
+  });
   useEffect(() => {
     for (const chamber of registry ?? []) {
       if (chamber.status === "active") preloadChamber(chamber.name);
