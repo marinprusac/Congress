@@ -87,8 +87,15 @@ export const eventHistory = sqliteTable(
   },
   (table) => [
     index("event_history_type_idx").on(table.type),
+    // recent-logs is unfiltered (ORDER BY occurredAt desc only) - kept as
+    // its own index since the composite below can't serve a sort with no
+    // leading priorityRank filter.
     index("event_history_occurred_at_idx").on(table.occurredAt),
-    index("event_history_priority_rank_idx").on(table.priorityRank),
+    // urgent-logs (and any other minPriority-filtered listHistory call)
+    // filters priorityRank >= X, then orders by occurredAt desc - one
+    // composite index serves both instead of a priorityRank-only one plus
+    // a separate sort step.
+    index("event_history_priority_rank_occurred_at_idx").on(table.priorityRank, table.occurredAt),
     index("event_history_expires_at_idx").on(table.expiresAt),
   ]
 );
@@ -124,6 +131,9 @@ export const notifications = sqliteTable(
   (table) => [
     uniqueIndex("notifications_chamber_dedupe_key_idx").on(table.chamber, table.dedupeKey),
     index("notifications_created_at_idx").on(table.createdAt),
+    // listNotifications()'s unreadCount is a `WHERE read_at IS NULL` count
+    // on every call - without an index, that's a full table scan.
+    index("notifications_read_at_idx").on(table.readAt),
   ]
 );
 

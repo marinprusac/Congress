@@ -33,38 +33,61 @@ const MIRRORED_PROPERTIES = [
   "tabSize",
 ] as const;
 
-export function getCaretCoordinates(element: HTMLTextAreaElement, index: number): { top: number; left: number } {
-  const div = document.createElement("div");
-  const style = window.getComputedStyle(element);
+// One mirror div, reused across every call (and every textarea) instead of
+// created/styled/appended/removed each time - useExhibitPicker only calls
+// this when the "[[" anchor itself moves now, not on every keystroke, but
+// building a fresh element and copying ~20 computed style properties onto
+// it is still needless work to repeat when the div and (usually) the
+// element being measured haven't changed since the last call.
+let mirror: HTMLDivElement | null = null;
+let leadingText: Text | null = null;
+let marker: HTMLSpanElement | null = null;
+let styledFor: HTMLTextAreaElement | null = null;
 
-  for (const prop of MIRRORED_PROPERTIES) {
-    (div.style as unknown as Record<string, string>)[prop] = (style as unknown as Record<string, string>)[prop] ?? "";
+function ensureMirror(element: HTMLTextAreaElement): { leadingText: Text; marker: HTMLSpanElement } {
+  if (!mirror || !leadingText || !marker) {
+    mirror = document.createElement("div");
+    mirror.style.position = "absolute";
+    mirror.style.visibility = "hidden";
+    mirror.style.whiteSpace = "pre-wrap";
+    mirror.style.wordWrap = "break-word";
+    mirror.style.top = "0";
+    mirror.style.left = "-9999px";
+    mirror.style.height = "auto";
+    mirror.style.overflow = "hidden";
+    leadingText = document.createTextNode("");
+    marker = document.createElement("span");
+    mirror.append(leadingText, marker);
+    document.body.appendChild(mirror);
+    styledFor = null;
   }
-  div.style.position = "absolute";
-  div.style.visibility = "hidden";
-  div.style.whiteSpace = "pre-wrap";
-  div.style.wordWrap = "break-word";
-  div.style.top = "0";
-  div.style.left = "-9999px";
-  div.style.height = "auto";
-  div.style.overflow = "hidden";
+  if (styledFor !== element) {
+    const style = window.getComputedStyle(element);
+    for (const prop of MIRRORED_PROPERTIES) {
+      (mirror.style as unknown as Record<string, string>)[prop] = (style as unknown as Record<string, string>)[prop] ?? "";
+    }
+    styledFor = element;
+  }
+  return { leadingText, marker };
+}
 
-  document.body.appendChild(div);
+export function getCaretCoordinates(element: HTMLTextAreaElement, index: number): { top: number; left: number } {
+  const { leadingText: lead, marker: span } = ensureMirror(element);
 
-  div.textContent = element.value.slice(0, index);
+  let text = element.value.slice(0, index);
   // A trailing newline needs an explicit space to take a new line inside a
   // div - a <textarea> gives it one for free, a div otherwise collapses it.
-  if (element.value[index - 1] === "\n") div.textContent += " ";
+  if (element.value[index - 1] === "\n") text += " ";
+  lead.textContent = text;
+  // Only the marker span's own start position matters (offsetTop/offsetLeft
+  // below) - its content just needs to be non-empty, not the rest of the
+  // note. The old version put the whole remaining tail in here, forcing a
+  // layout pass over a duplicate of the note's own largest text node on
+  // every measurement.
+  span.textContent = ".";
 
-  const span = document.createElement("span");
-  span.textContent = element.value.slice(index) || ".";
-  div.appendChild(span);
-
-  const coordinates = {
+  return {
     top: span.offsetTop - element.scrollTop,
     left: span.offsetLeft - element.scrollLeft,
   };
-
-  document.body.removeChild(div);
-  return coordinates;
 }

@@ -25,6 +25,14 @@ interface ExhibitTextareaProps {
   onCreate?: (title: string) => Promise<CapitolExhibitSearchResult>;
 }
 
+// Static browser capability, not per-render state - checked once at module
+// load. Where supported, the CSS `field-sizing: content` rule below
+// (.exhibit-textarea-auto-resize in shared.css) auto-grows the textarea
+// natively with no JS involved at all; the measuring effect further down
+// only exists as a fallback for browsers that don't support it yet.
+const supportsFieldSizingContent =
+  typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("field-sizing", "content");
+
 function mergeRefs<T>(refs: Array<React.Ref<T> | undefined>) {
   return (value: T | null) => {
     for (const ref of refs) {
@@ -57,11 +65,27 @@ export const ExhibitTextarea = forwardRef<HTMLTextAreaElement, ExhibitTextareaPr
   const elementRef = useRef<HTMLTextAreaElement | null>(null);
 
   useLayoutEffect(() => {
-    if (!autoResize) return;
+    // The CSS rule already does this natively where supported - running the
+    // JS path on top would fight it (this effect's own inline `style.height`
+    // write beats the stylesheet rule, forcing a layout read/write pair on
+    // every keystroke for nothing).
+    if (!autoResize || supportsFieldSizingContent) return;
     const el = elementRef.current;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
+    // Deferred to the next frame rather than measured synchronously inside
+    // this layout effect, which otherwise forces an extra layout pass before
+    // React can hand off to paint - on a textarea holding an entire note,
+    // that's a full-document reflow blocking paint on every character typed.
+    const frame = requestAnimationFrame(() => {
+      const previousHeight = el.style.height;
+      el.style.height = "auto";
+      const nextHeight = `${el.scrollHeight}px`;
+      // Skip the write (and the reflow/paint it would trigger) when nothing
+      // actually changed - most keystrokes don't cross a wrapped-line
+      // boundary.
+      el.style.height = nextHeight === previousHeight ? previousHeight : nextHeight;
+    });
+    return () => cancelAnimationFrame(frame);
   }, [value, autoResize]);
 
   function handleChange(e: ChangeEvent<HTMLTextAreaElement>) {
@@ -77,7 +101,7 @@ export const ExhibitTextarea = forwardRef<HTMLTextAreaElement, ExhibitTextareaPr
         onChange={handleChange}
         rows={rows}
         placeholder={placeholder}
-        className={className}
+        className={autoResize ? `${className} exhibit-textarea-auto-resize` : className}
       />
       <ExhibitPickerDropdown picker={picker} renderIcon={renderIcon} className="exhibit-picker-dropdown docked-sheet" />
     </div>

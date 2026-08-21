@@ -1,4 +1,4 @@
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import type {
   ExhibitSyncRequest,
@@ -18,43 +18,58 @@ const FAN_OUT_TIMEOUT_MS = 5_000;
 const exhibitSearchResponseSchema = z.object({ results: z.array(exhibitSearchResultSchema) });
 const exhibitResolveResponseSchema = z.object({ results: z.array(exhibitResolveResultSchema) });
 
+// Runs the upsert + delete-and-reinsert as one transaction with a single
+// multi-row insert, rather than a `.run()` per row - better-sqlite3 wraps
+// each unwrapped statement in its own implicit transaction (so one fsync
+// per statement under synchronous=NORMAL), and this fires on every note/
+// task/document/place/automation write, which with Notes' autosave means
+// every 1.2 seconds while typing.
 export function syncExhibit(push: ExhibitSyncRequest): void {
   const now = new Date();
-  const existing = db.select().from(exhibitCache).where(eq(exhibitCache.id, push.id)).get();
+  db.transaction((tx) => {
+    const existing = tx.select().from(exhibitCache).where(eq(exhibitCache.id, push.id)).get();
 
-  if (existing) {
-    db.update(exhibitCache)
-      .set({
-        chamber: push.chamber,
-        type: push.type,
-        name: push.name,
-        url: push.url,
-        deleted: push.deleted ?? false,
-        updatedAt: now,
-      })
-      .where(eq(exhibitCache.id, push.id))
-      .run();
-  } else {
-    db.insert(exhibitCache)
-      .values({
-        id: push.id,
-        chamber: push.chamber,
-        type: push.type,
-        name: push.name,
-        url: push.url,
-        deleted: push.deleted ?? false,
-        updatedAt: now,
-      })
-      .run();
-  }
+    if (existing) {
+      tx.update(exhibitCache)
+        .set({
+          chamber: push.chamber,
+          type: push.type,
+          name: push.name,
+          url: push.url,
+          deleted: push.deleted ?? false,
+          updatedAt: now,
+        })
+        .where(eq(exhibitCache.id, push.id))
+        .run();
+    } else {
+      tx.insert(exhibitCache)
+        .values({
+          id: push.id,
+          chamber: push.chamber,
+          type: push.type,
+          name: push.name,
+          url: push.url,
+          deleted: push.deleted ?? false,
+          updatedAt: now,
+        })
+        .run();
+    }
 
-  const manualRefs = new Set(push.manualRefs ?? []);
-  db.delete(exhibitRefs).where(eq(exhibitRefs.sourceId, push.id)).run();
-  for (const targetId of push.outgoingRefs) {
-    db.insert(exhibitRefs)
-      .values({ sourceId: push.id, sourceChamber: push.chamber, targetId, isManual: manualRefs.has(targetId) })
-      .run();
-  }
+    const manualRefs = new Set(push.manualRefs ?? []);
+    tx.delete(exhibitRefs).where(eq(exhibitRefs.sourceId, push.id)).run();
+    if (push.outgoingRefs.length > 0) {
+      tx.insert(exhibitRefs)
+        .values(
+          push.outgoingRefs.map((targetId) => ({
+            sourceId: push.id,
+            sourceChamber: push.chamber,
+            targetId,
+            isManual: manualRefs.has(targetId),
+          }))
+        )
+        .run();
+    }
+  });
 }
 
 export async function searchExhibits(query: string): Promise<CapitolExhibitSearchResult[]> {
@@ -79,69 +94,129 @@ export async function searchExhibits(query: string): Promise<CapitolExhibitSearc
   return perChamberResults.flat();
 }
 
-export async function resolveOneLive(id: string, chamber: string): Promise<CapitolExhibitResolveResult> {
+// Resolves every id in one owning Chamber through a single POST
+// /exhibits/resolve call, rather than one call per id - the resolve
+// contract already takes an array and was clearly designed for this.
+// resolveOneLive (below) is the single-id case of this same call.
+async function resolveManyLive(ids: string[], chamber: string): Promise<CapitolExhibitResolveResult[]> {
   const entry = getChamber(chamber);
   if (!entry || entry.status !== "active") {
-    return { id, chamber, unavailable: true };
+    return ids.map((id) => ({ id, chamber, unavailable: true }));
   }
 
   try {
     const res = await fetch(`${entry.apiBase}/exhibits/resolve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: [id] }),
+      body: JSON.stringify({ ids }),
       signal: AbortSignal.timeout(FAN_OUT_TIMEOUT_MS),
     });
-    if (!res.ok) return { id, chamber, unavailable: true };
+    if (!res.ok) return ids.map((id) => ({ id, chamber, unavailable: true }));
 
     const parsed = exhibitResolveResponseSchema.safeParse(await res.json());
-    if (!parsed.success) return { id, chamber, unavailable: true };
+    if (!parsed.success) return ids.map((id) => ({ id, chamber, unavailable: true }));
 
-    const result = parsed.data.results.find((r) => r.id === id);
-    if (!result) return { id, chamber, unavailable: true };
+    const byId = new Map(parsed.data.results.map((r) => [r.id, r]));
 
-    if ("deleted" in result) {
-      syncExhibit({ chamber, id, type: "", name: "", url: "", deleted: true, outgoingRefs: [] });
-      return { id, chamber, deleted: true };
-    }
+    return ids.map((id) => {
+      const result = byId.get(id);
+      if (!result) return { id, chamber, unavailable: true };
 
-    // A live resolve doesn't carry `type` (only /exhibits/search does), so a
-    // never-before-cached id gets an empty type here - harmless, since
-    // rendering only needs chamber (for the icon) + name + url.
-    const existing = db.select().from(exhibitCache).where(eq(exhibitCache.id, id)).get();
-    syncExhibit({
-      chamber,
-      id,
-      type: existing?.type ?? "",
-      name: result.name,
-      url: result.url,
-      outgoingRefs: db
-        .select({ targetId: exhibitRefs.targetId })
-        .from(exhibitRefs)
-        .where(eq(exhibitRefs.sourceId, id))
-        .all()
-        .map((r) => r.targetId),
+      if ("deleted" in result) {
+        syncExhibit({ chamber, id, type: "", name: "", url: "", deleted: true, outgoingRefs: [] });
+        return { id, chamber, deleted: true };
+      }
+
+      // A live resolve doesn't carry `type` (only /exhibits/search does), so
+      // a never-before-cached id gets an empty type here - harmless, since
+      // rendering only needs chamber (for the icon) + name + url.
+      const existing = db.select().from(exhibitCache).where(eq(exhibitCache.id, id)).get();
+      syncExhibit({
+        chamber,
+        id,
+        type: existing?.type ?? "",
+        name: result.name,
+        url: result.url,
+        outgoingRefs: db
+          .select({ targetId: exhibitRefs.targetId })
+          .from(exhibitRefs)
+          .where(eq(exhibitRefs.sourceId, id))
+          .all()
+          .map((r) => r.targetId),
+      });
+
+      return { id, chamber, name: result.name, url: result.url };
     });
-
-    return { id, chamber, name: result.name, url: result.url };
   } catch {
-    return { id, chamber, unavailable: true };
+    return ids.map((id) => ({ id, chamber, unavailable: true }));
   }
 }
 
+export async function resolveOneLive(id: string, chamber: string): Promise<CapitolExhibitResolveResult> {
+  const [result] = await resolveManyLive([id], chamber);
+  return result!;
+}
+
 export async function resolveExhibits(
-  refs: { id: string; chamber: string }[]
+  refs: { id: string; chamber: string }[],
+  // Lets a caller that already fetched the relevant exhibit_cache rows for
+  // other reasons (getConnections, below) reuse that same batch instead of
+  // this function re-querying the exact same ids a second time.
+  prefetchedCache?: Map<string, typeof exhibitCache.$inferSelect>
 ): Promise<CapitolExhibitResolveResult[]> {
-  return Promise.all(
-    refs.map(async ({ id, chamber }): Promise<CapitolExhibitResolveResult> => {
-      const cached = db.select().from(exhibitCache).where(eq(exhibitCache.id, id)).get();
-      if (cached) {
-        if (cached.deleted) return { id, chamber: cached.chamber, deleted: true };
-        return { id, chamber: cached.chamber, name: cached.name, url: cached.url };
-      }
-      return resolveOneLive(id, chamber);
+  if (refs.length === 0) return [];
+
+  // One `IN` lookup for every id's cache row, instead of one SELECT per
+  // ref - better-sqlite3 is synchronous, so the old `Promise.all` wrapper
+  // here never actually parallelised these, they ran strictly in sequence.
+  const cachedById =
+    prefetchedCache ??
+    new Map(
+      db
+        .select()
+        .from(exhibitCache)
+        .where(
+          inArray(
+            exhibitCache.id,
+            refs.map((r) => r.id)
+          )
+        )
+        .all()
+        .map((row) => [row.id, row])
+    );
+
+  const results = new Array<CapitolExhibitResolveResult>(refs.length);
+  const missesByChamber = new Map<string, { index: number; id: string }[]>();
+
+  refs.forEach((ref, index) => {
+    const cached = cachedById.get(ref.id);
+    if (cached) {
+      results[index] = cached.deleted
+        ? { id: ref.id, chamber: cached.chamber, deleted: true }
+        : { id: ref.id, chamber: cached.chamber, name: cached.name, url: cached.url };
+      return;
+    }
+    const misses = missesByChamber.get(ref.chamber) ?? [];
+    misses.push({ index, id: ref.id });
+    missesByChamber.set(ref.chamber, misses);
+  });
+
+  // One batched POST per owning Chamber for every cache miss, instead of
+  // one HTTP round trip per miss - a Connections panel on a well-linked
+  // note used to be a dozen sequential network calls.
+  await Promise.all(
+    Array.from(missesByChamber.entries()).map(async ([chamber, misses]) => {
+      const live = await resolveManyLive(
+        misses.map((m) => m.id),
+        chamber
+      );
+      live.forEach((result, i) => {
+        results[misses[i]!.index] = result;
+      });
     })
   );
+
+  return results;
 }
 
 // Which Chamber owns an Exhibit id, per the resolution cache - used to route
@@ -181,12 +256,28 @@ export async function getConnections(id: string): Promise<ExhibitRefEntry[]> {
     byOtherId.set(row.targetId, { chamber: existing?.chamber ?? null, isManual: (existing?.isManual ?? false) || row.isManual });
   }
 
+  // One batched lookup up front, reused below both to resolve a
+  // chamber === null entry and as resolveExhibits' own cache check - it
+  // would otherwise re-query the exact same ids a second time immediately
+  // after this function does.
+  const otherIds = Array.from(byOtherId.keys());
+  const cachedById = new Map(
+    otherIds.length > 0
+      ? db
+          .select()
+          .from(exhibitCache)
+          .where(inArray(exhibitCache.id, otherIds))
+          .all()
+          .map((row) => [row.id, row])
+      : []
+  );
+
   const toResolve: { id: string; chamber: string }[] = [];
   const isManualByOtherId = new Map<string, boolean>();
   for (const [otherId, entry] of byOtherId) {
     let chamber = entry.chamber;
     if (chamber === null) {
-      const cached = db.select().from(exhibitCache).where(eq(exhibitCache.id, otherId)).get();
+      const cached = cachedById.get(otherId);
       if (!cached) continue; // no cache row and no known chamber - nothing to route a resolve through
       chamber = cached.chamber;
     }
@@ -194,9 +285,9 @@ export async function getConnections(id: string): Promise<ExhibitRefEntry[]> {
     isManualByOtherId.set(otherId, entry.isManual);
   }
 
-  const resolved = await resolveExhibits(toResolve);
-  // Promise.all (inside resolveExhibits) preserves input order, so
-  // `toResolve` and `resolved` line up index-for-index.
+  const resolved = await resolveExhibits(toResolve, cachedById);
+  // resolveExhibits preserves input order, so `toResolve` and `resolved`
+  // line up index-for-index.
   return resolved.map((r, i) => ({ ...r, isManual: isManualByOtherId.get(toResolve[i]!.id) ?? false }));
 }
 

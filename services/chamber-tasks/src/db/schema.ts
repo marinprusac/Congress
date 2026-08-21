@@ -1,14 +1,24 @@
-import { sqliteTable, text, integer, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 
-export const tasks = sqliteTable("tasks", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  description: text("description").notNull().default(""),
-  dueDate: integer("due_date", { mode: "timestamp_ms" }),
-  completed: integer("completed", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
-});
+export const tasks = sqliteTable(
+  "tasks",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    dueDate: integer("due_date", { mode: "timestamp_ms" }),
+    completed: integer("completed", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    // The list endpoint sorts by this on every request.
+    index("tasks_updated_at_idx").on(table.updatedAt),
+    // listOpenTasks() and the due-date timer (notifications.ts) both filter
+    // on this exact pair on every task mutation.
+    index("tasks_completed_due_date_idx").on(table.completed, table.dueDate),
+  ]
+);
 
 // Explicit references added from the task's "References" side panel, kept
 // separate from the wikilinks parsed out of `tasks.description` - see

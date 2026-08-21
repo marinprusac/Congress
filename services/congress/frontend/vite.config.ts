@@ -83,7 +83,15 @@ export default defineConfig({
       // comment for why. Chamber remote entries share the same import map
       // (and so the same live module instances) once mounted into this
       // shell, which is the whole point.
-      external: ["react", "react-dom", "react-dom/client", "react-router-dom", "@tanstack/react-query", "react/jsx-runtime"],
+      external: [
+        "react",
+        "react-dom",
+        "react-dom/client",
+        "react-router-dom",
+        "@tanstack/react-query",
+        "react/jsx-runtime",
+        "@congress/congress-ui",
+      ],
     },
   },
   server: {

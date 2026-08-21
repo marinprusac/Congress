@@ -129,7 +129,37 @@ export function mountManualRefsRoutes(
   });
 }
 
+// Content-hashed build output (Vite's assets/ dir, in both build:web's and
+// build:remote's output) can be cached for a year - a hash change is a new
+// URL. The three deliberately unhashed names (index.html, remote-entry.js,
+// remote-entry.css) get a short cache instead: long enough to skip
+// revalidating on every same-session navigation, short enough that a
+// redeploy is visible without needing a hard refresh. serveStatic itself
+// only ever sets Last-Modified, so without this every one of these requests
+// was a full round trip (Caddy -> Congress -> the owning Chamber) for a
+// 304 at best.
+function cacheControlFor(path: string): string | undefined {
+  if (path.includes("/assets/")) {
+    return "public, max-age=31536000, immutable";
+  }
+  const lastSegment = path.slice(path.lastIndexOf("/") + 1);
+  if (lastSegment === "index.html" || lastSegment === "remote-entry.js" || lastSegment === "remote-entry.css") {
+    return "public, max-age=60, must-revalidate";
+  }
+  return undefined;
+}
+
 export function mountStaticFrontend(app: ChamberApp): void {
+  // Registered ahead of the serveStatic mounts below so the header lands on
+  // the same underlying Headers instance they (and the SPA-fallback route
+  // further down) build the eventual Response from - setting Cache-Control
+  // any later, e.g. from serveStatic's own onFound hook, is too late: by
+  // then the Response has already been constructed and copied its headers.
+  app.use("/*", async (c, next) => {
+    const cacheControl = cacheControlFor(c.req.path);
+    if (cacheControl) c.header("Cache-Control", cacheControl);
+    await next();
+  });
   app.use(
     "/*",
     serveStatic({

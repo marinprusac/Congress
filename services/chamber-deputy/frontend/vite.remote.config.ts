@@ -9,9 +9,10 @@ const root = fileURLToPath(new URL(".", import.meta.url));
 // shell (ChamberHost) dynamically imports to host this Chamber in-page
 // instead of navigating to it. Separate from the normal build:web output
 // (vite.config.ts, unchanged, still fully self-contained for standalone/dev
-// use): react/react-dom/react-router-dom/@tanstack/react-query are left
-// external here and resolved at runtime against Capitol's shared vendor
-// build via the importmap in its index.html - see that file and
+// use): react/react-dom/react-router-dom/@tanstack/react-query, plus
+// @congress/congress-ui itself, are left external here and resolved at
+// runtime against Capitol's shared vendor build via the importmap in its
+// index.html - see that file and
 // services/congress/frontend/vite.vendor.config.ts for why. Run after
 // build:web (emptyOutDir: false, so it doesn't wipe that output - the two
 // share one dist/).
@@ -22,6 +23,14 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // This build's own CSS graph should skip re-emitting the fonts +
+      // hand-written component classes congress-ui/styles.css normally
+      // pulls in (shared.css) - Congress's shell always has a full copy
+      // already loaded by the time this remote entry mounts into it. See
+      // congress-ui/src/styles.remote.css's own comment.
+      "@congress/congress-ui/styles.css": fileURLToPath(
+        new URL("../../../packages/congress-ui/src/styles.remote.css", import.meta.url)
+      ),
     },
   },
   build: {
@@ -29,7 +38,15 @@ export default defineConfig({
     emptyOutDir: false,
     rollupOptions: {
       input: fileURLToPath(new URL("./src/remote.tsx", import.meta.url)),
-      external: ["react", "react-dom", "react-dom/client", "react-router-dom", "@tanstack/react-query", "react/jsx-runtime"],
+      external: [
+        "react",
+        "react-dom",
+        "react-dom/client",
+        "react-router-dom",
+        "@tanstack/react-query",
+        "react/jsx-runtime",
+        "@congress/congress-ui",
+      ],
       // Vite's app-build default (preserveEntrySignatures: false) lets
       // Rollup tree-shake this entry's default export away entirely, since
       // nothing *in this build* consumes it - it's meant for Capitol's

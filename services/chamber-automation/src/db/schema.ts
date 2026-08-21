@@ -42,7 +42,12 @@ export const automations = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
-  (table) => [index("automations_trigger_event_type_idx").on(table.triggerEventType)]
+  (table) => [
+    index("automations_trigger_event_type_idx").on(table.triggerEventType),
+    // The list endpoint sorts by this on every request - without an
+    // index, that's a full table scan sort every time.
+    index("automations_updated_at_idx").on(table.updatedAt),
+  ]
 );
 
 // Explicit references added from an automation's "References" side panel,

@@ -1,21 +1,26 @@
 import { sqliteTable, text, integer, real, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 
-export const places = sqliteTable("places", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  body: text("body").notNull().default(""),
-  // User-defined ("home", "work", "gym", ...). "ignored" is not a distinct
-  // mechanism - it's just a place with this category, so a spot the owner
-  // never wants prompted about again is saved once and future visits there
-  // become ordinary confirmed visits, filtered out by category wherever it
-  // matters (widgets, MCP tools) - see visits.ts's classifyVisit.
-  category: text("category").notNull().default("place"),
-  latitude: real("latitude").notNull(),
-  longitude: real("longitude").notNull(),
-  radiusMeters: integer("radius_meters").notNull().default(100),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
-});
+export const places = sqliteTable(
+  "places",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    body: text("body").notNull().default(""),
+    // User-defined ("home", "work", "gym", ...). "ignored" is not a distinct
+    // mechanism - it's just a place with this category, so a spot the owner
+    // never wants prompted about again is saved once and future visits there
+    // become ordinary confirmed visits, filtered out by category wherever it
+    // matters (widgets, MCP tools) - see visits.ts's classifyVisit.
+    category: text("category").notNull().default("place"),
+    latitude: real("latitude").notNull(),
+    longitude: real("longitude").notNull(),
+    radiusMeters: integer("radius_meters").notNull().default(100),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  // The list endpoint sorts by this on every request.
+  (table) => [index("places_updated_at_idx").on(table.updatedAt)]
+);
 
 // Explicit references added from a place's "References" side panel, kept
 // separate from the wikilinks parsed out of `places.body` - see
@@ -67,20 +72,25 @@ export const visits = sqliteTable(
 // (tracking.ts), then the buffer is discarded. distanceKm/mode are rough by
 // design (summed haversine between buffered points; mode guessed from
 // speed), not turn-by-turn precision.
-export const trips = sqliteTable("trips", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  fromVisitId: integer("from_visit_id")
-    .notNull()
-    .references(() => visits.id, { onDelete: "cascade" }),
-  toVisitId: integer("to_visit_id")
-    .notNull()
-    .references(() => visits.id, { onDelete: "cascade" }),
-  departedAt: integer("departed_at", { mode: "timestamp_ms" }).notNull(),
-  arrivedAt: integer("arrived_at", { mode: "timestamp_ms" }).notNull(),
-  distanceKm: real("distance_km").notNull(),
-  mode: text("mode", { enum: ["walk", "bike", "drive", "unknown"] }).notNull(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-});
+export const trips = sqliteTable(
+  "trips",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    fromVisitId: integer("from_visit_id")
+      .notNull()
+      .references(() => visits.id, { onDelete: "cascade" }),
+    toVisitId: integer("to_visit_id")
+      .notNull()
+      .references(() => visits.id, { onDelete: "cascade" }),
+    departedAt: integer("departed_at", { mode: "timestamp_ms" }).notNull(),
+    arrivedAt: integer("arrived_at", { mode: "timestamp_ms" }).notNull(),
+    distanceKm: real("distance_km").notNull(),
+    mode: text("mode", { enum: ["walk", "bike", "drive", "unknown"] }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  // listTrips() sorts by this on every request.
+  (table) => [index("trips_departed_at_idx").on(table.departedAt)]
+);
 
 // Single-row table (id is always 1). unknownClusterRadiusMeters/minDwellMs
 // are the user-facing tunables exposed through createSingleRowSettings (see
