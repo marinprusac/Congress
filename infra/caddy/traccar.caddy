@@ -1,0 +1,24 @@
+# Reverse proxy for the self-hosted Traccar GPS server, which chamber-map
+# (services/chamber-map) polls for location - see docs/creating-a-chamber.md
+# and the Map Chamber's own README/plan for why. Not part of the Congress
+# Node monorepo itself - it runs as its own Docker container (see
+# /opt/traccar/docker-compose.yml on the server, same pattern as this box's
+# other Docker-run services like vaultwarden), bound to 127.0.0.1:8082.
+#
+# Traccar's web port (8082) internally proxies the phone-tracking protocol
+# too (Traccar Client just talks HTTPS to this same address) - no separate
+# device-protocol port needs to be exposed here.
+#
+# This VPS runs a shared top-level /etc/caddy/Caddyfile that imports
+# per-site snippets, so install this as /etc/caddy/traccar.caddy and add
+# `import /etc/caddy/traccar.caddy` to the top level of the main Caddyfile,
+# then `sudo systemctl reload caddy`. Needs an A record:
+# traccar.marinprusac.com -> 178.105.180.7.
+traccar.marinprusac.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8082
+
+    log {
+        output file /var/log/caddy/traccar-access.log
+    }
+}
