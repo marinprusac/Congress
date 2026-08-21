@@ -6,6 +6,9 @@ export const directiveSummarySchema = z.object({
   title: z.string(),
   body: z.string(),
   enabled: z.boolean(),
+  // Whether this directive needs the periodic checkup to wake it even with
+  // no new event pending - see db/schema.ts's own comment and checkup.ts.
+  timeBased: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -18,6 +21,7 @@ export const createDirectiveRequestSchema = z.object({
   title: z.string().min(1),
   body: z.string().default(""),
   enabled: z.boolean().default(true),
+  timeBased: z.boolean().default(true),
 });
 export type CreateDirectiveRequest = z.infer<typeof createDirectiveRequestSchema>;
 
@@ -25,6 +29,7 @@ export const updateDirectiveRequestSchema = z.object({
   title: z.string().min(1).optional(),
   body: z.string().optional(),
   enabled: z.boolean().optional(),
+  timeBased: z.boolean().optional(),
 });
 export type UpdateDirectiveRequest = z.infer<typeof updateDirectiveRequestSchema>;
 

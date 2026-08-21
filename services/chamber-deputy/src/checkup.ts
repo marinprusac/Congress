@@ -2,6 +2,7 @@ import { getSettings } from "./settings.js";
 import { enqueue } from "./jobQueue.js";
 import { runDeputy } from "./engine.js";
 import { drainPendingCheckupEvents } from "./pendingEvents.js";
+import { hasEnabledTimeBasedDirective } from "./directives.js";
 
 // Self-rescheduling timer rather than a fixed setInterval - settings.
 // checkupIntervalMs is owner-tunable (settings.ts), and reading it fresh
@@ -11,9 +12,15 @@ async function runPeriodicCheckup(): Promise<void> {
   const settings = await getSettings();
   if (!settings.paused) {
     const events = drainPendingCheckupEvents();
-    void enqueue(() => runDeputy({ trigger: "periodic", events })).catch((err) =>
-      console.warn(`Deputy periodic checkup failed: ${(err as Error).message}`)
-    );
+    // A tick with nothing pending and no directive that needs a wall-clock
+    // wake has nothing to check up on - spawning a headless `claude`
+    // subprocess (and, on a shared VPS, its CPU/memory) for it is pure
+    // waste. Still costs one cheap indexed SELECT every tick either way.
+    if (events.length > 0 || (await hasEnabledTimeBasedDirective())) {
+      void enqueue(() => runDeputy({ trigger: "periodic", events })).catch((err) =>
+        console.warn(`Deputy periodic checkup failed: ${(err as Error).message}`)
+      );
+    }
   }
   scheduleNext();
 }

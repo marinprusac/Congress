@@ -11,9 +11,10 @@ export function NewDirectivePage() {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState(searchParams.get("name") ?? "");
   const [body, setBody] = useState("");
+  const [timeBased, setTimeBased] = useState(true);
 
   const mutation = useMutation({
-    mutationFn: () => createDirective({ title, body, enabled: true }),
+    mutationFn: () => createDirective({ title, body, enabled: true, timeBased }),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["directives"] });
       navigate(resolveChamberPath(`/d/${created.id}`, "deputy", shellHosted));
@@ -45,6 +46,11 @@ export function NewDirectivePage() {
           renderIcon={(chamber) => getChamberIcon(chamber)}
           placeholder="Plain English - what should Deputy check or do, and when. Purely time-based ('every morning...') and event-reactive directives both go here."
         />
+
+        <label className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-slate">
+          <input type="checkbox" checked={timeBased} onChange={(e) => setTimeBased(e.target.checked)} />
+          Wake on schedule, even with no new events
+        </label>
 
         {mutation.isError && <FormErrorMessage>{(mutation.error as Error).message}</FormErrorMessage>}
 
