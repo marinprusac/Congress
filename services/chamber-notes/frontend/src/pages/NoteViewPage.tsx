@@ -15,6 +15,7 @@ import {
   showToast,
 } from "@congress/congress-ui";
 import { fetchNote, updateNote, deleteNote, setPinned, fetchSettings, quickCreateNoteExhibit } from "@/lib/api";
+import type { NoteSummary } from "../../../src/types";
 
 export function NoteViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -29,12 +30,23 @@ export function NoteViewPage() {
   const articleRef = useRef<HTMLElement>(null);
   const contentFieldRef = useRef<HTMLTextAreaElement | null>(null);
   const titleFieldRef = useRef<HTMLInputElement | null>(null);
+  // Mirror the latest draft/query state into refs so the click-outside and
+  // ⌘S effects below can depend on `editing` alone instead of on
+  // draftTitle/draftContent themselves - those two change on every
+  // keystroke, and depending on them meant tearing down and re-adding both
+  // document-level listeners once per character typed.
+  const draftTitleRef = useRef(draftTitle);
+  draftTitleRef.current = draftTitle;
+  const draftContentRef = useRef(draftContent);
+  draftContentRef.current = draftContent;
 
   const noteQuery = useQuery({
     queryKey: ["note", noteId],
     queryFn: () => fetchNote(noteId),
     enabled: Number.isInteger(noteId),
   });
+  const noteDataRef = useRef(noteQuery.data);
+  noteDataRef.current = noteQuery.data;
 
   const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
 
@@ -42,13 +54,52 @@ export function NoteViewPage() {
     mutationFn: (input: { title: string; content: string }) => updateNote(noteId, input),
     onSuccess: (updated) => {
       queryClient.setQueryData(["note", noteId], updated);
-      queryClient.invalidateQueries({ queryKey: ["notes"] });
+      // Keeps the home list's title/excerpt/pinned/updatedAt in sync live,
+      // without the network round-trip a full invalidate would cost - an
+      // autosave firing every 1.2s while typing used to invalidate ["notes"]
+      // outright, refetching every note's body just to redraw one row's
+      // excerpt. A real resync still happens on explicit save/unmount below.
+      queryClient.setQueryData<NoteSummary[]>(["notes"], (list) =>
+        list?.map((n) =>
+          n.id === updated.id
+            ? {
+                ...n,
+                title: updated.title,
+                excerpt: updated.excerpt,
+                pinned: updated.pinned,
+                frontmatter: updated.frontmatter,
+                updatedAt: updated.updatedAt,
+              }
+            : n
+        )
+      );
     },
   });
 
+  // Always reads the latest draft via refs (below) rather than closing over
+  // `draftTitle`/`draftContent` state directly, so it stays correct even
+  // when called from a stale closure captured by an effect that no longer
+  // re-runs on every keystroke (see the outside-click/⌘S effects).
   function saveExplicit() {
-    updateMutation.mutate({ title: draftTitle, content: draftContent }, { onSuccess: () => setEditing(false) });
+    updateMutation.mutate(
+      { title: draftTitleRef.current, content: draftContentRef.current },
+      {
+        onSuccess: () => {
+          setEditing(false);
+          queryClient.invalidateQueries({ queryKey: ["notes"] });
+        },
+      }
+    );
   }
+
+  // A real resync on leaving the page, even if every intermediate autosave
+  // only patched the list cache in place above - covers drift the patch
+  // can't (e.g. a field the patch doesn't carry, or another client's write).
+  useEffect(() => {
+    return () => {
+      queryClient.invalidateQueries({ queryKey: ["notes"] });
+    };
+  }, [queryClient]);
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteNote(noteId),
@@ -85,10 +136,12 @@ export function NoteViewPage() {
   }, [editing, settingsQuery.data?.autoSave, draftTitle, draftContent, noteQuery.data]);
 
   useEffect(() => {
-    if (!editing || !noteQuery.data) return;
+    if (!editing) return;
     function onOutsideDown(e: MouseEvent) {
       if (!(e.target instanceof Node) || articleRef.current?.contains(e.target)) return;
-      if (draftTitle === noteQuery.data!.title && draftContent === noteQuery.data!.content) {
+      const data = noteDataRef.current;
+      if (!data) return;
+      if (draftTitleRef.current === data.title && draftContentRef.current === data.content) {
         setEditing(false);
       } else {
         saveExplicit();
@@ -96,7 +149,7 @@ export function NoteViewPage() {
     }
     document.addEventListener("mousedown", onOutsideDown);
     return () => document.removeEventListener("mousedown", onOutsideDown);
-  }, [editing, draftTitle, draftContent, noteQuery.data]);
+  }, [editing]);
 
   useEffect(() => {
     if (!editing) return;
@@ -108,7 +161,7 @@ export function NoteViewPage() {
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [editing, draftTitle, draftContent]);
+  }, [editing]);
 
   async function onCreateExhibit(title: string) {
     const result = await quickCreateNoteExhibit(title);
