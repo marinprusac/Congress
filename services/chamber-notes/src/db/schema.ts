@@ -1,14 +1,20 @@
-import { sqliteTable, text, integer, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 
-export const notes = sqliteTable("notes", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  title: text("title").notNull().unique(),
-  frontmatterJson: text("frontmatter_json").notNull().default("{}"),
-  body: text("body").notNull().default(""),
-  pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
-});
+export const notes = sqliteTable(
+  "notes",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    title: text("title").notNull().unique(),
+    frontmatterJson: text("frontmatter_json").notNull().default("{}"),
+    body: text("body").notNull().default(""),
+    pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  // listNotes() sorts by this on every request - without an index, that's a
+  // full table scan sort every time.
+  (table) => [index("notes_updated_at_idx").on(table.updatedAt)]
+);
 
 // Explicit references added from the note's "References" side panel, kept
 // separate from the wikilinks parsed out of `notes.body` - see

@@ -8,6 +8,13 @@
       "when": 1787273439186,
       "tag": "0000_magenta_medusa",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1787325315769,
+      "tag": "0001_dapper_elektra",
+      "breakpoints": true
     }
   ]
 }

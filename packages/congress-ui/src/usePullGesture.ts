@@ -43,17 +43,30 @@ export function usePullGesture({ onRelease }: UsePullGestureOptions): { zone: Pu
   }
 
   useEffect(() => {
+    // A non-passive touchmove listener tells the browser it may call
+    // preventDefault, which forces the compositor to wait for this handler
+    // before it can scroll *anything* in the app - not just this gesture.
+    // Registered only for the lifetime of a qualifying drag (added once
+    // onTouchStart accepts it, removed on release/reset) instead of for the
+    // whole mounted lifetime of this hook, so every other scroll in the app
+    // stays compositor-only the rest of the time.
+    function stopTracking() {
+      window.removeEventListener("touchmove", onTouchMove);
+      reset();
+    }
+
     function onTouchStart(e: TouchEvent) {
       if (window.scrollY > 0 || e.touches.length !== 1) return;
       startYRef.current = e.touches[0]!.clientY;
       draggingRef.current = true;
+      window.addEventListener("touchmove", onTouchMove, { passive: false });
     }
 
     function onTouchMove(e: TouchEvent) {
       if (!draggingRef.current || startYRef.current === null) return;
       const delta = e.touches[0]!.clientY - startYRef.current;
       if (delta <= 0 || window.scrollY > 0) {
-        reset();
+        stopTracking();
         return;
       }
       // Only hijack the gesture once it's unambiguously a downward pull from
@@ -64,11 +77,10 @@ export function usePullGesture({ onRelease }: UsePullGestureOptions): { zone: Pu
 
     function onTouchEnd() {
       if (draggingRef.current && zoneRef.current !== "idle") onReleaseRef.current(zoneRef.current);
-      reset();
+      stopTracking();
     }
 
     window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("touchend", onTouchEnd);
     window.addEventListener("touchcancel", onTouchEnd);
     return () => {

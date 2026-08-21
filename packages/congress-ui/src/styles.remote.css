@@ -1,20 +1,18 @@
-/* Shared across every Congress frontend (Capitol + all Chambers) - theme
-   tokens, base reset, and every component style this package's React
-   components rely on (exhibit chips, the [[ picker, sharing badges/forms,
-   the Chamber shell). A consuming app's own index.css should only need
-   `@import "@congress/congress-ui/styles.css";` - there are no remaining
-   per-Chamber exceptions. */
+/* Trimmed variant of styles.css for a Chamber's own shell-hosted remote
+   build (frontend/vite.remote.config.ts aliases
+   "@congress/congress-ui/styles.css" to this file for that build only) -
+   everything styles.css has EXCEPT the `@import "./shared.css"` (fonts +
+   every hand-written component class). Congress's shell always loads the
+   full styles.css itself first (via its own index.css), so by the time any
+   Chamber mounts into it that content is already present in the document;
+   re-emitting a byte-identical copy into every Chamber's own
+   remote-entry.css was pure waste. Standalone/dev builds (main.tsx) are
+   unaffected - they still import the untrimmed styles.css, since nothing
+   else has necessarily already loaded shared.css for them. Kept in sync
+   with styles.css's own theme tokens/base layer by hand; the two only ever
+   differ in the one `@import` line below. */
 
 @import "tailwindcss";
-
-/* Fonts + every hand-written component class this package's own React
-   components rely on - split into its own file (shared.css) so a
-   shell-hosted Chamber's own remote build can use styles.remote.css
-   instead and skip re-emitting a byte-identical copy of this content into
-   its own remote-entry.css: Congress's shell always has this file's own
-   full build loaded first. Standalone/dev builds (this file) are
-   unaffected either way. */
-@import "./shared.css";
 
 /* Tailwind's automatic content detection skips node_modules, and pnpm
    workspace packages resolve through a node_modules symlink - so without

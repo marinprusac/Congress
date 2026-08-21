@@ -1,0 +1,1366 @@
+/* Fonts and hand-written component CSS shared by every Congress frontend -
+   split out of styles.css so a shell-hosted Chamber's own remote build
+   (styles.remote.css) can skip re-emitting an identical copy of this file
+   into its own remote-entry.css: Congress's shell always loads the full
+   styles.css (via its own index.css), so this content is already present
+   in the document by the time any Chamber mounts into it. Standalone/dev
+   builds still pull this in unchanged, via styles.css's own
+   `@import "./shared.css";` below. */
+
+@import "@fontsource/fraunces/400.css";
+@import "@fontsource/fraunces/600.css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+/* Chamber shell (ChamberLayout) - header, primary nav, and a bottom nav bar
+   that only appears on narrow viewports, since the top nav's small text
+   links aren't a comfortable phone target. */
+.chamber-shell {
+  min-height: 100vh;
+  background-color: var(--color-parchment);
+  color: var(--color-ink);
+  /* Resolve to 0 on any device without a notch/rounded corner, so this is
+     safe to apply unconditionally rather than gating it to mobile widths. */
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Deliberately terse - a title bar, not a masthead. No border-bottom: the
+   page's own content starts right away, with only its own spacing (not a
+   drawn rule) separating it from the header above. */
+.chamber-header {
+  position: relative;
+  padding: 0.85rem 1.5rem;
+}
+
+/* Mobile: this is the first thing on every page, above the fold, on a
+   screen with much less vertical room to give it than desktop - the
+   desktop padding/title size above eats a disproportionate share of a
+   phone viewport otherwise. */
+@media (max-width: 640px) {
+  .chamber-header {
+    padding: 0.6rem 1.25rem 0.5rem;
+  }
+}
+
+/* Mobile default: title row, then actions (search + nav) stacked below it
+   full-width - there's no room to fit a search field beside a 2.25rem
+   title on a phone screen. */
+.chamber-header-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+@media (min-width: 641px) {
+  .chamber-header-row {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+}
+
+/* "Congress" eyebrow above the title - matches CapitolHeader's own, so
+   every Chamber's header reads as part of the same system Capitol's does. */
+.chamber-eyebrow {
+  display: block;
+  margin-bottom: 0.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.6em;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-dust);
+}
+
+.chamber-title-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chamber-title {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  color: var(--color-ink);
+}
+
+@media (max-width: 640px) {
+  .chamber-title {
+    font-size: 1.15rem;
+  }
+}
+
+.chamber-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+/* A Chamber's own extra header link (Deputy's Directives/History, ...) -
+   same terse mono-uppercase treatment the old
+   ChamberPicker sub-nav links used, just relocated into the header. */
+.chamber-header-link {
+  font-family: var(--font-mono);
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-slate);
+}
+
+.chamber-header-link:hover,
+.chamber-header-link.active {
+  color: var(--color-accent);
+}
+
+/* Settings gear, and the model for any other icon-only header button - a
+   real ~44pt tap target regardless of the icon's own visual size, same
+   idiom as chamber-logs' own .notification-bell-trigger. */
+.chamber-header-icon-link {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: var(--color-slate);
+}
+
+.chamber-header-icon-link:hover {
+  color: var(--color-accent);
+}
+
+.chamber-header-icon-link svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+.chamber-main {
+  margin: 0 auto;
+  max-width: 72rem;
+  padding: 2.5rem 1.5rem;
+}
+
+/* Capitol's homepage canvas is the one page in the whole app that must never
+   scroll - "whatever fits the screen is it" (see Canvas.tsx). Applied by
+   Capitol's own Layout only on that route; every other page (Settings,
+   every other Chamber entirely) keeps the default scrolling
+   .chamber-shell/.chamber-main above untouched. Turns .chamber-shell into a
+   height-locked flex column instead of a normally-scrolling document -
+   ChamberHeader (in-flow) takes its own natural height, .chamber-main--canvas
+   fills the rest. */
+.chamber-shell--canvas {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chamber-main--canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* NavPanel - persistent cross-Chamber nav plus the one Settings entry
+   point, mounted once inside ChamberLayout (every Chamber gets it for
+   free) and once in Capitol's own App.tsx, and once more by Congress's own
+   unified Settings page. Desktop: an always-visible fixed sidebar on the
+   left. Mobile: off-canvas by default, slid in from the left edge only by
+   swiping right (useNavPanelSwipe) - there's no persistent trigger button,
+   which is also why .nav-panel-mobile-chambers below anchors the Chambers
+   list to the panel's own bottom edge rather than its top, for one-handed
+   thumb reach the instant it opens. */
+.nav-panel-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  color: var(--color-dust);
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  /* Long-press-and-drag (useReorderableList) tracks the pointer itself once
+     a press is held long enough - without this, touch's own native
+     scroll/pan takes over the gesture partway through a drag on mobile. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  /* Anchors are natively draggable in the browser (link/image drag-out) -
+     without this, that native drag competes with useReorderableList's own
+     pointer-based drag and pops up the browser's "drop to open/copy link"
+     affordance instead of reordering. */
+  -webkit-user-drag: none;
+  /* iOS Safari's own long-press affordance on an <a> - a link-preview popup
+     with Open/Copy/Share actions - fires on the same long-press
+     useReorderableList is trying to claim for drag, and touch-action/
+     user-select above don't suppress it. Without this, holding a row shows
+     that preview instead of picking it up to reorder. */
+  -webkit-touch-callout: none;
+}
+
+.nav-panel-link:hover,
+.nav-panel-link.active {
+  color: var(--color-accent);
+}
+
+/* Picked up by useReorderableList's long-press - a light lift so the row
+   being dragged visibly separates from the rest of the list. */
+.nav-panel-link--dragging {
+  color: var(--color-accent);
+  background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+/* Icon-only, deliberately understated (plain dust, no accent-toned label) -
+   Settings is a utility destination, not one more entry in the Chambers
+   list it sits apart from (bottom of the sidebar on desktop, top of the
+   panel on mobile - see NavPanel's own comment). */
+.nav-panel-link--settings {
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  justify-content: center;
+  padding: 0;
+}
+
+.nav-panel-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
+.nav-panel-icon-settings {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+}
+
+.nav-panel-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Pinned above Settings at the bottom of the desktop sidebar (margin-top:
+   auto pushes both it and Settings down regardless of how long the
+   Chambers list above is) - keeps Settings visually apart from the
+   reorderable list rather than leading it. */
+.nav-panel-divider {
+  height: 1px;
+  margin: auto 0.5rem 0.75rem;
+  background-color: var(--color-dust);
+}
+
+.nav-panel-chambers,
+.nav-panel-mobile-chambers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.nav-panel-desktop {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  display: none;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: var(--chamber-picker-width, 12rem);
+  overflow-y: auto;
+  padding: calc(1rem + env(safe-area-inset-top)) 0.75rem 1rem calc(0.75rem + env(safe-area-inset-left));
+  border-right: 1px solid var(--color-dust);
+  background-color: var(--color-parchment);
+}
+
+.nav-panel-backdrop {
+  display: none;
+}
+
+.nav-panel-mobile {
+  display: none;
+}
+
+@media (min-width: 641px) {
+  .nav-panel-desktop {
+    display: flex;
+  }
+
+  /* Reserves room for the desktop sidebar on whichever element is each
+     host page's own outermost container. */
+  :root {
+    --chamber-picker-width: 12rem;
+  }
+
+  .chamber-shell,
+  .capitol-shell {
+    padding-left: calc(var(--chamber-picker-width) + env(safe-area-inset-left));
+  }
+}
+
+@media (max-width: 640px) {
+  .nav-panel-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    /* Deliberately not `--color-ink`-based: that token flips light in dark
+       mode (it's the *foreground* color there), which would turn this
+       scrim into a white wash over the screen instead of a dark one. A
+       backdrop should read as dark in both themes, same as any modal
+       scrim. */
+    background-color: color-mix(in srgb, black 45%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease-out;
+  }
+
+  .nav-panel-backdrop[data-open="true"] {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .nav-panel-mobile {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    width: min(80vw, 18rem);
+    padding: calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom))
+      calc(1rem + env(safe-area-inset-left));
+    border-right: 1px solid var(--color-dust);
+    background-color: var(--color-parchment);
+    transform: translateX(-100%);
+    transition: transform 220ms ease-out;
+  }
+
+  /* Scoped to open/dragging rather than the base rule above - box-shadow
+     paints outside the element's own box, so applied unconditionally it
+     bled a faint glow past the left screen edge even while the panel sat
+     fully off-canvas at rest. `data-dragging` (set from useNavPanelSwipe's
+     `dragOffsetPx`/`dragProgress`, not just `data-open`) keeps the shadow
+     present through an in-progress drag too, not just once it settles. */
+  .nav-panel-mobile[data-open="true"],
+  .nav-panel-mobile[data-dragging="true"] {
+    box-shadow: 4px 0 20px color-mix(in srgb, var(--color-ink) 20%, transparent);
+  }
+
+  .nav-panel-mobile[data-open="true"] {
+    transform: translateX(0);
+  }
+
+  .nav-panel-mobile-top {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--color-dust);
+  }
+
+  .nav-panel-close {
+    margin-left: auto;
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    font-size: 1.4rem;
+    line-height: 1;
+    color: var(--color-dust);
+  }
+
+  /* Anchored to the panel's own bottom, not appended after Capitol/
+     Settings above - see this block's own top comment. */
+  .nav-panel-mobile-chambers {
+    margin-top: auto;
+    overflow-y: auto;
+  }
+
+  .nav-panel-mobile .nav-panel-link {
+    font-size: 0.95rem;
+    padding: 0.65rem 0.5rem;
+  }
+}
+
+/* Settings page tabs - one category per active Chamber that has its own
+   settings content, plus the fixed "General" tab for Congress's own
+   (dark mode, event retention, sign out). Mobile-first: a horizontally
+   scrolling strip rather than a wrap, so a long Chamber list never pushes
+   a tab below the fold. */
+.settings-tabs {
+  display: flex;
+  gap: 1.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-dust);
+}
+
+.settings-tab {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-dust);
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid transparent;
+}
+
+.settings-tab:hover {
+  color: var(--color-ink);
+}
+
+.settings-tab.active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.settings-tab-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+/* Expands a small inline text action's hit area toward Apple's ~44pt tap
+   target guidance without changing its visual size or shifting surrounding
+   layout - padding pushes the invisible click box out, the matching
+   negative margin pulls the visible box back to where it was. */
+.tap-target {
+  display: inline-block;
+  padding: 0.6em 0.4em;
+  margin: -0.6em -0.4em;
+}
+
+/* ExhibitTextarea's auto-resize, done natively where the browser supports
+   it instead of a per-keystroke JS scrollHeight measurement (see that
+   component's own comment - it skips its JS fallback entirely when this is
+   supported, so this rule and that JS path are never both active at once). */
+.exhibit-textarea-auto-resize {
+  field-sizing: content;
+}
+
+.note-link,
+.exhibit-chip[data-exhibit-state="resolved"] {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+  text-underline-offset: 2px;
+}
+
+.note-link:hover,
+.exhibit-chip[data-exhibit-state="resolved"]:hover {
+  text-decoration-color: var(--color-accent);
+}
+
+/* ExhibitMarkdown's react-markdown output styling - used by Notes' own
+   view/edit page. */
+.note-prose h1,
+.note-prose h2,
+.note-prose h3,
+.note-prose h4,
+.note-prose h5,
+.note-prose h6 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.25;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.note-prose h1 {
+  font-size: 2em;
+}
+
+.note-prose h2 {
+  font-size: 1.6em;
+}
+
+.note-prose h3 {
+  font-size: 1.3em;
+}
+
+.note-prose h4 {
+  font-size: 1.15em;
+}
+
+.note-prose h5 {
+  font-size: 1em;
+}
+
+.note-prose h6 {
+  font-size: 0.9em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-slate);
+}
+
+.note-prose p {
+  margin: 0.75em 0;
+  line-height: 1.65;
+}
+
+.note-prose ul,
+.note-prose ol {
+  margin: 0.75em 0;
+  padding-left: 1.5em;
+}
+
+.note-prose ul {
+  list-style: disc;
+}
+
+.note-prose ol {
+  list-style: decimal;
+}
+
+.note-prose code {
+  font-family: var(--font-mono);
+  background-color: color-mix(in srgb, var(--color-dust) 15%, transparent);
+  padding: 0.1em 0.3em;
+  font-size: 0.9em;
+}
+
+.note-prose pre {
+  font-family: var(--font-mono);
+  background-color: color-mix(in srgb, var(--color-dust) 15%, transparent);
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  margin: 0.75em 0;
+}
+
+.note-prose pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.note-prose blockquote {
+  border-left: 2px solid var(--color-dust);
+  padding-left: 1em;
+  margin: 0.75em 0;
+  color: var(--color-slate);
+}
+
+.note-table-wrapper {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  margin: 0.75em 0;
+}
+
+.note-prose table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.note-prose th,
+.note-prose td {
+  border: 1px solid var(--color-dust);
+  padding: 0.4em 0.6em;
+  text-align: left;
+}
+
+.exhibit-chip[data-exhibit-state="resolved"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+.exhibit-chip-icon svg,
+.exhibit-chip-prefix {
+  color: var(--color-slate);
+}
+
+.exhibit-chip-icon svg {
+  width: 0.9em;
+  height: 0.9em;
+  vertical-align: -0.1em;
+}
+
+.exhibit-chip-prefix {
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.exhibit-chip-prefix::after {
+  content: " — ";
+}
+
+.exhibit-chip[data-exhibit-state="deleted"] {
+  color: var(--color-dust);
+  text-decoration: line-through;
+}
+
+.exhibit-chip[data-exhibit-state="unavailable"] {
+  color: var(--color-dust);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.exhibit-chip-loading {
+  color: var(--color-dust);
+}
+
+/* Mobile default: content, then a divider, then the Connections panel, then
+   the page's own actions last - nobody needs Edit/Delete before they've even
+   seen what this connects to. */
+.exhibit-links-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "main"
+    "divider"
+    "connections"
+    "actions";
+  gap: 1.5rem;
+}
+
+.exhibit-links-main {
+  grid-area: main;
+  min-width: 0;
+}
+
+.exhibit-links-divider {
+  grid-area: divider;
+  border-top: 1px solid var(--color-dust);
+}
+
+.exhibit-links-actions {
+  grid-area: actions;
+}
+
+.exhibit-links-panel-connections {
+  grid-area: connections;
+  min-width: 0;
+}
+
+/* Desktop: the Connections panel flanks the content instead of stacking
+   below it - it spans both rows so the actions row underneath "main"
+   doesn't leave a gap in its own border/padding. */
+@media (min-width: 641px) {
+  .exhibit-links-layout {
+    grid-template-columns: minmax(0, 1fr) 12rem;
+    grid-template-areas:
+      "main connections"
+      "actions connections";
+    gap: 1.5rem 0;
+    align-items: start;
+  }
+
+  .exhibit-links-divider {
+    display: none;
+  }
+
+  .exhibit-links-panel-connections {
+    border-left: 1px solid var(--color-dust);
+    padding-left: 1.25rem;
+    margin-left: 1.25rem;
+  }
+}
+
+/* The field wrapper every [[ picker call site wraps its <textarea> +
+   <ExhibitPickerDropdown> in - gives the desktop rule below a positioning
+   anchor so the picker can render right under the field instead of pinned
+   to the viewport. */
+.exhibit-field {
+  position: relative;
+}
+
+.exhibit-action-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-dust);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Shared by every mobile-docked sheet (this dropdown, the exhibit-ref-add
+   popover, ConfirmSheet) - rounds only the top corners
+   (the bottom edge is the screen edge, rounding it would look like a gap)
+   and slides up on mount, so a bottom-docked panel reads as a native sheet
+   instead of a UI element that just appears mid-frame. Scoped to the mobile
+   breakpoint only - desktop keeps every sheet's existing flat, square,
+   anchored-dropdown look, since the global `border-radius: 0` reset is a
+   deliberate part of this app's design language everywhere else. */
+@media (max-width: 640px) {
+  .docked-sheet {
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+    animation: docked-sheet-in 180ms ease-out;
+  }
+}
+
+@keyframes docked-sheet-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Mobile default: fixed to the viewport, not positioned relative to the
+   textarea - a textarea can be far taller than the screen on mobile, which
+   left an earlier textarea-relative version rendered off-screen below the
+   fold, and it also sits above an on-screen keyboard this way. */
+.exhibit-picker-dropdown {
+  position: fixed;
+  left: 0.5rem;
+  right: 0.5rem;
+  /* --mobile-nav-height is never actually set anymore (NavPanel's mobile
+     variant is an off-canvas overlay, not persistent chrome reserving its
+     own space) - kept as a fallback-only var rather than a bare 0.5rem in
+     case that ever changes again, not because anything sets it today. */
+  bottom: calc(var(--mobile-nav-height, 0px) + 0.5rem);
+  z-index: 50;
+  max-height: 40vh;
+  overflow-y: auto;
+  border: 1px solid var(--color-dust);
+  background-color: var(--color-parchment);
+  box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
+}
+
+/* Desktop: no on-screen keyboard to dodge, but the field itself is often
+   far taller than the viewport (a long note auto-resizes to its full
+   content height) - anchoring under the *field* (top: 100%) put this
+   however many screens below the fold the field's bottom edge happened to
+   be, nowhere near the caret the user was actually typing at. --picker-
+   caret-top/-left (set inline by ExhibitPickerDropdown from
+   useExhibitPicker's caret-coordinate measurement) anchor it to the caret
+   itself instead; the top:100%/left:0 fallbacks only apply before the
+   first measurement or for a field this hook doesn't track. */
+@media (min-width: 641px) {
+  .exhibit-picker-dropdown {
+    position: absolute;
+    left: var(--picker-caret-left, 0);
+    right: auto;
+    top: var(--picker-caret-top, 100%);
+    bottom: auto;
+    width: min(22rem, calc(100% - var(--picker-caret-left, 0px)));
+    margin-top: 0;
+    max-height: 20rem;
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 15%, transparent);
+  }
+}
+
+.exhibit-picker-dropdown[hidden] {
+  display: none;
+}
+
+.exhibit-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.4em 0.6em;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.exhibit-picker-option.active {
+  background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.exhibit-picker-icon svg {
+  width: 0.9em;
+  height: 0.9em;
+}
+
+.exhibit-picker-empty {
+  padding: 0.4em 0.6em;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--color-dust);
+}
+
+.exhibit-picker-option.exhibit-picker-create {
+  color: var(--color-accent);
+}
+
+.exhibit-picker-error {
+  padding: 0.4em 0.6em;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--color-alert);
+}
+
+/* The "+" trigger and its popover search field in ExhibitLinksLayout's
+   References panel header - lets a reference be attached explicitly instead
+   of only via a "[[" token in body text. */
+.exhibit-ref-add-trigger {
+  font-family: var(--font-mono);
+  font-size: 1em;
+  line-height: 1;
+  color: var(--color-slate);
+  padding: 0 0.3em;
+}
+
+.exhibit-ref-add-trigger:hover {
+  color: var(--color-accent);
+}
+
+.exhibit-ref-add {
+  position: relative;
+  display: inline-block;
+}
+
+/* Positioned as one floating unit (input + dropdown), not as a flex sibling
+   of the panel header's title - see the comment above popoverStyle in
+   ExhibitLinksLayout.tsx for why. Mobile default mirrors
+   .exhibit-picker-dropdown: fixed to the viewport, above the mobile nav bar
+   and any on-screen keyboard. */
+.exhibit-ref-add-popover {
+  position: fixed;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: calc(var(--mobile-nav-height, 0px) + 0.5rem);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+@media (min-width: 641px) {
+  .exhibit-ref-add-popover {
+    position: absolute;
+    left: auto;
+    right: 0;
+    bottom: auto;
+    top: calc(100% + 0.375rem);
+    width: min(20rem, 85vw);
+  }
+}
+
+.exhibit-ref-add-input {
+  width: 100%;
+  border: 1px solid var(--color-dust);
+  background: var(--color-parchment);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  /* Never below 16px: iOS Safari zooms the whole page in on focus of any
+     input/textarea whose computed font-size is smaller than that,
+     regardless of touch-action/gesturestart zoom prevention elsewhere. */
+  font-size: max(16px, 0.85em);
+  padding: 0.5em 0.7em;
+}
+
+.exhibit-ref-add-input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.exhibit-ref-add-dropdown {
+  max-height: 40vh;
+  overflow-y: auto;
+  border: 1px solid var(--color-dust);
+  background-color: var(--color-parchment);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 15%, transparent);
+}
+
+@media (min-width: 641px) {
+  .exhibit-ref-add-dropdown {
+    max-height: 20rem;
+  }
+}
+
+.exhibit-ref-remove {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  line-height: 1;
+  color: var(--color-dust);
+  padding: 0 0.2em;
+}
+
+.exhibit-ref-remove:hover {
+  color: var(--color-alert);
+}
+
+.global-search {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* The header's own search slot is desktop-only - a phone screen has no room
+   for it next to a 2.25rem title, and MobileSearchReveal's pull gesture is
+   the mobile entry point instead. Scoped to .chamber-header-actions so it
+   doesn't also hide the copy MobileSearchReveal itself mounts when its
+   pulled-open overlay renders a <GlobalExhibitSearch> of its own. */
+.chamber-header-actions .global-search {
+  display: none;
+}
+
+@media (min-width: 641px) {
+  .global-search {
+    flex: none;
+    width: 16rem;
+  }
+
+  .chamber-header-actions .global-search {
+    display: block;
+  }
+}
+
+.mobile-pull-indicator {
+  position: fixed;
+  top: calc(0.75rem + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--color-dust);
+  background: var(--color-parchment);
+  color: var(--color-ink);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+}
+
+.mobile-pull-indicator[data-zone="refresh"] {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.mobile-search-reveal-expanded {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  padding-top: calc(0.75rem + env(safe-area-inset-top));
+  background: var(--color-parchment);
+  border-bottom: 1px solid var(--color-dust);
+}
+
+.mobile-search-reveal-expanded .global-search {
+  flex: 1;
+}
+
+.mobile-search-reveal-close {
+  color: var(--color-slate);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.mobile-search-reveal-close:hover {
+  color: var(--color-accent);
+}
+
+@media (min-width: 641px) {
+  .mobile-pull-indicator,
+  .mobile-search-reveal-expanded {
+    display: none;
+  }
+}
+
+.global-search-input {
+  width: 100%;
+  border: 1px solid var(--color-dust);
+  background: var(--color-parchment);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  /* Never below 16px: iOS Safari zooms the whole page in on focus of any
+     input/textarea whose computed font-size is smaller than that,
+     regardless of touch-action/gesturestart zoom prevention elsewhere. This
+     is also the exact input MobileSearchReveal auto-focuses on release. */
+  font-size: max(16px, 0.85em);
+  /* Extra right padding clears the "/" hint badge, which sits inside the
+     field rather than beside it so the input doesn't shift width when the
+     hint disappears on focus. */
+  padding: 0.5em 2.2em 0.5em 0.7em;
+}
+
+.global-search-input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.global-search-hint {
+  position: absolute;
+  top: 50%;
+  right: 0.5em;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-size: 0.7em;
+  color: var(--color-dust);
+  border: 1px solid var(--color-dust);
+  line-height: 1.4;
+  padding: 0 0.4em;
+}
+
+.global-search-dropdown {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.375rem);
+  left: 0;
+  right: 0;
+  max-height: 20rem;
+  overflow-y: auto;
+  border: 1px solid var(--color-dust);
+  background: var(--color-parchment);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 15%, transparent);
+}
+
+.global-search-dropdown[hidden] {
+  display: none;
+}
+
+
+.notification-item-dismiss {
+  flex-shrink: 0;
+  color: var(--color-dust);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 0.2rem;
+}
+
+.notification-item-dismiss:hover {
+  color: var(--color-alert);
+}
+
+/* Capitol's shell (ChamberHost): shown while a Chamber's remote entry is
+   being fetched for the first time in this tab - subsequent visits to an
+   already-loaded Chamber skip this entirely, since the module stays cached.
+   Deliberately a thin top-of-viewport bar rather than a full-page spinner,
+   so the persistent chrome (ChamberPicker) stays visibly interactive. */
+@keyframes chamber-host-loading-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+.chamber-host-loading-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 60;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+}
+
+.chamber-host-loading-bar::after {
+  content: "";
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: var(--color-accent);
+  animation: chamber-host-loading-sweep 1.1s ease-in-out infinite;
+}
+
+.chamber-host-unavailable {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 60vh;
+  padding: 2rem;
+  text-align: center;
+  color: var(--color-dust);
+}
+
+.chamber-host-unavailable-link {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-accent);
+}
+
+/* ConfirmSheet - native-feeling stand-in for window.confirm(). Unlike the
+   other docked sheets (exhibit pickers) it has no trigger
+   element to anchor to or dismiss-by-tapping-outside, hence the backdrop. */
+.confirm-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  /* Deliberately not `--color-ink`-based - see .nav-panel-backdrop's own
+     comment: that token flips light in dark mode (it's the *foreground*
+     color there), which turned this into a white wash over the screen
+     instead of a dark one. */
+  background-color: color-mix(in srgb, black 45%, transparent);
+}
+
+.confirm-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--mobile-nav-height, 0px);
+  border: 1px solid var(--color-dust);
+  background: var(--color-parchment);
+  padding: 1.25rem;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
+  font-size: 1rem;
+}
+
+@media (min-width: 641px) {
+  .confirm-sheet {
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(24rem, calc(100vw - 2rem));
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.confirm-sheet-title {
+  font-family: var(--font-display);
+  font-size: 1.3em;
+  color: var(--color-ink);
+  margin-bottom: 0.5rem;
+}
+
+.confirm-sheet-message {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--color-ink);
+  margin-bottom: 1.25rem;
+}
+
+.confirm-sheet-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1.25rem;
+}
+
+.confirm-sheet-cancel {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-slate);
+}
+
+.confirm-sheet-cancel:hover {
+  color: var(--color-ink);
+}
+
+.confirm-sheet-confirm {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.5em 1em;
+  border: 1px solid var(--color-alert);
+  color: var(--color-alert);
+  background: transparent;
+}
+
+.confirm-sheet-confirm:hover {
+  background: var(--color-alert);
+  color: var(--color-parchment);
+}
+
+/* ToastHost - brief, non-blocking confirmation/error banner after a
+   save/delete action, instead of the current silent-success/inline-only-
+   error default (see toast.ts). Mobile-first idiom, same as the docked
+   sheets: fixed to the viewport, above the mobile nav bar. */
+.toast-host {
+  position: fixed;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: calc(var(--mobile-nav-height, 0px) + 0.5rem);
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+@media (min-width: 641px) {
+  .toast-host {
+    left: auto;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    align-items: flex-end;
+  }
+}
+
+.toast {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  max-width: 24rem;
+  padding: 0.6em 1em;
+  border: 1px solid var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-parchment);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  animation: toast-in 180ms ease-out;
+}
+
+.toast-error {
+  border-color: var(--color-alert);
+  background: var(--color-alert);
+}
+
+@keyframes toast-in {
+  from {
+    transform: translateY(0.5rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ListSearchInput's row (input + the "+" new-item button) - floats fixed to
+   the bottom of the viewport, on top of the list content instead of
+   scrolling away with it, on every breakpoint (unlike .notification-panel's
+   mobile-fixed/desktop-anchored split, this is a persistent piece of
+   chrome, not a transient popover, so it stays fixed on desktop too).
+   Desktop: clears the fixed left sidebar via --chamber-picker-width, then
+   centers within the remaining width up to a comfortable max (auto margins
+   on a fixed element with both left/right set center it the same way they
+   would on an absolutely-positioned one). */
+.list-search-row {
+  position: fixed;
+  z-index: 40;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: calc(var(--mobile-nav-height, 0px) + 0.5rem);
+  display: flex;
+  gap: 0.5rem;
+}
+
+.list-search-row .list-search-input {
+  flex: 1;
+  min-width: 0;
+  box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
+}
+
+/* The "+" button docked beside the search input - replaces the old "New"
+   entry in ChamberPicker's now-removed sub-nav bar. Also reused (without
+   .list-search-row's fixed/floating positioning) by pages with no local
+   search input but the same need for a "+" trigger, e.g. Calendar's Agenda
+   toolbar. */
+.list-search-new {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  border: 1px solid var(--color-dust);
+  background-color: var(--color-parchment);
+  font-family: var(--font-mono);
+  font-size: 1.4em;
+  line-height: 1;
+  color: var(--color-ink);
+}
+
+.list-search-new:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* Only the floating instance (docked beside the fixed search input) wants
+   the "lifted above content" shadow - a static inline "+" elsewhere in a
+   page's own flow doesn't. */
+.list-search-row .list-search-new {
+  box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
+}
+
+@media (min-width: 641px) {
+  .list-search-row {
+    left: calc(var(--chamber-picker-width, 0px) + 1.5rem);
+    right: 1.5rem;
+    bottom: 1.5rem;
+    max-width: 26rem;
+    margin: 0 auto;
+  }
+}
+
+/* Applied to a list page's own outermost <section> (alongside
+   .list-search-row above) - since the search bar is now fixed/out of
+   flow, it no longer reserves its own space at the top of the page the way
+   an in-flow element would, so without this the *last* row(s) of a long
+   list would end up permanently hidden underneath it while scrolled to the
+   bottom. Sized to roughly the search bar's own height plus its bottom
+   offset. */
+.list-page {
+  padding-bottom: 3.5rem;
+}
+
+@media (min-width: 641px) {
+  .list-page {
+    padding-bottom: 4.5rem;
+  }
+}
+
+/* ListLoadingState skeleton - see that component's own comment. */
+.list-skeleton-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--color-dust);
+  padding: 0.85rem 0.25rem;
+}
+
+.list-skeleton-bar {
+  height: 0.85em;
+  background-color: color-mix(in srgb, var(--color-dust) 35%, transparent);
+  animation: list-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.list-skeleton-title {
+  width: 45%;
+  height: 1.1em;
+}
+
+.list-skeleton-subtitle {
+  width: 75%;
+}
+
+@keyframes list-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+

@@ -50,6 +50,13 @@
       "when": 1787188162619,
       "tag": "0006_furry_slayback",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1787325317249,
+      "tag": "0007_skinny_amazoness",
+      "breakpoints": true
     }
   ]
 }

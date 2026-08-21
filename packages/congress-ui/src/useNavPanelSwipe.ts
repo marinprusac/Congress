@@ -69,6 +69,18 @@ export function useNavPanelSwipe(): {
   }
 
   useEffect(() => {
+    // A non-passive touchmove listener tells the browser it may call
+    // preventDefault, which forces the compositor to wait for this handler
+    // before it can scroll *anything* in the app - not just this gesture.
+    // Registered only for the lifetime of a qualifying drag (added once
+    // onTouchStart accepts it, removed on release) instead of for the
+    // whole mounted lifetime of this hook, so every other scroll in the app
+    // stays compositor-only the rest of the time.
+    function stopTracking() {
+      window.removeEventListener("touchmove", onTouchMove);
+      endDrag();
+    }
+
     function onTouchStart(e: TouchEvent) {
       if (e.touches.length !== 1) return;
       const touch = e.touches[0]!;
@@ -77,6 +89,7 @@ export function useNavPanelSwipe(): {
       trackingRef.current = true;
       panelWidthRef.current = panelElRef.current?.getBoundingClientRect().width || PANEL_WIDTH_FALLBACK_PX;
       updateDrag(openRef.current ? panelWidthRef.current : 0);
+      window.addEventListener("touchmove", onTouchMove, { passive: false });
     }
 
     function onTouchMove(e: TouchEvent) {
@@ -87,7 +100,7 @@ export function useNavPanelSwipe(): {
       // Once this reads as more vertical than horizontal, it's a scroll, not
       // a nav-panel swipe - stop tracking it rather than fighting the page.
       if (Math.abs(dy) > Math.abs(dx) * 1.5) {
-        endDrag();
+        stopTracking();
         return;
       }
       // This is what actually stops iOS's own edge-swipe-back gesture from
@@ -104,11 +117,10 @@ export function useNavPanelSwipe(): {
         const width = panelWidthRef.current;
         setOpen(width > 0 && offsetRef.current / width > SNAP_OPEN_RATIO);
       }
-      endDrag();
+      stopTracking();
     }
 
     window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("touchend", onTouchEnd);
     window.addEventListener("touchcancel", onTouchEnd);
     return () => {

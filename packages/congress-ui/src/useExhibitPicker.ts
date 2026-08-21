@@ -136,17 +136,25 @@ export function useExhibitPicker({ value, onChange, onCreate }: UseExhibitPicker
       return;
     }
     setTrigger({ triggerStart, query: between, cursor });
-
-    if (element instanceof HTMLTextAreaElement) {
-      // Anchored to where "[[" was typed, not the live cursor - keeps the
-      // dropdown still while the query after it keeps changing.
-      const coords = getCaretCoordinates(element, triggerStart);
-      const lineHeight = parseFloat(window.getComputedStyle(element).lineHeight);
-      setCaretPosition({ top: coords.top + (Number.isFinite(lineHeight) ? lineHeight : 20), left: coords.left });
-    } else {
-      setCaretPosition(null);
-    }
   }, [element, value, caretTick]);
+
+  // The "[[" anchor's own position never moves while the query after it
+  // keeps changing, so this only needs to re-measure (a mirror-div layout
+  // read - see getCaretCoordinates) when triggerStart itself changes: a new
+  // trigger opening, or the caret jumping to a different existing one. The
+  // effect above used to also drive this measurement, re-running it on
+  // every keystroke of the query even though the anchor itself hadn't
+  // moved.
+  const triggerStart = trigger?.triggerStart ?? null;
+  useEffect(() => {
+    if (!element || triggerStart === null || !(element instanceof HTMLTextAreaElement)) {
+      setCaretPosition(null);
+      return;
+    }
+    const coords = getCaretCoordinates(element, triggerStart);
+    const lineHeight = parseFloat(window.getComputedStyle(element).lineHeight);
+    setCaretPosition({ top: coords.top + (Number.isFinite(lineHeight) ? lineHeight : 20), left: coords.left });
+  }, [element, triggerStart]);
 
   const select = useCallback(
     (result: CapitolExhibitSearchResult) => {
