@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
 import type { CapitolExhibitResolveResult } from "@congress/shared-types";
 import { parseExhibitToken } from "@congress/shared-types";
 import { splitExhibitText, extractExhibitTokens } from "./textSegments.js";
@@ -19,9 +19,12 @@ interface ExhibitAnnotatedTextProps {
 // doesn't use this: its body goes through a full react-markdown pipeline
 // instead (see NoteMarkdown), which needs its own link-based approach.
 export function ExhibitAnnotatedText({ text, renderIcon, onNavigate, className }: ExhibitAnnotatedTextProps) {
-  const tokens = extractExhibitTokens(text);
+  // Both are full regex passes over the body - memoized on `text` so a
+  // re-render triggered by something else entirely (e.g. a sibling resolve
+  // settling) doesn't re-parse the same string again.
+  const tokens = useMemo(() => extractExhibitTokens(text), [text]);
+  const segments = useMemo(() => splitExhibitText(text), [text]);
   const { resultsByToken, loading } = useResolvedExhibits(tokens);
-  const segments = splitExhibitText(text);
 
   return (
     <span className={className}>
