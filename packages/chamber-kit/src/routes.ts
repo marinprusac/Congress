@@ -164,6 +164,14 @@ export function mountStaticFrontend(app: ChamberApp): void {
     "/*",
     serveStatic({
       root: "./frontend/dist",
+      // Streams a pre-built .br/.gz sibling when one exists and the
+      // request's Accept-Encoding allows it (see scripts/compress-dist.mjs,
+      // run once per deploy) instead of every hop - Caddy included -
+      // recompressing the same file from scratch on every single request.
+      // A no-op locally / for any file the compress step hasn't touched:
+      // serveStatic just falls back to the plain file when no sibling
+      // exists.
+      precompressed: true,
     })
   );
   // Falls through to frontend/public directly (Hono's serveStatic calls
