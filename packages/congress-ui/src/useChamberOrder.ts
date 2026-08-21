@@ -35,7 +35,15 @@ function writeStoredOrder(order: string[]): void {
 // hence `setOrder` taking a full array rather than a single-step move.
 export function useChamberOrder(names: string[]): {
   order: string[];
+  // Updates the live, on-screen order only - useReorderableList calls this
+  // on every slot crossing mid-drag, so it deliberately stays state-only
+  // (no synchronous localStorage write) to keep a drag gesture's reflow
+  // cheap. See commitOrder for the persisted half.
   setOrder: (next: string[]) => void;
+  // Persists the final order once a drag ends - useReorderableList calls
+  // this only on drop, not on every crossing (see its own comment for why
+  // a synchronous `localStorage.setItem` mid-gesture was worth avoiding).
+  commitOrder: (next: string[]) => void;
 } {
   const [stored, setStored] = useState<string[]>(readStoredOrder);
 
@@ -43,8 +51,12 @@ export function useChamberOrder(names: string[]): {
 
   const setOrder = useCallback((next: string[]) => {
     setStored(next);
+  }, []);
+
+  const commitOrder = useCallback((next: string[]) => {
+    setStored(next);
     writeStoredOrder(next);
   }, []);
 
-  return { order, setOrder };
+  return { order, setOrder, commitOrder };
 }
