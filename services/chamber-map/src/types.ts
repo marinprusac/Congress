@@ -1,0 +1,116 @@
+import { z } from "zod";
+
+export const placeSummarySchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  body: z.string(),
+  category: z.string(),
+  latitude: z.number(),
+  longitude: z.number(),
+  radiusMeters: z.number().int(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type PlaceSummary = z.infer<typeof placeSummarySchema>;
+
+export const placeDetailSchema = placeSummarySchema;
+export type PlaceDetail = z.infer<typeof placeDetailSchema>;
+
+export const createPlaceRequestSchema = z.object({
+  name: z.string().min(1),
+  body: z.string().default(""),
+  category: z.string().min(1).default("place"),
+  latitude: z.number(),
+  longitude: z.number(),
+  radiusMeters: z.number().int().positive().default(100),
+});
+export type CreatePlaceRequest = z.infer<typeof createPlaceRequestSchema>;
+
+export const updatePlaceRequestSchema = z.object({
+  name: z.string().min(1).optional(),
+  body: z.string().optional(),
+  category: z.string().min(1).optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  radiusMeters: z.number().int().positive().optional(),
+});
+export type UpdatePlaceRequest = z.infer<typeof updatePlaceRequestSchema>;
+
+export const visitStatusSchema = z.enum(["confirmed", "pending", "adhoc", "ignored"]);
+export type VisitStatus = z.infer<typeof visitStatusSchema>;
+
+// placeName/placeCategory/latitude/longitude are denormalized onto the
+// visit at read time (a join, not stored) so the frontend/MCP tools never
+// need a second lookup - see visits.ts's toVisit. latitude/longitude are the
+// place's own coordinates for a confirmed visit, or clusterLatitude/
+// clusterLongitude for a pending/adhoc/ignored one - whichever is set.
+export const visitSchema = z.object({
+  id: z.number().int(),
+  placeId: z.number().int().nullable(),
+  placeName: z.string().nullable(),
+  placeCategory: z.string().nullable(),
+  status: visitStatusSchema,
+  adhocLabel: z.string().nullable(),
+  clusterLatitude: z.number().nullable(),
+  clusterLongitude: z.number().nullable(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
+  arrivedAt: z.string(),
+  departedAt: z.string().nullable(),
+  durationMinutes: z.number().nullable(),
+});
+export type Visit = z.infer<typeof visitSchema>;
+
+export const classifyVisitRequestSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("save_place"),
+    name: z.string().min(1),
+    category: z.string().min(1).default("place"),
+    radiusMeters: z.number().int().positive().default(100),
+    body: z.string().default(""),
+  }),
+  z.object({ action: z.literal("adhoc_label"), label: z.string().min(1) }),
+  z.object({ action: z.literal("ignore") }),
+]);
+export type ClassifyVisitRequest = z.infer<typeof classifyVisitRequestSchema>;
+
+export const tripModeSchema = z.enum(["walk", "bike", "drive", "unknown"]);
+export type TripMode = z.infer<typeof tripModeSchema>;
+
+export const tripSchema = z.object({
+  id: z.number().int(),
+  fromVisitId: z.number().int(),
+  toVisitId: z.number().int(),
+  fromLabel: z.string(),
+  toLabel: z.string(),
+  departedAt: z.string(),
+  arrivedAt: z.string(),
+  durationMinutes: z.number(),
+  distanceKm: z.number(),
+  mode: tripModeSchema,
+});
+export type Trip = z.infer<typeof tripSchema>;
+
+// Only the two user-facing tunables - see db/schema.ts's comment on why
+// lastProcessedAt/lastPollSucceededAt/lastPollError live on the same table
+// row but outside this type.
+export const settingsSchema = z.object({
+  unknownClusterRadiusMeters: z.number().int(),
+  minDwellMs: z.number().int(),
+});
+export type Settings = z.infer<typeof settingsSchema>;
+
+export const updateSettingsRequestSchema = z.object({
+  unknownClusterRadiusMeters: z.number().int().positive().optional(),
+  minDwellMs: z.number().int().positive().optional(),
+});
+export type UpdateSettingsRequest = z.infer<typeof updateSettingsRequestSchema>;
+
+// The poll loop's own health, surfaced on the Settings page - see
+// pollState.ts.
+export const pollHealthSchema = z.object({
+  lastProcessedAt: z.string().nullable(),
+  lastPollSucceededAt: z.string().nullable(),
+  lastPollError: z.string().nullable(),
+});
+export type PollHealth = z.infer<typeof pollHealthSchema>;

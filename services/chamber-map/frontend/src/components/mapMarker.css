@@ -1,0 +1,8 @@
+.map-place-marker-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--color-accent, #2b4a3e);
+  border: 2px solid var(--color-parchment, #fdfaf3);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}

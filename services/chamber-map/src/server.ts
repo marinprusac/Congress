@@ -1,0 +1,151 @@
+import { Hono } from "hono";
+import type { HttpBindings } from "@hono/node-server";
+import {
+  createPlaceRequestSchema,
+  updatePlaceRequestSchema,
+  updateSettingsRequestSchema,
+  classifyVisitRequestSchema,
+  visitStatusSchema,
+} from "./types.js";
+import {
+  mountManifestAndHealth,
+  mountExhibitSearchRoutes,
+  mountSettingsRoutes,
+  mountManualRefsRoutes,
+  mountStaticFrontend,
+} from "@congress/chamber-kit";
+import { manifest } from "./manifest.js";
+import {
+  listPlaces,
+  listRecentPlaces,
+  searchPlaces,
+  getPlace,
+  createPlace,
+  updatePlace,
+  deletePlace,
+  listManualRefsByExhibitId,
+  addManualRefByExhibitId,
+  removeManualRefByExhibitId,
+  resyncPlaceExhibitByExhibitId,
+} from "./places.js";
+import { listVisits, getVisit, classifyVisit, listTrips } from "./visits.js";
+import { getSettings, updateSettings } from "./settings.js";
+import { getPollState, toPollHealth } from "./pollState.js";
+import { searchPlaceExhibits, resolvePlaceExhibits } from "./exhibits.js";
+import { mcpApp } from "./mcp/server.js";
+
+export const app = new Hono<{ Bindings: HttpBindings }>();
+
+mountManifestAndHealth(app, manifest);
+
+app.get("/api/places/recent", async (c) => {
+  return c.json(await listRecentPlaces());
+});
+
+app.get("/api/places/search", async (c) => {
+  const query = c.req.query("q") ?? "";
+  if (!query.trim()) return c.json([]);
+  return c.json(await searchPlaces(query));
+});
+
+app.get("/api/places/:id", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
+  const place = await getPlace(id);
+  if (!place) return c.json({ error: "not_found" }, 404);
+  return c.json(place);
+});
+
+app.get("/api/places", async (c) => {
+  return c.json(await listPlaces());
+});
+
+app.post("/api/places", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = createPlaceRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  const place = await createPlace(parsed.data);
+  return c.json(place, 201);
+});
+
+app.put("/api/places/:id", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
+  const body = await c.req.json().catch(() => null);
+  const parsed = updatePlaceRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  const place = await updatePlace(id, parsed.data);
+  if (!place) return c.json({ error: "not_found" }, 404);
+  return c.json(place);
+});
+
+app.delete("/api/places/:id", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
+  const deleted = await deletePlace(id);
+  if (!deleted) return c.json({ error: "not_found" }, 404);
+  return c.body(null, 204);
+});
+
+function parseDateParam(value: string | undefined): Date | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+app.get("/api/visits", async (c) => {
+  const statusParsed = visitStatusSchema.safeParse(c.req.query("status"));
+  const status = statusParsed.success ? statusParsed.data : undefined;
+  const from = parseDateParam(c.req.query("from"));
+  const to = parseDateParam(c.req.query("to"));
+  return c.json(await listVisits({ status, from, to }));
+});
+
+app.get("/api/visits/:id", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
+  const visit = await getVisit(id);
+  if (!visit) return c.json({ error: "not_found" }, 404);
+  return c.json(visit);
+});
+
+app.post("/api/visits/:id/classify", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
+  const body = await c.req.json().catch(() => null);
+  const parsed = classifyVisitRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  const visit = await classifyVisit(id, parsed.data);
+  if (!visit) return c.json({ error: "not_found" }, 404);
+  return c.json(visit);
+});
+
+app.get("/api/trips", async (c) => {
+  const from = parseDateParam(c.req.query("from"));
+  const to = parseDateParam(c.req.query("to"));
+  return c.json(await listTrips({ from, to }));
+});
+
+app.get("/api/poll-health", (c) => {
+  return c.json(toPollHealth(getPollState()));
+});
+
+mountExhibitSearchRoutes(app, { search: searchPlaceExhibits, resolve: resolvePlaceExhibits });
+
+mountManualRefsRoutes(
+  app,
+  { list: listManualRefsByExhibitId, add: addManualRefByExhibitId, remove: removeManualRefByExhibitId },
+  resyncPlaceExhibitByExhibitId
+);
+
+mountSettingsRoutes(app, { getSettings, updateSettings }, updateSettingsRequestSchema);
+
+app.route("/mcp", mcpApp);
+
+mountStaticFrontend(app);
