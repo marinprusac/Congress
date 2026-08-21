@@ -34,10 +34,22 @@ function visitSelection() {
   return db.select({ visit: visits, place: places }).from(visits).leftJoin(places, eq(visits.placeId, places.id));
 }
 
+// Visits are the durable record this whole Chamber exists to produce (see
+// the visits table's own schema comment) - a personal location diary, not a
+// disposable log like event_history - so unlike that table this has no
+// time-based retention sweep deleting rows. What it does need is a ceiling
+// on one unfiltered read, since GPS polling accumulates visits/trips
+// continuously with no natural cap the way most other Chambers' content
+// does: an owner years into using this Chamber shouldn't have every visit
+// they've ever had loaded into memory and serialized just to answer "what's
+// recent" (both list pages sort by this same field already).
+const DEFAULT_LIST_LIMIT = 500;
+
 export interface ListVisitsFilter {
   status?: VisitStatus;
   from?: Date;
   to?: Date;
+  limit?: number;
 }
 
 export async function listVisits(filter: ListVisitsFilter = {}): Promise<Visit[]> {
@@ -49,6 +61,7 @@ export async function listVisits(filter: ListVisitsFilter = {}): Promise<Visit[]
   const rows = visitSelection()
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(visits.arrivedAt))
+    .limit(filter.limit ?? DEFAULT_LIST_LIMIT)
     .all();
   return rows.map(toVisit);
 }
@@ -125,15 +138,34 @@ export async function classifyVisit(id: number, request: ClassifyVisitRequest): 
 
 // --- Trips ---
 
-export interface BufferedFix {
-  latitude: number;
-  longitude: number;
-  // Traccar reports speed in knots - see traccar/client.ts.
-  speedKnots: number;
-  fixTime: Date;
+const KNOTS_TO_KMH = 1.852;
+
+// What a trip's distance/mode guess are actually computed from - a running
+// sum of consecutive-fix distances and a running max speed, not the whole
+// raw-fix history. Replaces an older unbounded array of every fix seen
+// since the last visit closed: distance and max speed are both naturally
+// streaming reductions, so a long journey with no recognized stop no longer
+// grows anything with the trip's length - this is O(1) regardless.
+export interface TripFixAccumulator {
+  count: number;
+  distanceKm: number;
+  maxSpeedKnots: number;
+  lastFix: { latitude: number; longitude: number } | null;
 }
 
-const KNOTS_TO_KMH = 1.852;
+export function createTripFixAccumulator(): TripFixAccumulator {
+  return { count: 0, distanceKm: 0, maxSpeedKnots: 0, lastFix: null };
+}
+
+export function accumulateTripFix(
+  acc: TripFixAccumulator,
+  fix: { latitude: number; longitude: number; speedKnots: number }
+): void {
+  if (acc.lastFix) acc.distanceKm += haversineMeters(acc.lastFix, fix) / 1000;
+  acc.maxSpeedKnots = Math.max(acc.maxSpeedKnots, fix.speedKnots);
+  acc.lastFix = { latitude: fix.latitude, longitude: fix.longitude };
+  acc.count += 1;
+}
 
 function guessTripMode(maxSpeedKmh: number): TripMode {
   if (maxSpeedKmh < 7) return "walk";
@@ -187,6 +219,7 @@ function tripSelection() {
 export interface ListTripsFilter {
   from?: Date;
   to?: Date;
+  limit?: number;
 }
 
 export async function listTrips(filter: ListTripsFilter = {}): Promise<Trip[]> {
@@ -197,6 +230,7 @@ export async function listTrips(filter: ListTripsFilter = {}): Promise<Trip[]> {
   const rows = tripSelection()
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(trips.departedAt))
+    .limit(filter.limit ?? DEFAULT_LIST_LIMIT)
     .all();
   return rows.map(toTrip);
 }
@@ -206,28 +240,24 @@ export async function getTrip(id: number): Promise<Trip | null> {
   return row ? toTrip(row) : null;
 }
 
-// distanceKm/mode are rough by design - summed haversine between whatever
-// raw fixes happened to be buffered while in transit (tracking.ts), guessed
-// mode from their max speed. An empty buffer (e.g. the Chamber restarted
-// mid-trip and lost its in-memory buffer - an accepted gap, same spirit as
-// chamber-tasks' in-memory notification state) just yields distanceKm 0.
+// distanceKm/mode are rough by design - a running sum/max accumulated while
+// in transit (tracking.ts), not the whole raw-fix history. An untouched
+// accumulator (e.g. the Chamber restarted mid-trip and lost its in-memory
+// state - an accepted gap, same spirit as chamber-tasks' in-memory
+// notification state) just yields distanceKm 0.
 export async function createTrip(
   fromVisitId: number,
   toVisitId: number,
   departedAt: Date,
   arrivedAt: Date,
-  buffer: BufferedFix[]
+  acc: TripFixAccumulator
 ): Promise<Trip> {
-  let distanceKm = 0;
-  for (let i = 1; i < buffer.length; i++) {
-    distanceKm += haversineMeters(buffer[i - 1]!, buffer[i]!) / 1000;
-  }
-  const maxSpeedKmh = buffer.length ? Math.max(...buffer.map((p) => p.speedKnots * KNOTS_TO_KMH)) : 0;
-  const mode: TripMode = buffer.length === 0 ? "unknown" : guessTripMode(maxSpeedKmh);
+  const maxSpeedKmh = acc.count > 0 ? acc.maxSpeedKnots * KNOTS_TO_KMH : 0;
+  const mode: TripMode = acc.count === 0 ? "unknown" : guessTripMode(maxSpeedKmh);
 
   const inserted = db
     .insert(trips)
-    .values({ fromVisitId, toVisitId, departedAt, arrivedAt, distanceKm, mode, createdAt: new Date() })
+    .values({ fromVisitId, toVisitId, departedAt, arrivedAt, distanceKm: acc.distanceKm, mode, createdAt: new Date() })
     .returning()
     .get();
 

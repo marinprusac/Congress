@@ -97,12 +97,19 @@ function parseDateParam(value: string | undefined): Date | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+function parseLimitParam(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const limit = Number(value);
+  return Number.isInteger(limit) && limit > 0 ? limit : undefined;
+}
+
 app.get("/api/visits", async (c) => {
   const statusParsed = visitStatusSchema.safeParse(c.req.query("status"));
   const status = statusParsed.success ? statusParsed.data : undefined;
   const from = parseDateParam(c.req.query("from"));
   const to = parseDateParam(c.req.query("to"));
-  return c.json(await listVisits({ status, from, to }));
+  const limit = parseLimitParam(c.req.query("limit"));
+  return c.json(await listVisits({ status, from, to, limit }));
 });
 
 app.get("/api/visits/:id", async (c) => {
@@ -129,7 +136,8 @@ app.post("/api/visits/:id/classify", async (c) => {
 app.get("/api/trips", async (c) => {
   const from = parseDateParam(c.req.query("from"));
   const to = parseDateParam(c.req.query("to"));
-  return c.json(await listTrips({ from, to }));
+  const limit = parseLimitParam(c.req.query("limit"));
+  return c.json(await listTrips({ from, to, limit }));
 });
 
 app.get("/api/poll-health", (c) => {
