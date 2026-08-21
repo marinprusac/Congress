@@ -1,0 +1,1 @@
+ALTER TABLE `selected_calendars` ADD `sync_token` text;

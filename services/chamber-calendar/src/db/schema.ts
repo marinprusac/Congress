@@ -25,6 +25,12 @@ export const selectedCalendars = sqliteTable(
     summary: text("summary").notNull(),
     colorHex: text("color_hex"),
     selected: integer("selected", { mode: "boolean" }).notNull().default(false),
+    // Google's incremental-sync cursor (events.list `nextSyncToken`) - null
+    // until the first full sync completes. See google/cache.ts's
+    // syncOneCalendar: present, it drives a cheap incremental sync instead of
+    // re-fetching the whole ~180-day window every cycle; cleared on a 410
+    // Gone response, which forces the next cycle back to a full resync.
+    syncToken: text("sync_token"),
   },
   (table) => [
     unique("selected_calendars_account_calendar_idx").on(table.accountId, table.googleCalendarId),
