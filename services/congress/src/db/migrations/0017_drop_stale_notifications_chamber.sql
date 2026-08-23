@@ -1,0 +1,12 @@
+-- The old "Notifications" Chamber was split into Logs and Automation
+-- (commit cd0838a); the two new Chambers registered under their own names
+-- but nothing ever removed the original "notifications" row, and the
+-- registry has no path to permanently retire a Chamber (only mark it
+-- offline/detached - see registry.ts) - so it has sat "offline" ever since,
+-- with the old service's stale widget list still surfacing in Capitol's
+-- Add-to-Canvas tray as choices that can never actually load. Safe to
+-- delete outright rather than just mark differently: nothing will ever
+-- register as "notifications" again, and any Capitol placement still
+-- pointing at it is repointed to "logs" separately (see chamber-capitol's
+-- own matching migration).
+DELETE FROM chambers WHERE name = 'notifications';

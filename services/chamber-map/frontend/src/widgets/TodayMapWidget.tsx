@@ -53,37 +53,39 @@ export function TodayMapWidget() {
       isEmpty={markers.length === 0}
       emptyLabel="— Nowhere recorded yet today —"
     >
-      <div className="h-full w-full overflow-hidden rounded" data-pull-gesture-ignore data-nav-swipe-ignore>
-        <MapContainer
-          center={[markers[0]!.latitude!, markers[0]!.longitude!]}
-          zoom={12}
-          style={{ height: "100%", width: "100%" }}
-          zoomControl={false}
-          dragging={false}
-          scrollWheelZoom={false}
-          doubleClickZoom={false}
-        >
-          <TileLayer url={tileUrl} attribution={MAP_TILE_ATTRIBUTION} />
-          {markers.map((v) => (
-            <Marker key={v.id} position={[v.latitude!, v.longitude!]} icon={placeMarkerIcon} />
-          ))}
-          {trips.map((t) => {
-            const fromVisit = visitsById.get(t.fromVisitId);
-            const toVisit = visitsById.get(t.toVisitId);
-            if (!fromVisit || !toVisit || fromVisit.latitude === null || toVisit.latitude === null) return null;
-            return (
-              <Polyline
-                key={t.id}
-                positions={[
-                  [fromVisit.latitude, fromVisit.longitude!],
-                  [toVisit.latitude, toVisit.longitude!],
-                ]}
-                pathOptions={{ color: MODE_COLOR[t.mode], weight: 2 }}
-              />
-            );
-          })}
-        </MapContainer>
-      </div>
+      {markers.length > 0 && (
+        <div className="h-full w-full overflow-hidden rounded" data-pull-gesture-ignore data-nav-swipe-ignore>
+          <MapContainer
+            center={[markers[0]!.latitude!, markers[0]!.longitude!]}
+            zoom={12}
+            style={{ height: "100%", width: "100%" }}
+            zoomControl={false}
+            dragging={false}
+            scrollWheelZoom={false}
+            doubleClickZoom={false}
+          >
+            <TileLayer url={tileUrl} attribution={MAP_TILE_ATTRIBUTION} />
+            {markers.map((v) => (
+              <Marker key={v.id} position={[v.latitude!, v.longitude!]} icon={placeMarkerIcon} />
+            ))}
+            {trips.map((t) => {
+              const fromVisit = visitsById.get(t.fromVisitId);
+              const toVisit = visitsById.get(t.toVisitId);
+              if (!fromVisit || !toVisit || fromVisit.latitude === null || toVisit.latitude === null) return null;
+              return (
+                <Polyline
+                  key={t.id}
+                  positions={[
+                    [fromVisit.latitude, fromVisit.longitude!],
+                    [toVisit.latitude, toVisit.longitude!],
+                  ]}
+                  pathOptions={{ color: MODE_COLOR[t.mode], weight: 2 }}
+                />
+              );
+            })}
+          </MapContainer>
+        </div>
+      )}
     </WidgetPreviewShell>
   );
 }
