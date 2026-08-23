@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from "react";
+import { Component, lazy, Suspense, useState, type ComponentType, type LazyExoticComponent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChamberHeader,
@@ -33,13 +33,20 @@ function SettingsGearIcon() {
 interface ChamberSettingsPanel {
   name: string;
   displayName: string;
-  Component: ComponentType;
 }
 
 // Resolves every active Chamber's own `settings` export (see RemoteModule)
 // out of the same remote-entry.js ChamberWarmups already preloads on
 // registry load - a Chamber with nothing configurable, or one that fails to
-// load, is simply excluded from the tab strip rather than shown broken.
+// load, is simply excluded from the tab strip rather than shown broken. Only
+// serializable {name, displayName} pairs go into this query's data - Congress
+// wraps every query in PersistedQueryProvider, which round-trips cached data
+// through IndexedDB via JSON, and a live component reference doesn't survive
+// that (silently becomes undefined on rehydrate, so a tab could crash the
+// whole shell days after this query last actually ran). The Component itself
+// is resolved separately below, the same in-memory-only way Capitol's canvas
+// resolves a widget (see getWidgetComponent in that Chamber's own
+// widgetComponent.ts).
 function useChamberSettingsPanels(chambers: { name: string; displayName: string }[]) {
   const key = chambers.map((c) => c.name).join(",");
   return useQuery({
@@ -49,7 +56,7 @@ function useChamberSettingsPanels(chambers: { name: string; displayName: string 
         chambers.map(async (c) => {
           try {
             const mod = await loadRemoteModule(c.name);
-            return mod.settings ? { name: c.name, displayName: c.displayName, Component: mod.settings } : null;
+            return mod.settings ? { name: c.name, displayName: c.displayName } : null;
           } catch {
             return null;
           }
@@ -60,6 +67,47 @@ function useChamberSettingsPanels(chambers: { name: string; displayName: string 
     enabled: chambers.length > 0,
     staleTime: Infinity,
   });
+}
+
+// Mirrors getWidgetComponent's own pattern (chamber-capitol's
+// widgetComponent.ts) - a plain in-memory Map, never react-query, so the
+// resolved component itself never touches the persisted cache above.
+const settingsComponentCache = new Map<string, LazyExoticComponent<ComponentType>>();
+
+function getSettingsComponent(chamberName: string): LazyExoticComponent<ComponentType> {
+  let component = settingsComponentCache.get(chamberName);
+  if (!component) {
+    component = lazy(async () => {
+      const mod = await loadRemoteModule(chamberName);
+      if (!mod.settings) throw new Error(`Chamber "${chamberName}" has no settings panel`);
+      return { default: mod.settings };
+    });
+    settingsComponentCache.set(chamberName, component);
+  }
+  return component;
+}
+
+// Isolates a broken settings panel to its own tab instead of letting an
+// uncaught render error (a genuine bug in that Chamber's own code, same
+// class of failure ChamberHost's own ChamberErrorBoundary guards against)
+// propagate past this root's own createRoot() and blank the entire shell -
+// confirmed by testing, same as that boundary's own comment.
+interface SettingsPanelErrorBoundaryState {
+  failed: boolean;
+}
+class SettingsPanelErrorBoundary extends Component<{ chamberName: string; children: ReactNode }, SettingsPanelErrorBoundaryState> {
+  state: SettingsPanelErrorBoundaryState = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (this.state.failed) {
+      return <p className="font-mono text-sm text-alert">{this.props.chamberName}'s settings failed to load.</p>;
+    }
+    return this.props.children;
+  }
 }
 
 // Congress-owned settings (dark mode) plus sign-out - previously exposed
@@ -123,6 +171,7 @@ export function SettingsPage() {
 
   const [tab, setTab] = useState<string>("general");
   const activePanel = (panels ?? []).find((p) => p.name === tab);
+  const ActivePanelComponent = activePanel ? getSettingsComponent(activePanel.name) : null;
 
   return (
     <div className="chamber-shell">
@@ -152,7 +201,20 @@ export function SettingsPage() {
             </button>
           ))}
         </div>
-        <section className="settings-tab-panel">{tab === "general" ? <GeneralTab /> : activePanel && <activePanel.Component />}</section>
+        <section className="settings-tab-panel">
+          {tab === "general" ? (
+            <GeneralTab />
+          ) : (
+            ActivePanelComponent &&
+            activePanel && (
+              <SettingsPanelErrorBoundary key={activePanel.name} chamberName={activePanel.displayName}>
+                <Suspense fallback={<p className="font-mono text-sm text-dust">Loading —</p>}>
+                  <ActivePanelComponent />
+                </Suspense>
+              </SettingsPanelErrorBoundary>
+            )
+          )}
+        </section>
       </main>
     </div>
   );
