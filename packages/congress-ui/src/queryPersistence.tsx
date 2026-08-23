@@ -25,9 +25,7 @@ function storeFor(namespace: string): UseStore {
 
 // A single reload's worth of patience for clearAppCaches below - it's a
 // best-effort cleanup running right before a page reload, not something a
-// pull-to-refresh gesture should ever be left hanging on indefinitely (a
-// stray IndexedDB connection this tab doesn't know about can leave a
-// deleteDatabase call permanently "blocked").
+// pull-to-refresh gesture should ever be left hanging on indefinitely.
 const CLEAR_TIMEOUT_MS = 2000;
 
 // Empties every persisted-query IndexedDB database this app owns - not just
@@ -36,50 +34,41 @@ const CLEAR_TIMEOUT_MS = 2000;
 // than a hardcoded chamber list - congress-ui has no business knowing every
 // Chamber's name) - plus every Cache Storage entry the service worker owns
 // (the precached shell, each Chamber's remote-entry bundle, the shared
-// vendor bundle). A database this tab already has an open connection to
-// (tracked in `stores` - the current namespace, and any Chamber visited
-// this session) can't be safely deleted outright without risking an
-// indefinitely "blocked" request, so those are emptied in place with
-// idb-keyval's own `clear` instead; a database nothing in this tab has
-// opened is deleted outright. Used by the pull-to-refresh "refresh" release
+// vendor bundle). Used by the pull-to-refresh "refresh" release
 // (MobileSearchReveal) so a manual reload actually means "genuinely fresh
 // everywhere", not "instantly rehydrated from whatever was cached, then
 // silently revalidated in the background" - which is what a bare
 // `location.reload()` amounts to given this persistence layer and the
 // service worker's own cache-first shell.
+//
+// Deliberately never calls indexedDB.deleteDatabase - a prior version did,
+// for a namespace this tab hadn't opened, on the theory that nothing here
+// held it open so the delete couldn't block. In practice a delete request
+// can still end up "blocked" (another tab of this same PWA, a stray
+// leftover connection, a browser-specific quirk), and unlike a normal
+// open(), a blocked *delete* doesn't just fail that one call - it parks
+// itself in the browser's per-origin IndexedDB queue and stalls every
+// later open() against that origin, including from a freshly reloaded
+// page, until whatever's blocking it closes. That's fatal here specifically
+// because PersistQueryClientProvider gates *every* query (the registry
+// fetch included) behind its own IndexedDB restore - one stuck delete
+// silently breaks navigation everywhere, which is exactly what this was
+// caught doing. `clear(store)` only ever needs a same-version, non-exclusive
+// open - safe to call on a namespace this tab has never touched, and safe
+// to run concurrently with another tab's own connection to it.
 export async function clearAppCaches(): Promise<void> {
-  const tasks: Promise<unknown>[] = [];
-
-  for (const store of stores.values()) {
-    tasks.push(clear(store).catch(() => {}));
-  }
-
+  const namespaces = new Set(stores.keys());
   if (typeof indexedDB.databases === "function") {
-    tasks.push(
-      indexedDB
-        .databases()
-        .then((dbs) =>
-          Promise.all(
-            dbs
-              .filter((db) => db.name?.startsWith(DB_PREFIX) && !stores.has(db.name.slice(DB_PREFIX.length)))
-              .map(
-                (db) =>
-                  new Promise<void>((resolve) => {
-                    const request = indexedDB.deleteDatabase(db.name!);
-                    request.onsuccess = () => resolve();
-                    request.onerror = () => resolve();
-                    // Nothing in this tab holds it open (that's the whole
-                    // point of this branch) - if it's blocked anyway, it's
-                    // some other tab/origin-worker's connection, out of our
-                    // control. Stop waiting rather than hang the reload.
-                    request.onblocked = () => resolve();
-                  })
-              )
-          )
-        )
-        .catch(() => {})
-    );
+    try {
+      for (const db of await indexedDB.databases()) {
+        if (db.name?.startsWith(DB_PREFIX)) namespaces.add(db.name.slice(DB_PREFIX.length));
+      }
+    } catch {
+      // Best effort - fall back to whatever namespaces this tab already knows.
+    }
   }
+
+  const tasks: Promise<unknown>[] = [...namespaces].map((namespace) => clear(storeFor(namespace)).catch(() => {}));
 
   if ("caches" in window) {
     tasks.push(
