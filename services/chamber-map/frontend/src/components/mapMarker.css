@@ -1,3 +1,12 @@
+/* Leaflet's own panes/controls use z-index up to 1000 (see its own
+   leaflet.css), which otherwise beats every fixed shell element in this app
+   (the mobile nav drawer's z-index: 40 included) since `.leaflet-container`
+   is only `position: relative`, not a stacking context of its own. This
+   caps Leaflet's internal stacking inside the map itself. */
+.leaflet-container {
+  isolation: isolate;
+}
+
 .map-place-marker-dot {
   width: 14px;
   height: 14px;

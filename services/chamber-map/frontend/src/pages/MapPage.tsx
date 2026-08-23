@@ -1,6 +1,7 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { MapContainer, TileLayer, Marker, Polyline, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
 import { Link } from "react-router-dom";
 import { useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchVisits, fetchTrips } from "@/lib/api";
@@ -38,6 +39,26 @@ const MODE_COLOR: Record<Trip["mode"], string> = {
   drive: "#a6231f",
   unknown: "#8b8880",
 };
+
+// MapContainer's own center/zoom props only apply once, at first mount -
+// react-leaflet ignores later changes to them. Visits load asynchronously
+// (the map mounts before the query resolves), so without this the map
+// would permanently lock onto its zoomed-out "no markers yet" fallback
+// view instead of ever moving to show the day's actual locations once they
+// arrive.
+function FitToMarkers({ markers }: { markers: Visit[] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (markers.length === 0) return;
+    if (markers.length === 1) {
+      map.setView([markers[0]!.latitude!, markers[0]!.longitude!], 13);
+      return;
+    }
+    const bounds = L.latLngBounds(markers.map((v): [number, number] => [v.latitude!, v.longitude!]));
+    map.fitBounds(bounds, { padding: [32, 32], maxZoom: 15 });
+  }, [markers, map]);
+  return null;
+}
 
 export function MapPage() {
   const [date, setDate] = useState(todayLocal());
@@ -117,13 +138,14 @@ export function MapPage() {
         </Link>
       </div>
 
-      <div className="mb-4 h-80 overflow-hidden rounded border border-dust">
+      <div className="mb-4 h-80 overflow-hidden rounded border border-dust" data-pull-gesture-ignore>
         <MapContainer
           center={markers[0] ? [markers[0].latitude!, markers[0].longitude!] : [20, 0]}
           zoom={markers.length ? 13 : 2}
           style={{ height: "100%", width: "100%" }}
         >
           <TileLayer url={tileUrl} attribution={MAP_TILE_ATTRIBUTION} />
+          <FitToMarkers markers={markers} />
           {markers.map((v) => (
             <Marker key={v.id} position={[v.latitude!, v.longitude!]} icon={placeMarkerIcon}>
               <Popup>{v.placeName ?? v.adhocLabel ?? "Unclassified location"}</Popup>

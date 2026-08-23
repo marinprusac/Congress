@@ -57,6 +57,12 @@ export function usePullGesture({ onRelease }: UsePullGestureOptions): { zone: Pu
 
     function onTouchStart(e: TouchEvent) {
       if (window.scrollY > 0 || e.touches.length !== 1) return;
+      // A full-bleed draggable surface near the top of the page (a Leaflet
+      // map, say) has its own meaning for a downward drag - opt it out via
+      // this attribute rather than letting this window-level listener steal
+      // the gesture out from under it.
+      const target = e.target;
+      if (target instanceof Element && target.closest("[data-pull-gesture-ignore]")) return;
       startYRef.current = e.touches[0]!.clientY;
       draggingRef.current = true;
       window.addEventListener("touchmove", onTouchMove, { passive: false });

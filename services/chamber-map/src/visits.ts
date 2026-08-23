@@ -1,4 +1,4 @@
-import { desc, eq, and, gte, lte, isNull } from "drizzle-orm";
+import { desc, eq, and, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import { db } from "./db/client.js";
 import { visits, places, trips } from "./db/schema.js";
@@ -54,7 +54,17 @@ export interface ListVisitsFilter {
 
 export async function listVisits(filter: ListVisitsFilter = {}): Promise<Visit[]> {
   const conditions = [];
-  if (filter.status) conditions.push(eq(visits.status, filter.status));
+  if (filter.status) {
+    conditions.push(eq(visits.status, filter.status));
+    // "pending" specifically means "worth asking about" - a spot only
+    // reaches pendingNotifiedAt once it's dwelled past minDwellMs (see
+    // tracking.ts's maybeFlagPending). Without this, every fleeting
+    // unmatched fix along a drive/bus ride (each opens then closes its own
+    // "pending" row in seconds, well under minDwellMs) would still surface
+    // here for classification, even though Settings already documents this
+    // page as filtering them out.
+    if (filter.status === "pending") conditions.push(isNotNull(visits.pendingNotifiedAt));
+  }
   if (filter.from) conditions.push(gte(visits.arrivedAt, filter.from));
   if (filter.to) conditions.push(lte(visits.arrivedAt, filter.to));
 
