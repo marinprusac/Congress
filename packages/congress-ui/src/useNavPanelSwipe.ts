@@ -144,18 +144,30 @@ export function useNavPanelSwipe(): {
       // Closing an open panel, or opening right from the edge, is
       // unambiguous the instant the touch lands - commit immediately rather
       // than waiting for movement like the from-anywhere case below does.
+      // This only decides how far updateDrag's baseline tracking starts
+      // from, not whether to preventDefault - see below for why those two
+      // are kept separate.
       committedRef.current = !closed || inEdgeZone;
       if (committedRef.current) {
         updateDrag(openRef.current ? panelWidthRef.current : 0);
-        // This - called this early, on touchstart itself, not touchmove -
-        // is what actually stops the platform's own edge-swipe-back
-        // gesture from firing alongside ours: it decides whether to claim
-        // the touch based on whether anything already has, before the
-        // finger even moves. A from-anywhere open can't do this on
-        // touchstart without also eating every ordinary tap's click event
-        // app-wide, which is why it waits for real movement instead (see
-        // ANYWHERE_COMMIT_PX below) - it's never competing with that
-        // native gesture anyway, since it doesn't start at the edge.
+      }
+      // Only the dedicated edge-zone *open* preventDefaults this early, on
+      // touchstart itself rather than touchmove - that's what actually
+      // stops the platform's own edge-swipe-back gesture from firing
+      // alongside ours, since it decides whether to claim the touch based
+      // on whether anything already has, before the finger even moves.
+      // Doing the same for "panel already open" - even though that case
+      // also commits immediately, just for updateDrag's sake above - would
+      // preventDefault on every ordinary tap anywhere inside the open
+      // panel, including on a chamber row: a stationary tap never reaches
+      // onTouchMove at all, so touchstart is the only place that could
+      // still swallow its click, and on mobile a prevented touchstart does
+      // exactly that (confirmed live - this broke every chamber icon in
+      // the open panel until caught). Closing was never competing with the
+      // native edge gesture anyway (it doesn't start at the edge), so it's
+      // fine to wait for real horizontal movement in onTouchMove instead,
+      // same as the from-anywhere open case already does.
+      if (inEdgeZone) {
         if (e.cancelable) e.preventDefault();
       }
     }
