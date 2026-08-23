@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
 import { usePullGesture } from "./usePullGesture.js";
+import { clearAppCaches } from "./queryPersistence.js";
 
 interface MobileSearchRevealProps {
   ownChamber: string;
@@ -32,7 +33,12 @@ function RefreshIcon() {
 // header, so this reclaims the pull-down gesture space a standalone PWA's
 // missing native pull-to-refresh leaves unused instead: a short pull down
 // from the top of the page reveals a search icon (release opens the
-// field), a longer pull swaps it to a refresh icon (release reloads).
+// field), a longer pull swaps it to a refresh icon (release does a hard
+// refresh - see clearAppCaches - not just window.location.reload() on its
+// own, which given this app's IndexedDB-persisted query cache and the
+// service worker's cache-first shell would otherwise still hand back
+// whatever was cached instantly, then only silently revalidate in the
+// background).
 export function MobileSearchReveal({ ownChamber, navigate, renderIcon }: MobileSearchRevealProps) {
   const [expanded, setExpanded] = useState(false);
   const expandedRef = useRef<HTMLDivElement>(null);
@@ -40,7 +46,9 @@ export function MobileSearchReveal({ ownChamber, navigate, renderIcon }: MobileS
   const { zone, progress } = usePullGesture({
     onRelease: (released) => {
       if (released === "refresh") {
-        window.location.reload();
+        // Best-effort and time-boxed internally (see clearAppCaches) -
+        // reload always happens, whether or not clearing finished cleanly.
+        void clearAppCaches().finally(() => window.location.reload());
       } else if (released === "search") {
         // flushSync + an immediate (not rAF-deferred) focus() call keeps
         // the whole thing inside the touchend handler's own call stack -
