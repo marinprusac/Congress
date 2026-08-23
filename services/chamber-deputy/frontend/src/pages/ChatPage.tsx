@@ -58,7 +58,7 @@ export function ChatPage() {
   let previousSessionId: string | null = null;
 
   return (
-    <section className="flex h-full flex-col">
+    <section className="mx-auto flex h-full w-full max-w-6xl flex-col">
       <div className="flex shrink-0 items-center justify-between px-4 pt-3 pb-2 sm:px-6 sm:pt-5">
         <h2 className="font-display text-2xl text-ink sm:text-3xl">Chat</h2>
         <button
