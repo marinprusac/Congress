@@ -14,13 +14,13 @@ export interface GridDims {
 // positions. Only each cell's pixel size (useCanvasGrid's cellPx) responds
 // to the live viewport - tune these two constants visually against real
 // device sizes, not by measurement. cols:rows is deliberately close to each
-// scope's own typical viewport shape (desktop ~9:5, mobile ~5:7) - that's a
+// scope's own typical viewport shape (desktop ~17:10, mobile ~5:7) - that's a
 // ratio of how many CELLS fit across vs down, not the shape of one cell:
 // cells themselves are always square (see useCanvasGrid), uniformly scaled,
 // never stretched.
 export const GRID: Record<CanvasScope, GridDims> = {
   mobile: { cols: 5, rows: 7 },
-  desktop: { cols: 9, rows: 5 },
+  desktop: { cols: 17, rows: 10 },
 };
 
 export interface PlacedRect {
