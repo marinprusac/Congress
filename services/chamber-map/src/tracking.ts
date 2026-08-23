@@ -18,18 +18,6 @@ import {
 
 const KNOTS_TO_KMH = 1.852;
 
-// Below this, an unmatched fix is treated as "stopped" and eligible to open
-// or extend an unknown dwell; at or above it, the fix is just transit data.
-// This - not distance-based clustering across consecutive fixes - is what
-// keeps a normal drive between two known places from generating a flood of
-// tiny "pending" visits at every unmatched ping along the route. Relies on
-// Traccar Client actually reporting a plausible speed per fix; if a device's
-// reporting mode never populates speed (rare, but possible depending on
-// platform/config), this degrades back to "every unmatched fix is a
-// candidate dwell" - an accepted, documented limitation rather than a
-// silent one.
-const STOPPED_SPEED_KMH = 3;
-
 interface PlaceCandidate {
   id: number;
   name: string;
@@ -172,7 +160,19 @@ export async function processPositions(positions: TraccarPosition[]): Promise<vo
     }
 
     const speedKmh = fix.speed * KNOTS_TO_KMH;
-    if (speedKmh < STOPPED_SPEED_KMH) {
+    // Below this, an unmatched fix is treated as "stopped" and eligible to
+    // open or extend an unknown dwell; at or above it, the fix is just
+    // transit data. This - not distance-based clustering across consecutive
+    // fixes - is what keeps a normal drive between two known places from
+    // generating a flood of tiny "pending" visits at every unmatched ping
+    // along the route. Relies on Traccar Client actually reporting a
+    // plausible speed per fix; if a device's reporting mode never populates
+    // speed (rare, but possible depending on platform/config), this degrades
+    // back to "every unmatched fix is a candidate dwell" - an accepted,
+    // documented limitation rather than a silent one. User-tunable (see
+    // Settings) since how aggressively a device rounds low speeds to zero
+    // varies by device/platform.
+    if (speedKmh < settings.stoppedSpeedKmh) {
       const newVisit = openPendingVisit(fix.latitude, fix.longitude, fixTime);
       await handleTransition(openVisitRow, newVisit, fixTime, placeById);
       openVisitRow = newVisit;

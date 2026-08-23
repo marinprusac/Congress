@@ -10,16 +10,26 @@ export function SettingsPage() {
 
   const [unknownClusterRadiusMeters, setUnknownClusterRadiusMeters] = useState(150);
   const [minDwellMinutes, setMinDwellMinutes] = useState(45);
+  const [stoppedSpeedKmh, setStoppedSpeedKmh] = useState(3);
+  const [pollIntervalSeconds, setPollIntervalSeconds] = useState(120);
 
   useEffect(() => {
     if (settingsQuery.data) {
       setUnknownClusterRadiusMeters(settingsQuery.data.unknownClusterRadiusMeters);
       setMinDwellMinutes(Math.round(settingsQuery.data.minDwellMs / 60000));
+      setStoppedSpeedKmh(settingsQuery.data.stoppedSpeedKmh);
+      setPollIntervalSeconds(Math.round(settingsQuery.data.pollIntervalMs / 1000));
     }
   }, [settingsQuery.data]);
 
   const mutation = useMutation({
-    mutationFn: () => updateSettings({ unknownClusterRadiusMeters, minDwellMs: minDwellMinutes * 60000 }),
+    mutationFn: () =>
+      updateSettings({
+        unknownClusterRadiusMeters,
+        minDwellMs: minDwellMinutes * 60000,
+        stoppedSpeedKmh,
+        pollIntervalMs: pollIntervalSeconds * 1000,
+      }),
     onSuccess: (updated) => {
       queryClient.setQueryData(["settings"], updated);
       showToast("Settings saved");
@@ -53,6 +63,26 @@ export function SettingsPage() {
         <FormTextInput type="number" min={1} value={minDwellMinutes} onChange={(e) => setMinDwellMinutes(Number(e.target.value))} />
         <p className="-mt-3 mb-4 font-mono text-xs text-dust">
           A shorter stop than this never shows up on the Pending page - it's treated as a quick stop, not a place worth naming.
+        </p>
+
+        <FormLabel>Stopped-speed threshold (km/h)</FormLabel>
+        <FormTextInput
+          type="number"
+          min={0.5}
+          step={0.5}
+          value={stoppedSpeedKmh}
+          onChange={(e) => setStoppedSpeedKmh(Number(e.target.value))}
+        />
+        <p className="-mt-3 mb-4 font-mono text-xs text-dust">
+          Below this speed an unmatched fix counts as "stopped somewhere" instead of transit. Raise it if a slow drive keeps
+          opening spurious pending visits; lower it if genuine stops (e.g. walking) are being missed.
+        </p>
+
+        <FormLabel>Traccar poll interval (seconds)</FormLabel>
+        <FormTextInput type="number" min={15} value={pollIntervalSeconds} onChange={(e) => setPollIntervalSeconds(Number(e.target.value))} />
+        <p className="-mt-3 mb-4 font-mono text-xs text-dust">
+          How often this Chamber asks Traccar for new fixes. Only helps if your device is actually reporting more often than
+          this - it can't recover location the device itself never sent.
         </p>
 
         <FormSubmitButton disabled={mutation.isPending}>{mutation.isPending ? "Saving —" : "Save Settings"}</FormSubmitButton>

@@ -106,6 +106,14 @@ export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
   unknownClusterRadiusMeters: integer("unknown_cluster_radius_meters").notNull().default(150),
   minDwellMs: integer("min_dwell_ms").notNull().default(45 * 60 * 1000),
+  // Below this, an unmatched fix is "stopped" (candidate dwell); at or above,
+  // it's transit - see tracking.ts's own comment on why speed, not
+  // distance-based clustering, is what tells the two apart.
+  stoppedSpeedKmh: real("stopped_speed_kmh").notNull().default(3),
+  // How often the poll loop asks Traccar for new fixes - poller.ts rereads
+  // this every tick instead of only at boot, so a change here takes effect
+  // on the very next tick without a restart.
+  pollIntervalMs: integer("poll_interval_ms").notNull().default(2 * 60 * 1000),
   lastProcessedAt: integer("last_processed_at", { mode: "timestamp_ms" }),
   lastPollSucceededAt: integer("last_poll_succeeded_at", { mode: "timestamp_ms" }),
   lastPollError: text("last_poll_error"),

@@ -69,6 +69,7 @@ export const classifyVisitRequestSchema = z.discriminatedUnion("action", [
     radiusMeters: z.number().int().positive().default(100),
     body: z.string().default(""),
   }),
+  z.object({ action: z.literal("assign_place"), placeId: z.number().int() }),
   z.object({ action: z.literal("adhoc_label"), label: z.string().min(1) }),
   z.object({ action: z.literal("ignore") }),
 ]);
@@ -91,18 +92,22 @@ export const tripSchema = z.object({
 });
 export type Trip = z.infer<typeof tripSchema>;
 
-// Only the two user-facing tunables - see db/schema.ts's comment on why
+// Only the user-facing tunables - see db/schema.ts's comment on why
 // lastProcessedAt/lastPollSucceededAt/lastPollError live on the same table
 // row but outside this type.
 export const settingsSchema = z.object({
   unknownClusterRadiusMeters: z.number().int(),
   minDwellMs: z.number().int(),
+  stoppedSpeedKmh: z.number(),
+  pollIntervalMs: z.number().int(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
 export const updateSettingsRequestSchema = z.object({
   unknownClusterRadiusMeters: z.number().int().positive().optional(),
   minDwellMs: z.number().int().positive().optional(),
+  stoppedSpeedKmh: z.number().positive().optional(),
+  pollIntervalMs: z.number().int().positive().optional(),
 });
 export type UpdateSettingsRequest = z.infer<typeof updateSettingsRequestSchema>;
 

@@ -134,6 +134,11 @@ export async function classifyVisit(id: number, request: ClassifyVisitRequest): 
       .set({ placeId: place.id, status: "confirmed", updatedAt: new Date() })
       .where(eq(visits.id, id))
       .run();
+  } else if (request.action === "assign_place") {
+    db.update(visits)
+      .set({ placeId: request.placeId, status: "confirmed", updatedAt: new Date() })
+      .where(eq(visits.id, id))
+      .run();
   } else if (request.action === "adhoc_label") {
     db.update(visits)
       .set({ adhocLabel: request.label, status: "adhoc", updatedAt: new Date() })

@@ -2,6 +2,7 @@ import { env } from "./env.js";
 import { fetchPositionsSince } from "./traccar/client.js";
 import { processPositions } from "./tracking.js";
 import { getPollState, updatePollState } from "./pollState.js";
+import { getSettings } from "./settings.js";
 import { publishEvent } from "./events.js";
 
 // Published once when a failure streak crosses this count (and reset on the
@@ -9,14 +10,16 @@ import { publishEvent } from "./events.js";
 // every tick" dedup spirit as chamber-tasks' due/overdue notifications.
 const FAILURE_ALERT_THRESHOLD = 3;
 
-let pollTimer: ReturnType<typeof setInterval> | undefined;
+let pollTimer: ReturnType<typeof setTimeout> | undefined;
 let consecutiveFailures = 0;
+let stopped = false;
 
 async function pollTick(): Promise<void> {
   const state = getPollState();
+  const settings = await getSettings();
   // First-ever boot: look back one interval, not this Chamber's entire
   // Traccar history.
-  const since = state.lastProcessedAt?.toISOString() ?? new Date(Date.now() - env.POLL_INTERVAL_MS).toISOString();
+  const since = state.lastProcessedAt?.toISOString() ?? new Date(Date.now() - settings.pollIntervalMs).toISOString();
   const now = new Date();
 
   try {
@@ -36,13 +39,19 @@ async function pollTick(): Promise<void> {
       });
     }
   }
+
+  // Reads pollIntervalMs fresh each tick (rather than fixing it once at
+  // startup in a setInterval) so a change made in Settings takes effect on
+  // the very next tick, not just after a restart.
+  if (!stopped) pollTimer = setTimeout(() => void pollTick(), settings.pollIntervalMs);
 }
 
 export function startTracking(): void {
+  stopped = false;
   void pollTick();
-  pollTimer = setInterval(() => void pollTick(), env.POLL_INTERVAL_MS);
 }
 
 export function stopTracking(): void {
-  if (pollTimer) clearInterval(pollTimer);
+  stopped = true;
+  if (pollTimer) clearTimeout(pollTimer);
 }

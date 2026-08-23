@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader, FormLabel, FormTextInput, showToast } from "@congress/congress-ui";
-import { fetchVisits, classifyVisit } from "@/lib/api";
+import { fetchVisits, fetchPlaces, classifyVisit } from "@/lib/api";
 import { PlacePicker } from "@/components/PlacePicker";
-import type { Visit } from "../../../src/types";
+import type { PlaceSummary, Visit } from "../../../src/types";
 
-function PendingVisitCard({ visit }: { visit: Visit }) {
+function PendingVisitCard({ visit, places }: { visit: Visit; places: PlaceSummary[] }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("place");
   const [radiusMeters, setRadiusMeters] = useState(100);
   const [adhocLabel, setAdhocLabel] = useState("");
+  const [existingPlaceId, setExistingPlaceId] = useState("");
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["visits"] });
 
@@ -19,6 +20,15 @@ function PendingVisitCard({ visit }: { visit: Visit }) {
     onSuccess: () => {
       invalidate();
       showToast(`Saved "${name}"`);
+    },
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: () => classifyVisit(visit.id, { action: "assign_place", placeId: Number(existingPlaceId) }),
+    onSuccess: () => {
+      invalidate();
+      const placeName = places.find((p) => p.id === Number(existingPlaceId))?.name ?? "place";
+      showToast(`Assigned to "${placeName}"`);
     },
   });
 
@@ -38,7 +48,7 @@ function PendingVisitCard({ visit }: { visit: Visit }) {
     },
   });
 
-  const pending = saveMutation.isPending || adhocMutation.isPending || ignoreMutation.isPending;
+  const pending = saveMutation.isPending || assignMutation.isPending || adhocMutation.isPending || ignoreMutation.isPending;
 
   return (
     <div className="mb-8 border border-dust p-4">
@@ -53,6 +63,30 @@ function PendingVisitCard({ visit }: { visit: Visit }) {
         </div>
       )}
 
+      {places.length > 0 && (
+        <div className="mb-4 flex items-start gap-3">
+          <select
+            value={existingPlaceId}
+            onChange={(e) => setExistingPlaceId(e.target.value)}
+            className="mb-0 w-full min-w-0 flex-1 border border-dust bg-parchment px-3 py-2 font-display text-xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            <option value="">This is already one of my places —</option>
+            {places.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <button
+            disabled={!existingPlaceId || pending}
+            onClick={() => assignMutation.mutate()}
+            className="tap-target mt-0.5 shrink-0 border border-accent px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-accent hover:bg-accent hover:text-parchment disabled:opacity-50"
+          >
+            Use this place
+          </button>
+        </div>
+      )}
+
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <FormTextInput placeholder="Place name" value={name} onChange={(e) => setName(e.target.value)} />
         <FormTextInput placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} />
@@ -63,7 +97,7 @@ function PendingVisitCard({ visit }: { visit: Visit }) {
         onClick={() => saveMutation.mutate()}
         className="tap-target mr-4 mb-4 border border-accent px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-accent hover:bg-accent hover:text-parchment disabled:opacity-50"
       >
-        Save as place
+        Save as new place
       </button>
 
       <div className="mb-4 flex items-start gap-3">
@@ -88,6 +122,8 @@ function PendingVisitCard({ visit }: { visit: Visit }) {
 
 export function PendingVisitsPage() {
   const query = useQuery({ queryKey: ["visits", "pending"], queryFn: () => fetchVisits({ status: "pending" }) });
+  const placesQuery = useQuery({ queryKey: ["places"], queryFn: fetchPlaces });
+  const places = placesQuery.data ?? [];
 
   return (
     <section>
@@ -96,7 +132,7 @@ export function PendingVisitsPage() {
       {query.isError && <p className="font-mono text-sm text-alert">Pending visits unavailable.</p>}
       {query.data && query.data.length === 0 && <p className="font-mono text-sm text-dust">— Nothing awaiting classification —</p>}
       {query.data?.map((visit) => (
-        <PendingVisitCard key={visit.id} visit={visit} />
+        <PendingVisitCard key={visit.id} visit={visit} places={places} />
       ))}
     </section>
   );

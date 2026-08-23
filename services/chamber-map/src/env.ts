@@ -11,6 +11,5 @@ export const env = loadEnv(
     TRACCAR_URL: z.string().url(),
     TRACCAR_TOKEN: z.string().min(1, "TRACCAR_TOKEN must be set"),
     TRACCAR_DEVICE_ID: z.coerce.number().int().positive(),
-    POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2 * 60 * 1000),
   })
 );

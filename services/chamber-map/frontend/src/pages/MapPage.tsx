@@ -26,7 +26,14 @@ function todayLocal(): string {
 function shiftDate(dateStr: string, days: number): string {
   const d = new Date(`${dateStr}T00:00:00`);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  // toISOString() converts to UTC, which silently shifts the date by a day
+  // in any timezone ahead of UTC (local midnight is still "yesterday" in
+  // UTC) - pull the parts back out in local time instead, the same way
+  // todayLocal() has to work around the same trap.
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function formatTime(iso: string): string {
