@@ -1,14 +1,44 @@
 import { useEffect, useRef, useState } from "react";
 
-// How close to the left edge (px) a touch has to start before it's eligible
-// to open the panel - keeps this from hijacking horizontal gestures
-// elsewhere on screen (list rows, carousels). Mirrors the "reserved gesture
-// space" comment on `overscroll-behavior-x: none` in styles.css - iOS's own
-// edge-swipe-back gesture used to live here and is now disabled in favor of
-// this one (belt-and-suspenders with the `preventDefault` below - the CSS
-// property alone doesn't reliably win the race against the native gesture
-// recognizer on every iOS version/mode).
+// How close to the left edge (px) a touch has to start to be treated as the
+// dedicated edge-swipe gesture, which gets its own touchstart-time
+// preventDefault (see onTouchStart) to win the race against the platform's
+// own edge-swipe-back recognizer - see that comment for why this is still
+// worth keeping as a distinct, narrower zone even now that opening also
+// works from anywhere (below).
 const EDGE_ZONE_PX = 24;
+// Below this, a horizontal drag is still ambiguous with normal touch jitter
+// (a slightly-off-axis tap, a finger settling before a vertical scroll) -
+// only once a from-anywhere drag clears this many px horizontally do we
+// treat it as a deliberate swipe and start stealing the touch sequence.
+// The dedicated edge zone above skips this - starting a drag that close to
+// the edge is already unambiguous intent.
+const ANYWHERE_COMMIT_PX = 12;
+
+// Whether a from-anywhere touch should be left alone rather than tracked as
+// a candidate nav-panel-open swipe: an element that opted out explicitly
+// (a full-bleed map, which wants its own pan/zoom to own every drag on it -
+// see data-nav-swipe-ignore in the Map chamber), a text input (a rightward
+// drag there is placing a cursor/selecting, not swiping), or anything
+// that's natively horizontally scrollable itself (a wide table, a code
+// block - `.note-prose pre`/`.note-table-wrapper` and friends), which
+// already owns this same gesture for its own scrolling. The dedicated edge
+// zone skips this check entirely - it's narrow enough, and the gesture
+// space it uses was already reserved for it (see `overscroll-behavior-x` in
+// styles.css), that nothing legitimate lives there to protect.
+function isNavSwipeIgnored(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  if (target.closest("[data-nav-swipe-ignore], input, textarea, select, [contenteditable]")) return true;
+  let el: Element | null = target;
+  while (el && el !== document.body) {
+    if (el.scrollWidth > el.clientWidth) {
+      const overflowX = getComputedStyle(el).overflowX;
+      if (overflowX === "auto" || overflowX === "scroll") return true;
+    }
+    el = el.parentElement;
+  }
+  return false;
+}
 // Matches `min(80vw, 18rem)` in styles.css's `.nav-panel-mobile` - used only
 // before the panel has ever been measured (its ref not attached yet).
 const PANEL_WIDTH_FALLBACK_PX = 288;
@@ -21,11 +51,20 @@ const PANEL_WIDTH_FALLBACK_PX = 288;
 const SNAP_OPEN_RATIO = 0.5;
 
 // Mobile-only off-canvas open/close state for NavPanel, driven by a
-// right-swipe from the screen's left edge to open and a left-swipe (from
-// anywhere on the open panel/backdrop) to close - there's no persistent
-// toggle button. Desktop's own NavPanel variant is always visible via CSS
-// alone and never reads `open`/`dragOffsetPx`/`dragProgress`, so this hook
-// is harmless (if unused) there.
+// right-swipe to open - from the screen's left edge reliably, or from
+// anywhere else on screen once the drag clearly reads as horizontal - and a
+// left-swipe (from anywhere on the open panel/backdrop) to close - there's
+// no persistent toggle button. Desktop's own NavPanel variant is always
+// visible via CSS alone and never reads `open`/`dragOffsetPx`/`dragProgress`,
+// so this hook is harmless (if unused) there.
+//
+// The from-anywhere case has to stay opt-out-able: a full-bleed surface with
+// its own horizontal drag meaning (the Map chamber's pan/zoom) tags itself
+// `data-nav-swipe-ignore` (mirroring `data-pull-gesture-ignore` on
+// usePullGesture) to keep this window-level listener from stealing the
+// touch out from under it; a genuinely horizontally-scrollable element (a
+// wide table, a code block) is detected and left alone the same way,
+// without needing its own opt-out tag.
 //
 // While a gesture is active, `dragOffsetPx`/`dragProgress` track the raw
 // finger position every touchmove so the panel/backdrop can be driven
@@ -50,6 +89,13 @@ export function useNavPanelSwipe(): {
   const panelWidthRef = useRef(PANEL_WIDTH_FALLBACK_PX);
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const trackingRef = useRef(false);
+  // True once a from-anywhere drag has cleared ANYWHERE_COMMIT_PX and this
+  // hook has actually started stealing the touch sequence (preventDefault).
+  // The dedicated edge-zone gesture skips this - it commits immediately, on
+  // touchstart itself, since starting a drag right at the edge is already
+  // unambiguous (and has to preventDefault that early to beat the native
+  // edge-swipe-back recognizer - see onTouchStart).
+  const committedRef = useRef(false);
   const offsetRef = useRef(0);
   const [dragOffsetPx, setDragOffsetPx] = useState<number | null>(null);
   const [dragProgress, setDragProgress] = useState<number | null>(null);
@@ -63,6 +109,7 @@ export function useNavPanelSwipe(): {
 
   function endDrag() {
     trackingRef.current = false;
+    committedRef.current = false;
     startRef.current = null;
     setDragOffsetPx(null);
     setDragProgress(null);
@@ -84,12 +131,33 @@ export function useNavPanelSwipe(): {
     function onTouchStart(e: TouchEvent) {
       if (e.touches.length !== 1) return;
       const touch = e.touches[0]!;
-      if (!openRef.current && touch.clientX > EDGE_ZONE_PX) return;
+      const closed = !openRef.current;
+      const inEdgeZone = touch.clientX <= EDGE_ZONE_PX;
+      // Outside the dedicated edge zone, opening from anywhere still has to
+      // stay out of the way of anything with its own meaning for a
+      // horizontal drag - see isNavSwipeIgnored.
+      if (closed && !inEdgeZone && isNavSwipeIgnored(e.target)) return;
       startRef.current = { x: touch.clientX, y: touch.clientY };
       trackingRef.current = true;
       panelWidthRef.current = panelElRef.current?.getBoundingClientRect().width || PANEL_WIDTH_FALLBACK_PX;
-      updateDrag(openRef.current ? panelWidthRef.current : 0);
       window.addEventListener("touchmove", onTouchMove, { passive: false });
+      // Closing an open panel, or opening right from the edge, is
+      // unambiguous the instant the touch lands - commit immediately rather
+      // than waiting for movement like the from-anywhere case below does.
+      committedRef.current = !closed || inEdgeZone;
+      if (committedRef.current) {
+        updateDrag(openRef.current ? panelWidthRef.current : 0);
+        // This - called this early, on touchstart itself, not touchmove -
+        // is what actually stops the platform's own edge-swipe-back
+        // gesture from firing alongside ours: it decides whether to claim
+        // the touch based on whether anything already has, before the
+        // finger even moves. A from-anywhere open can't do this on
+        // touchstart without also eating every ordinary tap's click event
+        // app-wide, which is why it waits for real movement instead (see
+        // ANYWHERE_COMMIT_PX below) - it's never competing with that
+        // native gesture anyway, since it doesn't start at the edge.
+        if (e.cancelable) e.preventDefault();
+      }
     }
 
     function onTouchMove(e: TouchEvent) {
@@ -103,9 +171,19 @@ export function useNavPanelSwipe(): {
         stopTracking();
         return;
       }
-      // This is what actually stops iOS's own edge-swipe-back gesture from
-      // firing alongside ours - a recognized horizontal drag owns the touch
-      // sequence outright rather than racing the native gesture recognizer.
+      if (!committedRef.current) {
+        // A from-anywhere drag: still deciding. Below the commit threshold,
+        // this is indistinguishable from tap jitter - leave the page alone
+        // and keep watching. A leftward drag has no meaning while the panel
+        // is closed (there's nothing to close), so once it's unambiguous
+        // it's just abandoned rather than committed to.
+        if (Math.abs(dx) < ANYWHERE_COMMIT_PX) return;
+        if (dx <= 0) {
+          stopTracking();
+          return;
+        }
+        committedRef.current = true;
+      }
       if (e.cancelable) e.preventDefault();
       const width = panelWidthRef.current;
       const base = openRef.current ? width : 0;
@@ -120,7 +198,15 @@ export function useNavPanelSwipe(): {
       stopTracking();
     }
 
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    // Non-passive so the edge-zone case above can preventDefault
+    // synchronously on touchstart itself - see the comment there. Every
+    // other touchstart in the app still costs almost nothing: a non-passive
+    // *touchstart* listener that doesn't call preventDefault doesn't block
+    // the compositor the way a non-passive touchmove would (that's the
+    // per-drag touchmove listener's own concern, addressed by its own
+    // "registered only for the lifetime of a qualifying drag" comment
+    // above).
+    window.addEventListener("touchstart", onTouchStart, { passive: false });
     window.addEventListener("touchend", onTouchEnd);
     window.addEventListener("touchcancel", onTouchEnd);
     return () => {

@@ -43,7 +43,12 @@ export function PlacePicker({ latitude, longitude, radiusMeters, onChange, heigh
   const initialCenter = useRef<[number, number]>([latitude, longitude]);
 
   return (
-    <div style={{ height }} className="overflow-hidden rounded border border-dust" data-pull-gesture-ignore>
+    <div
+      style={{ height }}
+      className="overflow-hidden rounded border border-dust"
+      data-pull-gesture-ignore
+      data-nav-swipe-ignore
+    >
       <MapContainer center={initialCenter.current} zoom={16} style={{ height: "100%", width: "100%" }} dragging={!readOnly} scrollWheelZoom={!readOnly}>
         <TileLayer url={tileUrl} attribution={MAP_TILE_ATTRIBUTION} />
         <Recenter latitude={latitude} longitude={longitude} />

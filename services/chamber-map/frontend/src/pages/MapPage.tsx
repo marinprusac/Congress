@@ -138,7 +138,11 @@ export function MapPage() {
         </Link>
       </div>
 
-      <div className="mb-4 h-80 overflow-hidden rounded border border-dust" data-pull-gesture-ignore>
+      <div
+        className="mb-4 h-80 overflow-hidden rounded border border-dust"
+        data-pull-gesture-ignore
+        data-nav-swipe-ignore
+      >
         <MapContainer
           center={markers[0] ? [markers[0].latitude!, markers[0].longitude!] : [20, 0]}
           zoom={markers.length ? 13 : 2}
