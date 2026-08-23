@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { ChamberHeader } from "./ChamberHeader.js";
 import { NavPanel } from "./NavPanel.js";
+import { useShellHosted } from "./ShellHostContext.js";
 
 interface ChamberLayoutProps {
   icon: ReactNode;
@@ -21,12 +22,20 @@ interface ChamberLayoutProps {
 // plus this Chamber's own header and content. A Chamber's home route is
 // always its default landing page (e.g. Notes' "All Notes" list) - there's
 // no separate "home" nav link to it.
+//
+// NavPanel only renders here when NOT shell-hosted (standalone dev boot, or
+// a direct full-page load through Congress's gateway proxy at
+// "/<chamber>/*") - shell-hosted, Congress's own App.tsx already mounts one
+// persistent NavPanel outside ChamberHost, so it survives this Chamber
+// failing to load instead of unmounting along with it. Rendering it again
+// here too would just double it up.
 export function ChamberLayout({ icon, title, ownChamber, renderIcon, extraActions }: ChamberLayoutProps) {
   const navigate = useNavigate();
+  const shellHosted = useShellHosted();
 
   return (
     <div className="chamber-shell">
-      <NavPanel current={ownChamber} currentLabel={title} />
+      {!shellHosted && <NavPanel current={ownChamber} currentLabel={title} />}
       <ChamberHeader
         icon={icon}
         title={title}

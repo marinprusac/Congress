@@ -11,7 +11,9 @@ import {
 // Composes NavPanel/ChamberHeader by hand instead of the shared
 // ChamberLayout wrapper (see every other Chamber's own Layout.tsx) so the
 // canvas-only chrome below (isHome) can be threaded onto the shell/main
-// wrapper divs.
+// wrapper divs. NavPanel itself only renders here when NOT shell-hosted -
+// see ChamberLayout's own comment on why: shell-hosted, Congress's App.tsx
+// already mounts one persistent NavPanel outside ChamberHost.
 export function Layout() {
   const navigate = useNavigate();
   const shellHosted = useShellHosted();
@@ -26,7 +28,7 @@ export function Layout() {
 
   return (
     <div className={`chamber-shell${isHome ? " chamber-shell--canvas" : ""}`}>
-      <NavPanel current="capitol" currentLabel="Capitol" />
+      {!shellHosted && <NavPanel current="capitol" currentLabel="Capitol" />}
       <ChamberHeader
         icon={<CapitolMark className="h-6 w-6 text-ink" />}
         title="Capitol"

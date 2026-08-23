@@ -2,7 +2,6 @@ import { useState, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChamberHeader,
-  NavPanel,
   ChamberMark,
   useAppliedTheme,
   useCapitolSettings,
@@ -110,6 +109,9 @@ function GeneralTab() {
 // /settings page) is mounted here as one tab-category, resolved from that
 // Chamber's own remote entry the same way Capitol's canvas resolves widgets
 // - see useChamberSettingsPanels above and RemoteModule's `settings` field.
+// NavPanel itself isn't mounted here anymore - App.tsx now mounts one
+// persistent NavPanel outside this route's own tree (see App.tsx's own
+// comment), covering Settings the same as every Chamber route.
 export function SettingsPage() {
   useAppliedTheme();
 
@@ -124,7 +126,6 @@ export function SettingsPage() {
 
   return (
     <div className="chamber-shell">
-      <NavPanel current="settings" currentLabel="Settings" />
       <ChamberHeader icon={<SettingsGearIcon />} title="Settings" showSearch={false} />
       <main className="chamber-main">
         <div className="settings-tabs" role="tablist" aria-label="Settings categories">

@@ -39,7 +39,7 @@ export function Layout() {
 
   return (
     <div className={`chamber-shell${isHome ? " chamber-shell--canvas" : ""}`}>
-      <NavPanel current="deputy" currentLabel="Deputy" />
+      {!shellHosted && <NavPanel current="deputy" currentLabel="Deputy" />}
       <ChamberHeader
         icon={<ChamberMark name="deputy" className="h-8 w-8 text-ink" />}
         title="Deputy"

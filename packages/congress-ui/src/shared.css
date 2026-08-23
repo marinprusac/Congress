@@ -169,14 +169,20 @@
 }
 
 /* NavPanel - persistent cross-Chamber nav plus the one Settings entry
-   point, mounted once inside ChamberLayout (every Chamber gets it for
-   free) and once in Capitol's own App.tsx, and once more by Congress's own
-   unified Settings page. Desktop: an always-visible fixed sidebar on the
-   left. Mobile: off-canvas by default, slid in from the left edge only by
-   swiping right (useNavPanelSwipe) - there's no persistent trigger button,
-   which is also why .nav-panel-mobile-chambers below anchors the Chambers
-   list to the panel's own bottom edge rather than its top, for one-handed
-   thumb reach the instant it opens. */
+   point. Shell-hosted, Congress's own App.tsx mounts exactly one, as a
+   sibling of ChamberHost rather than nested inside it, so it survives a
+   Chamber failing to load instead of unmounting along with that Chamber's
+   own subtree. Standalone (a Chamber's own dev boot, or a direct full-page
+   load through Congress's gateway proxy), there's no Congress shell to
+   supply that one - each Chamber's own Layout (via ChamberLayout, or
+   Capitol/Deputy's own hand-composed Layout) mounts its own instead, gated
+   on useShellHosted() being false so the two never double up. Desktop: an
+   always-visible fixed sidebar on the left. Mobile: off-canvas by default,
+   slid in from the left edge only by swiping right (useNavPanelSwipe) -
+   there's no persistent trigger button, which is also why
+   .nav-panel-mobile-chambers below anchors the Chambers list to the panel's
+   own bottom edge rather than its top, for one-handed thumb reach the
+   instant it opens. */
 .nav-panel-link {
   display: flex;
   align-items: center;
@@ -296,13 +302,18 @@
   }
 
   /* Reserves room for the desktop sidebar on whichever element is each
-     host page's own outermost container. */
+     host page's own outermost container. .chamber-host-unavailable is
+     Congress's own shell chrome (ChamberHost's offline/not-found state),
+     not a Chamber's own content - included here too since NavPanel (now
+     mounted as its sibling, not nested inside it) still reserves the same
+     strip of the viewport while it's on screen. */
   :root {
     --chamber-picker-width: 12rem;
   }
 
   .chamber-shell,
-  .capitol-shell {
+  .capitol-shell,
+  .chamber-host-unavailable {
     padding-left: calc(var(--chamber-picker-width) + env(safe-area-inset-left));
   }
 }
