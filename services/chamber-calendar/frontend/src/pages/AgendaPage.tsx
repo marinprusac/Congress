@@ -61,6 +61,17 @@ function startOfToday(): Date {
   return d;
 }
 
+// An invitation you haven't settled on yet - hasn't been declined (that's
+// filtered out of the agenda entirely server-side, see listCachedEvents) but
+// also not a confirmed "yes", so it renders as a dashed, lighter block: a
+// potential slot on the day rather than a commitment.
+function isUnconfirmed(event: { attendance: { isInvitation: boolean; responseStatus: string | null } }): boolean {
+  return (
+    event.attendance.isInvitation &&
+    (event.attendance.responseStatus === "needsAction" || event.attendance.responseStatus === "tentative")
+  );
+}
+
 export function AgendaPage() {
   const [anchor] = useState(startOfToday);
   const [query, setQuery] = useState("");
@@ -221,17 +232,22 @@ export function AgendaPage() {
                   <div className="w-16 shrink-0" aria-hidden="true" />
                   <div className="relative flex flex-1 flex-wrap gap-2 pb-2">
                     <span className="absolute inset-y-0 left-0 border-l-2 border-accent" aria-hidden="true" />
-                    {entry.events.map((event) => (
-                      <Link
-                        key={event.id}
-                        to={eventHref(event)}
-                        onMouseEnter={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
-                        onFocus={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
-                        className="border-l-2 border-accent bg-accent/[0.08] px-2 py-1 font-mono text-[11px] text-ink hover:bg-accent/[0.16]"
-                      >
-                        {event.title}
-                      </Link>
-                    ))}
+                    {entry.events.map((event) => {
+                      const unconfirmed = isUnconfirmed(event);
+                      return (
+                        <Link
+                          key={event.id}
+                          to={eventHref(event)}
+                          onMouseEnter={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
+                          onFocus={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
+                          className={`border-l-2 px-2 py-1 font-mono text-[11px] hover:bg-accent/[0.16] ${
+                            unconfirmed ? "border-dashed border-accent/50 bg-accent/[0.03] text-ink/70" : "border-accent bg-accent/[0.08] text-ink"
+                          }`}
+                        >
+                          {event.title}
+                        </Link>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -298,6 +314,7 @@ export function AgendaPage() {
               if (entry.blocks.length === 1) {
                 const block = entry.blocks[0]!;
                 const event = block.event;
+                const unconfirmed = isUnconfirmed(event);
                 const nowPercent =
                   block.nowOffsetMinutes !== undefined
                     ? Math.min(100, Math.max(0, (block.nowOffsetMinutes / Math.max(1, block.durationMinutes)) * 100))
@@ -315,10 +332,14 @@ export function AgendaPage() {
                       <div className="text-dust/60">{formatEventEndTime(event)}</div>
                     </div>
                     <div
-                      className="relative min-w-0 flex-1 border-l-2 border-accent bg-accent/[0.06] px-3 py-2 group-hover:bg-accent/[0.12]"
+                      className={`relative min-w-0 flex-1 border-l-2 px-3 py-2 group-hover:bg-accent/[0.12] ${
+                        unconfirmed ? "border-dashed border-accent/50 bg-accent/[0.02]" : "border-accent bg-accent/[0.06]"
+                      }`}
                       style={{ minHeight: clusterHeightPx }}
                     >
-                      <div className="font-display text-base leading-snug text-ink">{event.title}</div>
+                      <div className={`font-display text-base leading-snug ${unconfirmed ? "text-ink/70" : "text-ink"}`}>
+                        {event.title}
+                      </div>
                       <div className="font-mono text-[11px] text-dust">{event.calendarSummary}</div>
                       {nowPercent !== null && (
                         <div

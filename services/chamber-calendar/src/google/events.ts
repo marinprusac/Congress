@@ -22,11 +22,18 @@ import { pushExhibitSync } from "../exhibits.js";
 import { extractOutgoingExhibitRefs } from "@congress/chamber-kit";
 import { listManualRefs, deleteManualRefsForEvent } from "../refs.js";
 import { publishEvent } from "../events.js";
+import { computeGoogleAttendance, resolveAttendance, setLocalNotAttending, deleteLocalAttendance } from "../attendance.js";
 
 interface GoogleEventTime {
   date?: string;
   dateTime?: string;
   timeZone?: string;
+}
+
+interface GoogleAttendee {
+  email?: string;
+  self?: boolean;
+  responseStatus?: string;
 }
 
 interface GoogleEvent {
@@ -41,6 +48,7 @@ interface GoogleEvent {
   end: GoogleEventTime;
   organizer?: { self?: boolean };
   guestsCanModify?: boolean;
+  attendees?: GoogleAttendee[];
 }
 
 export class EventNotEditableError extends Error {
@@ -82,6 +90,7 @@ function normalizeGoogleEvent(
     end: allDay ? raw.end.date! : raw.end.dateTime!,
     htmlLink: raw.htmlLink ?? null,
     editable: isEventEditable(raw),
+    attendance: resolveAttendance(computeGoogleAttendance(raw), toExhibitId(accountId, calendarId, raw.id)),
   };
 }
 
@@ -160,7 +169,11 @@ export async function listEvents(fromISO: string, toISO: string): Promise<ListEv
         )) as { items?: GoogleEvent[] };
         const { summary, colorHex } = calendarMeta(accountId, calendarId);
         for (const raw of body.items ?? []) {
-          events.push(normalizeGoogleEvent(raw, accountId, calendarId, summary, colorHex));
+          // Same "not-attending events don't clutter the agenda" rule as
+          // listCachedEvents - this is only the out-of-cache-window fallback
+          // path, but it should still agree with the cached one.
+          const event = normalizeGoogleEvent(raw, accountId, calendarId, summary, colorHex);
+          if (!event.attendance.notAttending) events.push(event);
         }
       }
     } catch (err) {
@@ -301,6 +314,61 @@ export async function updateEvent(
   return result;
 }
 
+// notAttending:true on an invitation (this account is a listed attendee who
+// didn't organize the event) declines the real Google invite by patching
+// this account's own attendee entry - visible to the organizer/other guests,
+// exactly like clicking "No" in Google Calendar. On any other event (this
+// account organizes it, or isn't a listed attendee at all - there's no
+// Google RSVP to set), it's just a local, private note. false reverses
+// either one. Re-fetches the raw event first (rather than trusting the
+// cache) since patching attendees requires resending the *entire* list -
+// Google replaces it wholesale, it doesn't merge a partial one - and the
+// cache's own attendee data isn't kept around beyond the derived
+// isInvitation/responseStatus fields.
+export async function setEventAttendance(
+  accountId: number,
+  calendarId: string,
+  eventId: string,
+  notAttending: boolean
+): Promise<CalendarEvent> {
+  const account = requireAccount(accountId);
+  const raw = (await googleCalendarFetch(
+    account,
+    `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`
+  )) as GoogleEvent;
+  if (raw.status === "cancelled") throw new GoogleApiError(404, "Event not found");
+
+  const { isInvitation } = computeGoogleAttendance(raw);
+  let result: CalendarEvent;
+  if (!isInvitation) {
+    setLocalNotAttending(toExhibitId(accountId, calendarId, eventId), notAttending);
+    result = upsertCachedEventFromGoogle(raw, accountId, calendarId);
+  } else {
+    const attendees = (raw.attendees ?? []).map((a) =>
+      a.self ? { ...a, responseStatus: notAttending ? "declined" : "accepted" } : a
+    );
+    const updated = (await googleCalendarFetch(
+      account,
+      `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}?sendUpdates=all`,
+      { method: "PATCH", body: JSON.stringify({ attendees }) }
+    )) as GoogleEvent;
+    result = upsertCachedEventFromGoogle(updated, accountId, calendarId);
+  }
+
+  void publishEvent({
+    type: "calendar.event_attendance_changed",
+    payload: {
+      accountId: result.accountId,
+      calendarId: result.calendarId,
+      eventId: result.id,
+      title: result.title,
+      notAttending,
+      url: `/e/${result.accountId}/${encodeURIComponent(result.calendarId)}/${encodeURIComponent(result.id)}`,
+    },
+  });
+  return result;
+}
+
 export async function deleteEvent(accountId: number, calendarId: string, eventId: string): Promise<void> {
   const account = requireAccount(accountId);
   // Fetched first so the deletion sync push carries a real title - Google's
@@ -314,6 +382,7 @@ export async function deleteEvent(accountId: number, calendarId: string, eventId
   const exhibitId = toExhibitId(accountId, calendarId, eventId);
   deleteCachedEvent(exhibitId);
   deleteManualRefsForEvent(exhibitId);
+  deleteLocalAttendance(exhibitId);
   await pushExhibitSync({
     id: exhibitId,
     type: "event",

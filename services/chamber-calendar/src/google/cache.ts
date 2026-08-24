@@ -8,6 +8,8 @@ import { getAccountRow, AccountNeedsReconnectError } from "./accounts.js";
 import { listSelectedCalendarsInternal, calendarMeta, getCalendarSyncToken, setCalendarSyncToken } from "./calendars.js";
 import { toExhibitId } from "./eventId.js";
 import { publishEvent } from "../events.js";
+import { computeGoogleAttendance, resolveAttendance } from "../attendance.js";
+import type { AttendanceStatus } from "../types.js";
 
 // A disposable, rebuildable local mirror of a bounded window of Google
 // Calendar's own event data - Google stays the source of truth (see
@@ -67,6 +69,7 @@ export interface RawGoogleEvent {
   end: GoogleEventTime;
   organizer?: { self?: boolean };
   guestsCanModify?: boolean;
+  attendees?: Array<{ email?: string; self?: boolean; responseStatus?: string }>;
 }
 
 function isEventEditable(raw: RawGoogleEvent): boolean {
@@ -91,6 +94,10 @@ function rowToCalendarEvent(row: CachedEventRow): CalendarEvent {
     end: row.end,
     htmlLink: row.htmlLink,
     editable: row.editable,
+    attendance: resolveAttendance(
+      { isInvitation: row.isInvitation, responseStatus: row.attendeeResponseStatus as AttendanceStatus | null },
+      row.id
+    ),
   };
 }
 
@@ -104,6 +111,7 @@ export function toCacheRow(
 ): typeof cachedEvents.$inferInsert {
   const allDay = Boolean(raw.start.date);
   const { summary, colorHex } = calendarMeta(accountId, calendarId);
+  const attendance = computeGoogleAttendance(raw);
   return {
     id: toExhibitId(accountId, calendarId, raw.id),
     accountId,
@@ -119,6 +127,8 @@ export function toCacheRow(
     end: allDay ? raw.end.date! : raw.end.dateTime!,
     htmlLink: raw.htmlLink ?? null,
     editable: isEventEditable(raw),
+    isInvitation: attendance.isInvitation,
+    attendeeResponseStatus: attendance.responseStatus,
     googleUpdatedAt: raw.updated ?? new Date().toISOString(),
     syncedAt: new Date(),
   };
@@ -129,13 +139,22 @@ export function getCachedEvent(id: string): CalendarEvent | undefined {
   return row ? rowToCalendarEvent(row) : undefined;
 }
 
+// Excludes anything marked not-attending (a real Google decline or a local
+// note - see resolveAttendance) - the agenda is meant to show what you're
+// actually going to, same as Google Calendar's own default view hiding
+// declined events. Still reachable directly (getEvent) or via
+// searchCachedEvents, which stays unfiltered - hiding from the passive
+// agenda view isn't the same as making an event unfindable.
 export function listCachedEvents(fromISO: string, toISO: string): CalendarEvent[] {
   const rows = db
     .select()
     .from(cachedEvents)
     .where(and(gte(cachedEvents.start, fromISO), lte(cachedEvents.start, toISO)))
     .all();
-  return rows.map(rowToCalendarEvent).sort((a, b) => a.start.localeCompare(b.start));
+  return rows
+    .map(rowToCalendarEvent)
+    .filter((event) => !event.attendance.notAttending)
+    .sort((a, b) => a.start.localeCompare(b.start));
 }
 
 // Empty query only looks forward from now (matches the picker's
@@ -166,21 +185,7 @@ export function upsertCachedEventFromGoogle(raw: RawGoogleEvent, accountId: numb
   } else {
     db.insert(cachedEvents).values(row).run();
   }
-  return {
-    id: row.eventId,
-    accountId: row.accountId,
-    calendarId: row.calendarId,
-    calendarSummary: row.calendarSummary,
-    calendarColor: row.calendarColor ?? null,
-    title: row.title,
-    description: row.description ?? null,
-    location: row.location ?? null,
-    allDay: row.allDay,
-    start: row.start,
-    end: row.end,
-    htmlLink: row.htmlLink ?? null,
-    editable: row.editable,
-  };
+  return rowToCalendarEvent(row as CachedEventRow);
 }
 
 export function deleteCachedEvent(id: string): void {

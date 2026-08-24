@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ExhibitAnnotatedText,
   ExhibitActionBar,
@@ -9,9 +9,17 @@ import {
   useShellHosted,
   resolveChamberPath,
 } from "@congress/congress-ui";
-import { fetchEvent } from "@/lib/api";
+import { fetchEvent, setEventAttendance } from "@/lib/api";
 import { formatEventFullRange } from "@/lib/datetime";
 import { toExhibitId } from "@/lib/exhibits";
+import type { AttendanceStatus } from "../../../src/types";
+
+const RESPONSE_STATUS_LABELS: Record<AttendanceStatus, string> = {
+  needsAction: "Awaiting your response",
+  accepted: "You accepted",
+  declined: "You declined",
+  tentative: "You responded maybe",
+};
 
 export function EventViewPage() {
   const { accountId, calendarId, eventId } = useParams<{
@@ -21,11 +29,21 @@ export function EventViewPage() {
   }>();
   const navigate = useNavigate();
   const shellHosted = useShellHosted();
+  const queryClient = useQueryClient();
 
   const { data: event, isLoading, isError } = useQuery({
     queryKey: ["events", accountId, calendarId, eventId],
     queryFn: () => fetchEvent(Number(accountId), calendarId!, eventId!),
     enabled: Boolean(accountId && calendarId && eventId),
+  });
+
+  const attendanceMutation = useMutation({
+    mutationFn: (notAttending: boolean) =>
+      setEventAttendance(Number(accountId), calendarId!, eventId!, { notAttending }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["events", accountId, calendarId, eventId], updated);
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+    },
   });
 
   const exhibitId =
@@ -82,6 +100,27 @@ export function EventViewPage() {
           <div>
             <dt className="mb-1 text-xs uppercase tracking-wide text-dust">Calendar</dt>
             <dd className="text-ink">{event.calendarSummary}</dd>
+          </div>
+          <div>
+            <dt className="mb-1 text-xs uppercase tracking-wide text-dust">
+              {event.attendance.isInvitation ? "Invitation" : "Attendance"}
+            </dt>
+            <dd className="text-ink">
+              {event.attendance.isInvitation
+                ? RESPONSE_STATUS_LABELS[event.attendance.responseStatus ?? "needsAction"]
+                : event.attendance.notAttending
+                  ? "Not attending"
+                  : "Attending"}
+              {" — "}
+              <button
+                type="button"
+                onClick={() => attendanceMutation.mutate(!event.attendance.notAttending)}
+                disabled={attendanceMutation.isPending}
+                className="tap-target text-accent hover:underline disabled:opacity-50"
+              >
+                {event.attendance.notAttending ? "Mark as attending" : "Mark as not attending"}
+              </button>
+            </dd>
           </div>
           {event.description && (
             <div>

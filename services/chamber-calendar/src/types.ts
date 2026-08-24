@@ -40,6 +40,25 @@ export const setCalendarSelectionRequestSchema = z.object({
 });
 export type SetCalendarSelectionRequest = z.infer<typeof setCalendarSelectionRequestSchema>;
 
+export const attendanceStatusSchema = z.enum(["needsAction", "declined", "tentative", "accepted"]);
+export type AttendanceStatus = z.infer<typeof attendanceStatusSchema>;
+
+// Describes this account's own RSVP standing on an event. isInvitation is
+// true only when this account is a listed Google attendee who didn't
+// organize the event - the case Google Calendar itself treats as something
+// to accept/decline. There, responseStatus mirrors Google's own attendee
+// responseStatus and notAttending is just a read of it. For every other
+// event (this account organizes it, or isn't a listed attendee at all -
+// there's no Google invite to respond to), responseStatus is always null and
+// notAttending is a purely local, private note this Chamber stores on its
+// own (see attendance.ts) - Google never learns about it.
+export const eventAttendanceSchema = z.object({
+  isInvitation: z.boolean(),
+  responseStatus: attendanceStatusSchema.nullable(),
+  notAttending: z.boolean(),
+});
+export type EventAttendance = z.infer<typeof eventAttendanceSchema>;
+
 // start/end are ISO datetimes for timed events, or "YYYY-MM-DD" when allDay.
 export const calendarEventSchema = z.object({
   id: z.string(),
@@ -59,6 +78,7 @@ export const calendarEventSchema = z.object({
   // account itself. Such an event can still be removed from the calendar
   // (deleteEvent), just not edited in place.
   editable: z.boolean(),
+  attendance: eventAttendanceSchema,
 });
 export type CalendarEvent = z.infer<typeof calendarEventSchema>;
 
@@ -98,3 +118,10 @@ export const updateEventRequestSchema = z.object({
   timeZone: z.string().min(1).optional(),
 });
 export type UpdateEventRequest = z.infer<typeof updateEventRequestSchema>;
+
+// notAttending:true on an invitation (see eventAttendanceSchema) declines the
+// real Google invite (visible to the organizer/other guests, exactly like
+// clicking "No" in Google Calendar); on any other event it just sets the
+// local-only note. false reverses either one.
+export const setEventAttendanceRequestSchema = z.object({ notAttending: z.boolean() });
+export type SetEventAttendanceRequest = z.infer<typeof setEventAttendanceRequestSchema>;

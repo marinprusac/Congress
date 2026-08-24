@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult as textResult } from "@congress/chamber-kit";
 import { listAccounts } from "../google/accounts.js";
-import { listEvents, searchEvents, createEvent, updateEvent, deleteEvent } from "../google/events.js";
+import { listEvents, searchEvents, createEvent, updateEvent, deleteEvent, setEventAttendance } from "../google/events.js";
 
 export function registerTools(server: McpServer) {
   server.registerTool(
@@ -19,7 +19,8 @@ export function registerTools(server: McpServer) {
     "list_events",
     {
       title: "List Events",
-      description: "List events across all selected calendars in a date range (ISO 8601 datetimes).",
+      description:
+        "List events across all selected calendars in a date range (ISO 8601 datetimes). Excludes events marked not-attending (a real Google decline, or a local not-attending note) - use search_events to find those.",
       inputSchema: { from: z.string(), to: z.string() },
     },
     async ({ from, to }) => textResult(await listEvents(from, to))
@@ -30,7 +31,7 @@ export function registerTools(server: McpServer) {
     {
       title: "Search Events",
       description:
-        "Search events by title/description/location across all selected calendars, within a rolling ~6-month window centered on now.",
+        "Search events by title/description/location across all selected calendars, within a rolling ~6-month window centered on now. Unlike list_events, this includes events marked not-attending.",
       inputSchema: { query: z.string().min(1), limit: z.number().int().positive().max(50).default(20) },
     },
     async ({ query, limit }) => textResult(await searchEvents(query, limit))
@@ -76,6 +77,23 @@ export function registerTools(server: McpServer) {
     },
     async ({ accountId, calendarId, eventId, ...input }) =>
       textResult(await updateEvent(accountId, calendarId, eventId, input))
+  );
+
+  server.registerTool(
+    "set_event_attendance",
+    {
+      title: "Set Event Attendance",
+      description:
+        "Mark an event as attending or not attending. If it's an invitation (this account is a listed attendee who didn't organize it), this declines/accepts the real Google invite - visible to the organizer and other guests. Otherwise it's just a private local note.",
+      inputSchema: {
+        accountId: z.number().int(),
+        calendarId: z.string().min(1),
+        eventId: z.string().min(1),
+        notAttending: z.boolean(),
+      },
+    },
+    async ({ accountId, calendarId, eventId, notAttending }) =>
+      textResult(await setEventAttendance(accountId, calendarId, eventId, notAttending))
   );
 
   server.registerTool(

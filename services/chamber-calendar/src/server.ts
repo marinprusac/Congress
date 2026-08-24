@@ -5,6 +5,7 @@ import {
   setCalendarSelectionRequestSchema,
   createEventRequestSchema,
   updateEventRequestSchema,
+  setEventAttendanceRequestSchema,
 } from "./types.js";
 import {
   mountManifestAndHealth,
@@ -29,6 +30,7 @@ import {
   createEvent,
   updateEvent,
   deleteEvent,
+  setEventAttendance,
   resyncEventExhibit,
   EventNotEditableError,
 } from "./google/events.js";
@@ -174,6 +176,21 @@ app.patch("/api/events/:accountId/:calendarId/:eventId", async (c) => {
   if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   try {
     return c.json(await updateEvent(accountId, calendarId, eventId, parsed.data));
+  } catch (err) {
+    return mapError(c, err);
+  }
+});
+
+app.put("/api/events/:accountId/:calendarId/:eventId/attendance", async (c) => {
+  const accountId = Number(c.req.param("accountId"));
+  const calendarId = decodeURIComponent(c.req.param("calendarId"));
+  const eventId = decodeURIComponent(c.req.param("eventId"));
+  if (!Number.isInteger(accountId)) return c.json({ error: "invalid_account_id" }, 400);
+  const body = await c.req.json().catch(() => null);
+  const parsed = setEventAttendanceRequestSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  try {
+    return c.json(await setEventAttendance(accountId, calendarId, eventId, parsed.data.notAttending));
   } catch (err) {
     return mapError(c, err);
   }

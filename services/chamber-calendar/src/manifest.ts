@@ -24,6 +24,12 @@ export const calendarManifest: Manifest = {
     { type: "calendar.event_created", label: "Event created", description: "A new event was created on a connected calendar." },
     { type: "calendar.event_updated", label: "Event updated", description: "An event on a connected calendar changed." },
     { type: "calendar.event_deleted", label: "Event deleted", description: "An event on a connected calendar was deleted." },
+    {
+      type: "calendar.event_attendance_changed",
+      label: "Attendance changed",
+      description:
+        "This account's attendance on an event changed - a real Google accept/decline on an invitation, or a local not-attending note on any other event.",
+    },
     { type: "calendar.account_connected", label: "Account connected", description: "A new Google account was connected." },
     { type: "calendar.account_disconnected", label: "Account disconnected", description: "A Google account was disconnected." },
   ],

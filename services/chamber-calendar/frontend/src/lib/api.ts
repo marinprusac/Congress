@@ -7,6 +7,7 @@ import type {
   ListEventsResponse,
   CreateEventRequest,
   UpdateEventRequest,
+  SetEventAttendanceRequest,
 } from "../../../src/types";
 import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
@@ -90,6 +91,22 @@ export function updateEvent(
     `${API_BASE}/events/${accountId}/${encodeURIComponent(calendarId)}/${encodeURIComponent(eventId)}`,
     {
       method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }
+  ).then((res) => json(res));
+}
+
+export function setEventAttendance(
+  accountId: number,
+  calendarId: string,
+  eventId: string,
+  input: SetEventAttendanceRequest
+): Promise<CalendarEvent> {
+  return fetch(
+    `${API_BASE}/events/${accountId}/${encodeURIComponent(calendarId)}/${encodeURIComponent(eventId)}/attendance`,
+    {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }
