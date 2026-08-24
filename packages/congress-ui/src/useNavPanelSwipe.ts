@@ -203,7 +203,16 @@ export function useNavPanelSwipe(): {
     }
 
     function onTouchEnd() {
-      if (trackingRef.current) {
+      // trackingRef is true for every touchstart, including a plain tap that
+      // never moved - only a touch that actually committed to a drag (real
+      // movement past ANYWHERE_COMMIT_PX, or the immediate-commit close/edge-
+      // open cases) should resolve `open` here. Without this check, a tap
+      // that never committed still fell through to this branch and resolved
+      // `open` from offsetRef.current - which isn't reset between gestures,
+      // so it silently reused whatever offset the *last* committed drag left
+      // behind (e.g. a full-width offset from closing the panel), reopening
+      // it on the next unrelated tap anywhere on screen.
+      if (trackingRef.current && committedRef.current) {
         const width = panelWidthRef.current;
         setOpen(width > 0 && offsetRef.current / width > SNAP_OPEN_RATIO);
       }
