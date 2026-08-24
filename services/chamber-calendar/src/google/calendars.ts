@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import type { GoogleCalendarListItem, SelectedCalendar } from "../types.js";
 import { db } from "../db/client.js";
-import { googleAccounts, selectedCalendars } from "../db/schema.js";
+import { googleAccounts, selectedCalendars, cachedEvents } from "../db/schema.js";
 import { googleCalendarFetch } from "./client.js";
 import { getAccountRow } from "./accounts.js";
 
@@ -106,6 +106,18 @@ export function setCalendarSelection(
       .set({ summary, colorHex: colorHex ?? null, selected })
       .where(eq(selectedCalendars.id, existing.id))
       .run();
+    // Deselecting stops syncOneCalendar from ever visiting this
+    // (accountId, calendarId) pair again, so its cached rows would
+    // otherwise sit stale forever instead of aging out of the sync
+    // window like a still-selected calendar's do - purge them now
+    // rather than leaving orphaned events behind (e.g. duplicates from a
+    // calendar subscribed to under two different accounts, one of which
+    // gets deselected).
+    if (!selected) {
+      db.delete(cachedEvents)
+        .where(and(eq(cachedEvents.accountId, accountId), eq(cachedEvents.calendarId, googleCalendarId)))
+        .run();
+    }
     return;
   }
 
