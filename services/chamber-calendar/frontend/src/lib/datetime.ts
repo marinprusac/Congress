@@ -94,6 +94,12 @@ export interface AgendaGapEntry {
   kind: "gap";
   key: string;
   minutes: number;
+  // True when this gap is entirely behind "now" (including the one gap that
+  // runs right up to it, between the last past event and the current time) -
+  // a duration label on idle time that's already over reads as clutter, not
+  // information, so the gap still renders its true proportional blank space
+  // but without the "45 min" caption a future gap gets.
+  past: boolean;
 }
 
 // Idle time *between two days* at or above CUT_THRESHOLD_MINUTES -
@@ -361,7 +367,7 @@ export function buildAgendaTimeline(events: CalendarEvent[], now: AgendaNowConte
     if (allowCut && minutes >= CUT_THRESHOLD_MINUTES) {
       timeline.push({ kind: "cut", key: `cut-${keyBase}`, minutes });
     } else {
-      timeline.push({ kind: "gap", key: `gap-${keyBase}`, minutes });
+      timeline.push({ kind: "gap", key: `gap-${keyBase}`, minutes, past: nowMs !== null && endMs <= nowMs });
     }
   }
 

@@ -258,7 +258,7 @@ export function AgendaPage() {
                   <div className="w-16 shrink-0" aria-hidden="true" />
                   <div className="relative flex-1">
                     <span className="absolute inset-y-0 left-0 border-l-2 border-dust/30" aria-hidden="true" />
-                    {entry.minutes >= GAP_LABEL_THRESHOLD_MINUTES && (
+                    {!entry.past && entry.minutes >= GAP_LABEL_THRESHOLD_MINUTES && (
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-dust/50">
                         {formatGapDuration(entry.minutes)}
                       </span>

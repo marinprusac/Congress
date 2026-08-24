@@ -21,6 +21,16 @@ const RESPONSE_STATUS_LABELS: Record<AttendanceStatus, string> = {
   tentative: "You responded maybe",
 };
 
+// An invitation you haven't settled on yet - offer Accept/Decline as two
+// direct choices instead of the single toggle used once you've responded,
+// which would otherwise default to declining before you could accept.
+function isUnconfirmedInvitation(attendance: { isInvitation: boolean; responseStatus: AttendanceStatus | null }): boolean {
+  return (
+    attendance.isInvitation &&
+    (attendance.responseStatus === "needsAction" || attendance.responseStatus === "tentative")
+  );
+}
+
 export function EventViewPage() {
   const { accountId, calendarId, eventId } = useParams<{
     accountId: string;
@@ -111,15 +121,38 @@ export function EventViewPage() {
                 : event.attendance.notAttending
                   ? "Not attending"
                   : "Attending"}
-              {" — "}
-              <button
-                type="button"
-                onClick={() => attendanceMutation.mutate(!event.attendance.notAttending)}
-                disabled={attendanceMutation.isPending}
-                className="tap-target text-accent hover:underline disabled:opacity-50"
-              >
-                {event.attendance.notAttending ? "Mark as attending" : "Mark as not attending"}
-              </button>
+              {isUnconfirmedInvitation(event.attendance) ? (
+                <div className="mt-2 flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => attendanceMutation.mutate(false)}
+                    disabled={attendanceMutation.isPending}
+                    className="tap-target text-accent hover:underline disabled:opacity-50"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => attendanceMutation.mutate(true)}
+                    disabled={attendanceMutation.isPending}
+                    className="tap-target text-alert hover:underline disabled:opacity-50"
+                  >
+                    Decline
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {" — "}
+                  <button
+                    type="button"
+                    onClick={() => attendanceMutation.mutate(!event.attendance.notAttending)}
+                    disabled={attendanceMutation.isPending}
+                    className="tap-target text-accent hover:underline disabled:opacity-50"
+                  >
+                    {event.attendance.notAttending ? "Mark as attending" : "Mark as not attending"}
+                  </button>
+                </>
+              )}
             </dd>
           </div>
           {event.description && (

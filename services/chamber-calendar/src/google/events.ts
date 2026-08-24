@@ -198,20 +198,35 @@ export async function searchEvents(query: string, limit = 20): Promise<ListEvent
 }
 
 export async function getEvent(accountId: number, calendarId: string, eventId: string): Promise<CalendarEvent> {
-  const cached = getCachedEvent(toExhibitId(accountId, calendarId, eventId));
-  if (cached) return cached;
+  const exhibitId = toExhibitId(accountId, calendarId, eventId);
 
-  // Cache miss - an event outside the cache window, or one the sync hasn't
-  // picked up yet. Live-fetch and opportunistically write it into the cache
-  // (read-through), same "missing rows fall back to a live call" tolerance
-  // exhibit_cache already documents.
-  const account = requireAccount(accountId);
-  const raw = (await googleCalendarFetch(
-    account,
-    `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`
-  )) as GoogleEvent;
-  if (raw.status === "cancelled") throw new GoogleApiError(404, "Event not found");
-  return upsertCachedEventFromGoogle(raw, accountId, calendarId);
+  // Always try live first rather than only on a cache miss - a single-event
+  // view is low-volume enough to afford the round-trip, and it's exactly the
+  // moment staleness matters most: an RSVP answered directly in the Google
+  // Calendar app (not through this Chamber's own Accept/Decline) only
+  // reaches the cache on the next 5-minute poll otherwise, so this page
+  // could keep showing a since-answered invitation as still pending.
+  try {
+    const account = requireAccount(accountId);
+    const raw = (await googleCalendarFetch(
+      account,
+      `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`
+    )) as GoogleEvent;
+    if (raw.status === "cancelled") {
+      deleteCachedEvent(exhibitId);
+      throw new GoogleApiError(404, "Event not found");
+    }
+    return upsertCachedEventFromGoogle(raw, accountId, calendarId);
+  } catch (err) {
+    // A confirmed 404/cancelled is real - propagate it rather than serving a
+    // stale cached copy of an event that no longer exists. Anything else
+    // (account needs reconnect, a transient Google error) falls back to
+    // whatever's cached, the same tolerance the old cache-miss-only path had.
+    if (err instanceof GoogleApiError && err.status === 404) throw err;
+    const cached = getCachedEvent(exhibitId);
+    if (cached) return cached;
+    throw err;
+  }
 }
 
 // The set of Exhibits this event points at is the union of what's embedded
