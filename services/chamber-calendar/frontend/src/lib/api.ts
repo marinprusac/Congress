@@ -61,6 +61,11 @@ export function fetchEvents(fromISO: string, toISO: string): Promise<ListEventsR
   return fetch(`${API_BASE}/events?${params.toString()}`).then((res) => json(res));
 }
 
+export function searchEvents(query: string): Promise<ListEventsResponse> {
+  const params = new URLSearchParams({ q: query });
+  return fetch(`${API_BASE}/events/search?${params.toString()}`).then((res) => json(res));
+}
+
 export function fetchEvent(accountId: number, calendarId: string, eventId: string): Promise<CalendarEvent> {
   return fetch(
     `${API_BASE}/events/${accountId}/${encodeURIComponent(calendarId)}/${encodeURIComponent(eventId)}`

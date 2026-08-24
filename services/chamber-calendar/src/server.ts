@@ -24,6 +24,7 @@ import {
 import { listGoogleCalendars, listSelectedCalendarsForUI, setCalendarSelection } from "./google/calendars.js";
 import {
   listEvents,
+  searchEvents,
   getEvent,
   createEvent,
   updateEvent,
@@ -132,6 +133,12 @@ app.get("/api/events", async (c) => {
   const to = c.req.query("to");
   if (!from || !to) return c.json({ error: "missing_range" }, 400);
   return c.json(await listEvents(from, to));
+});
+
+app.get("/api/events/search", async (c) => {
+  const query = c.req.query("q") ?? "";
+  if (!query.trim()) return c.json({ events: [], accountErrors: [] });
+  return c.json(await searchEvents(query));
 });
 
 app.get("/api/events/:accountId/:calendarId/:eventId", async (c) => {
