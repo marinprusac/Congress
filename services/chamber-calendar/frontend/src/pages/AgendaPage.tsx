@@ -141,8 +141,6 @@ export function AgendaPage() {
         newHref={resolveChamberPath("/new", "calendar", shellHosted)}
       />
 
-      <h2 className="mb-6 font-display text-3xl text-ink">Agenda</h2>
-
       {!isSearching &&
         data?.accountErrors.map((err) => (
           <div key={err.accountId} className="mb-4 border border-alert px-3 py-2 font-mono text-sm text-alert">

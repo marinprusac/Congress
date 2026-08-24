@@ -234,6 +234,7 @@ export function NavPanel({ current, currentLabel }: NavPanelProps) {
       <div
         className="nav-panel-backdrop"
         data-open={open}
+        data-pull-gesture-ignore
         onClick={close}
         aria-hidden={!open}
         style={dragProgress !== null ? { opacity: dragProgress, transition: "none" } : undefined}
@@ -244,6 +245,7 @@ export function NavPanel({ current, currentLabel }: NavPanelProps) {
         aria-label="Navigation"
         data-open={open}
         data-dragging={dragging}
+        data-pull-gesture-ignore
         ref={panelRef}
         style={dragOffsetPx !== null ? { transform: `translateX(${dragOffsetPx}px)`, transition: "none" } : undefined}
       >
