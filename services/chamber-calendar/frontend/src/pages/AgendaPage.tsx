@@ -367,26 +367,23 @@ export function AgendaPage() {
                     {formatClockTime(Math.min(...entry.blocks.map((b) => new Date(b.event.start).getTime())))}
                   </div>
                   <div className="relative min-w-0 flex-1" style={{ height: containerHeightPx }}>
+                    {/* Paint layer: the full-width, alpha-blended bars described
+                        above. Purely visual (pointer-events-none) - when two
+                        blocks perfectly overlap, the higher-column bar would
+                        otherwise sit on top at full width and swallow every
+                        click meant for the one underneath it. */}
                     {blockLayouts.map(({ block, top, height }) => {
                       const event = block.event;
-                      // Percentage of the bar's own width, not a small fixed
-                      // px step - matches where this block's column would
-                      // have started under the old side-by-side column
-                      // layout, so overlapping titles land in genuinely
-                      // separate horizontal space instead of nearly on top
-                      // of each other.
                       const textIndent = `calc(${(block.column / block.columnCount) * 100}% + 8px)`;
                       const nowPercent =
                         block.nowOffsetMinutes !== undefined
                           ? Math.min(100, Math.max(0, (block.nowOffsetMinutes / Math.max(1, block.durationMinutes)) * 100))
                           : null;
                       return (
-                        <Link
+                        <div
                           key={event.id}
-                          to={eventHref(event)}
-                          onMouseEnter={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
-                          onFocus={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
-                          className="absolute inset-x-0 overflow-hidden border-l-2 border-accent bg-accent/[0.08] py-1 hover:bg-accent/[0.14]"
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-x-0 overflow-hidden border-l-2 border-accent bg-accent/[0.08] py-1"
                           style={{ top, height, zIndex: block.column + 1 }}
                         >
                           <div
@@ -410,7 +407,28 @@ export function AgendaPage() {
                               aria-hidden="true"
                             />
                           )}
-                        </Link>
+                        </div>
+                      );
+                    })}
+                    {/* Hit layer: one exclusive click/tap/focus slice per
+                        column, always above the paint layer, so every
+                        overlapping event - including two with identical
+                        start/end - stays independently clickable regardless
+                        of paint stacking order. */}
+                    {blockLayouts.map(({ block, top, height }) => {
+                      const event = block.event;
+                      const leftPercent = (block.column / block.columnCount) * 100;
+                      const widthPercent = 100 / block.columnCount;
+                      return (
+                        <Link
+                          key={`${event.id}-hit`}
+                          to={eventHref(event)}
+                          onMouseEnter={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
+                          onFocus={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
+                          aria-label={`${event.title}, ${formatEventStartTime(event)}–${formatEventEndTime(event)}`}
+                          className="absolute rounded-sm hover:bg-accent/20 focus-visible:bg-accent/20"
+                          style={{ top, height, left: `${leftPercent}%`, width: `${widthPercent}%`, zIndex: 100 + block.column }}
+                        />
                       );
                     })}
                   </div>
