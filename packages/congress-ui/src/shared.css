@@ -944,7 +944,10 @@
   top: calc(0.75rem + env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
-  z-index: 50;
+  /* Below .nav-panel-mobile/.nav-panel-backdrop (z-index 40/39) - the
+     off-canvas nav panel is modal-ish once open and must stack above this,
+     not the other way around. */
+  z-index: 35;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -967,7 +970,9 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 50;
+  /* Same reasoning as .mobile-pull-indicator above - stay below the
+     off-canvas nav panel rather than painting over it. */
+  z-index: 35;
   display: flex;
   align-items: center;
   gap: 0.5rem;
