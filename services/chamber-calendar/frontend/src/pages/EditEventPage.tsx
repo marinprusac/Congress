@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useShellHosted, resolveChamberPath, PageHeader } from "@congress/congress-ui";
+import { useShellHosted, resolveChamberPath, PageHeader, ExhibitLinksLayout, navigateToExhibit, getChamberIcon } from "@congress/congress-ui";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { fetchEvent, updateEvent, deleteEvent } from "@/lib/api";
 import { getBrowserTimeZone, toDatetimeLocalInput } from "@/lib/datetime";
+import { toExhibitId } from "@/lib/exhibits";
 import type { CalendarEvent } from "../../../src/types";
 
 function toFormValues(event: CalendarEvent): EventFormValues {
@@ -77,24 +78,31 @@ export function EditEventPage() {
   return (
     <section>
       <PageHeader title="Edit Event" />
-      <EventForm
-        values={values}
-        onChange={setValues}
-        calendarLocked
-        readOnly={data ? !data.editable : false}
-        onSubmit={() => updateMutation.mutate()}
-        submitting={updateMutation.isPending}
-        submitLabel="Save Changes"
-        onDelete={() => deleteMutation.mutate()}
-        deleting={deleteMutation.isPending}
-        error={
-          updateMutation.error instanceof Error
-            ? updateMutation.error.message
-            : deleteMutation.error instanceof Error
-              ? deleteMutation.error.message
-              : null
-        }
-      />
+      <ExhibitLinksLayout
+        exhibitId={toExhibitId(Number(accountId), calendarId!, eventId!)}
+        renderIcon={(chamber) => getChamberIcon(chamber)}
+        onNavigate={(r) => navigateToExhibit("calendar", r, navigate, shellHosted)}
+        editable
+      >
+        <EventForm
+          values={values}
+          onChange={setValues}
+          calendarLocked
+          readOnly={data ? !data.editable : false}
+          onSubmit={() => updateMutation.mutate()}
+          submitting={updateMutation.isPending}
+          submitLabel="Save Changes"
+          onDelete={() => deleteMutation.mutate()}
+          deleting={deleteMutation.isPending}
+          error={
+            updateMutation.error instanceof Error
+              ? updateMutation.error.message
+              : deleteMutation.error instanceof Error
+                ? deleteMutation.error.message
+                : null
+          }
+        />
+      </ExhibitLinksLayout>
     </section>
   );
 }

@@ -8,10 +8,13 @@ async function fetchExhibitConnections(exhibitId: string): Promise<ExhibitRefEnt
   return data.connections;
 }
 
-export function useExhibitConnections(exhibitId: string): ExhibitRefEntry[] {
+// `exhibitId: null` means "not created yet" (a draft in ExhibitLinksLayout) -
+// skips the fetch entirely rather than querying a nonexistent id.
+export function useExhibitConnections(exhibitId: string | null): ExhibitRefEntry[] {
   const query = useQuery({
     queryKey: ["exhibit-connections", exhibitId],
-    queryFn: () => fetchExhibitConnections(exhibitId),
+    queryFn: () => fetchExhibitConnections(exhibitId as string),
+    enabled: exhibitId !== null,
   });
   return query.data ?? [];
 }

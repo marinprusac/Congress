@@ -3,18 +3,31 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ExhibitTextarea,
+  ExhibitActionBar,
+  ExhibitLinksLayout,
+  navigateToExhibit,
   getChamberIcon,
   useShellHosted,
   resolveChamberPath,
-  PageHeader,
-  FormLabel,
-  FormTextInput,
+  flushDraftConnections,
   FormErrorMessage,
-  FormSubmitButton,
 } from "@congress/congress-ui";
+import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createPlace, quickCreatePlaceExhibit } from "@/lib/api";
 import { PlacePicker } from "@/components/PlacePicker";
 
+const inputClass =
+  "w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
+
+function fieldLabel(children: React.ReactNode) {
+  return <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">{children}</label>;
+}
+
+// Mirrors PlaceViewPage's editing state exactly (name input, category/
+// radius/picker fields, ExhibitTextarea, ExhibitLinksLayout with a live
+// Connections panel) rather than a plain form. Connections picked here are
+// staged (ExhibitLinksLayout's `exhibitId={null}` mode) and only actually
+// written once the create mutation below hands them a real id to attach to.
 export function NewPlacePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -25,6 +38,7 @@ export function NewPlacePage() {
   const [category, setCategory] = useState("place");
   const [radiusMeters, setRadiusMeters] = useState(100);
   const [coords, setCoords] = useState({ latitude: 0, longitude: 0 });
+  const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
 
   // Best-effort prefill so the picker doesn't open centered on the ocean -
   // the owner can still drag/click to adjust either way.
@@ -38,7 +52,11 @@ export function NewPlacePage() {
   }, []);
 
   const mutation = useMutation({
-    mutationFn: () => createPlace({ name, body, category, radiusMeters, ...coords }),
+    mutationFn: async () => {
+      const created = await createPlace({ name, body, category, radiusMeters, ...coords });
+      await flushDraftConnections(`place-${created.id}`, draftConnections);
+      return created;
+    },
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["places"] });
       navigate(resolveChamberPath(`/p/${created.id}`, "map", shellHosted));
@@ -52,46 +70,83 @@ export function NewPlacePage() {
   }
 
   return (
-    <section>
-      <PageHeader title="New Place" />
+    <article>
+      <div className="mb-6 border-b border-dust pb-4">
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Name"
+          className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+        />
+      </div>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (name.trim()) mutation.mutate();
-        }}
-      >
-        <FormLabel>Name</FormLabel>
-        <FormTextInput autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+      {mutation.isError && <FormErrorMessage>{(mutation.error as Error).message}</FormErrorMessage>}
 
-        <FormLabel>Category</FormLabel>
-        <FormTextInput value={category} onChange={(e) => setCategory(e.target.value)} placeholder="home, work, gym, ignored, ..." />
-
-        <FormLabel>Geofence radius (meters)</FormLabel>
-        <FormTextInput type="number" min={10} value={radiusMeters} onChange={(e) => setRadiusMeters(Number(e.target.value))} />
-
-        <FormLabel>Location (click or drag the pin to adjust)</FormLabel>
-        <div className="mb-4">
-          <PlacePicker latitude={coords.latitude} longitude={coords.longitude} radiusMeters={radiusMeters} onChange={setCoords} />
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          {fieldLabel("Category")}
+          <input
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="home, work, gym, ignored, ..."
+            className={inputClass}
+          />
         </div>
 
-        <FormLabel>Notes (optional, [[ to reference an Exhibit)</FormLabel>
+        <div>
+          {fieldLabel("Geofence radius (meters)")}
+          <input
+            type="number"
+            min={10}
+            value={radiusMeters}
+            onChange={(e) => setRadiusMeters(Number(e.target.value))}
+            className={inputClass}
+          />
+        </div>
+
+        <div className="sm:col-span-2">
+          {fieldLabel("Location (click or drag the pin to adjust)")}
+          <PlacePicker latitude={coords.latitude} longitude={coords.longitude} radiusMeters={radiusMeters} onChange={setCoords} />
+        </div>
+      </div>
+
+      <ExhibitLinksLayout
+        exhibitId={null}
+        renderIcon={(chamber) => getChamberIcon(chamber)}
+        onNavigate={(r) => navigateToExhibit("map", r, navigate, shellHosted)}
+        editable
+        onCreateReference={onCreateExhibit}
+        draftConnections={draftConnections}
+        onDraftConnectionsChange={setDraftConnections}
+        actions={
+          <ExhibitActionBar>
+            <button
+              onClick={() => name.trim() && mutation.mutate()}
+              disabled={!name.trim() || mutation.isPending}
+              className="tap-target text-accent hover:underline disabled:opacity-50"
+            >
+              {mutation.isPending ? "Creating —" : "Create"}
+            </button>
+            <button
+              onClick={() => navigate(resolveChamberPath("/places", "map", shellHosted))}
+              className="tap-target text-slate hover:underline"
+            >
+              Cancel
+            </button>
+          </ExhibitActionBar>
+        }
+      >
         <ExhibitTextarea
           value={body}
           onChange={setBody}
           rows={8}
-          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-          wrapperClassName="exhibit-field mb-4"
+          placeholder="Notes (optional), [[ to reference an Exhibit"
+          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onCreate={onCreateExhibit}
         />
-
-        {mutation.isError && <FormErrorMessage>{(mutation.error as Error).message}</FormErrorMessage>}
-
-        <FormSubmitButton disabled={!name.trim() || mutation.isPending}>
-          {mutation.isPending ? "Creating —" : "Create Place"}
-        </FormSubmitButton>
-      </form>
-    </section>
+      </ExhibitLinksLayout>
+    </article>
   );
 }

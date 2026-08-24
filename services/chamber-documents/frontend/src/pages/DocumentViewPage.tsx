@@ -119,8 +119,42 @@ export function DocumentViewPage() {
         </div>
       </dl>
 
-      {editing ? (
-        <>
+      <ExhibitLinksLayout
+        exhibitId={`document-${doc.id}`}
+        renderIcon={(chamber) => getChamberIcon(chamber)}
+        onNavigate={(r) => navigateToExhibit("documents", r, navigate, shellHosted)}
+        editable
+        actions={
+          <ExhibitActionBar>
+            {editing ? (
+              <>
+                <button
+                  onClick={() => updateMutation.mutate({ title: draftTitle, description: draftDescription })}
+                  className="tap-target text-accent hover:underline"
+                >
+                  Save
+                </button>
+                <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
+                  Edit
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(true)}
+                  className="tap-target text-alert hover:underline"
+                >
+                  Delete
+                </button>
+              </>
+            )}
+          </ExhibitActionBar>
+        }
+      >
+        {editing ? (
           <ExhibitTextarea
             value={draftDescription}
             onChange={setDraftDescription}
@@ -128,50 +162,17 @@ export function DocumentViewPage() {
             className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
             renderIcon={(chamber) => getChamberIcon(chamber)}
           />
-          <ExhibitActionBar>
-            <button
-              onClick={() => updateMutation.mutate({ title: draftTitle, description: draftDescription })}
-              className="tap-target text-accent hover:underline"
-            >
-              Save
-            </button>
-            <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
-              Cancel
-            </button>
-          </ExhibitActionBar>
-        </>
-      ) : (
-        <ExhibitLinksLayout
-          exhibitId={`document-${doc.id}`}
-          renderIcon={(chamber) => getChamberIcon(chamber)}
-          onNavigate={(r) => navigateToExhibit("documents", r, navigate, shellHosted)}
-          editable
-          actions={
-            <ExhibitActionBar>
-              <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
-                Edit
-              </button>
-              <button
-                onClick={() => setConfirmingDelete(true)}
-                className="tap-target text-alert hover:underline"
-              >
-                Delete
-              </button>
-            </ExhibitActionBar>
-          }
-        >
-          {doc.description ? (
-            <ExhibitAnnotatedText
-              text={doc.description}
-              renderIcon={(chamber) => getChamberIcon(chamber)}
-              onNavigate={(r) => navigateToExhibit("documents", r, navigate, shellHosted)}
-              className="whitespace-pre-wrap font-mono text-sm text-ink"
-            />
-          ) : (
-            <p className="font-mono text-sm text-dust">— No description —</p>
-          )}
-        </ExhibitLinksLayout>
-      )}
+        ) : doc.description ? (
+          <ExhibitAnnotatedText
+            text={doc.description}
+            renderIcon={(chamber) => getChamberIcon(chamber)}
+            onNavigate={(r) => navigateToExhibit("documents", r, navigate, shellHosted)}
+            className="whitespace-pre-wrap font-mono text-sm text-ink"
+          />
+        ) : (
+          <p className="font-mono text-sm text-dust">— No description —</p>
+        )}
+      </ExhibitLinksLayout>
       <ConfirmSheet
         open={confirmingDelete}
         title="Delete document"

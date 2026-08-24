@@ -1,4 +1,4 @@
-import type { ManualRefsResponse } from "@congress/shared-types";
+import type { CapitolExhibitSearchResult, ManualRefsResponse } from "@congress/shared-types";
 
 // Always routed through Capitol's proxy (POST/DELETE
 // "/congress/exhibits/:id/connections" in services/congress/src/server.ts),
@@ -45,4 +45,18 @@ export function removeExhibitConnection(exhibitId: string, otherExhibitId: strin
   return requestConnectionChange(exhibitId, `/connections/${encodeURIComponent(otherExhibitId)}`, {
     method: "DELETE",
   });
+}
+
+// Applies connections staged client-side (via ExhibitLinksLayout's draft
+// mode, `exhibitId={null}`) against the real id a "New X" page's own create
+// mutation just received - the create/edit UI looks identical from the
+// first render, but nothing is actually written to the exhibit_refs graph
+// until the exhibit itself exists to attach them to. Sequential, not
+// Promise.all: a partial failure part-way through should still leave the
+// connections made so far intact rather than racing duplicate/partial
+// writes against each other.
+export async function flushDraftConnections(exhibitId: string, staged: CapitolExhibitSearchResult[]): Promise<void> {
+  for (const result of staged) {
+    await addExhibitConnection(exhibitId, result.id, result.chamber);
+  }
 }

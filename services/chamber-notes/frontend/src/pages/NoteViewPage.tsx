@@ -234,8 +234,48 @@ export function NoteViewPage() {
         </dl>
       )}
 
-      {editing ? (
-        <>
+      <ExhibitLinksLayout
+        exhibitId={`note-${noteId}`}
+        renderIcon={(chamber) => getChamberIcon(chamber)}
+        onNavigate={(r) => navigateToExhibit("notes", r, navigate, shellHosted)}
+        editable
+        onCreateReference={onCreateExhibit}
+        actions={
+          <ExhibitActionBar>
+            {editing ? (
+              <>
+                {!settingsQuery.data?.autoSave && (
+                  <button onClick={saveExplicit} className="tap-target text-accent hover:underline">
+                    Save
+                  </button>
+                )}
+                <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
+                  {settingsQuery.data?.autoSave ? "Close" : "Cancel"}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => pinMutation.mutate(!note.pinned)}
+                  className="tap-target text-accent hover:underline"
+                >
+                  {note.pinned ? "Unpin" : "Pin"}
+                </button>
+                <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
+                  Edit
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(true)}
+                  className="tap-target text-alert hover:underline"
+                >
+                  Delete
+                </button>
+              </>
+            )}
+          </ExhibitActionBar>
+        }
+      >
+        {editing ? (
           <ExhibitTextarea
             ref={contentFieldRef}
             value={draftContent}
@@ -245,51 +285,14 @@ export function NoteViewPage() {
             renderIcon={(chamber) => getChamberIcon(chamber)}
             onCreate={onCreateExhibit}
           />
-          <ExhibitActionBar>
-            {!settingsQuery.data?.autoSave && (
-              <button onClick={saveExplicit} className="tap-target text-accent hover:underline">
-                Save
-              </button>
-            )}
-            <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
-              {settingsQuery.data?.autoSave ? "Close" : "Cancel"}
-            </button>
-          </ExhibitActionBar>
-        </>
-      ) : (
-        <ExhibitLinksLayout
-          exhibitId={`note-${noteId}`}
-          renderIcon={(chamber) => getChamberIcon(chamber)}
-          onNavigate={(r) => navigateToExhibit("notes", r, navigate, shellHosted)}
-          editable
-          onCreateReference={onCreateExhibit}
-          actions={
-            <ExhibitActionBar>
-              <button
-                onClick={() => pinMutation.mutate(!note.pinned)}
-                className="tap-target text-accent hover:underline"
-              >
-                {note.pinned ? "Unpin" : "Pin"}
-              </button>
-              <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
-                Edit
-              </button>
-              <button
-                onClick={() => setConfirmingDelete(true)}
-                className="tap-target text-alert hover:underline"
-              >
-                Delete
-              </button>
-            </ExhibitActionBar>
-          }
-        >
+        ) : (
           <ExhibitMarkdown
             body={body}
             onDoubleClick={editAtFraction}
             onNavigate={(r) => navigateToExhibit("notes", r, navigate, shellHosted)}
           />
-        </ExhibitLinksLayout>
-      )}
+        )}
+      </ExhibitLinksLayout>
       <ConfirmSheet
         open={confirmingDelete}
         title="Delete note"

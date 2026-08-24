@@ -17,7 +17,7 @@ export { navigateToExhibit } from "./navigateToExhibit.js";
 export { ChamberLayout } from "./ChamberLayout.js";
 export { ChamberHeader } from "./ChamberHeader.js";
 export { useExhibitConnections } from "./useExhibitConnections.js";
-export { addExhibitConnection, removeExhibitConnection } from "./exhibitRefs.js";
+export { addExhibitConnection, removeExhibitConnection, flushDraftConnections } from "./exhibitRefs.js";
 export { ExhibitLinksLayout } from "./ExhibitLinksLayout.js";
 export { ExhibitActionBar } from "./ExhibitActionBar.js";
 export {

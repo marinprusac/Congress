@@ -1,10 +1,20 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useShellHosted, resolveChamberPath, PageHeader } from "@congress/congress-ui";
+import {
+  useShellHosted,
+  resolveChamberPath,
+  PageHeader,
+  ExhibitLinksLayout,
+  navigateToExhibit,
+  getChamberIcon,
+  flushDraftConnections,
+} from "@congress/congress-ui";
+import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { createEvent } from "@/lib/api";
 import { getBrowserTimeZone } from "@/lib/datetime";
+import { toExhibitId } from "@/lib/exhibits";
 
 function defaultValues(): EventFormValues {
   const now = new Date();
@@ -32,11 +42,16 @@ export function NewEventPage() {
     ...defaultValues(),
     title: searchParams.get("title") ?? "",
   }));
+  // Staged locally (ExhibitLinksLayout's `exhibitId={null}` mode) since a new
+  // event has no id - Google Calendar only issues one once the event is
+  // actually created below - and only actually written via
+  // flushDraftConnections once that real id exists.
+  const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
 
   const mutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const [accountId, calendarId] = values.calendarKey.split("::") as [string, string];
-      return createEvent({
+      const created = await createEvent({
         accountId: Number(accountId),
         calendarId,
         title: values.title,
@@ -47,6 +62,8 @@ export function NewEventPage() {
         end: values.end,
         timeZone: getBrowserTimeZone(),
       });
+      await flushDraftConnections(toExhibitId(created.accountId, created.calendarId, created.id), draftConnections);
+      return created;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
@@ -57,14 +74,23 @@ export function NewEventPage() {
   return (
     <section>
       <PageHeader title="New Event" />
-      <EventForm
-        values={values}
-        onChange={setValues}
-        onSubmit={() => mutation.mutate()}
-        submitting={mutation.isPending}
-        submitLabel="Create Event"
-        error={mutation.error instanceof Error ? mutation.error.message : null}
-      />
+      <ExhibitLinksLayout
+        exhibitId={null}
+        renderIcon={(chamber) => getChamberIcon(chamber)}
+        onNavigate={(r) => navigateToExhibit("calendar", r, navigate, shellHosted)}
+        editable
+        draftConnections={draftConnections}
+        onDraftConnectionsChange={setDraftConnections}
+      >
+        <EventForm
+          values={values}
+          onChange={setValues}
+          onSubmit={() => mutation.mutate()}
+          submitting={mutation.isPending}
+          submitLabel="Create Event"
+          error={mutation.error instanceof Error ? mutation.error.message : null}
+        />
+      </ExhibitLinksLayout>
     </section>
   );
 }

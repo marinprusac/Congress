@@ -1,9 +1,25 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ExhibitTextarea, getChamberIcon, useShellHosted, resolveChamberPath, PageHeader, FormLabel, FormTextInput, FormErrorMessage, FormSubmitButton } from "@congress/congress-ui";
+import {
+  ExhibitTextarea,
+  ExhibitActionBar,
+  ExhibitLinksLayout,
+  navigateToExhibit,
+  getChamberIcon,
+  useShellHosted,
+  resolveChamberPath,
+  flushDraftConnections,
+  FormErrorMessage,
+} from "@congress/congress-ui";
+import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createDirective } from "@/lib/api";
 
+// Mirrors DirectiveViewPage's editing state exactly (title input,
+// ExhibitTextarea, ExhibitLinksLayout with a live Connections panel) rather
+// than a plain form. Connections picked here are staged (ExhibitLinksLayout's
+// `exhibitId={null}` mode) and only actually written once the create
+// mutation below hands them a real id to attach to.
 export function NewDirectivePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -12,9 +28,14 @@ export function NewDirectivePage() {
   const [title, setTitle] = useState(searchParams.get("name") ?? "");
   const [body, setBody] = useState("");
   const [timeBased, setTimeBased] = useState(true);
+  const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
 
   const mutation = useMutation({
-    mutationFn: () => createDirective({ title, body, enabled: true, timeBased }),
+    mutationFn: async () => {
+      const created = await createDirective({ title, body, enabled: true, timeBased });
+      await flushDraftConnections(`directive-${created.id}`, draftConnections);
+      return created;
+    },
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["directives"] });
       navigate(resolveChamberPath(`/d/${created.id}`, "deputy", shellHosted));
@@ -24,38 +45,57 @@ export function NewDirectivePage() {
   const canSubmit = title.trim().length > 0;
 
   return (
-    <section>
-      <PageHeader title="New Directive" />
+    <article>
+      <div className="mb-6 border-b border-dust pb-4">
+        <input
+          autoFocus
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. Morning overdue-task check"
+          className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+        />
+      </div>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (canSubmit) mutation.mutate();
-        }}
+      {mutation.isError && <FormErrorMessage>{(mutation.error as Error).message}</FormErrorMessage>}
+
+      <ExhibitLinksLayout
+        exhibitId={null}
+        renderIcon={(chamber) => getChamberIcon(chamber)}
+        onNavigate={(r) => navigateToExhibit("deputy", r, navigate, shellHosted)}
+        editable
+        draftConnections={draftConnections}
+        onDraftConnectionsChange={setDraftConnections}
+        actions={
+          <ExhibitActionBar>
+            <button
+              onClick={() => canSubmit && mutation.mutate()}
+              disabled={!canSubmit || mutation.isPending}
+              className="tap-target text-accent hover:underline disabled:opacity-50"
+            >
+              {mutation.isPending ? "Creating —" : "Create"}
+            </button>
+            <button
+              onClick={() => navigate(resolveChamberPath("/directives", "deputy", shellHosted))}
+              className="tap-target text-slate hover:underline"
+            >
+              Cancel
+            </button>
+          </ExhibitActionBar>
+        }
       >
-        <FormLabel>Title</FormLabel>
-        <FormTextInput autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Morning overdue-task check" />
-
-        <FormLabel>Instructions ([[ to reference an Exhibit)</FormLabel>
         <ExhibitTextarea
           value={body}
           onChange={setBody}
-          rows={8}
-          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-          wrapperClassName="exhibit-field mb-4"
-          renderIcon={(chamber) => getChamberIcon(chamber)}
+          rows={10}
           placeholder="Plain English - what should Deputy check or do, and when. Purely time-based ('every morning...') and event-reactive directives both go here."
+          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          renderIcon={(chamber) => getChamberIcon(chamber)}
         />
-
-        <label className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-slate">
+        <label className="mt-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-slate">
           <input type="checkbox" checked={timeBased} onChange={(e) => setTimeBased(e.target.checked)} />
           Wake on schedule, even with no new events
         </label>
-
-        {mutation.isError && <FormErrorMessage>{(mutation.error as Error).message}</FormErrorMessage>}
-
-        <FormSubmitButton disabled={!canSubmit || mutation.isPending}>{mutation.isPending ? "Creating —" : "Create Directive"}</FormSubmitButton>
-      </form>
-    </section>
+      </ExhibitLinksLayout>
+    </article>
   );
 }

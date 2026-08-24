@@ -9,7 +9,7 @@ import { useKeyboardInset } from "./useKeyboardInset.js";
 import { addExhibitConnection, removeExhibitConnection } from "./exhibitRefs.js";
 
 interface AddReferenceControlProps {
-  exhibitId: string;
+  exhibitId: string | null;
   existingIds: Set<string>;
   onAdd: (result: CapitolExhibitSearchResult) => Promise<void>;
   onCreate?: (title: string) => Promise<CapitolExhibitSearchResult>;
@@ -231,7 +231,14 @@ function LinksPanel({ title, results, renderIcon, onNavigate, className, addCont
 }
 
 interface ExhibitLinksLayoutProps {
-  exhibitId: string;
+  // `null` = this Exhibit hasn't been created yet (a "New X" page rendering
+  // the same layout as editing an existing one, before the first save) -
+  // Connections are staged in `draftConnections` instead of coming from
+  // Capitol's exhibit_refs graph. See `draftConnections`/
+  // `onDraftConnectionsChange` below and `flushDraftConnections` in
+  // exhibitRefs.ts, which applies them for real once a create mutation
+  // returns the exhibit's real id.
+  exhibitId: string | null;
   renderIcon?: (chamber: string) => ReactNode;
   onNavigate?: (result: Extract<ExhibitRefEntry, { url: string }>) => void;
   children: ReactNode;
@@ -251,6 +258,12 @@ interface ExhibitLinksLayoutProps {
   // Only a Chamber whose own Exhibits can be quick-created (Notes, today)
   // passes this - shows "+ Create <query>" in the add popover.
   onCreateReference?: (title: string) => Promise<CapitolExhibitSearchResult>;
+  // Required together, only while `exhibitId` is null - the connections
+  // picked so far on a not-yet-created Exhibit, held in the caller's own
+  // state (not this component's) so its create mutation can read them back
+  // and flush them for real via flushDraftConnections once it has a real id.
+  draftConnections?: CapitolExhibitSearchResult[];
+  onDraftConnectionsChange?: (next: CapitolExhibitSearchResult[]) => void;
 }
 
 // Flanks its children with a single panel backed by Capitol's exhibit_refs
@@ -267,9 +280,15 @@ export function ExhibitLinksLayout({
   className,
   editable,
   onCreateReference,
+  draftConnections,
+  onDraftConnectionsChange,
 }: ExhibitLinksLayoutProps) {
   const queryClient = useQueryClient();
-  const connections = useExhibitConnections(exhibitId);
+  const persistedConnections = useExhibitConnections(exhibitId);
+  const connections: ExhibitRefEntry[] =
+    exhibitId === null
+      ? (draftConnections ?? []).map((r) => ({ id: r.id, chamber: r.chamber, name: r.name, url: r.url, isManual: true }))
+      : persistedConnections;
 
   function refresh() {
     queryClient.invalidateQueries({ queryKey: ["exhibit-connections", exhibitId] });
@@ -278,12 +297,23 @@ export function ExhibitLinksLayout({
   // The picked result's chamber is passed through so Capitol can eagerly
   // cache it if it's never been created/edited within Congress before (e.g.
   // a pre-existing Google Calendar event) - see addExhibitConnection's own
-  // comment.
+  // comment. When `exhibitId` is still null, nothing is written yet - just
+  // staged in the caller's own state, same shape flushDraftConnections
+  // expects once a create mutation hands it a real id.
   async function addConnection(result: CapitolExhibitSearchResult) {
+    if (exhibitId === null) {
+      const staged = draftConnections ?? [];
+      if (!staged.some((r) => r.id === result.id)) onDraftConnectionsChange?.([...staged, result]);
+      return;
+    }
     await addExhibitConnection(exhibitId, result.id, result.chamber);
     refresh();
   }
   async function removeConnection(entry: ExhibitRefEntry) {
+    if (exhibitId === null) {
+      onDraftConnectionsChange?.((draftConnections ?? []).filter((r) => r.id !== entry.id));
+      return;
+    }
     await removeExhibitConnection(exhibitId, entry.id);
     refresh();
   }
