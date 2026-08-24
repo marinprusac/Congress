@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Link } from "react-router-dom";
-import { useShellHosted, resolveChamberPath } from "@congress/congress-ui";
-import { fetchVisits, fetchTrips } from "@/lib/api";
+import { useShellHosted, resolveChamberPath, showToast } from "@congress/congress-ui";
+import { fetchVisits, fetchTrips, labelTrip } from "@/lib/api";
 import { useMapTileUrl, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
 import { placeMarkerIcon } from "@/lib/markerIcon";
 import type { Trip, Visit } from "../../../src/types";
@@ -67,6 +67,69 @@ function FitToMarkers({ markers }: { markers: Visit[] }) {
   return null;
 }
 
+// A commute between two different known places auto-labels itself
+// ("commute to Work" - see tracking.ts's handleTransition); a same-place
+// round trip (t.needsLabel - see visits.ts's toTrip) stays genuinely
+// unlabeled instead, but still starts collapsed like every other trip - only
+// an explicit click opens the editor, never the page load itself.
+function TripEntry({ trip }: { trip: Trip }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [label, setLabel] = useState(trip.label ?? "");
+  const editRef = useRef<HTMLSpanElement>(null);
+
+  const mutation = useMutation({
+    mutationFn: () => labelTrip(trip.id, { label }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["trips"] });
+      showToast(label.trim() ? "Labeled" : "Label cleared");
+      setEditing(false);
+    },
+  });
+
+  // A click anywhere outside the input/save control closes editing without
+  // saving - same as Escape below, just for the "clicked elsewhere" case.
+  useEffect(() => {
+    if (!editing) return;
+    function onPointerDown(e: PointerEvent) {
+      if (editRef.current && !editRef.current.contains(e.target as Node)) setEditing(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [editing]);
+
+  return (
+    <li className="py-1 pl-6 text-xs text-dust">
+      <span className="italic">
+        {trip.mode} · {trip.durationMinutes} min · {trip.distanceKm.toFixed(1)} km
+        {trip.label ? ` · "${trip.label}"` : ""}
+      </span>{" "}
+      {editing ? (
+        <span ref={editRef} className="inline-flex items-center gap-1 align-middle">
+          <input
+            autoFocus
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") mutation.mutate();
+              if (e.key === "Escape") setEditing(false);
+            }}
+            placeholder='e.g. "walking the dog"'
+            className="w-36 border-b border-dust bg-transparent px-1 text-xs text-ink focus:outline-none focus-visible:border-accent"
+          />
+          <button disabled={mutation.isPending} onClick={() => mutation.mutate()} className="text-accent hover:underline disabled:opacity-50">
+            save
+          </button>
+        </span>
+      ) : (
+        <button onClick={() => setEditing(true)} className="text-accent hover:underline">
+          {trip.label ? "rename" : "label"}
+        </button>
+      )}
+    </li>
+  );
+}
+
 export function MapPage() {
   const [date, setDate] = useState(todayLocal());
   const shellHosted = useShellHosted();
@@ -93,32 +156,13 @@ export function MapPage() {
   }, [visits]);
 
   const entries = useMemo(() => {
-    const items: { at: string; node: ReactNode }[] = [];
+    const items: ({ at: string; kind: "visit"; visit: Visit } | { at: string; kind: "trip"; trip: Trip })[] = [];
     for (const v of visits) {
       if (v.status === "ignored") continue;
-      items.push({
-        at: v.arrivedAt,
-        node: (
-          <li key={`visit-${v.id}`} className="border-b border-dust py-2">
-            <span className="font-display text-ink">{v.placeName ?? v.adhocLabel ?? "Unclassified location"}</span>
-            <span className="ml-2 text-sm text-dust">
-              {formatTime(v.arrivedAt)}
-              {v.departedAt ? ` – ${formatTime(v.departedAt)}` : " – now"}
-              {v.durationMinutes !== null ? ` (${v.durationMinutes} min)` : ""}
-            </span>
-          </li>
-        ),
-      });
+      items.push({ at: v.arrivedAt, kind: "visit", visit: v });
     }
     for (const t of trips) {
-      items.push({
-        at: t.departedAt,
-        node: (
-          <li key={`trip-${t.id}`} className="border-b border-dust py-2 text-sm text-slate italic">
-            {t.mode} · {t.fromLabel} → {t.toLabel} · {t.durationMinutes} min · {t.distanceKm.toFixed(1)} km
-          </li>
-        ),
-      });
+      items.push({ at: t.departedAt, kind: "trip", trip: t });
     }
     return items.sort((a, b) => a.at.localeCompare(b.at));
   }, [visits, trips]);
@@ -166,13 +210,29 @@ export function MapPage() {
             const fromVisit = visitsById.get(t.fromVisitId);
             const toVisit = visitsById.get(t.toVisitId);
             if (!fromVisit || !toVisit || fromVisit.latitude === null || toVisit.latitude === null) return null;
+            // t.path is the real sequence of GPS fixes recorded while in
+            // transit (tracking.ts) - endpoints included so it connects
+            // visually to the place markers even when both ends are the same
+            // place (a same-place round trip with no dot in between). Falls
+            // back to a straight line only for a trip with no recorded path
+            // (e.g. one from before this was tracked, or a Chamber restart
+            // mid-trip lost the in-memory accumulator) - genuinely all we
+            // know in that case, not a substitute for the real thing.
+            const positions: [number, number][] =
+              t.path && t.path.length > 0
+                ? [
+                    [fromVisit.latitude, fromVisit.longitude!],
+                    ...t.path.map((p): [number, number] => [p.latitude, p.longitude]),
+                    [toVisit.latitude, toVisit.longitude!],
+                  ]
+                : [
+                    [fromVisit.latitude, fromVisit.longitude!],
+                    [toVisit.latitude, toVisit.longitude!],
+                  ];
             return (
               <Polyline
                 key={t.id}
-                positions={[
-                  [fromVisit.latitude, fromVisit.longitude!],
-                  [toVisit.latitude, toVisit.longitude!],
-                ]}
+                positions={positions}
                 pathOptions={{ color: MODE_COLOR[t.mode], weight: 3, dashArray: t.mode === "unknown" ? "4 4" : undefined }}
               />
             );
@@ -185,7 +245,27 @@ export function MapPage() {
       ) : entries.length === 0 ? (
         <p className="font-mono text-sm text-dust">— No visits recorded for this day —</p>
       ) : (
-        <ul>{entries.map((e) => e.node)}</ul>
+        <ul>
+          {entries.map((e) =>
+            e.kind === "visit" ? (
+              <li key={`visit-${e.visit.id}`} className="py-2">
+                <span className="font-display text-ink">{e.visit.placeName ?? e.visit.adhocLabel ?? "Unclassified location"}</span>
+                <span className="ml-2 text-sm text-dust">
+                  {formatTime(e.visit.arrivedAt)}
+                  {e.visit.departedAt ? ` – ${formatTime(e.visit.departedAt)}` : " – now"}
+                  {e.visit.durationMinutes !== null ? ` (${e.visit.durationMinutes} min)` : ""}
+                </span>
+                {e.visit.status === "pending" && (
+                  <Link to={resolveChamberPath("/pending", "map", shellHosted)} className="ml-2 text-sm text-accent hover:underline">
+                    Label it →
+                  </Link>
+                )}
+              </li>
+            ) : (
+              <TripEntry key={`trip-${e.trip.id}`} trip={e.trip} />
+            )
+          )}
+        </ul>
       )}
     </section>
   );

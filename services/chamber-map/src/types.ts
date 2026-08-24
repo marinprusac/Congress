@@ -78,10 +78,17 @@ export type ClassifyVisitRequest = z.infer<typeof classifyVisitRequestSchema>;
 export const tripModeSchema = z.enum(["walk", "bike", "drive", "unknown"]);
 export type TripMode = z.infer<typeof tripModeSchema>;
 
+// needsLabel is derived at read time (fromPlaceId === toPlaceId, both
+// non-null, label still unset) rather than stored - a same-place round trip
+// with no dot recorded in between is otherwise invisible ("Home -> Home"
+// says nothing about why). fromPlaceId/toPlaceId are exposed only to compute
+// this on the frontend too; prefer needsLabel over comparing them directly.
 export const tripSchema = z.object({
   id: z.number().int(),
   fromVisitId: z.number().int(),
   toVisitId: z.number().int(),
+  fromPlaceId: z.number().int().nullable(),
+  toPlaceId: z.number().int().nullable(),
   fromLabel: z.string(),
   toLabel: z.string(),
   departedAt: z.string(),
@@ -89,8 +96,18 @@ export const tripSchema = z.object({
   durationMinutes: z.number(),
   distanceKm: z.number(),
   mode: tripModeSchema,
+  label: z.string().nullable(),
+  needsLabel: z.boolean(),
+  // The actual GPS fixes recorded in transit, ascending by time - what the
+  // frontend draws as the trip's line on the map. Null only for a trip whose
+  // in-memory accumulator was lost to a Chamber restart mid-trip.
+  path: z.array(z.object({ latitude: z.number(), longitude: z.number() })).nullable(),
 });
 export type Trip = z.infer<typeof tripSchema>;
+
+// An empty label clears it (see visits.ts's labelTrip) - not rejected here.
+export const labelTripRequestSchema = z.object({ label: z.string() });
+export type LabelTripRequest = z.infer<typeof labelTripRequestSchema>;
 
 // Only the user-facing tunables - see db/schema.ts's comment on why
 // lastProcessedAt/lastPollSucceededAt/lastPollError live on the same table

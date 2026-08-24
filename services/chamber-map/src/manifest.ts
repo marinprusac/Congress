@@ -33,6 +33,11 @@ export const manifest: Manifest = {
       description: "The device has been dwelling at an unrecognized location and needs classification.",
     },
     {
+      type: "map.trip_needs_label",
+      label: "Trip needs a label",
+      description: "A round trip to the same known place with no stop recorded in between needs a purpose label.",
+    },
+    {
       type: "map.traccar_poll_failing",
       label: "Traccar poll failing",
       description: "Polling the Traccar server has failed several times in a row.",

@@ -9,7 +9,7 @@ export function SettingsPage() {
   const healthQuery = useQuery({ queryKey: ["poll-health"], queryFn: fetchPollHealth, refetchInterval: 30000 });
 
   const [unknownClusterRadiusMeters, setUnknownClusterRadiusMeters] = useState(150);
-  const [minDwellMinutes, setMinDwellMinutes] = useState(45);
+  const [minDwellMinutes, setMinDwellMinutes] = useState(15);
   const [stoppedSpeedKmh, setStoppedSpeedKmh] = useState(3);
   const [pollIntervalSeconds, setPollIntervalSeconds] = useState(120);
 

@@ -4,7 +4,7 @@ import { db } from "./db/client.js";
 import { visits, places, trips } from "./db/schema.js";
 import { createPlace } from "./places.js";
 import { haversineMeters } from "./geo.js";
-import type { Visit, VisitStatus, ClassifyVisitRequest, Trip, TripMode } from "./types.js";
+import type { Visit, VisitStatus, ClassifyVisitRequest, Trip, TripMode, LabelTripRequest } from "./types.js";
 
 export type VisitRow = typeof visits.$inferSelect;
 
@@ -155,21 +155,23 @@ export async function classifyVisit(id: number, request: ClassifyVisitRequest): 
 
 const KNOTS_TO_KMH = 1.852;
 
-// What a trip's distance/mode guess are actually computed from - a running
-// sum of consecutive-fix distances and a running max speed, not the whole
-// raw-fix history. Replaces an older unbounded array of every fix seen
-// since the last visit closed: distance and max speed are both naturally
-// streaming reductions, so a long journey with no recognized stop no longer
-// grows anything with the trip's length - this is O(1) regardless.
+// What a trip's distance/mode guess are computed from, and (via `points`)
+// the real path a trip's Polyline draws - a running sum/max plus the actual
+// fixes seen since the last visit closed. This single-user Chamber sees at
+// most a handful of trips a day and each fix is two floats, so keeping every
+// point is cheap; the growth this once traded away for a running reduction
+// (see git history) is the map's ability to show where a trip actually
+// went, not a synthesized stand-in for it.
 export interface TripFixAccumulator {
   count: number;
   distanceKm: number;
   maxSpeedKnots: number;
   lastFix: { latitude: number; longitude: number } | null;
+  points: { latitude: number; longitude: number }[];
 }
 
 export function createTripFixAccumulator(): TripFixAccumulator {
-  return { count: 0, distanceKm: 0, maxSpeedKnots: 0, lastFix: null };
+  return { count: 0, distanceKm: 0, maxSpeedKnots: 0, lastFix: null, points: [] };
 }
 
 export function accumulateTripFix(
@@ -179,6 +181,7 @@ export function accumulateTripFix(
   if (acc.lastFix) acc.distanceKm += haversineMeters(acc.lastFix, fix) / 1000;
   acc.maxSpeedKnots = Math.max(acc.maxSpeedKnots, fix.speedKnots);
   acc.lastFix = { latitude: fix.latitude, longitude: fix.longitude };
+  acc.points.push({ latitude: fix.latitude, longitude: fix.longitude });
   acc.count += 1;
 }
 
@@ -211,6 +214,8 @@ function toTrip(row: {
     id: trip.id,
     fromVisitId: trip.fromVisitId,
     toVisitId: trip.toVisitId,
+    fromPlaceId: fromVisit.placeId,
+    toPlaceId: toVisit.placeId,
     fromLabel: labelFor(fromVisit, fromPlace),
     toLabel: labelFor(toVisit, toPlace),
     departedAt: trip.departedAt.toISOString(),
@@ -218,7 +223,15 @@ function toTrip(row: {
     durationMinutes: Math.round((trip.arrivedAt.getTime() - trip.departedAt.getTime()) / 60000),
     distanceKm: trip.distanceKm,
     mode: trip.mode,
+    label: trip.label,
+    needsLabel: fromVisit.placeId !== null && fromVisit.placeId === toVisit.placeId && trip.label === null,
+    path: parseTripPath(trip.path),
   };
+}
+
+function parseTripPath(raw: string | null): { latitude: number; longitude: number }[] | null {
+  if (raw === null) return null;
+  return (JSON.parse(raw) as [number, number][]).map(([latitude, longitude]) => ({ latitude, longitude }));
 }
 
 function tripSelection() {
@@ -255,28 +268,42 @@ export async function getTrip(id: number): Promise<Trip | null> {
   return row ? toTrip(row) : null;
 }
 
-// distanceKm/mode are rough by design - a running sum/max accumulated while
-// in transit (tracking.ts), not the whole raw-fix history. An untouched
+// distanceKm/mode/path are all derived from the same accumulator (tracking.ts)
+// - a running sum/max plus the actual fixes seen while in transit, not the
+// whole raw-fix history from before the last visit closed. An untouched
 // accumulator (e.g. the Chamber restarted mid-trip and lost its in-memory
 // state - an accepted gap, same spirit as chamber-tasks' in-memory
-// notification state) just yields distanceKm 0.
+// notification state) just yields distanceKm 0 and a null path.
 export async function createTrip(
   fromVisitId: number,
   toVisitId: number,
   departedAt: Date,
   arrivedAt: Date,
-  acc: TripFixAccumulator
+  acc: TripFixAccumulator,
+  label: string | null = null
 ): Promise<Trip> {
   const maxSpeedKmh = acc.count > 0 ? acc.maxSpeedKnots * KNOTS_TO_KMH : 0;
   const mode: TripMode = acc.count === 0 ? "unknown" : guessTripMode(maxSpeedKmh);
+  const path = acc.points.length > 0 ? JSON.stringify(acc.points.map((p) => [p.latitude, p.longitude])) : null;
 
   const inserted = db
     .insert(trips)
-    .values({ fromVisitId, toVisitId, departedAt, arrivedAt, distanceKm: acc.distanceKm, mode, createdAt: new Date() })
+    .values({ fromVisitId, toVisitId, departedAt, arrivedAt, distanceKm: acc.distanceKm, mode, label, path, createdAt: new Date() })
     .returning()
     .get();
 
   const trip = await getTrip(inserted.id);
   if (!trip) throw new Error(`failed to read back inserted trip ${inserted.id}`);
   return trip;
+}
+
+export async function labelTrip(id: number, request: LabelTripRequest): Promise<Trip | null> {
+  const existing = db.select().from(trips).where(eq(trips.id, id)).get();
+  if (!existing) return null;
+  // An empty/whitespace-only label clears it back to null rather than
+  // storing "" - keeps "no label" a single representable state (also what
+  // makes a same-place round trip's needsLabel true again).
+  const label = request.label.trim() === "" ? null : request.label;
+  db.update(trips).set({ label }).where(eq(trips.id, id)).run();
+  return getTrip(id);
 }

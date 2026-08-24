@@ -7,6 +7,7 @@ import type {
   VisitStatus,
   ClassifyVisitRequest,
   Trip,
+  LabelTripRequest,
   Settings,
   UpdateSettingsRequest,
   PollHealth,
@@ -102,6 +103,14 @@ export function classifyVisit(id: number, input: ClassifyVisitRequest): Promise<
 
 export function fetchTrips(query: { from?: string; to?: string } = {}): Promise<Trip[]> {
   return fetch(`${API_BASE}/trips${toQueryString(query)}`).then((res) => json(res));
+}
+
+export function labelTrip(id: number, input: LabelTripRequest): Promise<Trip> {
+  return fetch(`${API_BASE}/trips/${id}/label`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  }).then((res) => json(res));
 }
 
 // --- Settings & poll health ---

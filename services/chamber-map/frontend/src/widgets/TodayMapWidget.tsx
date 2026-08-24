@@ -72,16 +72,20 @@ export function TodayMapWidget() {
               const fromVisit = visitsById.get(t.fromVisitId);
               const toVisit = visitsById.get(t.toVisitId);
               if (!fromVisit || !toVisit || fromVisit.latitude === null || toVisit.latitude === null) return null;
-              return (
-                <Polyline
-                  key={t.id}
-                  positions={[
-                    [fromVisit.latitude, fromVisit.longitude!],
-                    [toVisit.latitude, toVisit.longitude!],
-                  ]}
-                  pathOptions={{ color: MODE_COLOR[t.mode], weight: 2 }}
-                />
-              );
+              // See MapPage.tsx's own trip rendering for why endpoints are
+              // prepended/appended to the real recorded path.
+              const positions: [number, number][] =
+                t.path && t.path.length > 0
+                  ? [
+                      [fromVisit.latitude, fromVisit.longitude!],
+                      ...t.path.map((p): [number, number] => [p.latitude, p.longitude]),
+                      [toVisit.latitude, toVisit.longitude!],
+                    ]
+                  : [
+                      [fromVisit.latitude, fromVisit.longitude!],
+                      [toVisit.latitude, toVisit.longitude!],
+                    ];
+              return <Polyline key={t.id} positions={positions} pathOptions={{ color: MODE_COLOR[t.mode], weight: 2 }} />;
             })}
           </MapContainer>
         </div>

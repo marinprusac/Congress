@@ -3,6 +3,7 @@ import { haversineMeters } from "./geo.js";
 import { listPlaces } from "./places.js";
 import { getSettings } from "./settings.js";
 import { publishEvent } from "./events.js";
+import { recordPosition } from "./positions.js";
 import {
   getOpenVisit,
   openConfirmedVisit,
@@ -53,8 +54,23 @@ async function handleTransition(
   placeById: Map<number, PlaceCandidate>
 ): Promise<void> {
   if (previous) {
-    closeVisit(previous.id, atFixTime);
-    const trip = await createTrip(previous.id, next.id, previous.arrivedAt, atFixTime, inTransitAcc);
+    // `previous` may already be closed - see the early-close-on-resumed-
+    // movement branch in processPositions, which records a visit's true
+    // departure time before its eventual trip destination is known. Use that
+    // real timestamp for anything describing "when did previous end", not
+    // atFixTime (which by now is when we reached `next`, possibly much
+    // later - conflating the two would inflate a departed_place event's
+    // reported dwell duration by however long the following trip took).
+    const departedAt = previous.departedAt ?? atFixTime;
+    if (previous.departedAt === null) closeVisit(previous.id, atFixTime);
+    // A commute between two different known places names itself - only
+    // a same-place round trip (previous.placeId === next.placeId, handled
+    // below via needsLabel) is genuinely ambiguous enough to ask about.
+    const autoLabel =
+      previous.placeId !== null && next.placeId !== null && previous.placeId !== next.placeId
+        ? `commute to ${placeById.get(next.placeId)?.name ?? "destination"}`
+        : null;
+    const trip = await createTrip(previous.id, next.id, previous.arrivedAt, atFixTime, inTransitAcc, autoLabel);
     await publishEvent({
       type: "map.trip_completed",
       payload: {
@@ -66,6 +82,15 @@ async function handleTransition(
         durationMinutes: trip.durationMinutes,
       },
     });
+    // A round trip to the same known place with no dot recorded in between
+    // (see visits.ts's toTrip needsLabel) - "Home -> Home" alone says
+    // nothing about why, so ask the owner rather than leave it unexplained.
+    if (trip.needsLabel) {
+      await publishEvent({
+        type: "map.trip_needs_label",
+        payload: { tripId: trip.id, placeName: trip.fromLabel, durationMinutes: trip.durationMinutes },
+      });
+    }
     if (previous.placeId) {
       const place = placeById.get(previous.placeId);
       await publishEvent({
@@ -74,8 +99,8 @@ async function handleTransition(
           visitId: previous.id,
           placeId: previous.placeId,
           placeName: place?.name ?? null,
-          durationMinutes: Math.round((atFixTime.getTime() - previous.arrivedAt.getTime()) / 60000),
-          at: atFixTime.toISOString(),
+          durationMinutes: Math.round((departedAt.getTime() - previous.arrivedAt.getTime()) / 60000),
+          at: departedAt.toISOString(),
         },
       });
     }
@@ -97,20 +122,17 @@ async function handleTransition(
   }
 }
 
-function maybeFlagPending(visit: VisitRow, latestFixTime: Date, minDwellMs: number): void {
-  if (visit.status !== "pending" || visit.pendingNotifiedAt) return;
-  if (latestFixTime.getTime() - visit.arrivedAt.getTime() < minDwellMs) return;
-  markPendingNotified(visit.id, latestFixTime);
-  visit.pendingNotifiedAt = latestFixTime; // avoid re-firing later in the same batch
-  void publishEvent({
-    type: "map.unclassified_dwell_pending",
-    payload: {
-      visitId: visit.id,
-      clusterLatitude: visit.clusterLatitude,
-      clusterLongitude: visit.clusterLongitude,
-      dwellMinutes: Math.round((latestFixTime.getTime() - visit.arrivedAt.getTime()) / 60000),
-    },
-  });
+// An unmatched, stopped fix seen since the last visit closed, not yet worth
+// recording as a visit - see the dwell-threshold check in processPositions
+// below. Never persisted: if movement resumes before minDwellMs, this whole
+// stop silently folds into ordinary trip transit (a red light, a drive-thru
+// queue), which is the point - a dot on the map should mean "stayed
+// somewhere long enough to matter", not "any fix under stoppedSpeedKmh".
+// Restart-losing, same accepted gap as inTransitAcc.
+interface CandidateStop {
+  latitude: number;
+  longitude: number;
+  firstFixTime: Date;
 }
 
 // Processes one batch of Traccar fixes in ascending time order, mutating
@@ -133,50 +155,102 @@ export async function processPositions(positions: TraccarPosition[]): Promise<vo
   const placeById = new Map(candidates.map((p) => [p.id, p]));
 
   let openVisitRow = getOpenVisit();
+  // A pending visit already closed (see below) but not yet linked to an
+  // outgoing trip, since its destination isn't known yet - handleTransition
+  // creates that trip once the real next stop/place is found. At most one of
+  // {openVisitRow, tripOrigin} is ever non-null. Restart-losing by design,
+  // same accepted gap as inTransitAcc.
+  let tripOrigin: VisitRow | null = null;
+  let candidateStop: CandidateStop | null = null;
 
   for (const fix of positions) {
+    recordPosition(fix); // permanent log - see positions.ts - independent of everything below
     const fixTime = new Date(fix.fixTime);
     const matched = findMatchingPlace(fix, candidates);
 
     if (matched) {
       if (openVisitRow && openVisitRow.placeId === matched.id) continue; // still there
+      candidateStop = null; // didn't last - folds into this trip, no dot
       const newVisit = openConfirmedVisit(matched.id, fixTime);
-      await handleTransition(openVisitRow, newVisit, fixTime, placeById);
+      await handleTransition(openVisitRow ?? tripOrigin, newVisit, fixTime, placeById);
+      tripOrigin = null;
       openVisitRow = newVisit;
       continue;
     }
 
-    const stillInUnknownCluster =
-      !!openVisitRow &&
+    // Still inside an already-promoted (persisted) pending visit's cluster -
+    // nothing more to do, its dwell notification already fired at promotion.
+    if (
+      openVisitRow &&
       openVisitRow.placeId === null &&
       openVisitRow.clusterLatitude !== null &&
       openVisitRow.clusterLongitude !== null &&
       haversineMeters(fix, { latitude: openVisitRow.clusterLatitude, longitude: openVisitRow.clusterLongitude }) <=
-        settings.unknownClusterRadiusMeters;
-
-    if (stillInUnknownCluster && openVisitRow) {
-      maybeFlagPending(openVisitRow, fixTime, settings.minDwellMs);
+        settings.unknownClusterRadiusMeters
+    ) {
       continue;
     }
 
-    const speedKmh = fix.speed * KNOTS_TO_KMH;
-    // Below this, an unmatched fix is treated as "stopped" and eligible to
-    // open or extend an unknown dwell; at or above it, the fix is just
-    // transit data. This - not distance-based clustering across consecutive
-    // fixes - is what keeps a normal drive between two known places from
-    // generating a flood of tiny "pending" visits at every unmatched ping
-    // along the route. Relies on Traccar Client actually reporting a
-    // plausible speed per fix; if a device's reporting mode never populates
-    // speed (rare, but possible depending on platform/config), this degrades
-    // back to "every unmatched fix is a candidate dwell" - an accepted,
-    // documented limitation rather than a silent one. User-tunable (see
-    // Settings) since how aggressively a device rounds low speeds to zero
-    // varies by device/platform.
-    if (speedKmh < settings.stoppedSpeedKmh) {
-      const newVisit = openPendingVisit(fix.latitude, fix.longitude, fixTime);
-      await handleTransition(openVisitRow, newVisit, fixTime, placeById);
-      openVisitRow = newVisit;
+    // Still inside a not-yet-promoted candidate stop's cluster - keep
+    // buffering, and promote to a real visit once dwell crosses minDwellMs.
+    // Below that: an unmatched fix is what makes a fix eligible to start or
+    // extend a candidate at all. This - not distance-based clustering across
+    // consecutive fixes - is what keeps a normal drive between two known
+    // places from generating a flood of tiny dots at every unmatched ping
+    // along the route. Relies on Traccar reporting a plausible speed per
+    // fix; if a device's reporting mode never populates speed, this degrades
+    // to "every unmatched fix is a candidate dwell start" - an accepted,
+    // documented limitation. User-tunable (see Settings).
+    if (candidateStop && haversineMeters(fix, candidateStop) <= settings.unknownClusterRadiusMeters) {
+      accumulateTripFix(inTransitAcc, { latitude: fix.latitude, longitude: fix.longitude, speedKnots: fix.speed });
+      const dwellMs = fixTime.getTime() - candidateStop.firstFixTime.getTime();
+      if (dwellMs >= settings.minDwellMs) {
+        const arrivedAt = candidateStop.firstFixTime;
+        const newVisit = openPendingVisit(candidateStop.latitude, candidateStop.longitude, arrivedAt);
+        await handleTransition(openVisitRow ?? tripOrigin, newVisit, arrivedAt, placeById);
+        tripOrigin = null;
+        openVisitRow = newVisit;
+        candidateStop = null;
+        markPendingNotified(newVisit.id, fixTime);
+        await publishEvent({
+          type: "map.unclassified_dwell_pending",
+          payload: {
+            visitId: newVisit.id,
+            clusterLatitude: newVisit.clusterLatitude,
+            clusterLongitude: newVisit.clusterLongitude,
+            dwellMinutes: Math.round(dwellMs / 60000),
+          },
+        });
+      }
       continue;
+    }
+
+    // Left whatever we were at - an unpromoted candidate that didn't last
+    // (discarded, its time folds into ordinary trip transit - the "just
+    // lines, no dots" case for a red light or drive-thru), a promoted dot
+    // we've now moved away from, or a known place's own radius (this branch
+    // only runs once `matched` above is already null, so a confirmed visit
+    // here means we've left its radius too). Closing immediately - rather
+    // than waiting for a match/promotion elsewhere the way the old lazy
+    // behavior did - matters for two things: a promoted dot's cluster is
+    // frozen at its first stopped fix, so leaving it open (and reported as
+    // "current location" by getOpenVisit) for the rest of the trip would let
+    // it swallow whatever real stop comes next; and a known place needs its
+    // own accurate departure time so a same-place round trip that never
+    // dwells anywhere else in between (drive-thru, quick errand) still
+    // produces two visits and a real trip - see visits.ts's needsLabel -
+    // instead of one visit silently spanning the whole outing.
+    candidateStop = null;
+    if (openVisitRow) {
+      closeVisit(openVisitRow.id, fixTime);
+      openVisitRow.departedAt = fixTime;
+      tripOrigin = openVisitRow;
+      openVisitRow = null;
+    }
+
+    const speedKmh = fix.speed * KNOTS_TO_KMH;
+    if (speedKmh < settings.stoppedSpeedKmh) {
+      candidateStop = { latitude: fix.latitude, longitude: fix.longitude, firstFixTime: fixTime };
     }
 
     accumulateTripFix(inTransitAcc, { latitude: fix.latitude, longitude: fix.longitude, speedKnots: fix.speed });

@@ -14,7 +14,7 @@ export const { getSettings, updateSettings } = createSingleRowSettings<typeof se
   }),
   defaults: {
     unknownClusterRadiusMeters: 150,
-    minDwellMs: 45 * 60 * 1000,
+    minDwellMs: 15 * 60 * 1000,
     stoppedSpeedKmh: 3,
     pollIntervalMs: 2 * 60 * 1000,
   },

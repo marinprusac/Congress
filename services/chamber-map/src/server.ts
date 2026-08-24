@@ -6,6 +6,7 @@ import {
   updateSettingsRequestSchema,
   classifyVisitRequestSchema,
   visitStatusSchema,
+  labelTripRequestSchema,
 } from "./types.js";
 import {
   mountManifestAndHealth,
@@ -28,7 +29,7 @@ import {
   removeManualRefByExhibitId,
   resyncPlaceExhibitByExhibitId,
 } from "./places.js";
-import { listVisits, getVisit, classifyVisit, listTrips } from "./visits.js";
+import { listVisits, getVisit, classifyVisit, listTrips, labelTrip } from "./visits.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { getPollState, toPollHealth } from "./pollState.js";
 import { searchPlaceExhibits, resolvePlaceExhibits } from "./exhibits.js";
@@ -138,6 +139,19 @@ app.get("/api/trips", async (c) => {
   const to = parseDateParam(c.req.query("to"));
   const limit = parseLimitParam(c.req.query("limit"));
   return c.json(await listTrips({ from, to, limit }));
+});
+
+app.post("/api/trips/:id/label", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
+  const body = await c.req.json().catch(() => null);
+  const parsed = labelTripRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  const trip = await labelTrip(id, parsed.data);
+  if (!trip) return c.json({ error: "not_found" }, 404);
+  return c.json(trip);
 });
 
 app.get("/api/poll-health", (c) => {
