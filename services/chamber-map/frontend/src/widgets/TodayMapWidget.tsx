@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
 import { WidgetPreviewShell } from "@congress/congress-ui";
 import { fetchVisits, fetchTrips } from "@/lib/api";
-import { useMapTileUrl, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
+import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
 import { placeMarkerIcon } from "@/lib/markerIcon";
 import type { Trip, Visit } from "../../../src/types";
 import "leaflet/dist/leaflet.css";
@@ -23,6 +23,7 @@ const MODE_COLOR: Record<Trip["mode"], string> = {
 
 export function TodayMapWidget() {
   const tileUrl = useMapTileUrl();
+  const tileClassName = useMapTileClassName();
   const from = todayIso();
   const visitsQuery = useQuery({ queryKey: ["visits", "today-widget"], queryFn: () => fetchVisits({ from }) });
   const tripsQuery = useQuery({ queryKey: ["trips", "today-widget"], queryFn: () => fetchTrips({ from }) });
@@ -64,7 +65,7 @@ export function TodayMapWidget() {
             scrollWheelZoom={false}
             doubleClickZoom={false}
           >
-            <TileLayer url={tileUrl} attribution={MAP_TILE_ATTRIBUTION} />
+            <TileLayer url={tileUrl} attribution={MAP_TILE_ATTRIBUTION} className={tileClassName} />
             {markers.map((v) => (
               <Marker key={v.id} position={[v.latitude!, v.longitude!]} icon={placeMarkerIcon} />
             ))}

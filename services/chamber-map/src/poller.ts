@@ -19,13 +19,22 @@ async function pollTick(): Promise<void> {
   const settings = await getSettings();
   // First-ever boot: look back one interval, not this Chamber's entire
   // Traccar history.
-  const since = state.lastProcessedAt?.toISOString() ?? new Date(Date.now() - settings.pollIntervalMs).toISOString();
+  const since = state.lastProcessedAt ?? new Date(Date.now() - settings.pollIntervalMs);
   const now = new Date();
 
   try {
-    const positions = await fetchPositionsSince(env.TRACCAR_DEVICE_ID, since, now.toISOString());
+    const positions = await fetchPositionsSince(env.TRACCAR_DEVICE_ID, since.toISOString(), now.toISOString());
     await processPositions(positions);
-    updatePollState({ lastProcessedAt: now, lastPollSucceededAt: now, lastPollError: null });
+    // Advance the cursor to the latest fixTime actually seen, not to
+    // wall-clock `now` - Traccar can deliver a position late carrying an
+    // older fixTime (e.g. a phone resending its last cached fix after a GPS
+    // gap), and a wall-clock cursor would put that fixTime permanently
+    // behind the query window before it ever gets fetched. A tick that
+    // finds nothing leaves the cursor at `since` so the next tick re-checks
+    // the same window plus whatever's new, instead of skipping ahead.
+    const latest = positions.at(-1);
+    const lastProcessedAt = latest ? new Date(latest.fixTime) : since;
+    updatePollState({ lastProcessedAt, lastPollSucceededAt: now, lastPollError: null });
     consecutiveFailures = 0;
   } catch (error) {
     consecutiveFailures += 1;

@@ -1,15 +1,20 @@
 import { useCapitolSettings } from "@congress/congress-ui";
 
-// CARTO's free, keyless basemaps - no third-party API key, no per-request
-// coordinate leak beyond the tile provider itself (unavoidable for any
-// slippy map). Light/dark variants swapped via Congress's own dark-mode
-// setting, same as every other themed surface in this system.
-const LIGHT_TILE_URL = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
-const DARK_TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+// CARTO's raster basemaps used to be free and keyless but now watermark
+// every tile "API KEY REQUIRED" without one (see carto.com/basemaps/apikey)
+// - switched to OSM's own tile server instead, which is still genuinely
+// keyless. It has no native dark variant, so dark mode is faked with a CSS
+// filter (`.map-tiles-dark` in mapMarker.css) rather than a second tile
+// source, same "no third-party API key" constraint as before.
+const TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 export const MAP_TILE_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 export function useMapTileUrl(): string {
+  return TILE_URL;
+}
+
+export function useMapTileClassName(): string {
   const { data } = useCapitolSettings();
-  return data?.darkMode ? DARK_TILE_URL : LIGHT_TILE_URL;
+  return data?.darkMode ? "map-tiles-dark" : "";
 }

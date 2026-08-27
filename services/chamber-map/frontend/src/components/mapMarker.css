@@ -7,6 +7,13 @@
   isolation: isolate;
 }
 
+/* OSM's tile server has no dark variant, so dark mode inverts the raster
+   tiles instead - hue-rotate cancels the inversion's color-wheel flip so
+   roads/water keep roughly their normal hues instead of coming out orange. */
+.map-tiles-dark {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.85) saturate(0.5);
+}
+
 .map-place-marker-dot {
   width: 14px;
   height: 14px;

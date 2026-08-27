@@ -5,7 +5,7 @@ import L from "leaflet";
 import { Link } from "react-router-dom";
 import { useShellHosted, resolveChamberPath, showToast } from "@congress/congress-ui";
 import { fetchVisits, fetchTrips, labelTrip } from "@/lib/api";
-import { useMapTileUrl, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
+import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
 import { placeMarkerIcon } from "@/lib/markerIcon";
 import type { Trip, Visit } from "../../../src/types";
 import "leaflet/dist/leaflet.css";
@@ -134,6 +134,7 @@ export function MapPage() {
   const [date, setDate] = useState(todayLocal());
   const shellHosted = useShellHosted();
   const tileUrl = useMapTileUrl();
+  const tileClassName = useMapTileClassName();
   const { from, to } = localDayBounds(date);
 
   const visitsQuery = useQuery({ queryKey: ["visits", from, to], queryFn: () => fetchVisits({ from, to }) });
@@ -199,7 +200,7 @@ export function MapPage() {
           zoom={markers.length ? 13 : 2}
           style={{ height: "100%", width: "100%" }}
         >
-          <TileLayer url={tileUrl} attribution={MAP_TILE_ATTRIBUTION} />
+          <TileLayer url={tileUrl} attribution={MAP_TILE_ATTRIBUTION} className={tileClassName} />
           <FitToMarkers markers={markers} />
           {markers.map((v) => (
             <Marker key={v.id} position={[v.latitude!, v.longitude!]} icon={placeMarkerIcon}>

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Circle, useMap, useMapEvents } from "react-leaflet";
 import type L from "leaflet";
 import { useCapitolSettings } from "@congress/congress-ui";
-import { useMapTileUrl, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
+import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
 import { placeMarkerIcon } from "@/lib/markerIcon";
 import "leaflet/dist/leaflet.css";
 import "./mapMarker.css";
@@ -38,6 +38,7 @@ export interface PlacePickerProps {
 
 export function PlacePicker({ latitude, longitude, radiusMeters, onChange, height = 260, readOnly = false }: PlacePickerProps) {
   const tileUrl = useMapTileUrl();
+  const tileClassName = useMapTileClassName();
   const { data: capitolSettings } = useCapitolSettings();
   const circleColor = capitolSettings?.darkMode ? "#7fbf9e" : "#2b4a3e";
   const initialCenter = useRef<[number, number]>([latitude, longitude]);
@@ -50,7 +51,7 @@ export function PlacePicker({ latitude, longitude, radiusMeters, onChange, heigh
       data-nav-swipe-ignore
     >
       <MapContainer center={initialCenter.current} zoom={16} style={{ height: "100%", width: "100%" }} dragging={!readOnly} scrollWheelZoom={!readOnly}>
-        <TileLayer url={tileUrl} attribution={MAP_TILE_ATTRIBUTION} />
+        <TileLayer url={tileUrl} attribution={MAP_TILE_ATTRIBUTION} className={tileClassName} />
         <Recenter latitude={latitude} longitude={longitude} />
         {!readOnly && <ClickToMove onChange={onChange} />}
         <Marker
