@@ -19,6 +19,12 @@ import {
 
 const KNOTS_TO_KMH = 1.852;
 
+interface CandidateStop {
+  latitude: number;
+  longitude: number;
+  firstFixTime: Date;
+}
+
 interface PlaceCandidate {
   id: number;
   name: string;
@@ -46,6 +52,27 @@ function findMatchingPlace(fix: TraccarPosition, candidates: PlaceCandidate[]): 
 // gap as chamber-calendar's own in-memory "scheduled" map. O(1) regardless
 // of how long a trip runs, unlike the raw-fix array this replaced.
 let inTransitAcc: TripFixAccumulator = createTripFixAccumulator();
+
+// An unmatched, stopped fix seen since the last visit closed, not yet worth
+// recording as a visit - see the dwell-threshold check in processPositions
+// below. Never persisted: if movement resumes before minDwellMs, this whole
+// stop silently folds into ordinary trip transit (a red light, a drive-thru
+// queue), which is the point - a dot on the map should mean "stayed
+// somewhere long enough to matter", not "any fix under stoppedSpeedKmh".
+// Module-level and restart-losing, same accepted gap as inTransitAcc above -
+// it has to be, since dwell time is only ever accumulated across separate
+// poll ticks (each carrying just the handful of fixes seen since the last
+// one), never within a single processPositions call.
+let candidateStop: CandidateStop | null = null;
+
+// A pending visit already closed (see the "left whatever we were at" branch
+// in processPositions) but not yet linked to an outgoing trip, since its
+// destination isn't known yet - handleTransition creates that trip once the
+// real next stop/place is found, which (like candidateStop's promotion
+// above) can easily land in a later poll tick than the one that closed this
+// origin. At most one of {openVisitRow, tripOrigin} is ever non-null.
+// Module-level and restart-losing, same accepted gap as inTransitAcc.
+let tripOrigin: VisitRow | null = null;
 
 async function handleTransition(
   previous: VisitRow | null,
@@ -122,19 +149,6 @@ async function handleTransition(
   }
 }
 
-// An unmatched, stopped fix seen since the last visit closed, not yet worth
-// recording as a visit - see the dwell-threshold check in processPositions
-// below. Never persisted: if movement resumes before minDwellMs, this whole
-// stop silently folds into ordinary trip transit (a red light, a drive-thru
-// queue), which is the point - a dot on the map should mean "stayed
-// somewhere long enough to matter", not "any fix under stoppedSpeedKmh".
-// Restart-losing, same accepted gap as inTransitAcc.
-interface CandidateStop {
-  latitude: number;
-  longitude: number;
-  firstFixTime: Date;
-}
-
 // Processes one batch of Traccar fixes in ascending time order, mutating
 // visits/trips as arrivals/departures are detected. Re-derives "where are we
 // currently" fresh from the DB (getOpenVisit) rather than trusting in-memory
@@ -155,13 +169,6 @@ export async function processPositions(positions: TraccarPosition[]): Promise<vo
   const placeById = new Map(candidates.map((p) => [p.id, p]));
 
   let openVisitRow = getOpenVisit();
-  // A pending visit already closed (see below) but not yet linked to an
-  // outgoing trip, since its destination isn't known yet - handleTransition
-  // creates that trip once the real next stop/place is found. At most one of
-  // {openVisitRow, tripOrigin} is ever non-null. Restart-losing by design,
-  // same accepted gap as inTransitAcc.
-  let tripOrigin: VisitRow | null = null;
-  let candidateStop: CandidateStop | null = null;
 
   for (const fix of positions) {
     recordPosition(fix); // permanent log - see positions.ts - independent of everything below
