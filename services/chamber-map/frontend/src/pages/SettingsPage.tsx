@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader, FormLabel, FormTextInput, FormSubmitButton, showToast } from "@congress/congress-ui";
-import { fetchSettings, updateSettings, fetchPollHealth } from "@/lib/api";
+import { fetchSettings, updateSettings, fetchPollHealth, reprocessHistory } from "@/lib/api";
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
@@ -35,6 +35,25 @@ export function SettingsPage() {
       showToast("Settings saved");
     },
     onError: () => showToast("Failed to save settings.", "error"),
+  });
+
+  // Two-step rather than a browser confirm(): a rebuild throws away every
+  // derived visit and trip and recomputes them, so it shouldn't fire on one
+  // stray tap - but it's also recoverable (the position log it reads from is
+  // never touched), so it doesn't warrant a modal either.
+  const [confirmRebuild, setConfirmRebuild] = useState(false);
+  const rebuild = useMutation({
+    mutationFn: () => reprocessHistory(),
+    onSuccess: (result) => {
+      setConfirmRebuild(false);
+      queryClient.invalidateQueries({ queryKey: ["visits"] });
+      queryClient.invalidateQueries({ queryKey: ["trips"] });
+      showToast(`Rebuilt ${result.visitsCreated} visits and ${result.tripsCreated} trips`);
+    },
+    onError: () => {
+      setConfirmRebuild(false);
+      showToast("Rebuild failed.", "error");
+    },
   });
 
   const health = healthQuery.data;
@@ -101,6 +120,35 @@ export function SettingsPage() {
             <dd className={health.lastPollError ? "text-alert" : ""}>{health.lastPollError ?? "— none —"}</dd>
           </dl>
         )}
+      </div>
+
+      <div className="mt-10 border-t border-dust pt-6">
+        <p className="mb-3 font-mono text-xs uppercase tracking-wide text-dust">Rebuild history</p>
+        <p className="mb-4 font-mono text-xs text-dust">
+          Recomputes every visit and trip from the stored GPS log using the settings above and the places as they exist now.
+          Adding or moving a place already does this for the stretch it affects — run it by hand after changing a threshold
+          here, so past days are read the same way new ones will be. Your own labels and ignored spots are carried across;
+          the GPS log itself is never modified.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => (confirmRebuild ? rebuild.mutate() : setConfirmRebuild(true))}
+            disabled={rebuild.isPending}
+            className="tap-target border border-dust px-3 py-2 font-mono text-sm uppercase tracking-wide text-ink hover:border-accent hover:text-accent disabled:opacity-50"
+          >
+            {rebuild.isPending ? "Rebuilding —" : confirmRebuild ? "Tap again to confirm" : "Rebuild history"}
+          </button>
+          {confirmRebuild && !rebuild.isPending && (
+            <button
+              type="button"
+              onClick={() => setConfirmRebuild(false)}
+              className="tap-target font-mono text-sm text-dust hover:text-ink"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
       </div>
     </section>
   );

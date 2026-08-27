@@ -19,6 +19,12 @@ import {
 
 const KNOTS_TO_KMH = 1.852;
 
+// How far outside its cluster the device may reappear, as a multiple of
+// unknownClusterRadiusMeters, for a silent stretch to still count as time
+// spent at the stop it followed rather than as travel - see the
+// candidate-stop branch at the end of processPositions.
+const GAP_CREDIT_DRIFT_FACTOR = 3;
+
 interface CandidateStop {
   latitude: number;
   longitude: number;
@@ -84,12 +90,74 @@ let candidateStop: CandidateStop | null = null;
 // Module-level and restart-losing, same accepted gap as inTransitAcc.
 let tripOrigin: VisitRow | null = null;
 
+// The previous fix, kept to derive speed from displacement over time rather
+// than trusting the device's own instantaneous speed field - see
+// stoppedSpeedKmhFor below.
+let prevFix: { latitude: number; longitude: number; fixTime: Date } | null = null;
+
+// Drops every scrap of in-memory carry-over between fixes, so a historical
+// replay starts from the same blank slate a fresh boot would rather than
+// inheriting wherever the live poller happened to be - see reprocess.ts.
+// The DB-backed half of "where are we now" needs no reset: processPositions
+// re-reads it via getOpenVisit on every call.
+export function resetTrackingState(): void {
+  inTransitAcc = createTripFixAccumulator();
+  candidateStop = null;
+  tripOrigin = null;
+  prevFix = null;
+}
+
+// Serializes everything that touches the module state above. A poll tick
+// and a reprocess are both async and both await mid-way through, so without
+// this a tick landing inside a replay would interleave its own fixes into
+// the replay's carry-over state (and write visits into a range the replay is
+// concurrently deleting). Runs the next job regardless of whether the
+// previous one threw, so one failure can't wedge the queue.
+let trackingLock: Promise<unknown> = Promise.resolve();
+export function withTrackingLock<T>(job: () => Promise<T>): Promise<T> {
+  const run = trackingLock.then(job, job);
+  trackingLock = run.catch(() => undefined);
+  return run;
+}
+
+// How fast the device was actually moving, measured as displacement since
+// the previous fix rather than read off that fix's own speed field. The
+// device's instantaneous speed is a momentary sample - stand in a shop and
+// walk a few steps between aisles and it happily reports 3-7 km/h, which is
+// enough to look like travel even though net displacement over those
+// minutes is a few dozen metres. Integrating over the gap instead is what
+// lets "walked around inside one place" read as the stop it actually was.
+// Falls back to the reported speed when there's nothing to measure against:
+// the first fix after a (re)start, and the duplicate/out-of-order timestamps
+// this device's own history does contain, where elapsed time is <= 0.
+function movementSpeedKmh(fix: TraccarPosition, fixTime: Date): number {
+  const reported = fix.speed * KNOTS_TO_KMH;
+  if (!prevFix) return reported;
+  const elapsedMs = fixTime.getTime() - prevFix.fixTime.getTime();
+  if (elapsedMs <= 0) return reported;
+  return haversineMeters(prevFix, fix) / 1000 / (elapsedMs / 3_600_000);
+}
+
+// A historical replay (reprocess.ts) re-runs arrivals and departures that
+// already happened - relaying those would notify the owner all over again
+// about a trip they took last week, so a replay swaps this for a no-op.
+// Threaded through as a parameter rather than read off a module-level flag
+// because a live poll tick can interleave with a reprocess mid-await, and a
+// shared flag would leak one call's suppression into the other's events.
+type Emit = (event: Parameters<typeof publishEvent>[0]) => Promise<unknown>;
+const noopEmit: Emit = async () => {};
+function emitterFor(publishEvents: boolean): Emit {
+  return publishEvents ? publishEvent : noopEmit;
+}
+
 async function handleTransition(
   previous: VisitRow | null,
   next: VisitRow,
   atFixTime: Date,
-  placeById: Map<number, PlaceCandidate>
+  placeById: Map<number, PlaceCandidate>,
+  publishEvents: boolean
 ): Promise<void> {
+  const emit = emitterFor(publishEvents);
   if (previous) {
     // `previous` may already be closed - see the early-close-on-resumed-
     // movement branch in processPositions, which records a visit's true
@@ -115,7 +183,7 @@ async function handleTransition(
     const fromLatLng = visitLatLng(previous, placeById);
     const toLatLng = visitLatLng(next, placeById);
     const trip = await createTrip(previous.id, next.id, departedAt, atFixTime, inTransitAcc, fromLatLng, toLatLng, autoLabel);
-    await publishEvent({
+    await emit({
       type: "map.trip_completed",
       payload: {
         tripId: trip.id,
@@ -130,14 +198,14 @@ async function handleTransition(
     // (see visits.ts's toTrip needsLabel) - "Home -> Home" alone says
     // nothing about why, so ask the owner rather than leave it unexplained.
     if (trip.needsLabel) {
-      await publishEvent({
+      await emit({
         type: "map.trip_needs_label",
         payload: { tripId: trip.id, placeName: trip.fromLabel, durationMinutes: trip.durationMinutes },
       });
     }
     if (previous.placeId) {
       const place = placeById.get(previous.placeId);
-      await publishEvent({
+      await emit({
         type: "map.departed_place",
         payload: {
           visitId: previous.id,
@@ -153,7 +221,7 @@ async function handleTransition(
 
   if (next.placeId) {
     const place = placeById.get(next.placeId);
-    await publishEvent({
+    await emit({
       type: "map.arrived_at_place",
       payload: {
         visitId: next.id,
@@ -171,8 +239,20 @@ async function handleTransition(
 // currently" fresh from the DB (getOpenVisit) rather than trusting in-memory
 // state carried over from a previous call, so a Chamber restart never loses
 // track of it - see poller.ts.
-export async function processPositions(positions: TraccarPosition[]): Promise<void> {
+export interface ProcessPositionsOptions {
+  // False when replaying history, so an arrival/departure that already
+  // happened isn't relayed to the Logs/Automation Chambers a second time -
+  // see emitterFor above.
+  publishEvents?: boolean;
+}
+
+export async function processPositions(
+  positions: TraccarPosition[],
+  options: ProcessPositionsOptions = {}
+): Promise<void> {
   if (positions.length === 0) return;
+  const publishEvents = options.publishEvents ?? true;
+  const emit = emitterFor(publishEvents);
 
   const [placeRows, settings] = await Promise.all([listPlaces(), getSettings()]);
   const candidates: PlaceCandidate[] = placeRows.map((r) => ({
@@ -190,13 +270,18 @@ export async function processPositions(positions: TraccarPosition[]): Promise<vo
   for (const fix of positions) {
     recordPosition(fix); // permanent log - see positions.ts - independent of everything below
     const fixTime = new Date(fix.fixTime);
+    // Measured against the previous fix, then advanced right away so every
+    // path out of this iteration - including the several `continue`s below -
+    // leaves it correct for the next one.
+    const speedKmh = movementSpeedKmh(fix, fixTime);
+    prevFix = { latitude: fix.latitude, longitude: fix.longitude, fixTime };
     const matched = findMatchingPlace(fix, candidates);
 
     if (matched) {
       if (openVisitRow && openVisitRow.placeId === matched.id) continue; // still there
       candidateStop = null; // didn't last - folds into this trip, no dot
       const newVisit = openConfirmedVisit(matched.id, fixTime);
-      await handleTransition(openVisitRow ?? tripOrigin, newVisit, fixTime, placeById);
+      await handleTransition(openVisitRow ?? tripOrigin, newVisit, fixTime, placeById, publishEvents);
       tripOrigin = null;
       openVisitRow = newVisit;
       continue;
@@ -231,12 +316,12 @@ export async function processPositions(positions: TraccarPosition[]): Promise<vo
       if (dwellMs >= settings.minDwellMs) {
         const arrivedAt = candidateStop.firstFixTime;
         const newVisit = openPendingVisit(candidateStop.latitude, candidateStop.longitude, arrivedAt);
-        await handleTransition(openVisitRow ?? tripOrigin, newVisit, arrivedAt, placeById);
+        await handleTransition(openVisitRow ?? tripOrigin, newVisit, arrivedAt, placeById, publishEvents);
         tripOrigin = null;
         openVisitRow = newVisit;
         candidateStop = null;
         markPendingNotified(newVisit.id, fixTime);
-        await publishEvent({
+        await emit({
           type: "map.unclassified_dwell_pending",
           payload: {
             visitId: newVisit.id,
@@ -269,26 +354,31 @@ export async function processPositions(positions: TraccarPosition[]): Promise<vo
     // this is genuinely either/or, not two independent checks.)
     if (candidateStop) {
       // The device went quiet right after a stopped fix and only reappears
-      // now, outside the cluster - however far, however long. Sparse or
-      // indoor reporting (an airport terminal, a shop) can mean the
-      // "still here" pings that would ordinarily extend the cluster above
-      // just never arrived, so the silent stretch itself is the only dwell
-      // signal available; crediting it to the stop is what catches a real
-      // stay that a strict distance-clustered reading of the fixes alone
-      // would otherwise miss entirely. Closed immediately (not left open
-      // the way the ordinary in-cluster promotion above does), since by
-      // construction we already know they'd left by the time this fix
-      // arrived.
+      // now, outside the cluster. Where it reappears is what says whether
+      // that silence was spent standing still or moving: drift back into
+      // view a couple of hundred metres away and the gap was almost
+      // certainly spent at the stop, with indoor GPS simply failing to file
+      // the "still here" pings that would have extended the cluster above
+      // (a shop, a terminal). Reappear kilometres away and the same silence
+      // covered a journey - crediting that to the stop would invent a long
+      // dwell out of a flight or a train ride, and there's no way to tell
+      // from the fixes alone when within it they actually left, so the honest
+      // reading is to end the stay at the last evidence of it and let the
+      // gap fall to the trip. Closed immediately rather than left open the
+      // way the in-cluster promotion above does, since reaching this branch
+      // already means they'd gone by the time this fix arrived.
       const dwellMs = fixTime.getTime() - candidateStop.firstFixTime.getTime();
-      if (dwellMs >= settings.minDwellMs) {
+      const driftMeters = haversineMeters(fix, candidateStop);
+      const stayedPut = driftMeters <= settings.unknownClusterRadiusMeters * GAP_CREDIT_DRIFT_FACTOR;
+      if (stayedPut && dwellMs >= settings.minDwellMs) {
         const arrivedAt = candidateStop.firstFixTime;
         const newVisit = openPendingVisit(candidateStop.latitude, candidateStop.longitude, arrivedAt);
-        await handleTransition(openVisitRow ?? tripOrigin, newVisit, arrivedAt, placeById);
+        await handleTransition(openVisitRow ?? tripOrigin, newVisit, arrivedAt, placeById, publishEvents);
         closeVisit(newVisit.id, fixTime);
         newVisit.departedAt = fixTime;
         tripOrigin = newVisit;
         markPendingNotified(newVisit.id, fixTime);
-        await publishEvent({
+        await emit({
           type: "map.unclassified_dwell_pending",
           payload: {
             visitId: newVisit.id,
@@ -306,7 +396,6 @@ export async function processPositions(positions: TraccarPosition[]): Promise<vo
       openVisitRow = null;
     }
 
-    const speedKmh = fix.speed * KNOTS_TO_KMH;
     if (speedKmh < settings.stoppedSpeedKmh) {
       candidateStop = { latitude: fix.latitude, longitude: fix.longitude, firstFixTime: fixTime };
     }

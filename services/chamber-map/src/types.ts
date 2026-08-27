@@ -136,3 +136,27 @@ export const pollHealthSchema = z.object({
   lastPollError: z.string().nullable(),
 });
 export type PollHealth = z.infer<typeof pollHealthSchema>;
+
+// Rebuilding visits/trips from the raw position log - see reprocess.ts.
+// `from` omitted means "as far back as there are positions"; `to` omitted
+// means now.
+export const reprocessRequestSchema = z.object({
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+});
+export type ReprocessRequest = z.infer<typeof reprocessRequestSchema>;
+
+export const reprocessResultSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+  positionsReplayed: z.number().int(),
+  visitsDeleted: z.number().int(),
+  visitsCreated: z.number().int(),
+  tripsDeleted: z.number().int(),
+  tripsCreated: z.number().int(),
+  // Owner-authored adhoc labels, ignored dwells and trip labels that were
+  // carried across the rebuild, and how many found nothing to reattach to.
+  annotationsRestored: z.number().int(),
+  annotationsLost: z.number().int(),
+});
+export type ReprocessResult = z.infer<typeof reprocessResultSchema>;

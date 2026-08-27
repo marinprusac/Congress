@@ -1,6 +1,6 @@
 import { env } from "./env.js";
 import { fetchPositionsSince } from "./traccar/client.js";
-import { processPositions } from "./tracking.js";
+import { processPositions, withTrackingLock } from "./tracking.js";
 import { getPollState, updatePollState } from "./pollState.js";
 import { getSettings } from "./settings.js";
 import { publishEvent } from "./events.js";
@@ -24,7 +24,9 @@ async function pollTick(): Promise<void> {
 
   try {
     const positions = await fetchPositionsSince(env.TRACCAR_DEVICE_ID, since.toISOString(), now.toISOString());
-    await processPositions(positions);
+    // Queued behind any in-flight reprocess (and vice versa) so the two
+    // never interleave their writes - see withTrackingLock.
+    await withTrackingLock(() => processPositions(positions));
     // Advance the cursor to the latest fixTime actually seen, not to
     // wall-clock `now` - Traccar can deliver a position late carrying an
     // older fixTime (e.g. a phone resending its last cached fix after a GPS

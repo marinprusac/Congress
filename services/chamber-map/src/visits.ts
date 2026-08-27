@@ -122,14 +122,23 @@ export async function classifyVisit(id: number, request: ClassifyVisitRequest): 
   if (request.action === "save_place") {
     // Saving a spot with category "ignored" *is* the "stop asking about
     // this" mechanism - see db/schema.ts's comment on places.category.
-    const place = await createPlace({
-      name: request.name,
-      body: request.body,
-      category: request.category,
-      latitude: existing.clusterLatitude ?? 0,
-      longitude: existing.clusterLongitude ?? 0,
-      radiusMeters: request.radiusMeters,
-    });
+    const place = await createPlace(
+      {
+        name: request.name,
+        body: request.body,
+        category: request.category,
+        latitude: existing.clusterLatitude ?? 0,
+        longitude: existing.clusterLongitude ?? 0,
+        radiusMeters: request.radiusMeters,
+      },
+      // This visit is about to be assigned to the new place by id, and a
+      // reprocess would delete and regenerate it first, leaving the update
+      // below pointed at a row that no longer exists. Naming a dwell
+      // already explains that dwell, so there's nothing to backfill here
+      // anyway; a place that should also match *other* history is a manual
+      // rebuild away (POST /api/reprocess).
+      { reprocessHistory: false }
+    );
     db.update(visits)
       .set({ placeId: place.id, status: "confirmed", updatedAt: new Date() })
       .where(eq(visits.id, id))

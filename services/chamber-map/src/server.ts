@@ -7,6 +7,7 @@ import {
   classifyVisitRequestSchema,
   visitStatusSchema,
   labelTripRequestSchema,
+  reprocessRequestSchema,
 } from "./types.js";
 import {
   mountManifestAndHealth,
@@ -32,6 +33,7 @@ import {
 import { listVisits, getVisit, classifyVisit, listTrips, labelTrip } from "./visits.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { getPollState, toPollHealth } from "./pollState.js";
+import { reprocessRange } from "./reprocess.js";
 import { searchPlaceExhibits, resolvePlaceExhibits } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
@@ -156,6 +158,21 @@ app.post("/api/trips/:id/label", async (c) => {
 
 app.get("/api/poll-health", (c) => {
   return c.json(toPollHealth(getPollState()));
+});
+
+// Manual history rebuild - the same replay adding a place triggers on its
+// own, but pointed wherever the owner wants (after retuning a threshold, or
+// after a fix to the classifier itself). Defaults to the whole log.
+app.post("/api/reprocess", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = reprocessRequestSchema.safeParse(body ?? {});
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  const from = parsed.data.from ? new Date(parsed.data.from) : new Date(0);
+  const to = parsed.data.to ? new Date(parsed.data.to) : new Date();
+  if (from.getTime() > to.getTime()) return c.json({ error: "invalid_range" }, 400);
+  return c.json(await reprocessRange(from, to));
 });
 
 mountExhibitSearchRoutes(app, { search: searchPlaceExhibits, resolve: resolvePlaceExhibits });

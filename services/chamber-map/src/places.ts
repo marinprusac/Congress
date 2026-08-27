@@ -5,6 +5,7 @@ import { db } from "./db/client.js";
 import { places } from "./db/schema.js";
 import { toExhibitId, parsePlaceId, pushExhibitSync } from "./exhibits.js";
 import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForPlace } from "./refs.js";
+import { reprocessForPlace } from "./reprocess.js";
 
 // The set of Exhibits this place points at is the union of what's embedded
 // in its body ("[[" tokens) and what was added explicitly via the
@@ -45,6 +46,18 @@ export const removeManualRefByExhibitId = manualRefsByExhibitId.removeManualRefB
 export async function resyncPlaceExhibitByExhibitId(exhibitId: string): Promise<void> {
   const id = parsePlaceId(exhibitId);
   if (id !== null) await resyncPlaceExhibit(id);
+}
+
+// The place edit itself is already committed by the time history is rebuilt
+// off the back of it, and the rebuild is re-runnable by hand from Settings -
+// so a failure there is worth logging, not worth failing the write the
+// owner actually asked for.
+async function reprocessQuietly(...args: Parameters<typeof reprocessForPlace>): Promise<void> {
+  try {
+    await reprocessForPlace(...args);
+  } catch (error) {
+    console.error("[chamber-map] history rebuild after a place change failed:", error);
+  }
 }
 
 function toSummary(row: typeof places.$inferSelect): PlaceSummary {
@@ -88,7 +101,19 @@ export async function getPlace(id: number): Promise<PlaceDetail | null> {
   return row ? toSummary(row) : null;
 }
 
-export async function createPlace(input: CreatePlaceRequest): Promise<PlaceDetail> {
+export interface CreatePlaceOptions {
+  // Whether adding this place should re-derive the visits it retroactively
+  // explains (see reprocess.ts). Callers that are mid-way through editing a
+  // specific visit row pass false: a reprocess deletes and regenerates
+  // visits in its range, which would pull the row out from under them -
+  // see classifyVisit's save_place branch.
+  reprocessHistory?: boolean;
+}
+
+export async function createPlace(
+  input: CreatePlaceRequest,
+  options: CreatePlaceOptions = {}
+): Promise<PlaceDetail> {
   const now = new Date();
   const inserted = db
     .insert(places)
@@ -106,6 +131,14 @@ export async function createPlace(input: CreatePlaceRequest): Promise<PlaceDetai
     .get();
 
   await syncPlaceExhibit(inserted.id, inserted.name, inserted.body);
+
+  // A place is a rule for reading the position log, not just a row - so
+  // naming somewhere you've already been should surface those past visits
+  // rather than only apply going forward. No-ops when no recorded fix ever
+  // fell inside its radius.
+  if (options.reprocessHistory ?? true) {
+    await reprocessQuietly(inserted);
+  }
 
   return toSummary(inserted);
 }
@@ -128,6 +161,18 @@ export async function updatePlace(id: number, input: UpdatePlaceRequest): Promis
 
   await syncPlaceExhibit(id, next.name, next.body);
 
+  // Only geometry changes what the position log means - renaming a place or
+  // editing its body doesn't move a single visit, so don't rewrite history
+  // for those. Both geometries are passed so a shrunk radius or moved pin
+  // also reaches back far enough to drop visits the old shape used to match.
+  const geometryChanged =
+    next.latitude !== existing.latitude ||
+    next.longitude !== existing.longitude ||
+    next.radiusMeters !== existing.radiusMeters;
+  if (geometryChanged) {
+    await reprocessQuietly(next, existing);
+  }
+
   return getPlace(id);
 }
 
@@ -144,6 +189,11 @@ export async function deletePlace(id: number): Promise<boolean> {
       outgoingRefs: [],
       deleted: true,
     });
+    // The visits that pointed here are left behind with a null placeId by
+    // the FK's ON DELETE SET NULL, which reads as "Unknown location" rather
+    // than as the unclassified dwells they've become - replaying turns them
+    // back into ordinary pending stops the owner can reclassify.
+    await reprocessQuietly(existing);
   }
   return result.changes > 0;
 }

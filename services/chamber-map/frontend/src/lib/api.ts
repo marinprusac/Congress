@@ -11,6 +11,8 @@ import type {
   Settings,
   UpdateSettingsRequest,
   PollHealth,
+  ReprocessRequest,
+  ReprocessResult,
 } from "../../../src/types";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
@@ -129,4 +131,14 @@ export function updateSettings(input: UpdateSettingsRequest): Promise<Settings> 
 
 export function fetchPollHealth(): Promise<PollHealth> {
   return fetch(`${API_BASE}/poll-health`).then((res) => json(res));
+}
+
+// Rebuilds visits and trips from the stored position log. No body means
+// "the whole log" - see reprocess.ts.
+export function reprocessHistory(input: ReprocessRequest = {}): Promise<ReprocessResult> {
+  return fetch(`${API_BASE}/reprocess`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  }).then((res) => json(res));
 }
