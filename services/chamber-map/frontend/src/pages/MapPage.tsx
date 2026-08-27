@@ -8,6 +8,7 @@ import { fetchVisits, fetchTrips, labelTrip } from "@/lib/api";
 import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
 import { formatDuration } from "@/lib/formatDuration";
 import { placeMarkerIcon } from "@/lib/markerIcon";
+import { tripPositions } from "@/lib/tripPath";
 import type { Trip, Visit } from "../../../src/types";
 import "leaflet/dist/leaflet.css";
 import "@/components/mapMarker.css";
@@ -54,17 +55,27 @@ const MODE_COLOR: Record<Trip["mode"], string> = {
 // would permanently lock onto its zoomed-out "no markers yet" fallback
 // view instead of ever moving to show the day's actual locations once they
 // arrive.
-function FitToMarkers({ markers }: { markers: Visit[] }) {
+// Frames the day over where it was actually spent - the routes travelled as
+// well as the places stopped at. Fitting to the markers alone would zoom
+// tight around a single stop and leave that day's trip lines off-screen
+// entirely, which for a day whose whole story is one long journey hides
+// exactly the thing worth seeing. Both props must be memoized by the
+// caller: a fresh array each render would re-fit the map continuously and
+// fight the viewer's own panning.
+function FitToDay({ markers, paths }: { markers: Visit[]; paths: [number, number][][] }) {
   const map = useMap();
   useEffect(() => {
-    if (markers.length === 0) return;
-    if (markers.length === 1) {
-      map.setView([markers[0]!.latitude!, markers[0]!.longitude!], 13);
+    const points: [number, number][] = [
+      ...markers.map((v): [number, number] => [v.latitude!, v.longitude!]),
+      ...paths.flat(),
+    ];
+    if (points.length === 0) return;
+    if (points.length === 1) {
+      map.setView(points[0]!, 13);
       return;
     }
-    const bounds = L.latLngBounds(markers.map((v): [number, number] => [v.latitude!, v.longitude!]));
-    map.fitBounds(bounds, { padding: [32, 32], maxZoom: 15 });
-  }, [markers, map]);
+    map.fitBounds(L.latLngBounds(points), { padding: [32, 32], maxZoom: 15 });
+  }, [markers, paths, map]);
   return null;
 }
 
@@ -157,6 +168,17 @@ export function MapPage() {
     return [...byKey.values()];
   }, [visits]);
 
+  // Resolved once and reused for both drawing and framing, so the two can't
+  // disagree about which trips are on the map.
+  const tripLines = useMemo(
+    () =>
+      trips
+        .map((trip) => ({ trip, positions: tripPositions(trip, visitsById) }))
+        .filter((line): line is { trip: Trip; positions: [number, number][] } => line.positions !== null),
+    [trips, visitsById]
+  );
+  const tripPaths = useMemo(() => tripLines.map((line) => line.positions), [tripLines]);
+
   const entries = useMemo(() => {
     const items: ({ at: string; kind: "visit"; visit: Visit } | { at: string; kind: "trip"; trip: Trip })[] = [];
     for (const v of visits) {
@@ -202,47 +224,23 @@ export function MapPage() {
           style={{ height: "100%", width: "100%" }}
         >
           <TileLayer url={tileUrl} attribution={MAP_TILE_ATTRIBUTION} className={tileClassName} />
-          <FitToMarkers markers={markers} />
+          <FitToDay markers={markers} paths={tripPaths} />
           {markers.map((v) => (
             <Marker key={v.id} position={[v.latitude!, v.longitude!]} icon={placeMarkerIcon}>
               <Popup>{v.placeName ?? v.adhocLabel ?? "Unclassified location"}</Popup>
             </Marker>
           ))}
-          {trips.map((t) => {
-            const fromVisit = visitsById.get(t.fromVisitId);
-            const toVisit = visitsById.get(t.toVisitId);
-            if (!fromVisit || !toVisit || fromVisit.latitude === null || toVisit.latitude === null) return null;
-            // t.path is the real sequence of GPS fixes recorded while in
-            // transit (tracking.ts) - endpoints included so it connects
-            // visually to the place markers even when both ends are the same
-            // place (a same-place round trip with no dot in between). Falls
-            // back to a straight line only for a trip with no recorded path
-            // (e.g. one from before this was tracked, or a Chamber restart
-            // mid-trip lost the in-memory accumulator) - genuinely all we
-            // know in that case, not a substitute for the real thing.
-            const positions: [number, number][] =
-              t.path && t.path.length > 0
-                ? [
-                    [fromVisit.latitude, fromVisit.longitude!],
-                    ...t.path.map((p): [number, number] => [p.latitude, p.longitude]),
-                    [toVisit.latitude, toVisit.longitude!],
-                  ]
-                : [
-                    [fromVisit.latitude, fromVisit.longitude!],
-                    [toVisit.latitude, toVisit.longitude!],
-                  ];
-            return (
-              <Polyline
-                key={t.id}
-                positions={positions}
-                pathOptions={{
-                  color: MODE_COLOR[t.mode],
-                  weight: 3,
-                  dashArray: t.mode === "unknown" || t.mode === "transit" ? "4 4" : undefined,
-                }}
-              />
-            );
-          })}
+          {tripLines.map(({ trip, positions }) => (
+            <Polyline
+              key={trip.id}
+              positions={positions}
+              pathOptions={{
+                color: MODE_COLOR[trip.mode],
+                weight: 3,
+                dashArray: trip.mode === "unknown" || trip.mode === "transit" ? "4 4" : undefined,
+              }}
+            />
+          ))}
         </MapContainer>
       </div>
 

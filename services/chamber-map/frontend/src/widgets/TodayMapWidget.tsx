@@ -5,6 +5,7 @@ import { WidgetPreviewShell } from "@congress/congress-ui";
 import { fetchVisits, fetchTrips } from "@/lib/api";
 import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
 import { placeMarkerIcon } from "@/lib/markerIcon";
+import { tripPositions } from "@/lib/tripPath";
 import type { Trip, Visit } from "../../../src/types";
 import "leaflet/dist/leaflet.css";
 import "@/components/mapMarker.css";
@@ -70,22 +71,8 @@ export function TodayMapWidget() {
               <Marker key={v.id} position={[v.latitude!, v.longitude!]} icon={placeMarkerIcon} />
             ))}
             {trips.map((t) => {
-              const fromVisit = visitsById.get(t.fromVisitId);
-              const toVisit = visitsById.get(t.toVisitId);
-              if (!fromVisit || !toVisit || fromVisit.latitude === null || toVisit.latitude === null) return null;
-              // See MapPage.tsx's own trip rendering for why endpoints are
-              // prepended/appended to the real recorded path.
-              const positions: [number, number][] =
-                t.path && t.path.length > 0
-                  ? [
-                      [fromVisit.latitude, fromVisit.longitude!],
-                      ...t.path.map((p): [number, number] => [p.latitude, p.longitude]),
-                      [toVisit.latitude, toVisit.longitude!],
-                    ]
-                  : [
-                      [fromVisit.latitude, fromVisit.longitude!],
-                      [toVisit.latitude, toVisit.longitude!],
-                    ];
+              const positions = tripPositions(t, visitsById);
+              if (!positions) return null;
               return <Polyline key={t.id} positions={positions} pathOptions={{ color: MODE_COLOR[t.mode], weight: 2 }} />;
             })}
           </MapContainer>
