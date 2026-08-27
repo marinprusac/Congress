@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { useShellHosted, resolveChamberPath, showToast } from "@congress/congress-ui";
 import { fetchVisits, fetchTrips, labelTrip } from "@/lib/api";
 import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
+import { formatDuration } from "@/lib/formatDuration";
 import { placeMarkerIcon } from "@/lib/markerIcon";
 import type { Trip, Visit } from "../../../src/types";
 import "leaflet/dist/leaflet.css";
@@ -43,8 +44,7 @@ function formatTime(iso: string): string {
 const MODE_COLOR: Record<Trip["mode"], string> = {
   walk: "#7c9c74",
   bike: "#c98a3a",
-  drive: "#a6231f",
-  flight: "#3a6ea5",
+  transit: "#3a6ea5",
   unknown: "#8b8880",
 };
 
@@ -102,7 +102,7 @@ function TripEntry({ trip }: { trip: Trip }) {
   return (
     <li className="py-1 pl-6 text-xs text-dust">
       <span className="italic">
-        {trip.mode} · {trip.durationMinutes} min · {trip.distanceKm.toFixed(1)} km
+        {trip.mode} · {formatDuration(trip.durationMinutes)} · {trip.distanceKm.toFixed(1)} km
         {trip.label ? ` · "${trip.label}"` : ""}
       </span>{" "}
       {editing ? (
@@ -235,7 +235,11 @@ export function MapPage() {
               <Polyline
                 key={t.id}
                 positions={positions}
-                pathOptions={{ color: MODE_COLOR[t.mode], weight: 3, dashArray: t.mode === "unknown" ? "4 4" : undefined }}
+                pathOptions={{
+                  color: MODE_COLOR[t.mode],
+                  weight: 3,
+                  dashArray: t.mode === "unknown" || t.mode === "transit" ? "4 4" : undefined,
+                }}
               />
             );
           })}
@@ -255,7 +259,7 @@ export function MapPage() {
                 <span className="ml-2 text-sm text-dust">
                   {formatTime(e.visit.arrivedAt)}
                   {e.visit.departedAt ? ` – ${formatTime(e.visit.departedAt)}` : " – now"}
-                  {e.visit.durationMinutes !== null ? ` (${e.visit.durationMinutes} min)` : ""}
+                  {e.visit.durationMinutes !== null ? ` (${formatDuration(e.visit.durationMinutes)})` : ""}
                 </span>
                 {e.visit.status === "pending" && (
                   <Link to={resolveChamberPath("/pending", "map", shellHosted)} className="ml-2 text-sm text-accent hover:underline">

@@ -107,16 +107,14 @@ async function handleTransition(
       previous.placeId !== null && next.placeId !== null && previous.placeId !== next.placeId
         ? `commute to ${placeById.get(next.placeId)?.name ?? "destination"}`
         : null;
-    // Straight-line fallback for a trip with no accumulated in-transit fixes
-    // at all (a silent gap) - the only distance signal available then, and
-    // what tells guessTripMode's flight heuristic apart from an ordinary
-    // brief signal drop. 0 when either endpoint's location can't be
-    // resolved (shouldn't normally happen, but a missing place mid-flight
-    // shouldn't crash tracking over a cosmetic distance figure).
+    // The two visits' own locations - see createTrip's own comment for what
+    // these back (the flight heuristic's distance signal, a distanceKm
+    // fallback, and the path's anchors). Null when a location can't be
+    // resolved (shouldn't normally happen, but a missing place mid-trip
+    // shouldn't crash tracking over a cosmetic distance/path figure).
     const fromLatLng = visitLatLng(previous, placeById);
     const toLatLng = visitLatLng(next, placeById);
-    const endpointDistanceKm = fromLatLng && toLatLng ? haversineMeters(fromLatLng, toLatLng) / 1000 : 0;
-    const trip = await createTrip(previous.id, next.id, previous.arrivedAt, atFixTime, inTransitAcc, endpointDistanceKm, autoLabel);
+    const trip = await createTrip(previous.id, next.id, departedAt, atFixTime, inTransitAcc, fromLatLng, toLatLng, autoLabel);
     await publishEvent({
       type: "map.trip_completed",
       payload: {
@@ -266,8 +264,42 @@ export async function processPositions(positions: TraccarPosition[]): Promise<vo
     // dwells anywhere else in between (drive-thru, quick errand) still
     // produces two visits and a real trip - see visits.ts's needsLabel -
     // instead of one visit silently spanning the whole outing.
-    candidateStop = null;
-    if (openVisitRow) {
+    // (openVisitRow and candidateStop are never both non-null at once - the
+    // moment either one is set, the other has already been cleared - so
+    // this is genuinely either/or, not two independent checks.)
+    if (candidateStop) {
+      // The device went quiet right after a stopped fix and only reappears
+      // now, outside the cluster - however far, however long. Sparse or
+      // indoor reporting (an airport terminal, a shop) can mean the
+      // "still here" pings that would ordinarily extend the cluster above
+      // just never arrived, so the silent stretch itself is the only dwell
+      // signal available; crediting it to the stop is what catches a real
+      // stay that a strict distance-clustered reading of the fixes alone
+      // would otherwise miss entirely. Closed immediately (not left open
+      // the way the ordinary in-cluster promotion above does), since by
+      // construction we already know they'd left by the time this fix
+      // arrived.
+      const dwellMs = fixTime.getTime() - candidateStop.firstFixTime.getTime();
+      if (dwellMs >= settings.minDwellMs) {
+        const arrivedAt = candidateStop.firstFixTime;
+        const newVisit = openPendingVisit(candidateStop.latitude, candidateStop.longitude, arrivedAt);
+        await handleTransition(openVisitRow ?? tripOrigin, newVisit, arrivedAt, placeById);
+        closeVisit(newVisit.id, fixTime);
+        newVisit.departedAt = fixTime;
+        tripOrigin = newVisit;
+        markPendingNotified(newVisit.id, fixTime);
+        await publishEvent({
+          type: "map.unclassified_dwell_pending",
+          payload: {
+            visitId: newVisit.id,
+            clusterLatitude: newVisit.clusterLatitude,
+            clusterLongitude: newVisit.clusterLongitude,
+            dwellMinutes: Math.round(dwellMs / 60000),
+          },
+        });
+      }
+      candidateStop = null;
+    } else if (openVisitRow) {
       closeVisit(openVisitRow.id, fixTime);
       openVisitRow.departedAt = fixTime;
       tripOrigin = openVisitRow;

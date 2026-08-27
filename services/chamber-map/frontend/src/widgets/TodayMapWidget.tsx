@@ -17,8 +17,7 @@ function todayIso(): string {
 const MODE_COLOR: Record<Trip["mode"], string> = {
   walk: "#7c9c74",
   bike: "#c98a3a",
-  drive: "#a6231f",
-  flight: "#3a6ea5",
+  transit: "#3a6ea5",
   unknown: "#8b8880",
 };
 

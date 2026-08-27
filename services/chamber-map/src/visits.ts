@@ -185,23 +185,26 @@ export function accumulateTripFix(
   acc.count += 1;
 }
 
-// No ground transport plausibly covers this distance with literally zero
-// GPS pings the whole way (a long highway drive through a dead zone still
-// gets *some* signal somewhere) - airplane mode is what reliably produces a
-// completely silent gap, so a big enough endpoint-to-endpoint distance with
-// no accumulated fixes at all is treated as a flight rather than "unknown".
-const FLIGHT_MIN_SILENT_DISTANCE_KM = 300;
-// A fix genuinely recorded faster than any car - caught mid-climb/descent
-// before or after signal drops, rather than inferred from silence alone.
-const FLIGHT_MIN_SPEED_KMH = 200;
+const WALK_MAX_KMH = 7;
+const BIKE_MAX_KMH = 25;
+// Above this much distance with no tracked movement behind it, it stops
+// being plausible that a person just walked/biked it with a brief GPS gap
+// (a dead zone through one tunnel, a phone tucked away for a few minutes) -
+// something motorized covered it, whatever it actually was (car, train,
+// bus, plane; this Chamber doesn't try to tell those apart, see TripMode).
+// Checked against untracked distance, not bare fix count, so a trip isn't
+// misread as "walk" just because a handful of fixes exist at one end (e.g.
+// the final stretch from a bus stop to the front door, once signal returns)
+// while the bulk of it was covered with zero GPS.
+const UNTRACKED_TRANSIT_KM = 2;
 
 function guessTripMode(acc: TripFixAccumulator, endpointDistanceKm: number): TripMode {
   const maxSpeedKmh = acc.count > 0 ? acc.maxSpeedKnots * KNOTS_TO_KMH : 0;
-  if (maxSpeedKmh >= FLIGHT_MIN_SPEED_KMH) return "flight";
-  if (acc.count === 0) return endpointDistanceKm >= FLIGHT_MIN_SILENT_DISTANCE_KM ? "flight" : "unknown";
-  if (maxSpeedKmh < 7) return "walk";
-  if (maxSpeedKmh < 25) return "bike";
-  return "drive";
+  if (maxSpeedKmh >= BIKE_MAX_KMH) return "transit";
+  const untrackedKm = Math.max(endpointDistanceKm - acc.distanceKm, 0);
+  if (untrackedKm > UNTRACKED_TRANSIT_KM) return "transit";
+  if (acc.count === 0) return "unknown";
+  return maxSpeedKmh < WALK_MAX_KMH ? "walk" : "bike";
 }
 
 const fromVisits = alias(visits, "from_visits");
@@ -293,18 +296,26 @@ export async function createTrip(
   departedAt: Date,
   arrivedAt: Date,
   acc: TripFixAccumulator,
-  // Straight-line distance between the two visits' own locations - the only
-  // distance signal available when acc has no fixes at all (a silent gap),
-  // and what guessTripMode's flight heuristic checks against.
-  endpointDistanceKm: number,
+  // The two visits' own locations, when resolvable - null for e.g. an
+  // unclassified visit that somehow has neither a place nor cluster coords.
+  // Used three ways below: as the flight heuristic's distance signal, as a
+  // distanceKm fallback when there's little/no tracked movement to sum, and
+  // to anchor the path so a trip always has *something* to draw even when
+  // acc has no fixes at all (a silent gap, e.g. a flight, otherwise leaves
+  // path null and nothing renders on the map).
+  fromLatLng: { latitude: number; longitude: number } | null,
+  toLatLng: { latitude: number; longitude: number } | null,
   label: string | null = null
 ): Promise<Trip> {
+  const endpointDistanceKm = fromLatLng && toLatLng ? haversineMeters(fromLatLng, toLatLng) / 1000 : 0;
   const mode = guessTripMode(acc, endpointDistanceKm);
-  // acc.distanceKm is a sum over accumulated fixes - meaningless (always 0)
-  // when there were none, so fall back to the endpoint distance rather than
-  // reporting a silent gap as "0 km".
-  const distanceKm = acc.count > 0 ? acc.distanceKm : endpointDistanceKm;
-  const path = acc.points.length > 0 ? JSON.stringify(acc.points.map((p) => [p.latitude, p.longitude])) : null;
+  // acc.distanceKm only sums real tracked movement - for a flight (or any
+  // trip where most of the distance is untracked) that undercounts, so
+  // report the straight-line endpoint distance instead whenever it's the
+  // larger of the two.
+  const distanceKm = Math.max(acc.distanceKm, endpointDistanceKm);
+  const pathPoints = [...(fromLatLng ? [fromLatLng] : []), ...acc.points, ...(toLatLng ? [toLatLng] : [])];
+  const path = pathPoints.length > 0 ? JSON.stringify(pathPoints.map((p) => [p.latitude, p.longitude])) : null;
 
   const inserted = db
     .insert(trips)

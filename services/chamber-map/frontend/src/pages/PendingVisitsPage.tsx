@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader, FormLabel, FormTextInput, showToast } from "@congress/congress-ui";
 import { fetchVisits, fetchPlaces, classifyVisit } from "@/lib/api";
 import { PlacePicker } from "@/components/PlacePicker";
+import { formatDuration } from "@/lib/formatDuration";
 import type { PlaceSummary, Visit } from "../../../src/types";
 
 function PendingVisitCard({ visit, places }: { visit: Visit; places: PlaceSummary[] }) {
@@ -54,7 +55,7 @@ function PendingVisitCard({ visit, places }: { visit: Visit; places: PlaceSummar
     <div className="mb-8 border border-dust p-4">
       <p className="mb-3 font-mono text-xs text-dust">
         Arrived {new Date(visit.arrivedAt).toLocaleString()}
-        {visit.durationMinutes !== null ? ` — dwelling ${visit.durationMinutes} min` : ""}
+        {visit.durationMinutes !== null ? ` — dwelling ${formatDuration(visit.durationMinutes)}` : ""}
       </p>
 
       {visit.latitude !== null && visit.longitude !== null && (

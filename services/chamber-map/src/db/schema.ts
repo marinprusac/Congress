@@ -118,7 +118,7 @@ export const trips = sqliteTable(
     departedAt: integer("departed_at", { mode: "timestamp_ms" }).notNull(),
     arrivedAt: integer("arrived_at", { mode: "timestamp_ms" }).notNull(),
     distanceKm: real("distance_km").notNull(),
-    mode: text("mode", { enum: ["walk", "bike", "drive", "flight", "unknown"] }).notNull(),
+    mode: text("mode", { enum: ["walk", "bike", "transit", "unknown"] }).notNull(),
     // Owner-authored purpose ("walking the dog", "getting lunch"), only ever
     // meaningful for a trip whose endpoints are the same known place (see
     // visits.ts's needsLabel) - a same-place round trip with no dot recorded
