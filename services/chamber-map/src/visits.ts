@@ -185,7 +185,20 @@ export function accumulateTripFix(
   acc.count += 1;
 }
 
-function guessTripMode(maxSpeedKmh: number): TripMode {
+// No ground transport plausibly covers this distance with literally zero
+// GPS pings the whole way (a long highway drive through a dead zone still
+// gets *some* signal somewhere) - airplane mode is what reliably produces a
+// completely silent gap, so a big enough endpoint-to-endpoint distance with
+// no accumulated fixes at all is treated as a flight rather than "unknown".
+const FLIGHT_MIN_SILENT_DISTANCE_KM = 300;
+// A fix genuinely recorded faster than any car - caught mid-climb/descent
+// before or after signal drops, rather than inferred from silence alone.
+const FLIGHT_MIN_SPEED_KMH = 200;
+
+function guessTripMode(acc: TripFixAccumulator, endpointDistanceKm: number): TripMode {
+  const maxSpeedKmh = acc.count > 0 ? acc.maxSpeedKnots * KNOTS_TO_KMH : 0;
+  if (maxSpeedKmh >= FLIGHT_MIN_SPEED_KMH) return "flight";
+  if (acc.count === 0) return endpointDistanceKm >= FLIGHT_MIN_SILENT_DISTANCE_KM ? "flight" : "unknown";
   if (maxSpeedKmh < 7) return "walk";
   if (maxSpeedKmh < 25) return "bike";
   return "drive";
@@ -280,15 +293,22 @@ export async function createTrip(
   departedAt: Date,
   arrivedAt: Date,
   acc: TripFixAccumulator,
+  // Straight-line distance between the two visits' own locations - the only
+  // distance signal available when acc has no fixes at all (a silent gap),
+  // and what guessTripMode's flight heuristic checks against.
+  endpointDistanceKm: number,
   label: string | null = null
 ): Promise<Trip> {
-  const maxSpeedKmh = acc.count > 0 ? acc.maxSpeedKnots * KNOTS_TO_KMH : 0;
-  const mode: TripMode = acc.count === 0 ? "unknown" : guessTripMode(maxSpeedKmh);
+  const mode = guessTripMode(acc, endpointDistanceKm);
+  // acc.distanceKm is a sum over accumulated fixes - meaningless (always 0)
+  // when there were none, so fall back to the endpoint distance rather than
+  // reporting a silent gap as "0 km".
+  const distanceKm = acc.count > 0 ? acc.distanceKm : endpointDistanceKm;
   const path = acc.points.length > 0 ? JSON.stringify(acc.points.map((p) => [p.latitude, p.longitude])) : null;
 
   const inserted = db
     .insert(trips)
-    .values({ fromVisitId, toVisitId, departedAt, arrivedAt, distanceKm: acc.distanceKm, mode, label, path, createdAt: new Date() })
+    .values({ fromVisitId, toVisitId, departedAt, arrivedAt, distanceKm, mode, label, path, createdAt: new Date() })
     .returning()
     .get();
 

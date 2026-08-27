@@ -34,6 +34,16 @@ interface PlaceCandidate {
   radiusMeters: number;
 }
 
+function visitLatLng(visit: VisitRow, placeById: Map<number, PlaceCandidate>): { latitude: number; longitude: number } | null {
+  if (visit.placeId !== null) {
+    const place = placeById.get(visit.placeId);
+    return place ? { latitude: place.latitude, longitude: place.longitude } : null;
+  }
+  return visit.clusterLatitude !== null && visit.clusterLongitude !== null
+    ? { latitude: visit.clusterLatitude, longitude: visit.clusterLongitude }
+    : null;
+}
+
 function findMatchingPlace(fix: TraccarPosition, candidates: PlaceCandidate[]): PlaceCandidate | null {
   let best: { place: PlaceCandidate; distance: number } | null = null;
   for (const place of candidates) {
@@ -97,7 +107,16 @@ async function handleTransition(
       previous.placeId !== null && next.placeId !== null && previous.placeId !== next.placeId
         ? `commute to ${placeById.get(next.placeId)?.name ?? "destination"}`
         : null;
-    const trip = await createTrip(previous.id, next.id, previous.arrivedAt, atFixTime, inTransitAcc, autoLabel);
+    // Straight-line fallback for a trip with no accumulated in-transit fixes
+    // at all (a silent gap) - the only distance signal available then, and
+    // what tells guessTripMode's flight heuristic apart from an ordinary
+    // brief signal drop. 0 when either endpoint's location can't be
+    // resolved (shouldn't normally happen, but a missing place mid-flight
+    // shouldn't crash tracking over a cosmetic distance figure).
+    const fromLatLng = visitLatLng(previous, placeById);
+    const toLatLng = visitLatLng(next, placeById);
+    const endpointDistanceKm = fromLatLng && toLatLng ? haversineMeters(fromLatLng, toLatLng) / 1000 : 0;
+    const trip = await createTrip(previous.id, next.id, previous.arrivedAt, atFixTime, inTransitAcc, endpointDistanceKm, autoLabel);
     await publishEvent({
       type: "map.trip_completed",
       payload: {

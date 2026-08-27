@@ -75,7 +75,7 @@ export const classifyVisitRequestSchema = z.discriminatedUnion("action", [
 ]);
 export type ClassifyVisitRequest = z.infer<typeof classifyVisitRequestSchema>;
 
-export const tripModeSchema = z.enum(["walk", "bike", "drive", "unknown"]);
+export const tripModeSchema = z.enum(["walk", "bike", "drive", "flight", "unknown"]);
 export type TripMode = z.infer<typeof tripModeSchema>;
 
 // needsLabel is derived at read time (fromPlaceId === toPlaceId, both
