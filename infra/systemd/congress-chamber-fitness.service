@@ -1,0 +1,15 @@
+[Unit]
+Description=Congress - Fitness Chamber
+After=network.target congress-core.service
+
+[Service]
+Type=simple
+User=marin
+WorkingDirectory=/srv/congress/services/chamber-fitness
+ExecStart=/usr/bin/pnpm run start
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
