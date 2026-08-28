@@ -223,7 +223,7 @@ const BIKE_MAX_KMH = 25;
 // while the bulk of it was covered with zero GPS.
 const UNTRACKED_TRANSIT_KM = 2;
 
-function guessTripMode(acc: TripFixAccumulator, endpointDistanceKm: number): TripMode {
+export function guessTripMode(acc: TripFixAccumulator, endpointDistanceKm: number): TripMode {
   const maxSpeedKmh = acc.count > 0 ? acc.maxSpeedKnots * KNOTS_TO_KMH : 0;
   if (maxSpeedKmh >= BIKE_MAX_KMH) return "transit";
   const untrackedKm = Math.max(endpointDistanceKm - acc.distanceKm, 0);

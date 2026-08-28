@@ -38,7 +38,7 @@ const LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
 // re-publishes once, rather than being missed entirely.
 const lastNotifiedState = new Map<number, "due_soon" | "overdue">();
 
-async function checkDueTasks(): Promise<void> {
+export async function checkDueTasks(): Promise<void> {
   const now = Date.now();
   const rows = db
     .select({ id: tasks.id, name: tasks.name, dueDate: tasks.dueDate })
@@ -91,7 +91,7 @@ const MAX_TIMEOUT_MS = 24 * 24 * 60 * 60 * 1000;
 // wait for. A task can cross two thresholds (due_soon, then overdue); only
 // ones still in the future matter here, since anything already past is
 // caught by the checkDueTasks() call that runs right before this.
-function nextThresholdMs(now: number): number | null {
+export function nextThresholdMs(now: number): number | null {
   const rows = db
     .select({ dueDate: tasks.dueDate })
     .from(tasks)

@@ -1,42 +1,13 @@
-import { priorityLevelSchema, type EventDelivery, type PriorityLevel } from "@congress/shared-types";
+import type { EventDelivery } from "@congress/shared-types";
+// getPath/interpolate/priority comparison are shared with chamber-automation
+// (and Congress's own relay filter) rather than re-declared here - see
+// chamber-kit's eventMatching.ts. "low" (the bottom of PRIORITY_LEVELS)
+// already matches every firing, so there's no separate "no threshold" case
+// to special-case at the call sites below.
+import { interpolate, priorityAtLeast, priorityOf } from "@congress/chamber-kit";
 import { getEventSettingsRowByType, markEventSettingsFired } from "./eventSettings.js";
 import { pushNotification } from "./notifications.js";
-import { recordHistory, priorityRankFor } from "./eventHistory.js";
-
-// Reads a dotted path ("a.b.c") out of a plain object, returning undefined
-// for any missing/non-object segment - used by priority extraction and
-// template interpolation below.
-function getPath(payload: Record<string, unknown>, path: string): unknown {
-  return path
-    .split(".")
-    .reduce<unknown>((acc, key) => (acc && typeof acc === "object" ? (acc as Record<string, unknown>)[key] : undefined), payload);
-}
-
-// payload.priority is a convention (PRIORITY_LEVELS, shared-types), not
-// enforced by Congress - anything missing or unrecognized defaults to
-// "normal" rather than rejecting the event.
-function priorityOf(payload: Record<string, unknown>): PriorityLevel {
-  const parsed = priorityLevelSchema.safeParse(payload.priority);
-  return parsed.success ? parsed.data : "normal";
-}
-
-// ">=" is deliberately the only comparison a threshold supports - see
-// eventSettings table's own comment. "low" (the bottom of PRIORITY_LEVELS)
-// already matches every firing, so there's no separate "no threshold" case
-// to special-case here.
-function priorityMatches(threshold: PriorityLevel, priority: PriorityLevel): boolean {
-  return priorityRankFor(priority) >= priorityRankFor(threshold);
-}
-
-// Plain {{payload.x}}/{{payload.a.b}} interpolation - no templating library,
-// no arbitrary expressions, just a dotted-path lookup against the firing
-// event's own payload.
-function interpolate(template: string, payload: Record<string, unknown>): string {
-  return template.replace(/\{\{\s*payload\.([a-zA-Z0-9_.]+)\s*\}\}/g, (_match, path: string) => {
-    const value = getPath(payload, path);
-    return value === undefined || value === null ? "" : String(value);
-  });
-}
+import { recordHistory } from "./eventHistory.js";
 
 // Handed to mountEventReceiveRoute (@congress/chamber-kit) - looks up the
 // single settings row for this event type (auto-derived by
@@ -49,7 +20,7 @@ export async function handleReceivedEvent(event: EventDelivery): Promise<void> {
   const priority = priorityOf(event.payload);
   let fired = false;
 
-  if (row.recordToHistory && priorityMatches(row.historyMinPriority, priority)) {
+  if (row.recordToHistory && priorityAtLeast(priority, row.historyMinPriority)) {
     recordHistory({
       chamber: event.chamber,
       type: event.type,
@@ -61,7 +32,7 @@ export async function handleReceivedEvent(event: EventDelivery): Promise<void> {
     fired = true;
   }
 
-  if (row.notify && priorityMatches(row.notifyMinPriority, priority)) {
+  if (row.notify && priorityAtLeast(priority, row.notifyMinPriority)) {
     // The dedupe key template is an optional field the owner rarely fills
     // in - default to a key scoped to this event type so repeat firings
     // still update the one notification in place instead of piling up.

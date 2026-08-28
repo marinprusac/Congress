@@ -3,6 +3,7 @@ import { db } from "./db/client.js";
 import { visits, trips } from "./db/schema.js";
 import { findEarliestFixNear, listPositionsBetween } from "./positions.js";
 import { processPositions, resetTrackingState, withTrackingLock } from "./tracking.js";
+import { claimStrength } from "./annotationMatching.js";
 import type { ReprocessResult } from "./types.js";
 
 // Visits and trips are derived summaries over `positions` (see that table's
@@ -27,27 +28,6 @@ import type { ReprocessResult } from "./types.js";
 // ancient - one small edit shouldn't silently re-derive years of history.
 // A manual rebuild can still be pointed further back explicitly.
 const PLACE_LOOKBACK_DAYS = 90;
-
-// How much of the annotated stretch the replacement has to actually cover
-// before an annotation is moved onto it. Without a floor, any incidental
-// sliver of overlap would do, and an annotation could migrate onto a
-// neighbouring stretch that merely abuts the one it described.
-const MIN_OVERLAP_RATIO = 0.5;
-
-function overlapMs(a: { start: number; end: number }, b: { start: number; end: number }): number {
-  return Math.max(0, Math.min(a.end, b.end) - Math.max(a.start, b.start));
-}
-
-// Overlap, but only once it clears MIN_OVERLAP_RATIO of the saved span - 0
-// meaning "not the same stretch, don't move the annotation here". A
-// zero-length saved span has no ratio to take, so any overlap counts.
-function claimStrength(saved: { start: number; end: number }, candidate: { start: number; end: number }): number {
-  const overlap = overlapMs(saved, candidate);
-  if (overlap <= 0) return 0;
-  const savedLength = saved.end - saved.start;
-  if (savedLength <= 0) return overlap;
-  return overlap / savedLength >= MIN_OVERLAP_RATIO ? overlap : 0;
-}
 
 type VisitRow = typeof visits.$inferSelect;
 type TripRow = typeof trips.$inferSelect;

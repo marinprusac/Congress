@@ -1,5 +1,10 @@
 import { eq, and, desc, gte, lt } from "drizzle-orm";
-import { PRIORITY_LEVELS, type PriorityLevel } from "@congress/shared-types";
+import type { PriorityLevel } from "@congress/shared-types";
+// Shared with chamber-automation and Congress's own relay filter - see
+// chamber-kit's eventMatching.ts. Re-exported because this module's own
+// callers (and its widgets' priority filters) have always imported the rank
+// helper from here.
+import { priorityRank as priorityRankFor, priorityLevelForRank } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
 import { eventHistory, eventSettings } from "./db/schema.js";
 import type { EventHistoryEntry } from "./types.js";
@@ -11,14 +16,9 @@ import type { EventHistoryEntry } from "./types.js";
 const DEFAULT_HISTORY_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 const LIST_LIMIT = 50;
 
-export function priorityRankFor(level: PriorityLevel | undefined): number {
-  const rank = PRIORITY_LEVELS.indexOf(level ?? "normal");
-  return rank === -1 ? PRIORITY_LEVELS.indexOf("normal") : rank;
-}
+export { priorityRankFor };
 
-function priorityLevelFor(rank: number): PriorityLevel {
-  return PRIORITY_LEVELS[rank] ?? "normal";
-}
+const priorityLevelFor = priorityLevelForRank;
 
 function toEntry(row: typeof eventHistory.$inferSelect, label: string): EventHistoryEntry {
   return {

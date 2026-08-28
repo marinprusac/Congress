@@ -13,6 +13,34 @@ const FORWARD_TIMEOUT_MS = 10_000;
 // gets persisted - the reload-and-it's-there symptom this constant fixes.
 const DEPUTY_CHAT_TIMEOUT_MS = 5 * 60 * 1000;
 
+// A Chamber's registered apiBase is its origin plus "/api"; its frontend and
+// its public assets are served from the origin itself. Named rather than
+// inlined at each call site both because it is the same rule twice over and
+// because it is the sort of thing that silently keeps "working" against a
+// mis-shaped apiBase.
+export function frontendBaseOf(apiBase: string): string {
+  return apiBase.replace(/\/api$/, "");
+}
+
+// Strips a known fixed prefix off the incoming path and re-attaches the
+// query string against a new base. Compiling a RegExp (and treating the
+// chamber name as a pattern) on every proxied request would be needless work
+// - the routes are registered as "/api/:chamber/*" and "/:chamberName/*", so
+// the path is always known to start with exactly this prefix.
+export function rewriteChamberPath(path: string, prefix: string, base: string, search: string, fallback = ""): string {
+  const remainder = path.slice(prefix.length) || fallback;
+  return `${base}${remainder}${search}`;
+}
+
+// Deputy's chat POST blocks on a full headless `claude` run before
+// responding; every other Chamber route answers in milliseconds. See
+// DEPUTY_CHAT_TIMEOUT_MS above.
+export function timeoutFor(chamberName: string, method: string, remainder: string): number {
+  return chamberName === "deputy" && method === "POST" && remainder === "/chat/messages"
+    ? DEPUTY_CHAT_TIMEOUT_MS
+    : FORWARD_TIMEOUT_MS;
+}
+
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
   "keep-alive",
@@ -84,22 +112,13 @@ export async function forwardToChamber(c: Context): Promise<Response> {
     return c.json({ error: "chamber_offline", chamber: chamberName }, 503);
   }
 
-  // Compiling a RegExp (and treating chamberName as a pattern) on every
-  // proxied request is needless work for a fixed-prefix strip - the route is
-  // registered as "/api/:chamber/*", so the path is always known to start
-  // with this exact prefix.
   const apiPrefix = `/api/${chamberName}`;
   const remainder = c.req.path.slice(apiPrefix.length);
   const search = new URL(c.req.url).search;
-  const targetUrl = `${chamber.apiBase}${remainder}${search}`;
-
-  const timeoutMs =
-    chamberName === "deputy" && c.req.method === "POST" && remainder === "/chat/messages"
-      ? DEPUTY_CHAT_TIMEOUT_MS
-      : FORWARD_TIMEOUT_MS;
+  const targetUrl = rewriteChamberPath(c.req.path, apiPrefix, chamber.apiBase, search);
 
   try {
-    return await proxyRequest(c, targetUrl, timeoutMs);
+    return await proxyRequest(c, targetUrl, timeoutFor(chamberName, c.req.method, remainder));
   } catch {
     return c.json({ error: "chamber_unreachable", chamber: chamberName }, 503);
   }
@@ -147,10 +166,8 @@ export async function proxyToChamberIcon(c: Context, chamberName: string): Promi
     return c.json({ error: "chamber_not_found", chamber: chamberName }, 404);
   }
 
-  const frontendBase = chamber.apiBase.replace(/\/api$/, "");
-
   try {
-    return await proxyRequest(c, `${frontendBase}/icons/mark.svg`);
+    return await proxyRequest(c, `${frontendBaseOf(chamber.apiBase)}/icons/mark.svg`);
   } catch {
     return c.json({ error: "chamber_unreachable", chamber: chamberName }, 404);
   }
@@ -169,13 +186,16 @@ export async function forwardToChamberFrontend(
     return c.json({ error: "chamber_offline", chamber: chamber.name }, 503);
   }
 
-  const frontendBase = chamber.apiBase.replace(/\/api$/, "");
-  // Same fixed-prefix strip as forwardToChamber above - the path is always
-  // known to start with "/<chamber.name>" here too.
-  const frontendPrefix = `/${chamber.name}`;
-  const remainder = c.req.path.slice(frontendPrefix.length) || "/";
+  // Same fixed-prefix strip as forwardToChamber above, except that a bare
+  // "/<chamber>" has to become "/" rather than an empty path.
   const search = new URL(c.req.url).search;
-  const targetUrl = `${frontendBase}${remainder}${search}`;
+  const targetUrl = rewriteChamberPath(
+    c.req.path,
+    `/${chamber.name}`,
+    frontendBaseOf(chamber.apiBase),
+    search,
+    "/"
+  );
 
   try {
     return await proxyRequest(c, targetUrl);

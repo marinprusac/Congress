@@ -1,4 +1,9 @@
-import { priorityLevelSchema, PRIORITY_LEVELS, type EventPublishRequest, type PriorityLevel, type ChamberSubscription } from "@congress/shared-types";
+import type { EventPublishRequest, PriorityLevel, ChamberSubscription } from "@congress/shared-types";
+// The same priority vocabulary every subscribing Chamber matches against -
+// see chamber-kit's eventMatching.ts. Congress's filter has to agree with
+// theirs exactly, since a mismatch here means a Chamber's own rules never
+// get the chance to run at all.
+import { priorityAtLeast, priorityOf } from "@congress/chamber-kit";
 import { listChambers, getChamber } from "./registry.js";
 import { env } from "./env.js";
 
@@ -15,15 +20,6 @@ import { env } from "./env.js";
 const RETRY_DELAYS_MS = [0, 5_000, 15_000, 30_000, 90_000];
 const DELIVERY_TIMEOUT_MS = 5_000;
 
-function priorityOf(payload: Record<string, unknown>): PriorityLevel {
-  const parsed = priorityLevelSchema.safeParse(payload.priority);
-  return parsed.success ? parsed.data : "normal";
-}
-
-function priorityRank(p: PriorityLevel): number {
-  return PRIORITY_LEVELS.indexOf(p);
-}
-
 // Coarse per-chamber gate: does this Chamber's own declared interest list
 // (carried on its heartbeat - see registry.ts's subscriptionsJson) cover
 // this publish at all. "*" subscribes to every type (used by a Chamber
@@ -31,10 +27,16 @@ function priorityRank(p: PriorityLevel): number {
 // precise per-rule matching (exact minPriority, condition fields, ...)
 // still happens after it receives the delivery - this is only ever a
 // superset filter, never the final word on whether something "matches".
-function subscriptionMatches(subscriptions: ChamberSubscription[], type: string, priority: PriorityLevel): boolean {
-  return subscriptions.some(
-    (s) => (s.type === "*" || s.type === type) && priorityRank(priority) >= priorityRank(s.minPriority ?? "low")
-  );
+export function subscriptionMatches(
+  subscriptions: ChamberSubscription[],
+  type: string,
+  priority: PriorityLevel
+): boolean {
+  // An absent minPriority means "low" here specifically - i.e. relay
+  // everything of that type - rather than eventMatching's own "treat an
+  // unset level as normal" default, which is about a *publisher* that
+  // didn't declare a priority, not a subscriber that didn't set a floor.
+  return subscriptions.some((s) => (s.type === "*" || s.type === type) && priorityAtLeast(priority, s.minPriority ?? "low"));
 }
 
 function sleep(ms: number): Promise<void> {
