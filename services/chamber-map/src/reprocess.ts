@@ -209,16 +209,33 @@ export async function reprocessRange(from: Date, to: Date = new Date()): Promise
 // Losing that state doesn't corrupt anything already committed, but it does
 // leave the *next* visit permanently unlinked - a real stop with no trip
 // connecting it to wherever the device came from, since nothing else ever
-// retries that link once the moment has passed. Replaying from the last
-// known visit's own arrival (using the exact same code path the live poller
-// uses - see this module's own header comment) re-derives it correctly
-// whether or not anything was actually lost: a boot after a clean shutdown
-// just reproduces the same visit/trip unchanged. Returns null when there's
-// no visit yet to anchor the replay to (a brand new install).
+// retries that link once the moment has passed.
+//
+// `from` has to be the exact moment the trip leading into the latest visit
+// began - the second-to-last visit's own departure, not its arrival and
+// not the latest visit's own arrival either. Either of those instead would
+// put `from` *inside* an already-correct stay or an already-correct trip,
+// reopening a visit that still has no departure yet to replay one from and
+// clipping the fixes the trip needs to reconstruct its path/distance/mode -
+// collapsing it to a same-instant, same-place non-event rather than
+// reconstructing it. Anchoring at the departure itself keeps the
+// second-to-last visit untouched (reopened and immediately re-closed at
+// the very same fix, since `from` is inclusive) and hands the replay every
+// fix the incoming trip actually needs. With fewer than two visits there's
+// no preceding trip to have lost, so the latest visit's own arrival is a
+// safe (if inert) anchor - and a visit that isn't the latest is always
+// already closed, so `departedAt` is never null here.
+//
+// Replaying (via the exact same code path the live poller uses - see this
+// module's own header comment) re-derives the tail correctly whether or
+// not anything was actually lost: a boot after a clean shutdown just
+// reproduces the same visits/trips unchanged. Returns null when there's no
+// visit yet to anchor the replay to (a brand new install).
 export async function healTrackingStateOnBoot(): Promise<ReprocessResult | null> {
-  const latest = db.select().from(visits).orderBy(desc(visits.arrivedAt)).limit(1).get();
-  if (!latest) return null;
-  return reprocessRange(latest.arrivedAt);
+  const recent = db.select().from(visits).orderBy(desc(visits.arrivedAt)).limit(2).all();
+  if (recent.length === 0) return null;
+  const from = recent[1]?.departedAt ?? recent[0]!.arrivedAt;
+  return reprocessRange(from);
 }
 
 // Applies a newly added or moved place to the history it should have
