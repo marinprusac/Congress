@@ -111,11 +111,11 @@ don't reimplement them:
 | `createChamberBootstrap({...})` | The entire boot sequence — migrate, listen, register + heartbeat with Congress, clean shutdown on SIGINT/SIGTERM. Your `src/index.ts` is ~7 lines that call this once. |
 | `createMcpApp(name, registerTools, internalToken)` | The full MCP transport/session/error plumbing, plus gating `/mcp` behind the same shared-secret header used for register/heartbeat/events - you only write `server.registerTool(...)` calls. |
 | `fetchRegistry(capitolUrl, internalToken)` | Server-side counterpart to congress-ui's own `fetchRegistry` - resolves another Chamber's `apiBase`/`mcpUrl` out of the live registry, e.g. before calling one of its tools. |
-| `listChamberTools(mcpUrl, internalToken)` / `callChamberTool(mcpUrl, internalToken, name, args)` | A short-lived MCP *client* against another Chamber's own `mcpUrl` - `tools/list`/`tools/call`, gated the same way. What Automation Chamber's automations use to actually do something, see §5.3. |
+| `listChamberTools(mcpUrl, internalToken)` / `callChamberTool(mcpUrl, internalToken, name, args)` | A short-lived MCP *client* against another Chamber's own `mcpUrl` - `tools/list`/`tools/call`, gated the same way. What Automation Chamber's automations use to actually do something, see §5.4. |
 | `createTableBackedExhibits(config)` | Implements the whole Exhibit content contract (search/resolve) for a table-backed entity from a handful of callbacks. |
 | `createPushExhibitSync(opts)` | Fire-and-forget `POST /congress/exhibits/sync` after create/update/delete. |
-| `createPublishEvent(opts)` | Fire-and-forget `POST /congress/events/publish` for a domain event another Chamber's rules or automations might react to - see §5.2. |
-| `mountEventReceiveRoute(app, internalToken, onEvent)` | Mounts `POST /api/events/receive`, the push counterpart to `createPublishEvent` - Congress calls this directly the moment a publish matches your own declared subscriptions, instead of you polling for it. See §5.2. |
+| `createPublishEvent(opts)` | Fire-and-forget `POST /congress/events/publish` for a domain event another Chamber's rules or automations might react to - see §5.3. |
+| `mountEventReceiveRoute(app, internalToken, onEvent)` | Mounts `POST /api/events/receive`, the push counterpart to `createPublishEvent` - Congress calls this directly the moment a publish matches your own declared subscriptions, instead of you polling for it. See §5.3. |
 | `createSingleRowSettings(config)` | The "id is always 1, select-then-upsert" settings pattern every Chamber uses. |
 | `createManualRefs`/`createManualRefsByExhibitId` | CRUD for the "Connections" side-panel's manually-added refs, separate from wikilinks parsed out of body text. |
 | `extractOutgoingExhibitRefs(text)` | Parses `[[...]]` tokens out of body text into an exhibit-id list. |
@@ -220,7 +220,31 @@ tools reachable at `/mcp` (gated by `CONGRESS_INTERNAL_TOKEN`, not a
 session cookie, since MCP clients are machines) — just works once the
 manifest is correct and the process is heartbeating.
 
-### 5.2 Publishing and receiving events
+### 5.2 Settings tab
+
+If your Chamber has anything the owner might want to configure (an API key,
+a poll interval, thresholds — anything editable via `GET`/`PUT /api/settings`
+and `createSingleRowSettings`), it gets its own tab on Congress's unified
+Settings page (`services/congress/frontend/src/pages/SettingsPage.tsx`)
+automatically — as long as `frontend/src/remote.tsx` exports it:
+
+```ts
+export const settings: ComponentType = withQueryClient(SettingsPage);
+```
+
+wrapping your `frontend/src/pages/SettingsPage.tsx` the same way `widgets`
+wraps each widget component above. **This is not automatic just because
+`SettingsPage.tsx` exists** — the scaffold generates that file for you, but
+Congress's Settings hub only shows a tab for a Chamber whose remote entry
+actually exports `settings`; a Chamber with nothing configurable is meant to
+omit it (Capitol does this — it has no `SettingsPage.tsx` at all), but for
+every other Chamber, forgetting this one line is easy to do and easy to
+miss, since your own Chamber's `/‹name›/settings` route still works
+standalone — only the *unified* tab silently disappears, with nothing
+broken or logged anywhere. Check this first if a Chamber's settings ever
+seem to have "gone missing" from the hub.
+
+### 5.3 Publishing and receiving events
 
 If your Chamber has a background check that decides "the owner should know
 about this" (a due date, an incoming webhook, anything else only your
@@ -328,7 +352,7 @@ A Chamber that never expects to react to another Chamber's events omits
 to opt into structurally, and Congress simply never has anything to push to
 it.
 
-### 5.3 Being called by an automation
+### 5.4 Being called by an automation
 
 Any MCP tool your Chamber registers via `registerTools` (§4) is automatically
 callable by an Automation Chamber automation — there's nothing to opt into
