@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FormLabel, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
+import { FormLabel } from "@congress/congress-ui";
 import { fetchSettings, updateSettings, fetchSpend } from "@/lib/api";
 import type { UpdateSettingsRequest } from "../../../src/types";
 
 const inputClass = "w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
 
 export function SettingsPage() {
-  const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
   const spendQuery = useQuery({ queryKey: ["settings", "spend"], queryFn: fetchSpend, refetchInterval: 60_000 });
@@ -19,8 +17,7 @@ export function SettingsPage() {
     if (settingsQuery.data) {
       const s = settingsQuery.data;
       setDraft({
-        personaPrompt: s.personaPrompt,
-        checkupIntervalMs: s.checkupIntervalMs,
+        contextPrompt: s.contextPrompt,
         chatIdleWindowMs: s.chatIdleWindowMs,
         budgetCapUsd: s.budgetCapUsd,
         model: s.model,
@@ -76,26 +73,16 @@ export function SettingsPage() {
           save();
         }}
       >
-        <FormLabel>Persona / tone</FormLabel>
+        <FormLabel>Context</FormLabel>
         <textarea
-          value={draft.personaPrompt ?? ""}
-          onChange={(e) => setDraft((d) => ({ ...d, personaPrompt: e.target.value }))}
+          value={draft.contextPrompt ?? ""}
+          onChange={(e) => setDraft((d) => ({ ...d, contextPrompt: e.target.value }))}
           rows={3}
-          placeholder="e.g. Be terse. Always double-check before anything irreversible."
+          placeholder="e.g. [[note:42]] is the gate to your notes database. Be terse. Always double-check before anything irreversible."
           className={`${inputClass} mb-4`}
         />
 
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <FormLabel>Checkup interval (minutes)</FormLabel>
-            <input
-              type="number"
-              min={1}
-              value={draft.checkupIntervalMs != null ? Math.round(draft.checkupIntervalMs / 60_000) : ""}
-              onChange={(e) => setDraft((d) => ({ ...d, checkupIntervalMs: Number(e.target.value) * 60_000 }))}
-              className={inputClass}
-            />
-          </div>
           <div>
             <FormLabel>Chat idle window (minutes)</FormLabel>
             <input
@@ -143,12 +130,6 @@ export function SettingsPage() {
           {mutation.isPending ? "Saving —" : "Save Settings"}
         </button>
       </form>
-
-      <p className="mt-8 border-t border-dust pt-4 font-mono text-xs text-dust">
-        <Link to={resolveChamberPath("/runs", "deputy", shellHosted)} className="text-accent hover:underline">
-          View run history →
-        </Link>
-      </p>
     </section>
   );
 }

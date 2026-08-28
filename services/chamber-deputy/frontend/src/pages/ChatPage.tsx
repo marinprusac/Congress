@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FormSubmitButton } from "@congress/congress-ui";
+import { FormSubmitButton, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchMessages, postChatMessage } from "@/lib/api";
 import type { Message } from "../../../src/types";
 
@@ -12,6 +13,7 @@ import type { Message } from "../../../src/types";
 // though, via an optimistic cache write in onMutate below - the user
 // shouldn't stare at an unchanged transcript for however long the run takes.
 export function ChatPage() {
+  const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
   const [forceNewThread, setForceNewThread] = useState(false);
@@ -60,6 +62,12 @@ export function ChatPage() {
   return (
     <section className="mx-auto flex h-full w-full max-w-6xl flex-col">
       <div className="flex shrink-0 items-center justify-between px-4 pt-3 pb-2 sm:px-6 sm:pt-5">
+        <Link
+          to={resolveChamberPath("/", "deputy", shellHosted)}
+          className="tap-target font-mono text-xs uppercase tracking-wide text-slate hover:underline"
+        >
+          ← Directives
+        </Link>
         <h2 className="font-display text-2xl text-ink sm:text-3xl">Chat</h2>
         <button
           type="button"

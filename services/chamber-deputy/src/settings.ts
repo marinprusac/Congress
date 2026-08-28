@@ -7,8 +7,7 @@ import { settings } from "./db/schema.js";
 // of these is a Settings field specifically so it's cheap to override without
 // a redeploy, not a hardcoded constant.
 const DEFAULT_SETTINGS: Settings = {
-  personaPrompt: "",
-  checkupIntervalMs: 20 * 60 * 1000,
+  contextPrompt: "",
   chatIdleWindowMs: 30 * 60 * 1000,
   budgetCapUsd: 10,
   model: "claude-sonnet-5",
@@ -21,8 +20,7 @@ export const { getSettings, updateSettings } = createSingleRowSettings<typeof se
   db,
   table: settings,
   toSettings: (row) => ({
-    personaPrompt: row.personaPrompt,
-    checkupIntervalMs: row.checkupIntervalMs,
+    contextPrompt: row.contextPrompt,
     chatIdleWindowMs: row.chatIdleWindowMs,
     budgetCapUsd: row.budgetCapUsd,
     model: row.model,

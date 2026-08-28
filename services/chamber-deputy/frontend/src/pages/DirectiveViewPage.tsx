@@ -13,8 +13,12 @@ import {
   ConfirmSheet,
   showToast,
 } from "@congress/congress-ui";
-import { fetchDirective, updateDirective, deleteDirective } from "@/lib/api";
+import { fetchDirective, updateDirective, deleteDirective, runDirective } from "@/lib/api";
 import type { UpdateDirectiveRequest } from "../../../src/types";
+
+function intervalMsToMinutesInput(intervalMs: number | null | undefined): string {
+  return intervalMs != null ? String(Math.round(intervalMs / 60_000)) : "";
+}
 
 export function DirectiveViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +29,7 @@ export function DirectiveViewPage() {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draft, setDraft] = useState<UpdateDirectiveRequest>({});
+  const [intervalMinutesInput, setIntervalMinutesInput] = useState("");
 
   const directiveQuery = useQuery({
     queryKey: ["directive", directiveId],
@@ -44,16 +49,26 @@ export function DirectiveViewPage() {
     mutationFn: () => deleteDirective(directiveId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["directives"] });
-      navigate(resolveChamberPath("/directives", "deputy", shellHosted));
+      navigate(resolveChamberPath("/", "deputy", shellHosted));
       showToast("Directive deleted");
     },
     onError: () => showToast("Failed to delete directive.", "error"),
   });
 
+  const runMutation = useMutation({
+    mutationFn: () => runDirective(directiveId),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["directive", directiveId] });
+      showToast(result.ok ? "Directive run complete" : (result.errorMessage ?? "Directive run failed."), result.ok ? "success" : "error");
+    },
+    onError: () => showToast("Failed to run directive.", "error"),
+  });
+
   useEffect(() => {
     if (directiveQuery.data && !editing) {
       const d = directiveQuery.data;
-      setDraft({ title: d.title, body: d.body, enabled: d.enabled, timeBased: d.timeBased });
+      setDraft({ title: d.title, body: d.body, enabled: d.enabled, intervalMs: d.intervalMs });
+      setIntervalMinutesInput(intervalMsToMinutesInput(d.intervalMs));
     }
   }, [directiveQuery.data, editing]);
 
@@ -64,7 +79,8 @@ export function DirectiveViewPage() {
   const directive = directiveQuery.data;
 
   function save() {
-    updateMutation.mutate(draft, { onSuccess: () => setEditing(false) });
+    const intervalMs = intervalMinutesInput.trim() ? Number(intervalMinutesInput) * 60_000 : null;
+    updateMutation.mutate({ ...draft, intervalMs }, { onSuccess: () => setEditing(false) });
   }
 
   function toggleEnabled() {
@@ -107,6 +123,9 @@ export function DirectiveViewPage() {
               </>
             ) : (
               <>
+                <button onClick={() => runMutation.mutate()} disabled={runMutation.isPending} className="tap-target text-accent hover:underline disabled:opacity-50">
+                  {runMutation.isPending ? "Running —" : "Run now"}
+                </button>
                 <button onClick={toggleEnabled} className="tap-target text-accent hover:underline">
                   {directive.enabled ? "Disable" : "Enable"}
                 </button>
@@ -131,12 +150,16 @@ export function DirectiveViewPage() {
               renderIcon={(chamber) => getChamberIcon(chamber)}
             />
             <label className="mt-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-slate">
+              Run automatically every
               <input
-                type="checkbox"
-                checked={draft.timeBased ?? true}
-                onChange={(e) => setDraft((d) => ({ ...d, timeBased: e.target.checked }))}
+                type="number"
+                min={1}
+                value={intervalMinutesInput}
+                onChange={(e) => setIntervalMinutesInput(e.target.value)}
+                placeholder="manual only"
+                className="w-24 border border-dust bg-parchment px-2 py-1 text-ink normal-case tracking-normal focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
               />
-              Wake on schedule, even with no new events
+              minutes (blank = play button only)
             </label>
           </>
         ) : directive.body ? (

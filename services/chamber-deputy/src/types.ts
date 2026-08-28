@@ -6,9 +6,11 @@ export const directiveSummarySchema = z.object({
   title: z.string(),
   body: z.string(),
   enabled: z.boolean(),
-  // Whether this directive needs the periodic checkup to wake it even with
-  // no new event pending - see db/schema.ts's own comment and checkup.ts.
-  timeBased: z.boolean(),
+  // This directive's own schedule - null means it only ever runs on demand
+  // (the play button) or as part of an urgent/chat bundle. See
+  // db/schema.ts's own comment and checkup.ts.
+  intervalMs: z.number().int().positive().nullable(),
+  lastRunAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -21,7 +23,7 @@ export const createDirectiveRequestSchema = z.object({
   title: z.string().min(1),
   body: z.string().default(""),
   enabled: z.boolean().default(true),
-  timeBased: z.boolean().default(true),
+  intervalMs: z.number().int().positive().nullable().default(null),
 });
 export type CreateDirectiveRequest = z.infer<typeof createDirectiveRequestSchema>;
 
@@ -29,7 +31,7 @@ export const updateDirectiveRequestSchema = z.object({
   title: z.string().min(1).optional(),
   body: z.string().optional(),
   enabled: z.boolean().optional(),
-  timeBased: z.boolean().optional(),
+  intervalMs: z.number().int().positive().nullable().optional(),
 });
 export type UpdateDirectiveRequest = z.infer<typeof updateDirectiveRequestSchema>;
 
@@ -67,29 +69,15 @@ export const deputyTranscriptEntrySchema = z.object({
 });
 export type DeputyTranscriptEntry = z.infer<typeof deputyTranscriptEntrySchema>;
 
-export const deputyRunTriggerSchema = z.enum(["chat", "periodic", "urgent"]);
+// "scheduled" - this directive's own timer came due (checkup.ts).
+// "manual" - the owner hit the play button on one directive.
+// "chat"/"urgent" still bundle every enabled directive into one prompt,
+// unchanged from before this split.
+export const deputyRunTriggerSchema = z.enum(["chat", "scheduled", "urgent", "manual"]);
 export type DeputyRunTrigger = z.infer<typeof deputyRunTriggerSchema>;
 
-export const deputyRunSchema = z.object({
-  id: z.number().int(),
-  trigger: deputyRunTriggerSchema,
-  sessionId: z.string().nullable(),
-  prompt: z.string(),
-  transcript: z.array(deputyTranscriptEntrySchema),
-  finalResponse: z.string().nullable(),
-  ok: z.boolean(),
-  errorMessage: z.string().nullable(),
-  inputTokens: z.number().int().nullable(),
-  outputTokens: z.number().int().nullable(),
-  costUsd: z.number().nullable(),
-  durationMs: z.number().int().nullable(),
-  createdAt: z.string(),
-});
-export type DeputyRun = z.infer<typeof deputyRunSchema>;
-
 export const settingsSchema = z.object({
-  personaPrompt: z.string(),
-  checkupIntervalMs: z.number().int().positive(),
+  contextPrompt: z.string(),
   chatIdleWindowMs: z.number().int().positive(),
   budgetCapUsd: z.number().positive(),
   model: z.string().min(1),
@@ -100,8 +88,7 @@ export const settingsSchema = z.object({
 export type Settings = z.infer<typeof settingsSchema>;
 
 export const updateSettingsRequestSchema = z.object({
-  personaPrompt: z.string().optional(),
-  checkupIntervalMs: z.number().int().positive().optional(),
+  contextPrompt: z.string().optional(),
   chatIdleWindowMs: z.number().int().positive().optional(),
   budgetCapUsd: z.number().positive().optional(),
   model: z.string().min(1).optional(),

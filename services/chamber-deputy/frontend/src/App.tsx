@@ -5,7 +5,6 @@ import { ChatPage } from "@/pages/ChatPage";
 import { DirectivesListPage } from "@/pages/DirectivesListPage";
 import { DirectiveViewPage } from "@/pages/DirectiveViewPage";
 import { NewDirectivePage } from "@/pages/NewDirectivePage";
-import { RunHistoryPage } from "@/pages/RunHistoryPage";
 
 export function App() {
   useAppliedTheme();
@@ -13,11 +12,10 @@ export function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<ChatPage />} />
-        <Route path="directives" element={<DirectivesListPage />} />
+        <Route index element={<DirectivesListPage />} />
         <Route path="directives/new" element={<NewDirectivePage />} />
         <Route path="d/:id" element={<DirectiveViewPage />} />
-        <Route path="runs" element={<RunHistoryPage />} />
+        <Route path="chat" element={<ChatPage />} />
       </Route>
     </Routes>
   );

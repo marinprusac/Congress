@@ -2,44 +2,65 @@ import { getSettings } from "./settings.js";
 import { enqueue } from "./jobQueue.js";
 import { runDeputy } from "./engine.js";
 import { drainPendingCheckupEvents } from "./pendingEvents.js";
-import { hasEnabledTimeBasedDirective } from "./directives.js";
+import { listDueScheduledDirectives, nextScheduledWakeDelayMs, markDirectiveRunNow } from "./directives.js";
 
-// Self-rescheduling timer rather than a fixed setInterval - settings.
-// checkupIntervalMs is owner-tunable (settings.ts), and reading it fresh
-// each time this arms the next wait means a changed interval takes effect
-// on the very next firing instead of needing a restart.
-async function runPeriodicCheckup(): Promise<void> {
+// Single self-rescheduling timer, armed for whichever enabled+scheduled
+// directive's own (lastRunAt + intervalMs) is soonest - the same "one timer
+// for the soonest deadline" idiom chamber-tasks uses for due-date checks,
+// just per-directive here instead of per-task. Each due directive gets its
+// own runDeputy call (its own `claude` subprocess) rather than one bundled
+// prompt for all of them.
+async function tick(): Promise<void> {
   const settings = await getSettings();
   if (!settings.paused) {
-    const events = drainPendingCheckupEvents();
-    // A tick with nothing pending and no directive that needs a wall-clock
-    // wake has nothing to check up on - spawning a headless `claude`
-    // subprocess (and, on a shared VPS, its CPU/memory) for it is pure
-    // waste. Still costs one cheap indexed SELECT every tick either way.
-    if (events.length > 0 || (await hasEnabledTimeBasedDirective())) {
-      void enqueue(() => runDeputy({ trigger: "periodic", events })).catch((err) =>
-        console.warn(`Deputy periodic checkup failed: ${(err as Error).message}`)
-      );
+    const due = await listDueScheduledDirectives();
+    if (due.length > 0) {
+      // Drained once per tick, not once per directive - every directive due
+      // in this same tick sees the same batch of events since the last one.
+      const events = drainPendingCheckupEvents();
+      for (const directive of due) {
+        // Stamp lastRunAt now, before the run actually executes (it's
+        // queued behind the concurrency-1 job queue and may take a while) -
+        // otherwise scheduleNext() below would see this directive as still
+        // due and re-fire it on the very next tick.
+        await markDirectiveRunNow(directive.id);
+        void enqueue(() => runDeputy({ trigger: "scheduled", events, directive })).catch((err) =>
+          console.warn(`Deputy scheduled run for directive ${directive.id} failed: ${(err as Error).message}`)
+        );
+      }
     }
   }
-  scheduleNext();
+  await scheduleNext();
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 
-function scheduleNext(): void {
-  void getSettings().then((settings) => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => void runPeriodicCheckup(), settings.checkupIntervalMs);
-  });
+async function scheduleNext(): Promise<void> {
+  if (timer) clearTimeout(timer);
+  const delay = await nextScheduledWakeDelayMs();
+  // No enabled directive has its own timer set - leave the timer unarmed
+  // rather than polling for nothing. rearmScheduler() re-checks this the
+  // next time a directive is created/updated/deleted/toggled.
+  if (delay === null) {
+    timer = undefined;
+    return;
+  }
+  timer = setTimeout(() => void tick(), delay);
 }
 
 // Runs once immediately on boot (same as the old poller's first tick firing
-// right away), then on its own self-rescheduling interval after that.
+// right away), then on its own self-rescheduling timer after that.
 export function startPeriodicCheckup(): void {
-  void runPeriodicCheckup();
+  void tick();
 }
 
 export function stopPeriodicCheckup(): void {
   if (timer) clearTimeout(timer);
+}
+
+// Called from server.ts after any directive create/update/delete/toggle -
+// a shortened interval or a newly-scheduled directive shouldn't have to
+// wait for whatever the old timer was armed for.
+export function rearmScheduler(): void {
+  void scheduleNext();
 }

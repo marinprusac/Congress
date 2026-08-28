@@ -16,16 +16,20 @@ export const directives = sqliteTable("directives", {
   title: text("title").notNull(),
   body: text("body").notNull().default(""),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
-  // Separate from the free-text body (still not structurally parsed - see
-  // the comment above) - an explicit owner toggle for whether this
-  // directive needs the periodic checkup to actually fire even when no new
-  // event arrived (a purely time-based directive like "every morning...")
-  // versus one that only ever needs to react to an event Deputy already
-  // received (checkup.ts's runPeriodicCheckup skips the run when there's
-  // nothing pending and no enabled directive has this set). Defaults true
-  // so an existing directive keeps firing on schedule exactly as before
-  // this flag existed, until its owner narrows it.
-  timeBased: integer("time_based", { mode: "boolean" }).notNull().default(true),
+  // Own schedule, separate from the free-text body (still not structurally
+  // parsed - see the comment above): null means this directive only ever
+  // runs on demand (play button) or as part of an urgent/chat bundle, never
+  // on its own timer. checkup.ts arms a single self-rescheduling timer for
+  // whichever enabled+scheduled directive's (lastRunAt + intervalMs) is
+  // soonest - the same "one timer for the soonest deadline" idiom
+  // chamber-tasks uses for due-date checks, just per-directive here instead
+  // of per-task.
+  intervalMs: integer("interval_ms"),
+  // Stamped the moment a scheduled or manual run for this directive is
+  // kicked off (not when it finishes) - see checkup.ts/directives.ts -
+  // so a slow `claude` invocation can't cause the next tick to re-fire the
+  // same directive before the first run lands.
+  lastRunAt: integer("last_run_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
@@ -63,40 +67,31 @@ export const messages = sqliteTable(
   (table) => [index("messages_session_id_idx").on(table.sessionId), index("messages_created_at_idx").on(table.createdAt)]
 );
 
-// One row per headless `claude` invocation (chat reply, periodic checkup, or
-// urgent fast path) - the audit log the whole "call every tool with
-// --dangerously-skip-permissions" design leans on for visibility (see
-// docs/deputy-chamber-plan.md §11). `transcriptJson` is an array of
-// DeputyTranscriptEntry (types.ts), parsed out of the CLI's own
-// --output-format stream-json - see engine.ts's spawnClaude.
-export const deputyRuns = sqliteTable(
-  "deputy_runs",
+// Just enough to enforce settings.budgetCapUsd (engine.ts's runDeputy checks
+// todaySpendUsd before spawning another `claude` process) - no transcript,
+// prompt, or response text. Full context for a completed directive run is
+// published live to Congress's event relay instead (events.ts's
+// deputy.directive_run) for the Logs Chamber to durably keep if the owner
+// sets up a rule; Deputy itself keeps no run history of its own.
+export const deputySpend = sqliteTable(
+  "deputy_spend",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    trigger: text("trigger", { enum: ["chat", "periodic", "urgent"] }).notNull(),
-    sessionId: text("session_id"),
-    prompt: text("prompt").notNull(),
-    transcriptJson: text("transcript_json").notNull().default("[]"),
-    finalResponse: text("final_response"),
-    ok: integer("ok", { mode: "boolean" }).notNull(),
-    errorMessage: text("error_message"),
-    inputTokens: integer("input_tokens"),
-    outputTokens: integer("output_tokens"),
     costUsd: real("cost_usd"),
-    durationMs: integer("duration_ms"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   },
-  (table) => [index("deputy_runs_created_at_idx").on(table.createdAt), index("deputy_runs_trigger_idx").on(table.trigger)]
+  (table) => [index("deputy_spend_created_at_idx").on(table.createdAt)]
 );
 
 // Single-row table (id is always 1) - unlike most Chambers' placeholder
 // settings row, Deputy has real owner-tunable knobs from day one (see
-// docs/deputy-chamber-plan.md §12): persona/tone, scheduling, the budget
-// cap, model choice, retention, and the pause/kill switch.
+// docs/deputy-chamber-plan.md §12): background context, chat behavior, the
+// budget cap, model choice, retention, and the pause/kill switch. Scheduling
+// is no longer a single global knob here - see directives.ts's own
+// intervalMs, one per directive.
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
-  personaPrompt: text("persona_prompt").notNull().default(""),
-  checkupIntervalMs: integer("checkup_interval_ms").notNull().default(20 * 60 * 1000),
+  contextPrompt: text("context_prompt").notNull().default(""),
   chatIdleWindowMs: integer("chat_idle_window_ms").notNull().default(30 * 60 * 1000),
   budgetCapUsd: real("budget_cap_usd").notNull().default(10),
   model: text("model").notNull().default("claude-sonnet-5"),
@@ -111,11 +106,11 @@ export const settings = sqliteTable("settings", {
 // own (see services/congress/src/events.ts), so a Chamber that wants to
 // fold "everything since last time" into a periodic prompt has to persist
 // that itself instead of re-polling a cursor against Congress's own
-// storage. Drained (read + deleted) in one step every time a periodic
-// checkup actually runs (eventReceive.ts's handleReceivedEvent inserts,
-// checkup.ts's runPeriodicCheckup drains) - an urgent event both lands here
-// *and* separately preempts an immediate run, same two-track behavior the
-// old poller's lastUrgentEventId/lastCheckupEventId split gave it.
+// storage. Drained (read + deleted) in one step every time any directive's
+// own scheduled tick actually fires (eventReceive.ts's handleReceivedEvent
+// inserts, checkup.ts's tick drains) - an urgent event both lands here *and*
+// separately preempts an immediate run, same two-track behavior the old
+// poller's lastUrgentEventId/lastCheckupEventId split gave it.
 export const pendingCheckupEvents = sqliteTable(
   "pending_checkup_events",
   {

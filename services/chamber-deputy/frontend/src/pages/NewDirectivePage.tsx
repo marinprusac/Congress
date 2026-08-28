@@ -27,12 +27,13 @@ export function NewDirectivePage() {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState(searchParams.get("name") ?? "");
   const [body, setBody] = useState("");
-  const [timeBased, setTimeBased] = useState(true);
+  const [intervalMinutes, setIntervalMinutes] = useState("");
   const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const created = await createDirective({ title, body, enabled: true, timeBased });
+      const intervalMs = intervalMinutes.trim() ? Number(intervalMinutes) * 60_000 : null;
+      const created = await createDirective({ title, body, enabled: true, intervalMs });
       await flushDraftConnections(`directive-${created.id}`, draftConnections);
       return created;
     },
@@ -75,7 +76,7 @@ export function NewDirectivePage() {
               {mutation.isPending ? "Creating —" : "Create"}
             </button>
             <button
-              onClick={() => navigate(resolveChamberPath("/directives", "deputy", shellHosted))}
+              onClick={() => navigate(resolveChamberPath("/", "deputy", shellHosted))}
               className="tap-target text-slate hover:underline"
             >
               Cancel
@@ -92,8 +93,16 @@ export function NewDirectivePage() {
           renderIcon={(chamber) => getChamberIcon(chamber)}
         />
         <label className="mt-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-slate">
-          <input type="checkbox" checked={timeBased} onChange={(e) => setTimeBased(e.target.checked)} />
-          Wake on schedule, even with no new events
+          Run automatically every
+          <input
+            type="number"
+            min={1}
+            value={intervalMinutes}
+            onChange={(e) => setIntervalMinutes(e.target.value)}
+            placeholder="manual only"
+            className="w-24 border border-dust bg-parchment px-2 py-1 text-ink normal-case tracking-normal focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          />
+          minutes (blank = play button only)
         </label>
       </ExhibitLinksLayout>
     </article>

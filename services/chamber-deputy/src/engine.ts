@@ -3,11 +3,11 @@ import { createInterface } from "node:readline";
 import type { PriorityLevel } from "@congress/shared-types";
 import { env } from "./env.js";
 import { getSettings, updateSettings } from "./settings.js";
-import { recordRun, todaySpendUsd } from "./deputyRuns.js";
+import { recordSpend, todaySpendUsd } from "./spend.js";
 import { writeMcpConfigFile } from "./mcpConfig.js";
 import { buildPrompt, type PromptContext } from "./promptAssembly.js";
 import { publishEvent } from "./events.js";
-import type { DeputyRunTrigger, DeputyTranscriptEntry } from "./types.js";
+import type { DeputyRunTrigger, DeputyTranscriptEntry, DirectiveSummary } from "./types.js";
 
 export interface RunContext extends PromptContext {
   trigger: DeputyRunTrigger;
@@ -189,6 +189,9 @@ async function spawnClaude(opts: { prompt: string; mcpConfigPath: string; model:
   };
 }
 
+// chat/urgent still bundle every enabled directive, so there's no single
+// directive to attribute a report to - keep the old "only worth mentioning
+// if it actually did something" gate for those.
 async function reportIfActionTaken(trigger: DeputyRunTrigger, spawnResult: SpawnResult): Promise<void> {
   if (!spawnResult.ok || spawnResult.transcript.length === 0) return;
   await publishEvent({
@@ -198,6 +201,37 @@ async function reportIfActionTaken(trigger: DeputyRunTrigger, spawnResult: Spawn
       summary: spawnResult.response ?? "",
       toolCalls: spawnResult.transcript.length,
       priority: spawnResult.priority,
+    },
+  });
+}
+
+// A "scheduled"/"manual" run is scoped to one directive, so it can carry
+// full context - published on every completion (not gated on having taken
+// action) since Deputy keeps no run history of its own any more; whether
+// any of this is worth durably keeping or notifying on is entirely the
+// receiving Logs Chamber rule's call (recordToHistory/minPriority/notify),
+// not something decided here.
+async function reportDirectiveRun(directive: DirectiveSummary, trigger: DeputyRunTrigger, spawnResult: SpawnResult): Promise<void> {
+  const actionTaken = spawnResult.transcript.length > 0;
+  await publishEvent({
+    type: "deputy.directive_run",
+    payload: {
+      directiveId: directive.id,
+      directiveTitle: directive.title,
+      trigger,
+      ok: spawnResult.ok,
+      actionTaken,
+      summary: spawnResult.response,
+      errorMessage: spawnResult.errorMessage,
+      toolCallCount: spawnResult.transcript.length,
+      transcript: spawnResult.transcript,
+      costUsd: spawnResult.costUsd,
+      inputTokens: spawnResult.inputTokens,
+      outputTokens: spawnResult.outputTokens,
+      durationMs: spawnResult.durationMs,
+      // The model only emits a PRIORITY line when it took action (see
+      // extractPriority above) - a no-op tick is never worth more than low.
+      priority: actionTaken ? spawnResult.priority : "low",
     },
   });
 }
@@ -243,21 +277,13 @@ export async function runDeputy(ctx: RunContext): Promise<RunResult> {
       resumeSessionId: ctx.resumeSessionId,
     });
 
-    recordRun({
-      trigger: ctx.trigger,
-      sessionId: result.sessionId,
-      prompt,
-      transcript: result.transcript,
-      finalResponse: result.response,
-      ok: result.ok,
-      errorMessage: result.errorMessage,
-      inputTokens: result.inputTokens,
-      outputTokens: result.outputTokens,
-      costUsd: result.costUsd,
-      durationMs: result.durationMs,
-    });
+    recordSpend(result.costUsd);
 
-    await reportIfActionTaken(ctx.trigger, result);
+    if (ctx.directive) {
+      await reportDirectiveRun(ctx.directive, ctx.trigger, result);
+    } else {
+      await reportIfActionTaken(ctx.trigger, result);
+    }
 
     const spentAfter = await todaySpendUsd();
     if (spentAfter >= settings.budgetCapUsd) {

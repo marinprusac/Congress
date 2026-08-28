@@ -17,7 +17,7 @@ export function MessageDeputyWidget() {
   const mutation = useMutation({
     mutationFn: () => postChatMessage({ text: text.trim(), newThread: false }),
     onSuccess: () => {
-      navigate(resolveChamberPath("/", "deputy", shellHosted));
+      navigate(resolveChamberPath("/chat", "deputy", shellHosted));
     },
   });
 

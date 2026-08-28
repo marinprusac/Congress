@@ -1,4 +1,4 @@
-import { and, desc, eq, like, or } from "drizzle-orm";
+import { and, desc, eq, isNotNull, like, or } from "drizzle-orm";
 import type { DirectiveSummary, DirectiveDetail, CreateDirectiveRequest, UpdateDirectiveRequest } from "./types.js";
 import { extractOutgoingExhibitRefs, createManualRefsByExhibitId } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
@@ -50,23 +50,57 @@ function toSummary(row: typeof directives.$inferSelect): DirectiveSummary {
     title: row.title,
     body: row.body,
     enabled: row.enabled,
-    timeBased: row.timeBased,
+    intervalMs: row.intervalMs,
+    lastRunAt: row.lastRunAt ? row.lastRunAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-// checkup.ts's runPeriodicCheckup skips the periodic run entirely when this
-// is false for every enabled directive and nothing else is pending -
-// `limit(1)` since only existence matters, not which directive or how many.
-export async function hasEnabledTimeBasedDirective(): Promise<boolean> {
-  const row = db
-    .select({ id: directives.id })
+// Every enabled directive with its own timer set - the pool checkup.ts's
+// scheduler picks due directives from and computes the next wake delay
+// against. Fetched into JS rather than done with SQL date arithmetic since
+// the directive count here is small (a personal system's own standing
+// instructions), not worth the query complexity.
+async function listEnabledScheduledDirectives(): Promise<DirectiveSummary[]> {
+  const rows = db
+    .select()
     .from(directives)
-    .where(and(eq(directives.enabled, true), eq(directives.timeBased, true)))
-    .limit(1)
-    .get();
-  return Boolean(row);
+    .where(and(eq(directives.enabled, true), isNotNull(directives.intervalMs)))
+    .all();
+  return rows.map(toSummary);
+}
+
+function dueAt(d: DirectiveSummary): number {
+  const last = d.lastRunAt ? new Date(d.lastRunAt).getTime() : 0;
+  return last + (d.intervalMs as number);
+}
+
+// checkup.ts's tick() runs everything this returns, each as its own
+// runDeputy call.
+export async function listDueScheduledDirectives(): Promise<DirectiveSummary[]> {
+  const now = Date.now();
+  const rows = await listEnabledScheduledDirectives();
+  return rows.filter((d) => dueAt(d) <= now);
+}
+
+// Delay in ms until the soonest enabled+scheduled directive comes due, or
+// null if none are scheduled at all - checkup.ts leaves its timer unarmed
+// in that case rather than polling forever for nothing. Same "one timer for
+// the soonest deadline" idiom chamber-tasks uses for due-date checks.
+export async function nextScheduledWakeDelayMs(): Promise<number | null> {
+  const rows = await listEnabledScheduledDirectives();
+  if (rows.length === 0) return null;
+  const now = Date.now();
+  const soonest = Math.min(...rows.map(dueAt));
+  return Math.max(0, soonest - now);
+}
+
+// Stamped the moment a scheduled or manual run is kicked off, not when it
+// finishes - see db/schema.ts's own comment on why (avoids a slow `claude`
+// invocation causing the next tick to re-fire the same directive).
+export async function markDirectiveRunNow(id: number): Promise<void> {
+  db.update(directives).set({ lastRunAt: new Date() }).where(eq(directives.id, id)).run();
 }
 
 export async function listDirectives(): Promise<DirectiveSummary[]> {
@@ -112,7 +146,7 @@ export async function createDirective(input: CreateDirectiveRequest): Promise<Di
       title: input.title,
       body: input.body,
       enabled: input.enabled,
-      timeBased: input.timeBased,
+      intervalMs: input.intervalMs,
       createdAt: now,
       updatedAt: now,
     })
@@ -132,7 +166,10 @@ export async function updateDirective(id: number, input: UpdateDirectiveRequest)
     title: input.title ?? existing.title,
     body: input.body ?? existing.body,
     enabled: input.enabled ?? existing.enabled,
-    timeBased: input.timeBased ?? existing.timeBased,
+    // intervalMs can be legitimately set back to null (unschedule), so an
+    // absent field (not sent at all) is what falls back to the existing
+    // value here - not `?? ` against null.
+    intervalMs: input.intervalMs !== undefined ? input.intervalMs : existing.intervalMs,
     updatedAt: new Date(),
   };
 

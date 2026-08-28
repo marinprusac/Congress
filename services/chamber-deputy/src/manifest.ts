@@ -14,21 +14,21 @@ export const manifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  // §12: a quick "message Deputy" box, and a recent-activity feed reading
-  // deputy_runs for a lightweight "what has Deputy been doing" glance
-  // without opening the full audit log/run history page.
-  widgets: [
-    { id: "message", width: 2, height: 1, label: "Message Deputy" },
-    { id: "recent-activity", width: 2, height: 3, label: "Recent Activity" },
-  ],
-  // §7: published only when a run actually took a real action - Logs
-  // Chamber's own rules (a minPriority threshold) decide whether that's
-  // worth recording/notifying.
+  // §12: a quick "message Deputy" box. Deputy keeps no run-history page or
+  // widget of its own any more - see deputy.directive_run below, which the
+  // Logs Chamber's own widgets (recent-logs/urgent-logs) can surface instead
+  // once the owner sets up a rule for it.
+  widgets: [{ id: "message", width: 2, height: 1, label: "Message Deputy" }],
   events: [
     {
       type: "deputy.report",
       label: "Deputy report",
-      description: "Published when Deputy takes a real action (calls a tool) worth surfacing to the owner.",
+      description: "Published by a chat/urgent run when it takes a real action (calls a tool) worth surfacing to the owner.",
+    },
+    {
+      type: "deputy.directive_run",
+      label: "Directive run",
+      description: "Published every time one directive's own scheduled or manual run completes, with its full transcript.",
     },
   ],
 };

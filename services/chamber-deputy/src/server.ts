@@ -20,6 +20,7 @@ import {
   createDirective,
   updateDirective,
   deleteDirective,
+  markDirectiveRunNow,
   listManualRefsByExhibitId,
   addManualRefByExhibitId,
   removeManualRefByExhibitId,
@@ -28,7 +29,10 @@ import {
 import { getSettings, updateSettings } from "./settings.js";
 import { searchDirectiveExhibits, resolveDirectiveExhibits } from "./exhibits.js";
 import { listMessages, postChatMessage } from "./chat.js";
-import { listRecentRuns, getRun, todaySpendUsd } from "./deputyRuns.js";
+import { todaySpendUsd } from "./spend.js";
+import { enqueue } from "./jobQueue.js";
+import { runDeputy } from "./engine.js";
+import { rearmScheduler } from "./checkup.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -65,6 +69,7 @@ app.post("/api/directives", async (c) => {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
   const directive = await createDirective(parsed.data);
+  rearmScheduler();
   return c.json(directive, 201);
 });
 
@@ -78,6 +83,7 @@ app.put("/api/directives/:id", async (c) => {
   }
   const directive = await updateDirective(id, parsed.data);
   if (!directive) return c.json({ error: "not_found" }, 404);
+  rearmScheduler();
   return c.json(directive);
 });
 
@@ -86,7 +92,35 @@ app.delete("/api/directives/:id", async (c) => {
   if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
   const deleted = await deleteDirective(id);
   if (!deleted) return c.json({ error: "not_found" }, 404);
+  rearmScheduler();
   return c.body(null, 204);
+});
+
+// Play button (list row or directive page) - runs this one directive right
+// now, outside its normal schedule. Blocking on the queued run itself, same
+// "acceptable for a functional/transactional exchange" call chat.ts already
+// makes (concurrency-1 job queue, so this queues behind anything already
+// running).
+app.post("/api/directives/:id/run", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
+  const directive = await getDirective(id);
+  if (!directive) return c.json({ error: "not_found" }, 404);
+
+  await markDirectiveRunNow(id);
+  rearmScheduler();
+  try {
+    const result = await enqueue(() => runDeputy({ trigger: "manual", directive }));
+    return c.json({ ok: result.ok, response: result.response, errorMessage: result.errorMessage });
+  } catch (err) {
+    // runDeputy can throw before ever reaching the CLI (e.g. it couldn't
+    // reach Congress to build the MCP config) - report that the same way as
+    // every other failure this endpoint can return (paused, budget cap,
+    // the CLI itself failing): a 200 with ok:false, so parseJsonResponse
+    // (congress-ui) doesn't throw away this body and swallow errorMessage
+    // behind a generic "Request failed: <status>".
+    return c.json({ ok: false, response: null, errorMessage: (err as Error).message });
+  }
 });
 
 mountExhibitSearchRoutes(app, { search: searchDirectiveExhibits, resolve: resolveDirectiveExhibits });
@@ -118,18 +152,6 @@ app.post("/api/chat/messages", async (c) => {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
   return c.json(await postChatMessage(parsed.data));
-});
-
-app.get("/api/runs/recent", async (c) => {
-  return c.json(await listRecentRuns());
-});
-
-app.get("/api/runs/:id", async (c) => {
-  const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
-  const run = await getRun(id);
-  if (!run) return c.json({ error: "not_found" }, 404);
-  return c.json(run);
 });
 
 app.route("/mcp", mcpApp);

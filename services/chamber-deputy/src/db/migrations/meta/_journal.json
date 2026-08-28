@@ -29,6 +29,13 @@
       "when": 1787327718754,
       "tag": "0003_overrated_white_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1787878652301,
+      "tag": "0004_deputy_per_directive_schedule",
+      "breakpoints": true
     }
   ]
 }

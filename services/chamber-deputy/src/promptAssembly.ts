@@ -1,6 +1,7 @@
 import type { EventLogEntry } from "@congress/shared-types";
 import { getSettings } from "./settings.js";
 import { listEnabledDirectives } from "./directives.js";
+import type { DirectiveSummary } from "./types.js";
 
 // Layer 1 (docs/deputy-chamber-plan.md §4): code-owned, not editable via UI.
 // Frames the one hard capability boundary (MCP tools only, never Bash/
@@ -20,7 +21,12 @@ function baseIdentitySection(): string {
   return `${BASE_IDENTITY_PROMPT}\n\nCurrent server time: ${new Date().toISOString()}`;
 }
 
-async function directivesSection(): Promise<string> {
+// A "scheduled"/"manual" run is scoped to exactly one directive (its own
+// timer, or the owner's play button) - that one directive is its whole
+// mandate, not a bundle. "chat"/"urgent" still see every enabled directive
+// at once, same as before this split.
+async function directivesSection(directive?: DirectiveSummary): Promise<string> {
+  if (directive) return `### ${directive.title}\n${directive.body}`;
   const enabled = await listEnabledDirectives();
   if (enabled.length === 0) return "No standing directives are configured yet.";
   return enabled.map((d) => `### ${d.title}\n${d.body}`).join("\n\n");
@@ -32,37 +38,42 @@ function formatEvents(events: EventLogEntry[]): string {
 }
 
 export interface PromptContext {
-  trigger: "chat" | "periodic" | "urgent";
+  trigger: "chat" | "scheduled" | "urgent" | "manual";
   chatMessage?: string;
   events?: EventLogEntry[];
+  // The one directive this run is about - only set for "scheduled"/"manual"
+  // (see directivesSection above). Absent for "chat"/"urgent", which still
+  // see every enabled directive bundled together.
+  directive?: DirectiveSummary;
 }
 
 // Builds the full prompt fresh on every invocation - nothing is baked into a
-// static system prompt file (docs/deputy-chamber-plan.md §4). Layer 3 (all
-// enabled directives) is always included regardless of trigger kind, since a
-// time-based directive has no corresponding event to react to at all.
+// static system prompt file (docs/deputy-chamber-plan.md §4).
 export async function buildPrompt(ctx: PromptContext): Promise<string> {
   const settings = await getSettings();
 
   const parts = [baseIdentitySection()];
 
-  if (settings.personaPrompt.trim()) {
-    parts.push(`## Persona\n${settings.personaPrompt.trim()}`);
+  if (settings.contextPrompt.trim()) {
+    parts.push(`## Context\n${settings.contextPrompt.trim()}`);
   }
 
-  parts.push(`## Standing directives\n${await directivesSection()}`);
+  const heading = ctx.directive ? "## This run's directive" : "## Standing directives";
+  parts.push(`${heading}\n${await directivesSection(ctx.directive)}`);
 
   if (ctx.trigger === "chat") {
     parts.push(
       `## Message from the owner\nThis is a short functional exchange about app/data management, not an open-ended conversation.\n\n${ctx.chatMessage ?? ""}`
     );
-  } else if (ctx.trigger === "periodic") {
+  } else if (ctx.trigger === "scheduled") {
     parts.push(
-      `## Periodic checkup\nThis is a scheduled checkup, not a reaction to any one event - consider every enabled directive above, including purely time-based ones. Consult your own journal (a note you maintain in Notes Chamber, if you keep one) to avoid repeating a same-day directive you've already handled. Events published since the last checkup:\n${formatEvents(ctx.events ?? [])}`
+      `## Scheduled run\nThis directive's own timer came due - handle it now, considering only this one directive. Consult your own journal (a note you maintain in Notes Chamber, if you keep one) to avoid repeating work you've already done. Events received since this directive last ran:\n${formatEvents(ctx.events ?? [])}`
     );
+  } else if (ctx.trigger === "manual") {
+    parts.push(`## Manual run\nThe owner asked you to run this one directive right now, outside its normal schedule.`);
   } else {
     parts.push(
-      `## Urgent event\nThis event was marked urgent and preempted the next scheduled checkup - handle it now rather than waiting:\n${formatEvents(ctx.events ?? [])}`
+      `## Urgent event\nThis event was marked urgent and preempted the next scheduled run - handle it now rather than waiting, considering every standing directive above:\n${formatEvents(ctx.events ?? [])}`
     );
   }
 

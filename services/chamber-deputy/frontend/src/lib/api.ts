@@ -6,7 +6,6 @@ import type {
   Message,
   PostChatMessageRequest,
   PostChatMessageResponse,
-  DeputyRun,
   Settings,
   UpdateSettingsRequest,
 } from "../../../src/types";
@@ -51,6 +50,10 @@ export async function deleteDirective(id: number): Promise<void> {
   assertDeleteOk(res, "delete directive");
 }
 
+export function runDirective(id: number): Promise<{ ok: boolean; response: string | null; errorMessage: string | null }> {
+  return fetch(`${API_BASE}/directives/${id}/run`, { method: "POST" }).then((res) => json(res));
+}
+
 export function fetchMessages(): Promise<Message[]> {
   return fetch(`${API_BASE}/chat/messages`).then((res) => json(res));
 }
@@ -61,14 +64,6 @@ export function postChatMessage(input: PostChatMessageRequest): Promise<PostChat
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   }).then((res) => json(res));
-}
-
-export function fetchRecentRuns(): Promise<DeputyRun[]> {
-  return fetch(`${API_BASE}/runs/recent`).then((res) => json(res));
-}
-
-export function fetchRun(id: number): Promise<DeputyRun> {
-  return fetch(`${API_BASE}/runs/${id}`).then((res) => json(res));
 }
 
 export function fetchSettings(): Promise<Settings> {

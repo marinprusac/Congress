@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 export function ListSearchInput({
@@ -6,6 +7,7 @@ export function ListSearchInput({
   placeholder,
   newHref,
   newLabel = "New",
+  leading,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -17,9 +19,15 @@ export function ListSearchInput({
   // now-removed sub-nav bar. Omit on a list page with no creation flow.
   newHref?: string;
   newLabel?: string;
+  // An extra action docked to the left of the input, in the same fixed
+  // row - e.g. Deputy's directives list docks a "Chat" toggle here. Style
+  // it with the "list-search-new" class to match the "+" button's own
+  // sizing/border.
+  leading?: ReactNode;
 }) {
   return (
     <div className="list-search-row">
+      {leading}
       <input
         type="search"
         placeholder={placeholder}
