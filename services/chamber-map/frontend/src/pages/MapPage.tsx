@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-
 import L from "leaflet";
 import { Link } from "react-router-dom";
 import { useShellHosted, resolveChamberPath, showToast } from "@congress/congress-ui";
-import { fetchVisits, fetchTrips, labelTrip } from "@/lib/api";
+import { fetchVisits, fetchTrips, fetchVisit, fetchVisitActiveAt, labelTrip } from "@/lib/api";
 import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
 import { formatDuration } from "@/lib/formatDuration";
 import { placeMarkerIcon } from "@/lib/markerIcon";
@@ -20,9 +20,15 @@ function localDayBounds(dateStr: string): { from: string; to: string } {
   };
 }
 
+// Pulls the calendar-day part back out in local time - the same
+// UTC-conversion trap toISOString() sets for shiftDate() below, worked
+// around the same way.
+function localDateStr(d: Date): string {
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
 function todayLocal(): string {
-  const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  return localDateStr(new Date());
 }
 
 function shiftDate(dateStr: string, days: number): string {
@@ -40,6 +46,16 @@ function shiftDate(dateStr: string, days: number): string {
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+// A bare time reads as "today" - true for every ordinary visit, since arrival
+// is what the day query filters on, but not for a boundary carried in from
+// outside that window (see the day-bookend logic below) or for a departure
+// that spilled into a later day than its own arrival. Dates the two apart.
+function formatTimeMaybeDated(iso: string, referenceDate: string): string {
+  const time = formatTime(iso);
+  if (localDateStr(new Date(iso)) === referenceDate) return time;
+  return `${new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
 }
 
 const MODE_COLOR: Record<Trip["mode"], string> = {
@@ -156,18 +172,6 @@ export function MapPage() {
   const trips = tripsQuery.data ?? [];
   const visitsById = useMemo(() => new Map(visits.map((v) => [v.id, v])), [visits]);
 
-  // One marker per distinct place (or per unplaced cluster) visited that
-  // day, not one per visit - two stops at Home shouldn't draw two pins.
-  const markers = useMemo(() => {
-    const byKey = new Map<string, Visit>();
-    for (const v of visits) {
-      if (v.status === "ignored" || v.latitude === null || v.longitude === null) continue;
-      const key = v.placeId ? `place-${v.placeId}` : `visit-${v.id}`;
-      if (!byKey.has(key)) byKey.set(key, v);
-    }
-    return [...byKey.values()];
-  }, [visits]);
-
   // Resolved once and reused for both drawing and framing, so the two can't
   // disagree about which trips are on the map.
   const tripLines = useMemo(
@@ -190,6 +194,73 @@ export function MapPage() {
     }
     return items.sort((a, b) => a.at.localeCompare(b.at));
   }, [visits, trips]);
+
+  // A day should never open or close on a bare route - the device was
+  // always *somewhere* at midnight, even if that stay's own arrival (or, for
+  // an entirely quiet day, its only visit at all) falls outside this day's
+  // [from, to) window. The day's leading/trailing trip already names the
+  // visit each case needs (fromVisitId/toVisitId), no day-window guesswork
+  // required; a day with no visits or trips of its own at all instead asks
+  // "where was the device as of this day's very first instant" directly.
+  const firstEntry = entries[0] ?? null;
+  const lastEntry = entries.length > 0 ? entries[entries.length - 1]! : null;
+  const leadingTrip = firstEntry?.kind === "trip" ? firstEntry.trip : null;
+  const trailingTrip = lastEntry?.kind === "trip" ? lastEntry.trip : null;
+  const dayEmpty = entries.length === 0;
+
+  const leadingVisitQuery = useQuery({
+    queryKey: ["visit", leadingTrip?.fromVisitId],
+    queryFn: () => fetchVisit(leadingTrip!.fromVisitId),
+    enabled: leadingTrip !== null,
+  });
+  const trailingVisitQuery = useQuery({
+    queryKey: ["visit", trailingTrip?.toVisitId],
+    queryFn: () => fetchVisit(trailingTrip!.toVisitId),
+    enabled: trailingTrip !== null,
+  });
+  const activeVisitQuery = useQuery({
+    queryKey: ["visit-active-at", from],
+    queryFn: () => fetchVisitActiveAt(from),
+    enabled: dayEmpty,
+  });
+
+  const bookendVisits = [leadingVisitQuery.data, trailingVisitQuery.data, activeVisitQuery.data].filter(
+    (v): v is Visit => v != null
+  );
+  const bookendsLoading =
+    (leadingTrip !== null && leadingVisitQuery.isLoading) ||
+    (trailingTrip !== null && trailingVisitQuery.isLoading) ||
+    (dayEmpty && activeVisitQuery.isLoading);
+
+  // One marker per distinct place (or per unplaced cluster) visited that
+  // day, not one per visit - two stops at Home shouldn't draw two pins.
+  // Bookend visits fold in here too, so a route-only or entirely-quiet day
+  // still shows *something* on the map, not an empty tile.
+  const markers = useMemo(() => {
+    const byKey = new Map<string, Visit>();
+    for (const v of [...visits, ...bookendVisits]) {
+      if (v.status === "ignored" || v.latitude === null || v.longitude === null) continue;
+      const key = v.placeId ? `place-${v.placeId}` : `visit-${v.id}`;
+      if (!byKey.has(key)) byKey.set(key, v);
+    }
+    return [...byKey.values()];
+  }, [visits, leadingVisitQuery.data, trailingVisitQuery.data, activeVisitQuery.data]);
+
+  // entries, with a carried-over visit spliced onto whichever end(s) would
+  // otherwise open or close on a bare route (see the query block above) - an
+  // entirely quiet day replaces the empty list outright with its one
+  // carried-over stay instead of appending to nothing.
+  const displayEntries = useMemo(() => {
+    if (dayEmpty) {
+      return activeVisitQuery.data
+        ? [{ at: activeVisitQuery.data.arrivedAt, kind: "visit" as const, visit: activeVisitQuery.data }]
+        : [];
+    }
+    const items = [...entries];
+    if (leadingVisitQuery.data) items.unshift({ at: leadingVisitQuery.data.arrivedAt, kind: "visit", visit: leadingVisitQuery.data });
+    if (trailingVisitQuery.data) items.push({ at: trailingVisitQuery.data.arrivedAt, kind: "visit", visit: trailingVisitQuery.data });
+    return items;
+  }, [entries, dayEmpty, leadingVisitQuery.data, trailingVisitQuery.data, activeVisitQuery.data]);
 
   return (
     <section>
@@ -244,19 +315,19 @@ export function MapPage() {
         </MapContainer>
       </div>
 
-      {visitsQuery.isLoading || tripsQuery.isLoading ? (
+      {visitsQuery.isLoading || tripsQuery.isLoading || bookendsLoading ? (
         <p className="font-mono text-sm text-dust">Loading —</p>
-      ) : entries.length === 0 ? (
+      ) : displayEntries.length === 0 ? (
         <p className="font-mono text-sm text-dust">— No visits recorded for this day —</p>
       ) : (
         <ul>
-          {entries.map((e) =>
+          {displayEntries.map((e) =>
             e.kind === "visit" ? (
               <li key={`visit-${e.visit.id}`} className="py-2">
                 <span className="font-display text-ink">{e.visit.placeName ?? e.visit.adhocLabel ?? "Unclassified location"}</span>
                 <span className="ml-2 text-sm text-dust">
-                  {formatTime(e.visit.arrivedAt)}
-                  {e.visit.departedAt ? ` – ${formatTime(e.visit.departedAt)}` : " – now"}
+                  {formatTimeMaybeDated(e.visit.arrivedAt, date)}
+                  {e.visit.departedAt ? ` – ${formatTimeMaybeDated(e.visit.departedAt, date)}` : " – now"}
                   {e.visit.durationMinutes !== null ? ` (${formatDuration(e.visit.durationMinutes)})` : ""}
                 </span>
                 {e.visit.status === "pending" && (

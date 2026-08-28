@@ -93,6 +93,17 @@ export function fetchVisit(id: number): Promise<Visit> {
   return fetch(`${API_BASE}/visits/${id}`).then((res) => json(res));
 }
 
+// Wherever the device was at a given instant, even if the visit that covers
+// it never arrived within whatever day-bounded window the caller is
+// otherwise viewing - see the day-bookend logic in MapPage.tsx. Null (not a
+// rejected promise) for the genuinely-empty-history case, an install too new
+// for a request-time instant to fall inside any visit yet.
+export async function fetchVisitActiveAt(at: string): Promise<Visit | null> {
+  const res = await fetch(`${API_BASE}/visits/active-at?at=${encodeURIComponent(at)}`);
+  if (res.status === 404) return null;
+  return json(res);
+}
+
 export function classifyVisit(id: number, input: ClassifyVisitRequest): Promise<Visit> {
   return fetch(`${API_BASE}/visits/${id}/classify`, {
     method: "POST",

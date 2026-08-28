@@ -81,6 +81,22 @@ export async function getVisit(id: number): Promise<Visit | null> {
   return row ? toVisit(row) : null;
 }
 
+// Wherever the device actually was at a given instant - the day view's own
+// [from, to] window only ever returns visits that *arrived* inside it, which
+// says nothing about a day spent entirely at a stay that started earlier (no
+// visit arrives that day at all) or a day that opens mid-trip (the stay it
+// left from arrived on a previous day). Visits never overlap, so the most
+// recent one that had already started by `instant` - whether or not it had
+// departed yet - is that instant's unambiguous answer.
+export async function getVisitActiveAt(instant: Date): Promise<Visit | null> {
+  const row = visitSelection()
+    .where(lte(visits.arrivedAt, instant))
+    .orderBy(desc(visits.arrivedAt))
+    .limit(1)
+    .get();
+  return row ? toVisit(row) : null;
+}
+
 // The visit currently open (no departure recorded yet), if any - re-derived
 // from the DB on every poll tick rather than cached in memory, so a Chamber
 // restart never loses track of "where you currently are" (unlike the

@@ -30,7 +30,7 @@ import {
   removeManualRefByExhibitId,
   resyncPlaceExhibitByExhibitId,
 } from "./places.js";
-import { listVisits, getVisit, classifyVisit, listTrips, labelTrip } from "./visits.js";
+import { listVisits, getVisit, getVisitActiveAt, classifyVisit, listTrips, labelTrip } from "./visits.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { getPollState, toPollHealth } from "./pollState.js";
 import { reprocessRange } from "./reprocess.js";
@@ -113,6 +113,18 @@ app.get("/api/visits", async (c) => {
   const to = parseDateParam(c.req.query("to"));
   const limit = parseLimitParam(c.req.query("limit"));
   return c.json(await listVisits({ status, from, to, limit }));
+});
+
+// Registered ahead of /api/visits/:id (same reason /api/places/recent and
+// /api/places/search sit ahead of /api/places/:id above) - lets the day view
+// bookend a day with no visits of its own onto whichever stay was already
+// under way when it began.
+app.get("/api/visits/active-at", async (c) => {
+  const at = parseDateParam(c.req.query("at"));
+  if (!at) return c.json({ error: "invalid_request" }, 400);
+  const visit = await getVisitActiveAt(at);
+  if (!visit) return c.json({ error: "not_found" }, 404);
+  return c.json(visit);
 });
 
 app.get("/api/visits/:id", async (c) => {
