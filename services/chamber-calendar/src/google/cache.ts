@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, like, or } from "drizzle-orm";
+import { and, eq, like, or } from "drizzle-orm";
 import type { EventPublishRequest } from "@congress/shared-types";
 import type { CalendarEvent } from "../types.js";
 import { db } from "../db/client.js";
@@ -145,16 +145,25 @@ export function getCachedEvent(id: string): CalendarEvent | undefined {
 // declined events. Still reachable directly (getEvent) or via
 // searchCachedEvents, which stays unfiltered - hiding from the passive
 // agenda view isn't the same as making an event unfindable.
+// `start`/`end` are stored as Google's own RFC3339 text, offset-suffixed
+// (e.g. "+02:00") rather than normalized to UTC "Z" - so ordering/range
+// comparisons must go through Date parsing (which resolves an offset to the
+// right absolute instant), never a raw string/SQL gte/lte or localeCompare,
+// which silently order by the offset's local digits instead.
+function startMsOf(event: CalendarEvent): number {
+  return new Date(event.start).getTime();
+}
+
 export function listCachedEvents(fromISO: string, toISO: string): CalendarEvent[] {
-  const rows = db
+  const fromMs = new Date(fromISO).getTime();
+  const toMs = new Date(toISO).getTime();
+  return db
     .select()
     .from(cachedEvents)
-    .where(and(gte(cachedEvents.start, fromISO), lte(cachedEvents.start, toISO)))
-    .all();
-  return rows
+    .all()
     .map(rowToCalendarEvent)
-    .filter((event) => !event.attendance.notAttending)
-    .sort((a, b) => a.start.localeCompare(b.start));
+    .filter((event) => !event.attendance.notAttending && startMsOf(event) >= fromMs && startMsOf(event) <= toMs)
+    .sort((a, b) => startMsOf(a) - startMsOf(b));
 }
 
 // Empty query only looks forward from now (matches the picker's
@@ -163,17 +172,24 @@ export function listCachedEvents(fromISO: string, toISO: string): CalendarEvent[
 // here since the whole cache table is already within the search window.
 export function searchCachedEvents(query: string, limit = 20): CalendarEvent[] {
   const trimmed = query.trim();
-  const conditions = trimmed
-    ? [or(like(cachedEvents.title, `%${trimmed}%`), like(cachedEvents.description, `%${trimmed}%`), like(cachedEvents.location, `%${trimmed}%`))]
-    : [gte(cachedEvents.start, new Date().toISOString())];
-  const rows = db
+  if (!trimmed) {
+    const nowMs = Date.now();
+    return db
+      .select()
+      .from(cachedEvents)
+      .all()
+      .map(rowToCalendarEvent)
+      .filter((event) => startMsOf(event) >= nowMs)
+      .sort((a, b) => startMsOf(a) - startMsOf(b))
+      .slice(0, limit);
+  }
+  return db
     .select()
     .from(cachedEvents)
-    .where(and(...conditions))
-    .all();
-  return rows
+    .where(or(like(cachedEvents.title, `%${trimmed}%`), like(cachedEvents.description, `%${trimmed}%`), like(cachedEvents.location, `%${trimmed}%`)))
+    .all()
     .map(rowToCalendarEvent)
-    .sort((a, b) => a.start.localeCompare(b.start))
+    .sort((a, b) => startMsOf(a) - startMsOf(b))
     .slice(0, limit);
 }
 

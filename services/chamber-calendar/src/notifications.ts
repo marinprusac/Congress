@@ -32,7 +32,12 @@ function dedupeKeyFor(accountId: number, calendarId: string, eventId: string): s
 }
 
 interface ScheduledFire {
-  timer: ReturnType<typeof setTimeout>;
+  // Undefined once fired - kept as a map entry (rather than removed) so a
+  // later poll that still sees this same event/start time knows it's
+  // already been handled, instead of re-arming a zero-delay timer and
+  // publishing a duplicate on every subsequent poll until the event's start
+  // time finally passes.
+  timer: ReturnType<typeof setTimeout> | undefined;
   // The instant this was armed for - lets a later poll tell "still the same
   // start time, leave it alone" apart from "rescheduled, replace it".
   fireAtMs: number;
@@ -42,7 +47,8 @@ interface ScheduledFire {
 // lookahead window - in-memory only, rebuilt from Google's own data on
 // every poll, so a restart just loses precise timing until the next poll
 // re-discovers what's upcoming (same accepted gap chamber-tasks' own
-// lastNotifiedState has).
+// lastNotifiedState has). Entries for events no longer in the polled
+// window are pruned at the end of each pollUpcomingEvents run.
 const scheduled = new Map<string, ScheduledFire>();
 
 // Unlike chamber-tasks' due-task check, this never publishes a "cleared"
@@ -52,7 +58,6 @@ const scheduled = new Map<string, ScheduledFire>();
 // countdown-style reminder: the notification content itself trails off, it
 // doesn't nag.
 async function publishStartingSoon(accountId: number, calendarId: string, eventId: string, title: string, startMs: number): Promise<void> {
-  scheduled.delete(dedupeKeyFor(accountId, calendarId, eventId));
   const minutesUntil = Math.max(0, Math.round((startMs - Date.now()) / 60_000));
   await publishEvent({
     type: "calendar.event_starting_soon",
@@ -72,15 +77,18 @@ async function publishStartingSoon(accountId: number, calendarId: string, eventI
 // leaving an unchanged one alone.
 function scheduleFire(key: string, fireAtMs: number, fire: () => void): void {
   const existing = scheduled.get(key);
+  // Same fire instant as before, whether it's still pending or has already
+  // fired - either way there's nothing new to do here.
   if (existing && existing.fireAtMs === fireAtMs) return;
-  if (existing) clearTimeout(existing.timer);
+  if (existing?.timer) clearTimeout(existing.timer);
 
   const delay = Math.max(0, fireAtMs - Date.now());
-  const timer = setTimeout(() => {
-    scheduled.delete(key);
+  const entry: ScheduledFire = { timer: undefined, fireAtMs };
+  entry.timer = setTimeout(() => {
+    entry.timer = undefined;
     fire();
   }, delay);
-  scheduled.set(key, { timer, fireAtMs });
+  scheduled.set(key, entry);
 }
 
 // A local cache read now, not a live Google call - the calendar cache sync
@@ -89,16 +97,26 @@ function scheduleFire(key: string, fireAtMs: number, fire: () => void): void {
 function pollUpcomingEvents(): void {
   const now = Date.now();
   const events = listCachedEvents(new Date(now).toISOString(), new Date(now + LOOKAHEAD_MS).toISOString());
+  const seen = new Set<string>();
 
   for (const event of events) {
     if (event.allDay) continue;
     const key = dedupeKeyFor(event.accountId, event.calendarId, event.id);
+    seen.add(key);
     const startMs = new Date(event.start).getTime();
     scheduleFire(key, startMs - LOOKAHEAD_MS, () => {
       void publishStartingSoon(event.accountId, event.calendarId, event.id, event.title, startMs).catch((err) =>
         console.warn(`calendar.event_starting_soon publish failed: ${(err as Error).message}`)
       );
     });
+  }
+
+  // Drop anything that fell out of the polled window - cancelled, moved
+  // outside the lookahead, or (the common case) its start time simply
+  // passed - so a restarted event id occurring later isn't mistaken for
+  // "already handled", and so this map doesn't grow without bound.
+  for (const key of scheduled.keys()) {
+    if (!seen.has(key)) scheduled.delete(key);
   }
 }
 

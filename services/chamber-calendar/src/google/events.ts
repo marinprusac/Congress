@@ -185,7 +185,7 @@ export async function listEvents(fromISO: string, toISO: string): Promise<ListEv
     }
   }
 
-  events.sort((a, b) => a.start.localeCompare(b.start));
+  events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
   return { events, accountErrors };
 }
 
