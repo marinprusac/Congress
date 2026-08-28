@@ -22,6 +22,7 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@congress/test-support": "workspace:*",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^26.2.0",
     "typescript": "^5.7.0",

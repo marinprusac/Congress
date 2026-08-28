@@ -62,17 +62,17 @@ export class TitleConflictError extends Error {
   }
 }
 
-function parseFrontmatter(content: string): { frontmatter: Record<string, unknown>; body: string } {
+export function parseFrontmatter(content: string): { frontmatter: Record<string, unknown>; body: string } {
   const { data, content: body } = matter(content);
   return { frontmatter: data ?? {}, body: body.replace(/^\s+/, "") };
 }
 
-function reconstructContent(frontmatter: Record<string, unknown>, body: string): string {
+export function reconstructContent(frontmatter: Record<string, unknown>, body: string): string {
   if (!frontmatter || Object.keys(frontmatter).length === 0) return body;
   return matter.stringify(body, frontmatter);
 }
 
-async function titleExists(title: string, excludeId?: number): Promise<boolean> {
+export async function titleExists(title: string, excludeId?: number): Promise<boolean> {
   const row = db
     .select({ id: notes.id })
     .from(notes)
