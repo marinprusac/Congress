@@ -66,6 +66,11 @@ export function postChatMessage(input: PostChatMessageRequest): Promise<PostChat
   }).then((res) => json(res));
 }
 
+export async function clearChatThread(): Promise<void> {
+  const res = await fetch(`${API_BASE}/chat/messages`, { method: "DELETE" });
+  assertDeleteOk(res, "clear chat thread");
+}
+
 export function fetchSettings(): Promise<Settings> {
   return fetch(`${API_BASE}/settings`).then((res) => json(res));
 }

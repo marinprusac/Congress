@@ -28,6 +28,13 @@ export async function listRecentMessages(limit = MESSAGES_LIST_LIMIT): Promise<M
 // row's timestamp is nudged 1ms later than the user row's so chronological
 // ordering (by createdAt) is unambiguous even though both are written in the
 // same call.
+// The owner's "start fresh" action (ChatPage's Clear button) - Deputy keeps
+// no history beyond the current thread, so clearing means actually deleting
+// every stored message, not starting a new session id alongside old ones.
+export function deleteAllMessages(): void {
+  db.delete(messages).run();
+}
+
 export function insertMessagePair(sessionId: string, userText: string, assistantText: string): { userMessage: Message; assistantMessage: Message } {
   const now = new Date();
   const userRow = db

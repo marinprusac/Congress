@@ -46,10 +46,6 @@ export type Message = z.infer<typeof messageSchema>;
 
 export const postChatMessageRequestSchema = z.object({
   text: z.string().min(1),
-  // Forces a fresh session id regardless of the idle window - the chat
-  // page's own "New thread" affordance, independent of timeout-based
-  // resets (see docs/deputy-chamber-plan.md §8).
-  newThread: z.boolean().default(false),
 });
 export type PostChatMessageRequest = z.infer<typeof postChatMessageRequestSchema>;
 

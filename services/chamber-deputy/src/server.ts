@@ -28,7 +28,7 @@ import {
 } from "./directives.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { searchDirectiveExhibits, resolveDirectiveExhibits } from "./exhibits.js";
-import { listMessages, postChatMessage } from "./chat.js";
+import { listMessages, postChatMessage, clearThread } from "./chat.js";
 import { todaySpendUsd } from "./spend.js";
 import { enqueue } from "./jobQueue.js";
 import { runDeputy } from "./engine.js";
@@ -152,6 +152,13 @@ app.post("/api/chat/messages", async (c) => {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
   return c.json(await postChatMessage(parsed.data));
+});
+
+// The Clear button (ChatPage, shown in place of Send when the input is
+// empty) - Deputy keeps no history beyond the current thread.
+app.delete("/api/chat/messages", async (c) => {
+  clearThread();
+  return c.body(null, 204);
 });
 
 app.route("/mcp", mcpApp);
