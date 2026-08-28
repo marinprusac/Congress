@@ -1,0 +1,30 @@
+#!/bin/sh
+# Runs typecheck + tests before a push is allowed, for the developer machine.
+#
+# Pushing to main IS the deploy here - the VPS polls origin/main every 30s and
+# fast-forwards, rebuilds and restarts (see infra/deploy/sync.sh). There is no
+# CI stage in between, so this hook is the only thing standing between a broken
+# commit and production.
+#
+# This is the laptop counterpart to pre-push-hook, which is the *server* clone's
+# hook and blocks pushes to main entirely. They are separate files because they
+# solve different problems; a machine only ever wants one of them.
+#
+# Like that one, this file is checked in as the source of truth rather than run
+# by git from here. Install with:
+#   cp infra/deploy/pre-push-hook-checks .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+#
+# To push anyway (a genuinely known-broken WIP branch), use `git push --no-verify`.
+
+set -e
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+echo "pre-push: typecheck..."
+pnpm typecheck
+
+echo "pre-push: tests..."
+pnpm test
+
+echo "pre-push: ok"

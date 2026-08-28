@@ -1,10 +1,22 @@
 {
   "name": "congress-monorepo",
   "private": true,
+  "type": "module",
   "scripts": {
-    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.tests.json && pnpm -r typecheck",
     "dev:congress": "pnpm --filter congress dev:server",
     "dev:congress:web": "pnpm --filter congress dev:web",
     "create-chamber": "node scripts/create-chamber.mjs"
+  },
+  "devDependencies": {
+    "@congress/shared-types": "workspace:*",
+    "@congress/test-support": "workspace:*",
+    "@hono/node-server": "^2.1.0",
+    "@types/node": "^26.2.0",
+    "hono": "^4.13.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
   }
 }

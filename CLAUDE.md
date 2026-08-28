@@ -29,12 +29,25 @@ pnpm --filter congress build:vendor            # Congress only: shared React/rou
 pnpm --filter <service> typecheck              # tsc --noEmit, server + frontend tsconfig
 
 pnpm -r typecheck                              # typecheck every package/service — run this after any change
+pnpm typecheck                                 # the above, plus the root tests/ directory
+
+pnpm test                                      # vitest, whole monorepo — run this after any change
+pnpm test services/chamber-map                 # any path fragment filters
+pnpm test:watch                                # vitest in watch mode
 
 pnpm --filter <service> db:generate            # after editing src/db/schema.ts -> drizzle-kit generate
 pnpm --filter <service> db:migrate             # apply migrations locally (also auto-applied on service boot)
 ```
 
-There is no test suite and no lint config in this repo — `pnpm -r typecheck` is the only automated check, and it's expected to pass cleanly before committing.
+There is no lint config in this repo — `pnpm typecheck` and `pnpm test` are the two automated checks, and both are expected to pass cleanly before committing.
+
+Tests are Vitest, configured once at the root (`vitest.config.mts`) rather than per service, and live beside the code they cover as `src/**/*.test.ts` (plus `tests/` at the root for cross-service checks like the migration smoke test). They run in a Node environment only — there is no jsdom setup, so frontend coverage is limited to `congress-ui`'s pure string helpers, not component rendering. Shared helpers live in `packages/test-support` (`@congress/test-support`) — a workspace package rather than a plain folder, so each service's own `typecheck` (which pins `rootDir` to its own `src/`) can still see them. Two things make this work and are worth knowing before adding a suite:
+
+- Every service opens its SQLite handle and parses its env **at module load** (`src/db/client.ts`, `src/env.ts`). `packages/test-support/src/env.ts` is a Vitest `setupFile`, so it runs before any of that and points `DB_PATH` at a fresh temp file — one per test file, since Vitest gives each test file its own module registry. A test that needs several databases in one file resets with `vi.resetModules()` after moving `process.env.DB_PATH`.
+- `runMigrations()`'s default migrations path is relative to the process cwd (the repo root under Vitest), so tests pass an absolute one via `migrationsDir(<service>)`.
+- Congress's gateway is tested against a **real** ephemeral upstream (`startFakeChamber`), not a stubbed `fetch` — its behaviour is mostly header and stream handling, which a stub cannot exercise.
+
+Since pushing to `main` is the deploy, `infra/deploy/pre-push-hook-checks` runs both checks before a push; install it with `cp infra/deploy/pre-push-hook-checks .git/hooks/pre-push && chmod +x .git/hooks/pre-push` (it's the developer-machine counterpart to `infra/deploy/pre-push-hook`, which is the *server* clone's hook and does something else entirely).
 
 A Chamber's frontend dev server proxies `/api`, `/manifest`, `/health`, `/mcp` to its own backend port, and exhibit search/resolve calls (`/congress/*`) to Congress's dev port (`3000`) — see the `PROXY_TARGET`/`CONGRESS_PROXY_TARGET` constants at the top of each `frontend/vite.config.ts`. In production everything is same-origin through Congress's proxy instead (see Gateway below), which is also why each frontend build sets `base: "/<chamber-name>/"`. Congress's own dev server additionally proxies `/capitol` (not its own API — the gateway's chamber-frontend proxy, needed so `dev:web` can reach the Capitol Chamber's build the way production does).
 
