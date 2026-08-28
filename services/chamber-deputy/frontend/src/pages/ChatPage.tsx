@@ -97,7 +97,7 @@ export function ChatPage() {
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 sm:px-6">
         {messagesQuery.isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}
-        {!messagesQuery.isLoading && messages.length === 0 && <p className="font-mono text-sm text-dust">— No messages yet — ask Deputy something —</p>}
+        {!messagesQuery.isLoading && messages.length === 0 && <p className="font-mono text-sm text-dust">— No messages yet —</p>}
         {messages.map((message) => (
           <div
             key={message.id}
@@ -125,7 +125,7 @@ export function ChatPage() {
           onClick={() => navigate(resolveChamberPath("/", "deputy", shellHosted))}
           aria-label="Directives"
           title="Directives"
-          className="tap-target flex w-11 shrink-0 items-center justify-center border border-dust text-ink hover:border-accent hover:text-accent"
+          className="list-search-new shrink-0"
         >
           <DirectivesIcon />
         </button>

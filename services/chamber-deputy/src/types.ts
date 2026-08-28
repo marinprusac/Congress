@@ -19,6 +19,15 @@ export type DirectiveSummary = z.infer<typeof directiveSummarySchema>;
 export const directiveDetailSchema = directiveSummarySchema;
 export type DirectiveDetail = z.infer<typeof directiveDetailSchema>;
 
+// GET /api/directives/running - which directive, if any, currently has a
+// `claude` run actually executing (see runningState.ts). Polled by the
+// directives list to show a live spinner for a run kicked off anywhere, not
+// just this browser tab's own play button.
+export const runningDirectiveResponseSchema = z.object({
+  directiveId: z.number().int().nullable(),
+});
+export type RunningDirectiveResponse = z.infer<typeof runningDirectiveResponseSchema>;
+
 export const createDirectiveRequestSchema = z.object({
   title: z.string().min(1),
   body: z.string().default(""),

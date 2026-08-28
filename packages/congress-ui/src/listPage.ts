@@ -9,6 +9,12 @@ export interface SearchableListOptions<T> {
   fetchSearch?: (query: string) => Promise<T[]>;
   // Client-filter mode (Documents): fetches once, filters in JS.
   filterClient?: (item: T, query: string) => boolean;
+  // Opt-in background polling (react-query's refetchInterval) - e.g.
+  // Deputy's directives list, which needs fresh lastRunAt/intervalMs to
+  // keep its play-button progress rings honest even when nothing local
+  // triggered a refetch (a scheduled run fired server-side, or another
+  // tab/device ran one). Omit for the common case of no live-updating need.
+  refetchInterval?: number;
 }
 
 // One unconditional useQuery call regardless of which mode this call site
@@ -21,12 +27,13 @@ export interface SearchableListOptions<T> {
 // first call site that doesn't hold that invariant, and React gives no
 // warning until it does.
 export function useSearchableList<T>(opts: SearchableListOptions<T>) {
-  const { queryKeyBase, query, fetchAll, fetchSearch, filterClient } = opts;
+  const { queryKeyBase, query, fetchAll, fetchSearch, filterClient, refetchInterval } = opts;
 
   const searching = Boolean(fetchSearch && query);
   const result = useQuery({
     queryKey: searching ? [queryKeyBase, "search", query] : [queryKeyBase],
     queryFn: searching ? () => fetchSearch!(query) : fetchAll,
+    refetchInterval,
   });
 
   const q = query.trim().toLowerCase();

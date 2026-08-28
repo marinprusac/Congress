@@ -3,6 +3,7 @@ import { enqueue } from "./jobQueue.js";
 import { runDeputy } from "./engine.js";
 import { drainPendingCheckupEvents } from "./pendingEvents.js";
 import { listDueScheduledDirectives, nextScheduledWakeDelayMs, markDirectiveRunNow } from "./directives.js";
+import { withRunningDirective } from "./runningState.js";
 
 // Single self-rescheduling timer, armed for whichever enabled+scheduled
 // directive's own (lastRunAt + intervalMs) is soonest - the same "one timer
@@ -24,7 +25,7 @@ async function tick(): Promise<void> {
         // otherwise scheduleNext() below would see this directive as still
         // due and re-fire it on the very next tick.
         await markDirectiveRunNow(directive.id);
-        void enqueue(() => runDeputy({ trigger: "scheduled", events, directive })).catch((err) =>
+        void enqueue(() => withRunningDirective(directive.id, () => runDeputy({ trigger: "scheduled", events, directive }))).catch((err) =>
           console.warn(`Deputy scheduled run for directive ${directive.id} failed: ${(err as Error).message}`)
         );
       }

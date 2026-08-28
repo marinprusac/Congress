@@ -33,6 +33,7 @@ import { todaySpendUsd } from "./spend.js";
 import { enqueue } from "./jobQueue.js";
 import { runDeputy } from "./engine.js";
 import { rearmScheduler } from "./checkup.js";
+import { getRunningDirectiveId, withRunningDirective } from "./runningState.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -48,6 +49,12 @@ app.get("/api/directives/search", async (c) => {
   const query = c.req.query("q") ?? "";
   if (!query.trim()) return c.json([]);
   return c.json(await searchDirectives(query));
+});
+
+// Polled by the directives list (not the single-directive page) to drive
+// its play-button progress ring's "running" state - see runningState.ts.
+app.get("/api/directives/running", async (c) => {
+  return c.json({ directiveId: getRunningDirectiveId() });
 });
 
 app.get("/api/directives/:id", async (c) => {
@@ -110,7 +117,7 @@ app.post("/api/directives/:id/run", async (c) => {
   await markDirectiveRunNow(id);
   rearmScheduler();
   try {
-    const result = await enqueue(() => runDeputy({ trigger: "manual", directive }));
+    const result = await enqueue(() => withRunningDirective(id, () => runDeputy({ trigger: "manual", directive })));
     return c.json({ ok: result.ok, response: result.response, errorMessage: result.errorMessage });
   } catch (err) {
     // runDeputy can throw before ever reaching the CLI (e.g. it couldn't
