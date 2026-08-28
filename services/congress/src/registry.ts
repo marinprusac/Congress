@@ -85,7 +85,11 @@ export function registerChamber(manifest: Manifest, subscriptions: ChamberSubscr
   const row = db.select().from(chambers).where(eq(chambers.name, manifest.name)).get();
   if (!row) throw new Error("Failed to read back registered chamber");
   if (existing && existing.status === "offline") {
-    publishEvent({ chamber: "congress", type: "congress.chamber_online", payload: { chamberName: manifest.name } });
+    publishEvent({
+      chamber: "congress",
+      type: "congress.chamber_online",
+      payload: { chamberName: manifest.name, priority: "low" },
+    });
   }
   const entry = toEntry(row);
   ensureCache().set(entry.name, entry);
@@ -131,7 +135,11 @@ export function recordHeartbeat(name: string, subscriptions?: ChamberSubscriptio
     .get();
 
   if (existing.status === "offline") {
-    publishEvent({ chamber: "congress", type: "congress.chamber_online", payload: { chamberName: name } });
+    publishEvent({
+      chamber: "congress",
+      type: "congress.chamber_online",
+      payload: { chamberName: name, priority: "low" },
+    });
   }
   const entry = row ? toEntry(row) : null;
   if (entry) ensureCache().set(entry.name, entry);

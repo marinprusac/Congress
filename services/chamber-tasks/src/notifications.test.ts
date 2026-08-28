@@ -16,9 +16,10 @@ vi.mock("@congress/chamber-kit", async (importOriginal) => ({
   createPublishEvent: () => publishSpy,
 }));
 
+import type { PriorityLevel } from "@congress/shared-types";
 import { db, runMigrations } from "./db/client.js";
 import { tasks } from "./db/schema.js";
-import { checkDueTasks, nextThresholdMs, stopDueTaskNotifications } from "./notifications.js";
+import { checkDueTasks, escalate, nextThresholdMs, stopDueTaskNotifications } from "./notifications.js";
 
 const NOW = Date.parse("2026-03-01T12:00:00.000Z");
 const HOUR = 60 * 60 * 1000;
@@ -45,13 +46,14 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function task(name: string, dueOffsetMs: number | null, completed = false) {
+function task(name: string, dueOffsetMs: number | null, completed = false, priority: PriorityLevel = "normal") {
   return db
     .insert(tasks)
     .values({
       name,
       dueDate: dueOffsetMs === null ? null : new Date(NOW + dueOffsetMs),
       completed,
+      priority,
       createdAt: new Date(NOW),
       updatedAt: new Date(NOW),
     })
@@ -130,10 +132,15 @@ describe("checkDueTasks", () => {
     expect(published()).toEqual([{ type: "tasks.overdue", taskId: t.id }]);
   });
 
-  it("carries the name and a link in the payload, for a rule to template from", async () => {
+  it("carries the name, a link, and priority in the payload, for a rule to template from", async () => {
     const t = task("Taxes", 6 * HOUR);
     await checkDueTasks();
-    expect(publishSpy.mock.calls[0]![0].payload).toEqual({ taskId: t.id, name: "Taxes", url: `/t/${t.id}` });
+    expect(publishSpy.mock.calls[0]![0].payload).toEqual({
+      taskId: t.id,
+      name: "Taxes",
+      url: `/t/${t.id}`,
+      priority: "normal",
+    });
   });
 
   it("ignores completed tasks entirely", async () => {
@@ -230,5 +237,51 @@ describe("state transitions", () => {
     await checkDueTasks();
     expect(published()).toEqual([{ type: "tasks.overdue", taskId: a.id }]);
     expect(published().some((p) => p.taskId === b.id)).toBe(false);
+  });
+});
+
+describe("escalate", () => {
+  it("bumps a priority one level", () => {
+    expect(escalate("low")).toBe("normal");
+    expect(escalate("normal")).toBe("high");
+    expect(escalate("high")).toBe("urgent");
+  });
+
+  it("caps at urgent rather than overflowing", () => {
+    expect(escalate("urgent")).toBe("urgent");
+  });
+});
+
+describe("event priority", () => {
+  function payloadPriority(): unknown {
+    return publishSpy.mock.calls[0]![0].payload.priority;
+  }
+
+  it("due_soon carries the task's own priority unchanged", async () => {
+    task("soon", 6 * HOUR, false, "high");
+    await checkDueTasks();
+    expect(payloadPriority()).toBe("high");
+  });
+
+  it("overdue escalates one level above the task's own priority", async () => {
+    task("late", -HOUR, false, "normal");
+    await checkDueTasks();
+    expect(payloadPriority()).toBe("high");
+  });
+
+  it("overdue stays urgent rather than escalating past the cap", async () => {
+    task("late", -HOUR, false, "urgent");
+    await checkDueTasks();
+    expect(payloadPriority()).toBe("urgent");
+  });
+
+  it("due_cleared is always low regardless of the task's own priority", async () => {
+    const t = task("soon", 6 * HOUR, false, "urgent");
+    await checkDueTasks();
+    publishSpy.mockClear();
+
+    db.update(tasks).set({ completed: true }).where(sql`id = ${t.id}`).run();
+    await checkDueTasks();
+    expect(payloadPriority()).toBe("low");
   });
 });

@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import { PRIORITY_LEVELS } from "@congress/shared-types";
 
 export const tasks = sqliteTable(
   "tasks",
@@ -8,6 +9,10 @@ export const tasks = sqliteTable(
     description: text("description").notNull().default(""),
     dueDate: integer("due_date", { mode: "timestamp_ms" }),
     completed: integer("completed", { mode: "boolean" }).notNull().default(false),
+    // Ordered low < normal < high < urgent (PRIORITY_LEVELS, shared-types).
+    // Drives payload.priority on tasks.due_soon/tasks.overdue - see
+    // notifications.ts.
+    priority: text("priority", { enum: PRIORITY_LEVELS }).notNull().default("normal"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },

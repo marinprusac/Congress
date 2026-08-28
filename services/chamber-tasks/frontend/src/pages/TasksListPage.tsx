@@ -12,6 +12,7 @@ import {
   ListEmptyState,
 } from "@congress/congress-ui";
 import { fetchTasks, fetchTask, searchTasks, setCompleted } from "@/lib/api";
+import { PriorityMark } from "@/components/PriorityControls";
 import type { TaskSummary } from "../../../src/types";
 
 function formatDueDate(value: string | null): string | null {
@@ -80,9 +81,10 @@ export function TasksListPage() {
                 <span className={task.completed ? "font-display text-lg text-dust line-through" : "font-display text-lg text-ink"}>
                   {task.name}
                 </span>
-                {task.dueDate && (
-                  <span className="shrink-0 font-mono text-xs text-dust">{formatDueDate(task.dueDate)}</span>
-                )}
+                <span className="flex shrink-0 items-baseline gap-2">
+                  <PriorityMark priority={task.priority} />
+                  {task.dueDate && <span className="font-mono text-xs text-dust">{formatDueDate(task.dueDate)}</span>}
+                </span>
               </div>
               {task.description && <p className="mt-1 text-sm text-slate">{task.description}</p>}
             </Link>

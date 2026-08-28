@@ -69,7 +69,7 @@ export async function updateEventSettings(eventType: string, input: UpdateEventS
 
   db.update(eventSettings).set(next).where(eq(eventSettings.eventType, eventType)).run();
   notifySubscriptionsChanged();
-  void publishEvent({ type: "logs.rule_updated", payload: { eventType, label: existing.label } });
+  void publishEvent({ type: "logs.rule_updated", payload: { eventType, label: existing.label, priority: "low" } });
 
   return getEventSettingsByType(eventType);
 }

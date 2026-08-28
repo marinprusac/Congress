@@ -96,7 +96,10 @@ export function upsertAccountFromOAuth(input: {
     })
     .returning()
     .get();
-  void publishEvent({ type: "calendar.account_connected", payload: { accountId: row.id, label: row.label } });
+  void publishEvent({
+    type: "calendar.account_connected",
+    payload: { accountId: row.id, label: row.label, priority: "low" },
+  });
   return toDTO(row);
 }
 
@@ -116,7 +119,10 @@ export async function disconnectAccount(id: number): Promise<boolean> {
   await revokeToken(existing.refreshToken);
   const result = db.delete(googleAccounts).where(eq(googleAccounts.id, id)).run();
   if (result.changes > 0) {
-    void publishEvent({ type: "calendar.account_disconnected", payload: { accountId: id, label: existing.label } });
+    void publishEvent({
+      type: "calendar.account_disconnected",
+      payload: { accountId: id, label: existing.label, priority: "high" },
+    });
   }
   return result.changes > 0;
 }

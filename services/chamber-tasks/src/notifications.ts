@@ -1,5 +1,6 @@
 import { and, eq, isNotNull } from "drizzle-orm";
 import { createPublishEvent } from "@congress/chamber-kit";
+import { PRIORITY_LEVELS, type PriorityLevel } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { tasks } from "./db/schema.js";
 import { env } from "./env.js";
@@ -38,10 +39,18 @@ const LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
 // re-publishes once, rather than being missed entirely.
 const lastNotifiedState = new Map<number, "due_soon" | "overdue">();
 
+// tasks.overdue reads as one level more urgent than the task's own set
+// priority - being overdue is inherently worse than merely due-soon for the
+// same task - capped at "urgent" since there's nowhere higher to escalate to.
+export function escalate(priority: PriorityLevel): PriorityLevel {
+  const nextIndex = Math.min(PRIORITY_LEVELS.indexOf(priority) + 1, PRIORITY_LEVELS.length - 1);
+  return PRIORITY_LEVELS[nextIndex] as PriorityLevel;
+}
+
 export async function checkDueTasks(): Promise<void> {
   const now = Date.now();
   const rows = db
-    .select({ id: tasks.id, name: tasks.name, dueDate: tasks.dueDate })
+    .select({ id: tasks.id, name: tasks.name, dueDate: tasks.dueDate, priority: tasks.priority })
     .from(tasks)
     .where(and(eq(tasks.completed, false), isNotNull(tasks.dueDate)))
     .all();
@@ -62,7 +71,12 @@ export async function checkDueTasks(): Promise<void> {
       publishes.push(
         publishEvent({
           type: state === "overdue" ? "tasks.overdue" : "tasks.due_soon",
-          payload: { taskId: row.id, name: row.name, url: `/t/${row.id}` },
+          payload: {
+            taskId: row.id,
+            name: row.name,
+            url: `/t/${row.id}`,
+            priority: state === "overdue" ? escalate(row.priority) : row.priority,
+          },
         })
       );
     }
@@ -70,7 +84,7 @@ export async function checkDueTasks(): Promise<void> {
 
   for (const id of lastNotifiedState.keys()) {
     if (!currentlyDue.has(id)) {
-      publishes.push(publishEvent({ type: "tasks.due_cleared", payload: { taskId: id } }));
+      publishes.push(publishEvent({ type: "tasks.due_cleared", payload: { taskId: id, priority: "low" } }));
     }
   }
 

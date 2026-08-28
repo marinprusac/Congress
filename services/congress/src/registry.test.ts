@@ -73,7 +73,7 @@ describe("registerChamber", () => {
     deregisterChamber("delta");
     registerChamber(makeManifest("delta"));
     expect(publishEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "congress.chamber_online", payload: { chamberName: "delta" } })
+      expect.objectContaining({ type: "congress.chamber_online", payload: { chamberName: "delta", priority: "low" } })
     );
   });
 
@@ -110,7 +110,7 @@ describe("recordHeartbeat", () => {
 
     expect(getChamber("hotel")?.status).toBe("active");
     expect(publishEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "congress.chamber_online", payload: { chamberName: "hotel" } })
+      expect.objectContaining({ type: "congress.chamber_online", payload: { chamberName: "hotel", priority: "low" } })
     );
   });
 
