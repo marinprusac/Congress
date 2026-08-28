@@ -201,6 +201,26 @@ export async function reprocessRange(from: Date, to: Date = new Date()): Promise
   });
 }
 
+// Called once on boot, before live polling starts. The trip-linking state
+// that stitches one visit to the next (tripOrigin/candidateStop in
+// tracking.ts) lives only in memory by design - but this Chamber restarts
+// often and unpredictably, since every git push redeploys every service,
+// including mid-trip if the owner happens to be travelling when one lands.
+// Losing that state doesn't corrupt anything already committed, but it does
+// leave the *next* visit permanently unlinked - a real stop with no trip
+// connecting it to wherever the device came from, since nothing else ever
+// retries that link once the moment has passed. Replaying from the last
+// known visit's own arrival (using the exact same code path the live poller
+// uses - see this module's own header comment) re-derives it correctly
+// whether or not anything was actually lost: a boot after a clean shutdown
+// just reproduces the same visit/trip unchanged. Returns null when there's
+// no visit yet to anchor the replay to (a brand new install).
+export async function healTrackingStateOnBoot(): Promise<ReprocessResult | null> {
+  const latest = db.select().from(visits).orderBy(desc(visits.arrivedAt)).limit(1).get();
+  if (!latest) return null;
+  return reprocessRange(latest.arrivedAt);
+}
+
 // Applies a newly added or moved place to the history it should have
 // matched all along. Returns null - reprocessing nothing - when no fix in
 // the lookback window ever fell inside the place's radius, which is the
