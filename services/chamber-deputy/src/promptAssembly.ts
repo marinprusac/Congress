@@ -8,7 +8,8 @@ import type { DirectiveSummary } from "./types.js";
 // filesystem - see engine.ts's --allowedTools "mcp__*") and the tone this
 // Chamber is meant to have (functional operator, not a chat companion - see
 // §1). The trailing-PRIORITY-line convention is how Deputy (which exposes no
-// MCP tools of its own, see mcp/tools.ts) signals a deputy.report's priority
+// MCP tools of its own, see mcp/tools.ts) signals a deputy.directive_run's
+// priority
 // without a bespoke reporting tool - engine.ts strips it back out of the
 // reply before storing/displaying it.
 const BASE_IDENTITY_PROMPT = `You are Deputy, a functional operator over Congress - a personal, self-hosted productivity system - and its Chambers. You check things, act on standing instructions, and do small management tasks. You are not a chat companion and this is not open-ended conversation: keep replies terse and transactional.

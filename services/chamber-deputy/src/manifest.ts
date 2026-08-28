@@ -21,14 +21,10 @@ export const manifest: Manifest = {
   widgets: [{ id: "message", width: 2, height: 1, label: "Message Deputy" }],
   events: [
     {
-      type: "deputy.report",
-      label: "Deputy report",
-      description: "Published by a chat/urgent run when it takes a real action (calls a tool) worth surfacing to the owner.",
-    },
-    {
       type: "deputy.directive_run",
       label: "Directive run",
-      description: "Published every time one directive's own scheduled or manual run completes, with its full transcript.",
+      description:
+        "Published with a run's full transcript every time a directive's own scheduled or manual run completes, or when a chat/urgent run takes a real action (calls a tool) worth surfacing to the owner.",
     },
   ],
 };

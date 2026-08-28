@@ -25,7 +25,7 @@ export interface RunResult {
   costUsd: number | null;
 }
 
-interface SpawnResult {
+export interface SpawnResult {
   ok: boolean;
   response: string | null;
   sessionId: string | null;
@@ -189,36 +189,33 @@ async function spawnClaude(opts: { prompt: string; mcpConfigPath: string; model:
   };
 }
 
-// chat/urgent still bundle every enabled directive, so there's no single
-// directive to attribute a report to - keep the old "only worth mentioning
-// if it actually did something" gate for those.
-async function reportIfActionTaken(trigger: DeputyRunTrigger, spawnResult: SpawnResult): Promise<void> {
-  if (!spawnResult.ok || spawnResult.transcript.length === 0) return;
-  await publishEvent({
-    type: "deputy.report",
-    payload: {
-      trigger,
-      summary: spawnResult.response ?? "",
-      toolCalls: spawnResult.transcript.length,
-      priority: spawnResult.priority,
-    },
-  });
-}
-
-// A "scheduled"/"manual" run is scoped to one directive, so it can carry
-// full context - published on every completion (not gated on having taken
-// action) since Deputy keeps no run history of its own any more; whether
-// any of this is worth durably keeping or notifying on is entirely the
-// receiving Logs Chamber rule's call (recordToHistory/minPriority/notify),
-// not something decided here.
-async function reportDirectiveRun(directive: DirectiveSummary, trigger: DeputyRunTrigger, spawnResult: SpawnResult): Promise<void> {
+// One event type for every run, whichever of the four triggers produced it -
+// deputy.report used to exist alongside this as a second, near-identical
+// event for the bundled chat/urgent case, which just meant every Logs rule
+// the owner wanted "when Deputy does something" had to be set up twice.
+// Kept the deputy.directive_run name over deputy.report since it stays the
+// more descriptive of the two even once it covers every trigger - a
+// chat/urgent run is still fundamentally carrying out (some of) the same
+// directives, just bundled rather than one at a time. `directive` is only
+// ever present for manual/scheduled runs (chat/urgent still bundle every
+// enabled directive into one prompt, so there's no single directive to
+// attribute the report to). A directive-scoped run publishes on every
+// completion, not gated on having taken action, since Deputy keeps no run
+// history of its own any more and whether any of this is worth durably
+// keeping or notifying on is entirely the receiving Logs Chamber rule's call
+// (recordToHistory/minPriority/notify); a chat/urgent run keeps the older
+// "only worth mentioning if it actually did something" gate instead, since
+// its own turn is already visible in the Chat page.
+export async function reportRun(trigger: DeputyRunTrigger, spawnResult: SpawnResult, directive?: DirectiveSummary): Promise<void> {
   const actionTaken = spawnResult.transcript.length > 0;
+  if (!directive && (!spawnResult.ok || !actionTaken)) return;
+
   await publishEvent({
     type: "deputy.directive_run",
     payload: {
-      directiveId: directive.id,
-      directiveTitle: directive.title,
       trigger,
+      directiveId: directive?.id ?? null,
+      directiveTitle: directive?.title ?? null,
       ok: spawnResult.ok,
       actionTaken,
       summary: spawnResult.response,
@@ -279,11 +276,7 @@ export async function runDeputy(ctx: RunContext): Promise<RunResult> {
 
     recordSpend(result.costUsd);
 
-    if (ctx.directive) {
-      await reportDirectiveRun(ctx.directive, ctx.trigger, result);
-    } else {
-      await reportIfActionTaken(ctx.trigger, result);
-    }
+    await reportRun(ctx.trigger, result, ctx.directive);
 
     const spentAfter = await todaySpendUsd();
     if (spentAfter >= settings.budgetCapUsd) {

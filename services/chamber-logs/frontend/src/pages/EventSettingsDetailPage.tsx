@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getChamberIcon, showToast } from "@congress/congress-ui";
 import { PRIORITY_LEVELS, type PriorityLevel } from "@congress/shared-types";
 import { fetchEventSettings, updateEventSettings, fetchHistory } from "@/lib/api";
-import type { UpdateEventSettingsRequest } from "../../../src/types";
+import { PayloadView, summarizePayload } from "@/components/PayloadView";
+import type { EventHistoryEntry, UpdateEventSettingsRequest } from "../../../src/types";
 
 const inputClass =
   "w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
@@ -210,17 +211,39 @@ export function EventSettingsDetailPage() {
         {historyQuery.data && historyQuery.data.length > 0 && (
           <ul className="space-y-2">
             {historyQuery.data.map((entry) => (
-              <li key={entry.id} className="border border-dust p-2 font-mono text-xs text-ink">
-                <div className="flex items-center justify-between gap-2 text-dust">
-                  <span>{new Date(entry.occurredAt).toLocaleString()}</span>
-                  <span>{entry.priority}</span>
-                </div>
-                <div className="mt-1 truncate text-dust">{JSON.stringify(entry.payload)}</div>
-              </li>
+              <HistoryEntryRow key={entry.id} entry={entry} />
             ))}
           </ul>
         )}
       </div>
     </article>
+  );
+}
+
+// <details>/<summary> rather than hand-rolled expand state: free keyboard
+// and tap support, and each row's open/closed state doesn't need tracking
+// in a parent map. Collapsed shows a human-readable one-line preview (see
+// summarizePayload); expanded renders the full payload via PayloadView -
+// never a raw JSON.stringify dump, per this Chamber's whole point of
+// existing (surfacing events to the owner, not to a debugger).
+function HistoryEntryRow({ entry }: { entry: EventHistoryEntry }) {
+  return (
+    <li className="border border-dust font-mono text-xs text-ink">
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 marker:content-none [&::-webkit-details-marker]:hidden">
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="shrink-0 text-dust transition-transform group-open:rotate-90">▸</span>
+            <span className="min-w-0 truncate text-dust">{summarizePayload(entry.payload)}</span>
+          </span>
+          <span className="flex shrink-0 items-baseline gap-2 text-dust">
+            <span>{entry.priority}</span>
+            <span>{new Date(entry.occurredAt).toLocaleString()}</span>
+          </span>
+        </summary>
+        <div className="border-t border-dust p-3 text-sm">
+          <PayloadView value={entry.payload} />
+        </div>
+      </details>
+    </li>
   );
 }

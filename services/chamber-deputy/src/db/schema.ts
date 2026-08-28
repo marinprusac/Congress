@@ -69,10 +69,10 @@ export const messages = sqliteTable(
 
 // Just enough to enforce settings.budgetCapUsd (engine.ts's runDeputy checks
 // todaySpendUsd before spawning another `claude` process) - no transcript,
-// prompt, or response text. Full context for a completed directive run is
-// published live to Congress's event relay instead (events.ts's
-// deputy.directive_run) for the Logs Chamber to durably keep if the owner
-// sets up a rule; Deputy itself keeps no run history of its own.
+// prompt, or response text. Full context for a completed run is published
+// live to Congress's event relay instead (events.ts's deputy.directive_run)
+// for the Logs Chamber to durably keep if the owner sets up a rule; Deputy
+// itself keeps no run history of its own.
 export const deputySpend = sqliteTable(
   "deputy_spend",
   {
