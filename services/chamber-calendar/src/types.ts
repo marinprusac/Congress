@@ -67,8 +67,15 @@ export const calendarEventSchema = z.object({
   calendarSummary: z.string(),
   calendarColor: z.string().nullable(),
   title: z.string(),
+  // The plain, human-readable text actually stored on the Google event -
+  // never contains raw "[[exhibit:...]]" token syntax. descriptionRich/
+  // locationRich carry the chip-bearing value the editor loads/edits; null
+  // there means this event predates the rich/plain split and has no
+  // recorded rich value yet (falls back to the plain field verbatim).
   description: z.string().nullable(),
   location: z.string().nullable(),
+  descriptionRich: z.string().nullable(),
+  locationRich: z.string().nullable(),
   allDay: z.boolean(),
   start: z.string(),
   end: z.string(),
@@ -95,12 +102,22 @@ export const listEventsResponseSchema = z.object({
 });
 export type ListEventsResponse = z.infer<typeof listEventsResponseSchema>;
 
+// `description`/`location` stay plain-text inputs for API/MCP callers with
+// no concept of exhibit chips (e.g. an Automation-triggered create_event
+// tool call) - the value is used as both the rich and plain text verbatim,
+// same as a rich value with no tokens in it. The web frontend instead
+// populates `descriptionRich`/`locationRich` (the CM6 editor's authored
+// text, tokens intact); when given, these take priority and the server
+// derives the plain text actually sent to Google by resolving their tokens
+// to current labels (see google/richTextMirror.ts).
 export const createEventRequestSchema = z.object({
   accountId: z.number().int(),
   calendarId: z.string().min(1),
   title: z.string().min(1),
   description: z.string().optional(),
   location: z.string().optional(),
+  descriptionRich: z.string().optional(),
+  locationRich: z.string().optional(),
   allDay: z.boolean(),
   start: z.string(),
   end: z.string(),
@@ -112,6 +129,8 @@ export const updateEventRequestSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   location: z.string().optional(),
+  descriptionRich: z.string().optional(),
+  locationRich: z.string().optional(),
   allDay: z.boolean().optional(),
   start: z.string().optional(),
   end: z.string().optional(),

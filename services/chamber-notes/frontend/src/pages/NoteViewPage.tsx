@@ -2,13 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ExhibitTextarea,
+  ExhibitFieldEditor,
   ExhibitActionBar,
-  ExhibitMarkdown,
   ExhibitLinksLayout,
   navigateToExhibit,
   getChamberIcon,
-  stripFrontmatter,
   useShellHosted,
   resolveChamberPath,
   ConfirmSheet,
@@ -23,18 +21,13 @@ export function NoteViewPage() {
   const navigate = useNavigate();
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftContent, setDraftContent] = useState("");
   const articleRef = useRef<HTMLElement>(null);
-  const contentFieldRef = useRef<HTMLTextAreaElement | null>(null);
-  const titleFieldRef = useRef<HTMLInputElement | null>(null);
-  // Mirror the latest draft/query state into refs so the click-outside and
-  // ⌘S effects below can depend on `editing` alone instead of on
-  // draftTitle/draftContent themselves - those two change on every
-  // keystroke, and depending on them meant tearing down and re-adding both
-  // document-level listeners once per character typed.
+  // Mirror the latest draft state into refs so the click-outside and ⌘S
+  // effects below (both stable, added once) can read the current draft
+  // without re-subscribing on every keystroke.
   const draftTitleRef = useRef(draftTitle);
   draftTitleRef.current = draftTitle;
   const draftContentRef = useRef(draftContent);
@@ -83,13 +76,15 @@ export function NoteViewPage() {
   function saveExplicit() {
     updateMutation.mutate(
       { title: draftTitleRef.current, content: draftContentRef.current },
-      {
-        onSuccess: () => {
-          setEditing(false);
-          queryClient.invalidateQueries({ queryKey: ["notes"] });
-        },
-      }
+      { onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notes"] }) }
     );
+  }
+
+  function cancelEdits() {
+    const data = noteDataRef.current;
+    if (!data) return;
+    setDraftTitle(data.title);
+    setDraftContent(data.content);
   }
 
   // A real resync on leaving the page, even if every intermediate autosave
@@ -119,40 +114,43 @@ export function NoteViewPage() {
     },
   });
 
+  // Loads drafts from the server exactly once per note - a background
+  // refetch of the same note (e.g. after a pin toggle) must never stomp
+  // in-progress local edits, but navigating to a *different* note (a new
+  // `noteId`, hence a fresh id on the fetched data) must reset them.
+  const initializedNoteIdRef = useRef<number | null>(null);
   useEffect(() => {
-    if (noteQuery.data && !editing) {
+    if (noteQuery.data && initializedNoteIdRef.current !== noteQuery.data.id) {
       setDraftTitle(noteQuery.data.title);
       setDraftContent(noteQuery.data.content);
+      initializedNoteIdRef.current = noteQuery.data.id;
     }
-  }, [noteQuery.data, editing]);
+  }, [noteQuery.data]);
 
   useEffect(() => {
-    if (!editing || !settingsQuery.data?.autoSave || !noteQuery.data) return;
+    if (!settingsQuery.data?.autoSave || !noteQuery.data) return;
     if (draftTitle === noteQuery.data.title && draftContent === noteQuery.data.content) return;
     const timer = setTimeout(() => {
       updateMutation.mutate({ title: draftTitle, content: draftContent });
     }, 1200);
     return () => clearTimeout(timer);
-  }, [editing, settingsQuery.data?.autoSave, draftTitle, draftContent, noteQuery.data]);
+  }, [settingsQuery.data?.autoSave, draftTitle, draftContent, noteQuery.data]);
 
   useEffect(() => {
-    if (!editing) return;
     function onOutsideDown(e: MouseEvent) {
       if (!(e.target instanceof Node) || articleRef.current?.contains(e.target)) return;
       const data = noteDataRef.current;
       if (!data) return;
-      if (draftTitleRef.current === data.title && draftContentRef.current === data.content) {
-        setEditing(false);
-      } else {
+      if (draftTitleRef.current !== data.title || draftContentRef.current !== data.content) {
         saveExplicit();
       }
     }
     document.addEventListener("mousedown", onOutsideDown);
     return () => document.removeEventListener("mousedown", onOutsideDown);
-  }, [editing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
-    if (!editing) return;
     function onKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
@@ -161,7 +159,8 @@ export function NoteViewPage() {
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [editing]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function onCreateExhibit(title: string) {
     const result = await quickCreateNoteExhibit(title);
@@ -175,48 +174,15 @@ export function NoteViewPage() {
     return <p className="font-mono text-sm text-alert">Note not found.</p>;
 
   const note = noteQuery.data;
-  const body = stripFrontmatter(note.content);
-
-  function editTitle() {
-    setEditing(true);
-    requestAnimationFrame(() => {
-      titleFieldRef.current?.focus();
-      titleFieldRef.current?.select();
-    });
-  }
-
-  function editAtFraction(fraction: number) {
-    const prefixLength = note.content.length - body.length;
-    const offset = Math.round(prefixLength + fraction * body.length);
-    setEditing(true);
-    requestAnimationFrame(() => {
-      const el = contentFieldRef.current;
-      if (el) {
-        el.focus();
-        el.setSelectionRange(offset, offset);
-      }
-    });
-  }
 
   return (
     <article ref={articleRef}>
       <div className="mb-6 border-b border-dust pb-4">
-        {editing ? (
-          <input
-            ref={titleFieldRef}
-            value={draftTitle}
-            onChange={(e) => setDraftTitle(e.target.value)}
-            className="w-full font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-          />
-        ) : (
-          <h2
-            className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink"
-            onDoubleClick={editTitle}
-            title="Double-click to edit"
-          >
-            {note.title}
-          </h2>
-        )}
+        <input
+          value={draftTitle}
+          onChange={(e) => setDraftTitle(e.target.value)}
+          className="w-full font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+        />
       </div>
 
       {updateMutation.isError && (
@@ -242,56 +208,40 @@ export function NoteViewPage() {
         onCreateReference={onCreateExhibit}
         actions={
           <ExhibitActionBar>
-            {editing ? (
+            {!settingsQuery.data?.autoSave && (
               <>
-                {!settingsQuery.data?.autoSave && (
-                  <button onClick={saveExplicit} className="tap-target text-accent hover:underline">
-                    Save
-                  </button>
-                )}
-                <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
-                  {settingsQuery.data?.autoSave ? "Close" : "Cancel"}
+                <button onClick={saveExplicit} className="tap-target text-accent hover:underline">
+                  Save
                 </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => pinMutation.mutate(!note.pinned)}
-                  className="tap-target text-accent hover:underline"
-                >
-                  {note.pinned ? "Unpin" : "Pin"}
-                </button>
-                <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
-                  Edit
-                </button>
-                <button
-                  onClick={() => setConfirmingDelete(true)}
-                  className="tap-target text-alert hover:underline"
-                >
-                  Delete
+                <button onClick={cancelEdits} className="tap-target text-slate hover:underline">
+                  Cancel
                 </button>
               </>
             )}
+            <button
+              onClick={() => pinMutation.mutate(!note.pinned)}
+              className="tap-target text-accent hover:underline"
+            >
+              {note.pinned ? "Unpin" : "Pin"}
+            </button>
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              className="tap-target text-alert hover:underline"
+            >
+              Delete
+            </button>
           </ExhibitActionBar>
         }
       >
-        {editing ? (
-          <ExhibitTextarea
-            ref={contentFieldRef}
-            value={draftContent}
-            onChange={setDraftContent}
-            rows={20}
-            className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-            renderIcon={(chamber) => getChamberIcon(chamber)}
-            onCreate={onCreateExhibit}
-          />
-        ) : (
-          <ExhibitMarkdown
-            body={body}
-            onDoubleClick={editAtFraction}
-            onNavigate={(r) => navigateToExhibit("notes", r, navigate, shellHosted)}
-          />
-        )}
+        <ExhibitFieldEditor
+          value={draftContent}
+          onChange={setDraftContent}
+          minRows={20}
+          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
+          renderIcon={(chamber) => getChamberIcon(chamber)}
+          onNavigate={(r) => navigateToExhibit("notes", r, navigate, shellHosted)}
+          onCreate={onCreateExhibit}
+        />
       </ExhibitLinksLayout>
       <ConfirmSheet
         open={confirmingDelete}

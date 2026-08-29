@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ExhibitTextarea,
+  ExhibitFieldEditor,
   ExhibitActionBar,
-  ExhibitAnnotatedText,
   ExhibitLinksLayout,
   navigateToExhibit,
   getChamberIcon,
@@ -63,13 +62,19 @@ export function TaskViewPage() {
     onError: () => showToast("Failed to delete task.", "error"),
   });
 
+  // Loads drafts exactly once per task, not on every background refetch -
+  // the description is now always live (see below), so a resync gated on
+  // `!editing` (editing only ever toggles name/due-date) would stomp
+  // in-progress description edits made while `editing` is false.
+  const initializedTaskIdRef = useRef<number | null>(null);
   useEffect(() => {
-    if (taskQuery.data && !editing) {
+    if (taskQuery.data && initializedTaskIdRef.current !== taskQuery.data.id) {
       setDraftName(taskQuery.data.name);
       setDraftDescription(taskQuery.data.description);
       setDraftDueDate(toDateInputValue(taskQuery.data.dueDate));
+      initializedTaskIdRef.current = taskQuery.data.id;
     }
-  }, [taskQuery.data, editing]);
+  }, [taskQuery.data]);
 
   if (!Number.isInteger(taskId)) return <p className="font-mono text-sm text-alert">Invalid task id.</p>;
   if (taskQuery.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
@@ -89,6 +94,16 @@ export function TaskViewPage() {
       { onSuccess: () => setEditing(false) }
     );
   }
+
+  function cancel() {
+    setEditing(false);
+    setDraftName(task.name);
+    setDraftDescription(task.description);
+    setDraftDueDate(toDateInputValue(task.dueDate));
+  }
+
+  const descriptionDirty = draftDescription !== task.description;
+  const showSaveControls = editing || descriptionDirty;
 
   return (
     <article>
@@ -136,12 +151,12 @@ export function TaskViewPage() {
         onCreateReference={onCreateExhibit}
         actions={
           <ExhibitActionBar>
-            {editing ? (
+            {showSaveControls ? (
               <>
                 <button onClick={save} className="tap-target text-accent hover:underline">
                   Save
                 </button>
-                <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
+                <button onClick={cancel} className="tap-target text-slate hover:underline">
                   Cancel
                 </button>
               </>
@@ -167,25 +182,16 @@ export function TaskViewPage() {
           </ExhibitActionBar>
         }
       >
-        {editing ? (
-          <ExhibitTextarea
-            value={draftDescription}
-            onChange={setDraftDescription}
-            rows={12}
-            className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-            renderIcon={(chamber) => getChamberIcon(chamber)}
-            onCreate={onCreateExhibit}
-          />
-        ) : task.description ? (
-          <ExhibitAnnotatedText
-            text={task.description}
-            renderIcon={(chamber) => getChamberIcon(chamber)}
-            onNavigate={(r) => navigateToExhibit("tasks", r, navigate, shellHosted)}
-            className="whitespace-pre-wrap text-base text-ink"
-          />
-        ) : (
-          <p className="whitespace-pre-wrap text-base text-dust">— No description —</p>
-        )}
+        <ExhibitFieldEditor
+          value={draftDescription}
+          onChange={setDraftDescription}
+          minRows={12}
+          placeholder="— No description —"
+          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
+          renderIcon={(chamber) => getChamberIcon(chamber)}
+          onNavigate={(r) => navigateToExhibit("tasks", r, navigate, shellHosted)}
+          onCreate={onCreateExhibit}
+        />
       </ExhibitLinksLayout>
       <ConfirmSheet
         open={confirmingDelete}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractOutgoingExhibitRefs } from "./wikilinks.js";
+import { extractExhibitTokensWithLabels, extractOutgoingExhibitRefs } from "./wikilinks.js";
 
 // Every Chamber that stores body text runs this over it on save and hands
 // the result to Congress's exhibit_refs graph, so a miss here silently
@@ -39,5 +39,37 @@ describe("extractOutgoingExhibitRefs", () => {
   it("returns an empty array for text with no links at all", () => {
     expect(extractOutgoingExhibitRefs("just some prose")).toEqual([]);
     expect(extractOutgoingExhibitRefs("")).toEqual([]);
+  });
+});
+
+// Feeds chamber-calendar's richTextMirror.projectRichToPlain, which needs
+// both the token (to resolve a live label) and the embedded alias (the
+// fallback when resolution fails) for every reference in a rich value.
+describe("extractExhibitTokensWithLabels", () => {
+  it("returns the full token, chamber, id, and alias", () => {
+    expect(extractExhibitTokensWithLabels("see [[exhibit:map:place-4|Grandma's House]]")).toEqual([
+      { token: "exhibit:map:place-4", chamber: "map", id: "place-4", label: "Grandma's House" },
+    ]);
+  });
+
+  it("falls back to the bare id as the label when no alias is given", () => {
+    expect(extractExhibitTokensWithLabels("[[exhibit:map:place-4]]")).toEqual([
+      { token: "exhibit:map:place-4", chamber: "map", id: "place-4", label: "place-4" },
+    ]);
+  });
+
+  it("deduplicates by token, keeping the first alias seen", () => {
+    const text = "[[exhibit:map:place-4|First]] later [[exhibit:map:place-4|Second]]";
+    expect(extractExhibitTokensWithLabels(text)).toEqual([
+      { token: "exhibit:map:place-4", chamber: "map", id: "place-4", label: "First" },
+    ]);
+  });
+
+  it("ignores plain wikilinks that are not exhibit tokens", () => {
+    expect(extractExhibitTokensWithLabels("[[Some Title]]")).toEqual([]);
+  });
+
+  it("returns an empty array for text with no links at all", () => {
+    expect(extractExhibitTokensWithLabels("just some prose")).toEqual([]);
   });
 });

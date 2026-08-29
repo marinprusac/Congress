@@ -75,8 +75,14 @@ export const cachedEvents = sqliteTable(
     calendarSummary: text("calendar_summary").notNull(),
     calendarColor: text("calendar_color"),
     title: text("title").notNull(),
+    // The plain human-readable projection actually sent to/read from Google
+    // - never contains raw "[[exhibit:...]]" token syntax. The *Rich
+    // columns below hold the chip-bearing local value the editor loads and
+    // edits; see google/richTextMirror.ts for how one derives the other.
     description: text("description"),
     location: text("location"),
+    descriptionRich: text("description_rich"),
+    locationRich: text("location_rich"),
     allDay: integer("all_day", { mode: "boolean" }).notNull(),
     start: text("start").notNull(),
     end: text("end").notNull(),

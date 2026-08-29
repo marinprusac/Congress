@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ExhibitTextarea,
+  ExhibitFieldEditor,
   ExhibitActionBar,
   ExhibitLinksLayout,
   navigateToExhibit,
@@ -88,12 +88,12 @@ export function NewNotePage() {
           </ExhibitActionBar>
         }
       >
-        <ExhibitTextarea
+        <ExhibitFieldEditor
           value={content}
           onChange={setContent}
-          rows={20}
-          placeholder={"---\ntags: []\n---\nStart writing. Type [[ to reference a note, event, or other Exhibit."}
-          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          minRows={20}
+          placeholder={"---\ntags: []\n---\nStart writing. Type @ to reference a note, event, or other Exhibit."}
+          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onCreate={onCreateExhibit}
         />

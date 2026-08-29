@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ExhibitTextarea,
+  ExhibitFieldEditor,
   ExhibitActionBar,
   ExhibitLinksLayout,
   navigateToExhibit,
@@ -87,12 +87,12 @@ export function NewDirectivePage() {
           </ExhibitActionBar>
         }
       >
-        <ExhibitTextarea
+        <ExhibitFieldEditor
           value={body}
           onChange={setBody}
-          rows={10}
+          minRows={10}
           placeholder="Plain English - what should Deputy check or do, and when. Purely time-based ('every morning...') and event-reactive directives both go here."
-          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
         />
         <ScheduleEditor value={schedule} onChange={setSchedule} eventCatalog={catalogQuery.data ?? []} eventCatalogLoading={catalogQuery.isLoading} />

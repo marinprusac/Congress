@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ExhibitTextarea,
+  ExhibitFieldEditor,
   getChamberIcon,
   useShellHosted,
   resolveChamberPath,
@@ -49,12 +49,12 @@ export function NewItemPage() {
         <FormLabel>Name</FormLabel>
         <FormTextInput autoFocus value={name} onChange={(e) => setName(e.target.value)} />
 
-        <FormLabel>Body (optional, [[ to reference an Exhibit)</FormLabel>
-        <ExhibitTextarea
+        <FormLabel>Body (optional, @ to reference an Exhibit)</FormLabel>
+        <ExhibitFieldEditor
           value={body}
           onChange={setBody}
-          rows={10}
-          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          minRows={10}
+          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
           wrapperClassName="exhibit-field mb-4"
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onCreate={onCreateExhibit}

@@ -1,7 +1,28 @@
 import type { ReactNode } from "react";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
-import type { ExhibitPickerState } from "./useExhibitPicker.js";
 import { useKeyboardInset } from "./useKeyboardInset.js";
+
+// The display/selection contract this dropdown renders off of - owned here
+// rather than by whatever produces it, since this component is the one
+// actual reader of every field. The CM6-based editors (see
+// codemirror/useExhibitEditorCore.ts) are the only current producer.
+export interface ExhibitPickerState {
+  open: boolean;
+  query: string;
+  results: CapitolExhibitSearchResult[];
+  loading: boolean;
+  activeIndex: number;
+  setActiveIndex: (index: number) => void;
+  select: (result: CapitolExhibitSearchResult) => void;
+  showCreate: boolean;
+  creating: boolean;
+  createError: string | null;
+  createNew: () => void;
+  // Anchor point for the dropdown, relative to the .exhibit-field wrapper -
+  // consumed only by the desktop CSS rule (see shared.css), which is caret-
+  // anchored; the mobile rule stays fixed-to-viewport and ignores this.
+  caretPosition: { top: number; left: number } | null;
+}
 
 interface ExhibitPickerDropdownProps {
   picker: ExhibitPickerState;

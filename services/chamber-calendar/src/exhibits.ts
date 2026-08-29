@@ -43,7 +43,7 @@ export async function resolveEventExhibits(ids: string[]): Promise<ExhibitResolv
           `/calendars/${encodeURIComponent(parsed.calendarId)}/events/${encodeURIComponent(parsed.eventId)}`
         )) as RawGoogleEvent;
         if (raw.status === "cancelled") return { id, deleted: true };
-        const event = upsertCachedEventFromGoogle(raw, parsed.accountId, parsed.calendarId);
+        const event = await upsertCachedEventFromGoogle(raw, parsed.accountId, parsed.calendarId);
         return { id, name: event.title, url: eventUrl(parsed.accountId, parsed.calendarId, parsed.eventId) };
       } catch {
         // Covers a real 404 and an account needing reconnect alike - the

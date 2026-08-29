@@ -1,10 +1,9 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ExhibitTextarea,
+  ExhibitFieldEditor,
   ExhibitActionBar,
-  ExhibitAnnotatedText,
   ExhibitLinksLayout,
   navigateToExhibit,
   getChamberIcon,
@@ -58,12 +57,18 @@ export function PlaceViewPage() {
     onError: () => showToast("Failed to delete place.", "error"),
   });
 
+  // Loads exactly once per place, not on every background refetch - the
+  // body field is now always live (see below), so a resync gated on
+  // `!editing` (editing only ever toggles the name/radius/location fields)
+  // would stomp in-progress body edits made while `editing` is false.
+  const initializedPlaceIdRef = useRef<number | null>(null);
   useEffect(() => {
-    if (placeQuery.data && !editing) {
+    if (placeQuery.data && initializedPlaceIdRef.current !== placeQuery.data.id) {
       const p = placeQuery.data;
       setDraft({ name: p.name, body: p.body, latitude: p.latitude, longitude: p.longitude, radiusMeters: p.radiusMeters });
+      initializedPlaceIdRef.current = p.id;
     }
-  }, [placeQuery.data, editing]);
+  }, [placeQuery.data]);
 
   if (!Number.isInteger(placeId)) return <p className="font-mono text-sm text-alert">Invalid place id.</p>;
   if (placeQuery.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
@@ -80,6 +85,14 @@ export function PlaceViewPage() {
   function save() {
     updateMutation.mutate(draft, { onSuccess: () => setEditing(false) });
   }
+
+  function cancel() {
+    setEditing(false);
+    setDraft({ name: place.name, body: place.body, latitude: place.latitude, longitude: place.longitude, radiusMeters: place.radiusMeters });
+  }
+
+  const bodyDirty = (draft.body ?? "") !== place.body;
+  const showSaveControls = editing || bodyDirty;
 
   return (
     <article>
@@ -135,12 +148,12 @@ export function PlaceViewPage() {
         onCreateReference={onCreateExhibit}
         actions={
           <ExhibitActionBar>
-            {editing ? (
+            {showSaveControls ? (
               <>
                 <button onClick={save} className="tap-target text-accent hover:underline">
                   Save
                 </button>
-                <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
+                <button onClick={cancel} className="tap-target text-slate hover:underline">
                   Cancel
                 </button>
               </>
@@ -157,25 +170,16 @@ export function PlaceViewPage() {
           </ExhibitActionBar>
         }
       >
-        {editing ? (
-          <ExhibitTextarea
-            value={draft.body ?? ""}
-            onChange={(value) => setDraft((d) => ({ ...d, body: value }))}
-            rows={8}
-            className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-            renderIcon={(chamber) => getChamberIcon(chamber)}
-            onCreate={onCreateExhibit}
-          />
-        ) : place.body ? (
-          <ExhibitAnnotatedText
-            text={place.body}
-            renderIcon={(chamber) => getChamberIcon(chamber)}
-            onNavigate={(r) => navigateToExhibit("map", r, navigate, shellHosted)}
-            className="whitespace-pre-wrap text-base text-ink"
-          />
-        ) : (
-          <p className="whitespace-pre-wrap text-base text-dust">— No notes —</p>
-        )}
+        <ExhibitFieldEditor
+          value={draft.body ?? ""}
+          onChange={(value) => setDraft((d) => ({ ...d, body: value }))}
+          minRows={8}
+          placeholder="— No notes —"
+          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
+          renderIcon={(chamber) => getChamberIcon(chamber)}
+          onNavigate={(r) => navigateToExhibit("map", r, navigate, shellHosted)}
+          onCreate={onCreateExhibit}
+        />
       </ExhibitLinksLayout>
 
       <ConfirmSheet

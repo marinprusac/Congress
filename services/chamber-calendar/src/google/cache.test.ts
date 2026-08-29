@@ -38,11 +38,11 @@ describe("listCachedEvents", () => {
     db.run("delete from cached_events");
   });
 
-  it("includes an event within the window even when its offset digits read later than a UTC 'Z' bound", () => {
+  it("includes an event within the window even when its offset digits read later than a UTC 'Z' bound", async () => {
     // Real instant is 10:15 UTC, but the stored text's own local hour ("12")
     // reads as later than the UTC query bounds' hour ("10") - a raw string
     // compare would wrongly exclude this from a [10:00Z, 10:30Z] window.
-    upsertCachedEventFromGoogle(
+    await upsertCachedEventFromGoogle(
       raw("2026-01-01T12:15:00+02:00", "2026-01-01T12:45:00+02:00"),
       1,
       "primary"
@@ -52,13 +52,13 @@ describe("listCachedEvents", () => {
     expect(results).toHaveLength(1);
   });
 
-  it("excludes an event whose real start has already passed, even when its offset digits still read inside the window", () => {
+  it("excludes an event whose real start has already passed, even when its offset digits still read inside the window", async () => {
     // The exact shape of the production bug: a Zagreb-time (+02:00) event
     // that actually started 90 minutes before the query's "now" was still
     // matching a "starting in the next 30 minutes" query, because the
     // stored local-hour digits ("16:25") fell between the UTC query bounds'
     // digits ("15:55" and "16:25").
-    upsertCachedEventFromGoogle(
+    await upsertCachedEventFromGoogle(
       raw("2026-08-22T16:25:00+02:00", "2026-08-22T20:50:00+02:00"),
       1,
       "primary"
@@ -68,11 +68,11 @@ describe("listCachedEvents", () => {
     expect(results).toHaveLength(0);
   });
 
-  it("sorts by real start instant, not by offset-suffixed text", () => {
+  it("sorts by real start instant, not by offset-suffixed text", async () => {
     // "09:00+02:00" (07:00 UTC) sorts after "08:00Z" as text, but is
     // actually earlier - a `localeCompare` sort would put them backwards.
-    upsertCachedEventFromGoogle(raw("2026-01-01T09:00:00+02:00", "2026-01-01T09:30:00+02:00"), 1, "primary");
-    upsertCachedEventFromGoogle(raw("2026-01-01T08:00:00Z", "2026-01-01T08:30:00Z"), 1, "primary");
+    await upsertCachedEventFromGoogle(raw("2026-01-01T09:00:00+02:00", "2026-01-01T09:30:00+02:00"), 1, "primary");
+    await upsertCachedEventFromGoogle(raw("2026-01-01T08:00:00Z", "2026-01-01T08:30:00Z"), 1, "primary");
 
     const results = listCachedEvents("2026-01-01T00:00:00.000Z", "2026-01-01T23:59:59.000Z");
     expect(results.map((e) => e.start)).toEqual(["2026-01-01T09:00:00+02:00", "2026-01-01T08:00:00Z"]);
@@ -88,8 +88,8 @@ describe("searchCachedEvents", () => {
     vi.useRealTimers();
   });
 
-  it("empty query excludes an already-started event regardless of its offset digits", () => {
-    upsertCachedEventFromGoogle(
+  it("empty query excludes an already-started event regardless of its offset digits", async () => {
+    await upsertCachedEventFromGoogle(
       raw("2026-08-22T16:25:00+02:00", "2026-08-22T20:50:00+02:00"),
       1,
       "primary"

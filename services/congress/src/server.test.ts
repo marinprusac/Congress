@@ -100,7 +100,6 @@ describe("session-only routes", () => {
     { method: "GET", path: "/congress/settings" },
     { method: "PUT", path: "/congress/settings", body: { darkMode: true } },
     { method: "GET", path: "/congress/exhibits/search?q=x" },
-    { method: "POST", path: "/congress/exhibits/resolve", body: { refs: [] } },
     { method: "GET", path: "/congress/exhibits/note-1/connections" },
   ];
 
@@ -134,6 +133,25 @@ describe("/congress/registry", () => {
 
   it("401s with neither", async () => {
     expect((await app.request("/congress/registry")).status).toBe(401);
+  });
+});
+
+describe("POST /congress/exhibits/resolve", () => {
+  it("accepts either a session or the internal token", async () => {
+    // A Chamber's own backend resolves tokens too now (e.g. chamber-calendar
+    // projecting a rich value's tokens to plain labels before syncing to
+    // Google), and it has no session cookie to present - only the browser
+    // does, for live chip resolution.
+    const body = JSON.stringify({ refs: [] });
+    expect((await app.request("/congress/exhibits/resolve", { method: "POST", headers: { ...internal, ...json }, body })).status).toBe(200);
+    expect(
+      (await app.request("/congress/exhibits/resolve", { method: "POST", headers: { ...json, ...session() }, body }, bindings())).status
+    ).toBe(200);
+  });
+
+  it("401s with neither", async () => {
+    const res = await app.request("/congress/exhibits/resolve", { method: "POST", headers: json, body: JSON.stringify({ refs: [] }) });
+    expect(res.status).toBe(401);
   });
 });
 

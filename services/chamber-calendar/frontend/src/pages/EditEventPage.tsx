@@ -12,8 +12,10 @@ function toFormValues(event: CalendarEvent): EventFormValues {
   return {
     calendarKey: `${event.accountId}::${event.calendarId}`,
     title: event.title,
-    description: event.description ?? "",
-    location: event.location ?? "",
+    // The rich (chip-bearing) value is what the editor loads - falls back
+    // to the plain field for a row from before this split existed.
+    description: event.descriptionRich ?? event.description ?? "",
+    location: event.locationRich ?? event.location ?? "",
     allDay: event.allDay,
     start: event.allDay ? event.start : toDatetimeLocalInput(event.start),
     end: event.allDay ? event.end : toDatetimeLocalInput(event.end),
@@ -46,8 +48,8 @@ export function EditEventPage() {
       if (!values) throw new Error("Form not loaded");
       return updateEvent(Number(accountId), calendarId!, eventId!, {
         title: values.title,
-        description: values.description || undefined,
-        location: values.location || undefined,
+        descriptionRich: values.description || undefined,
+        locationRich: values.location || undefined,
         allDay: values.allDay,
         start: values.start,
         end: values.end,

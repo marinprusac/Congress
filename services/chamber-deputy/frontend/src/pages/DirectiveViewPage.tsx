@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ExhibitTextarea,
+  ExhibitFieldEditor,
   ExhibitActionBar,
-  ExhibitAnnotatedText,
   ExhibitLinksLayout,
   navigateToExhibit,
   getChamberIcon,
@@ -65,8 +64,13 @@ export function DirectiveViewPage() {
     onError: () => showToast("Failed to run directive.", "error"),
   });
 
+  // Loads exactly once per directive, not on every background refetch - the
+  // body field is now always live (see below), so a resync gated on
+  // `!editing` (editing only ever toggles the title/schedule fields) would
+  // stomp in-progress body edits made while `editing` is false.
+  const initializedDirectiveIdRef = useRef<number | null>(null);
   useEffect(() => {
-    if (directiveQuery.data && !editing) {
+    if (directiveQuery.data && initializedDirectiveIdRef.current !== directiveQuery.data.id) {
       const d = directiveQuery.data;
       setDraft({ title: d.title, body: d.body, enabled: d.enabled });
       setSchedule({
@@ -78,8 +82,9 @@ export function DirectiveViewPage() {
         scheduleTimeZone: d.scheduleTimeZone,
         triggerEventType: d.triggerEventType,
       });
+      initializedDirectiveIdRef.current = d.id;
     }
-  }, [directiveQuery.data, editing]);
+  }, [directiveQuery.data]);
 
   if (!Number.isInteger(directiveId)) return <p className="font-mono text-sm text-alert">Invalid directive id.</p>;
   if (directiveQuery.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
@@ -92,9 +97,26 @@ export function DirectiveViewPage() {
     updateMutation.mutate({ ...draft, ...schedule }, { onSuccess: () => setEditing(false) });
   }
 
+  function cancel() {
+    setEditing(false);
+    setDraft({ title: directive.title, body: directive.body, enabled: directive.enabled });
+    setSchedule({
+      scheduleType: directive.scheduleType,
+      intervalMs: directive.intervalMs,
+      scheduleHour: directive.scheduleHour,
+      scheduleMinute: directive.scheduleMinute,
+      scheduleDayOfWeek: directive.scheduleDayOfWeek,
+      scheduleTimeZone: directive.scheduleTimeZone,
+      triggerEventType: directive.triggerEventType,
+    });
+  }
+
   function toggleEnabled() {
     updateMutation.mutate({ enabled: !directive.enabled });
   }
+
+  const bodyDirty = (draft.body ?? "") !== directive.body;
+  const showSaveControls = editing || bodyDirty;
 
   return (
     <article>
@@ -124,12 +146,12 @@ export function DirectiveViewPage() {
         editable
         actions={
           <ExhibitActionBar>
-            {editing ? (
+            {showSaveControls ? (
               <>
                 <button onClick={save} className="tap-target text-accent hover:underline">
                   Save
                 </button>
-                <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
+                <button onClick={cancel} className="tap-target text-slate hover:underline">
                   Cancel
                 </button>
               </>
@@ -152,26 +174,17 @@ export function DirectiveViewPage() {
           </ExhibitActionBar>
         }
       >
-        {editing ? (
-          <>
-            <ExhibitTextarea
-              value={draft.body ?? ""}
-              onChange={(value) => setDraft((d) => ({ ...d, body: value }))}
-              rows={10}
-              className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-              renderIcon={(chamber) => getChamberIcon(chamber)}
-            />
-            <ScheduleEditor value={schedule} onChange={setSchedule} eventCatalog={catalogQuery.data ?? []} eventCatalogLoading={catalogQuery.isLoading} />
-          </>
-        ) : directive.body ? (
-          <ExhibitAnnotatedText
-            text={directive.body}
-            renderIcon={(chamber) => getChamberIcon(chamber)}
-            onNavigate={(r) => navigateToExhibit("deputy", r, navigate, shellHosted)}
-            className="whitespace-pre-wrap text-base text-ink"
-          />
-        ) : (
-          <p className="whitespace-pre-wrap text-base text-dust">— No instructions —</p>
+        <ExhibitFieldEditor
+          value={draft.body ?? ""}
+          onChange={(value) => setDraft((d) => ({ ...d, body: value }))}
+          minRows={10}
+          placeholder="— No instructions —"
+          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
+          renderIcon={(chamber) => getChamberIcon(chamber)}
+          onNavigate={(r) => navigateToExhibit("deputy", r, navigate, shellHosted)}
+        />
+        {editing && (
+          <ScheduleEditor value={schedule} onChange={setSchedule} eventCatalog={catalogQuery.data ?? []} eventCatalogLoading={catalogQuery.isLoading} />
         )}
       </ExhibitLinksLayout>
 

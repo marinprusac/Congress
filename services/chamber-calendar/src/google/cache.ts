@@ -10,6 +10,10 @@ import { toExhibitId } from "./eventId.js";
 import { publishEvent } from "../events.js";
 import { computeGoogleAttendance, resolveAttendance } from "../attendance.js";
 import type { AttendanceStatus } from "../types.js";
+import { env } from "../env.js";
+import { resolveExhibitsServerSide, extractExhibitTokensWithLabels } from "@congress/chamber-kit";
+import { buildExhibitToken, type CapitolExhibitResolveResult, type ExhibitToken } from "@congress/shared-types";
+import { projectRichToPlain, reconcileRichValue } from "./richTextMirror.js";
 
 // A disposable, rebuildable local mirror of a bounded window of Google
 // Calendar's own event data - Google stays the source of truth (see
@@ -89,6 +93,8 @@ function rowToCalendarEvent(row: CachedEventRow): CalendarEvent {
     title: row.title,
     description: row.description,
     location: row.location,
+    descriptionRich: row.descriptionRich,
+    locationRich: row.locationRich,
     allDay: row.allDay,
     start: row.start,
     end: row.end,
@@ -131,6 +137,89 @@ export function toCacheRow(
     attendeeResponseStatus: attendance.responseStatus,
     googleUpdatedAt: raw.updated ?? new Date().toISOString(),
     syncedAt: new Date(),
+  };
+}
+
+// A field's rich value the Chamber's own write-through path (create/update)
+// already knows for certain, keyed present only for a field that request
+// actually touched - see resolveRichFields, which distinguishes "not
+// present" (reconcile against the previously-stored rich value, the poll-
+// sync/live-refetch path) from "present" (use directly, no reconciliation
+// needed - the caller authored this value themselves).
+export interface RichOverride {
+  descriptionRich?: string | null;
+  locationRich?: string | null;
+}
+
+// Resolves a batch of exhibit tokens' current labels via one Congress round
+// trip - shared across both fields of one event so a single call covers it,
+// not two. Falls back to "no label for any token" (leaning on each token's
+// own embedded alias instead, see projectRichToPlain) if Congress can't be
+// reached, rather than failing the sync/write over a resolve hiccup.
+export async function buildLabelResolver(tokens: ExhibitToken[]): Promise<(token: ExhibitToken) => string | null> {
+  if (tokens.length === 0) return () => null;
+  let results: CapitolExhibitResolveResult[];
+  try {
+    results = await resolveExhibitsServerSide(tokens, env.CAPITOL_URL, env.CONGRESS_INTERNAL_TOKEN);
+  } catch {
+    return () => null;
+  }
+  const byToken = new Map(results.map((r) => [buildExhibitToken({ chamber: r.chamber, id: r.id }), r]));
+  return (token) => {
+    const result = byToken.get(buildExhibitToken(token));
+    return result && "name" in result ? result.name : null;
+  };
+}
+
+function reconcileOrOverride(
+  previousRich: string | null,
+  freshPlain: string | null,
+  hasOverride: boolean,
+  overrideValue: string | null | undefined,
+  resolveLabel: (token: ExhibitToken) => string | null
+): string | null {
+  if (hasOverride) return overrideValue ?? null;
+  const projectedFromPrevious = previousRich !== null ? projectRichToPlain(previousRich, resolveLabel) : null;
+  return reconcileRichValue({ previousRich, freshPlain, projectedFromPrevious }).rich;
+}
+
+// Determines what descriptionRich/locationRich should be for a fresh cache
+// row - either field present in `override` is trusted directly (the
+// Chamber's own write-through, which knows exactly what the client
+// authored), and any field absent from it reconciles against whatever was
+// previously stored for that event (see richTextMirror.ts's
+// reconcileRichValue for the actual decision rule and its rationale).
+export async function resolveRichFields(
+  raw: RawGoogleEvent,
+  previousRow: CachedEventRow | undefined,
+  override?: RichOverride
+): Promise<{ descriptionRich: string | null; locationRich: string | null }> {
+  const hasDescriptionOverride = !!override && "descriptionRich" in override;
+  const hasLocationOverride = !!override && "locationRich" in override;
+  const previousDescriptionRich = previousRow?.descriptionRich ?? null;
+  const previousLocationRich = previousRow?.locationRich ?? null;
+
+  const tokens = [
+    ...(hasDescriptionOverride ? [] : extractExhibitTokensWithLabels(previousDescriptionRich ?? "")),
+    ...(hasLocationOverride ? [] : extractExhibitTokensWithLabels(previousLocationRich ?? "")),
+  ];
+  const resolveLabel = await buildLabelResolver(tokens);
+
+  return {
+    descriptionRich: reconcileOrOverride(
+      previousDescriptionRich,
+      raw.description ?? null,
+      hasDescriptionOverride,
+      override?.descriptionRich,
+      resolveLabel
+    ),
+    locationRich: reconcileOrOverride(
+      previousLocationRich,
+      raw.location ?? null,
+      hasLocationOverride,
+      override?.locationRich,
+      resolveLabel
+    ),
   };
 }
 
@@ -193,9 +282,21 @@ export function searchCachedEvents(query: string, limit = 20): CalendarEvent[] {
     .slice(0, limit);
 }
 
-export function upsertCachedEventFromGoogle(raw: RawGoogleEvent, accountId: number, calendarId: string): CalendarEvent {
-  const row = toCacheRow(raw, accountId, calendarId);
-  const existing = db.select({ id: cachedEvents.id }).from(cachedEvents).where(eq(cachedEvents.id, row.id)).get();
+// `richOverride` supplied means this is the Chamber's own write-through
+// (create/update, which knows exactly what the client authored for
+// whichever fields it touched) - omitted, both descriptionRich and
+// locationRich reconcile against whatever was previously cached (the
+// live-refetch-first path in getEvent/setEventAttendance).
+export async function upsertCachedEventFromGoogle(
+  raw: RawGoogleEvent,
+  accountId: number,
+  calendarId: string,
+  richOverride?: RichOverride
+): Promise<CalendarEvent> {
+  const baseRow = toCacheRow(raw, accountId, calendarId);
+  const existing = db.select().from(cachedEvents).where(eq(cachedEvents.id, baseRow.id)).get();
+  const richFields = await resolveRichFields(raw, existing, richOverride);
+  const row = { ...baseRow, ...richFields };
   if (existing) {
     db.update(cachedEvents).set(row).where(eq(cachedEvents.id, row.id)).run();
   } else {
@@ -290,13 +391,57 @@ async function syncOneCalendar(accountId: number, calendarId: string): Promise<v
   const unseenIds = new Set(existingById.keys());
   const toPublish: Array<Omit<EventPublishRequest, "chamber">> = [];
 
+  // Precomputes, per event, exactly what the transaction below should do -
+  // including any resolved rich fields for a row that will actually be
+  // written. resolveRichFields is async (a Congress round trip when the
+  // previously-stored rich value has tokens), which a better-sqlite3
+  // transaction callback can't await, so this whole decision has to be made
+  // in its own pass first; the transaction then only does synchronous
+  // reads/writes off of it. Skipped entirely for a cancelled, pruned, or
+  // unchanged event (the common case on every 5-minute cycle), so the
+  // steady-state cost of this cache sync is unaffected.
+  type SyncDecision =
+    | { kind: "cancelled" }
+    | { kind: "prune" }
+    | { kind: "unchanged" }
+    | { kind: "write"; row: typeof cachedEvents.$inferInsert; isNew: boolean };
+  const decisions = new Map<string, SyncDecision>();
+  for (const raw of items) {
+    const exhibitId = toExhibitId(accountId, calendarId, raw.id);
+    const existing = existingById.get(exhibitId);
+
+    if (raw.status === "cancelled") {
+      decisions.set(exhibitId, { kind: "cancelled" });
+      continue;
+    }
+
+    const baseRow = toCacheRow(raw, accountId, calendarId);
+    // Unlike a full sync (server-side filtered to the window already), an
+    // incremental sync can return events anywhere on the calendar - drop
+    // (or prune, if previously cached) anything that has moved outside the
+    // window instead of caching it.
+    if (incremental && (baseRow.start < startISO || baseRow.start > endISO)) {
+      decisions.set(exhibitId, { kind: "prune" });
+      continue;
+    }
+
+    if (existing && existing.googleUpdatedAt === baseRow.googleUpdatedAt) {
+      decisions.set(exhibitId, { kind: "unchanged" });
+      continue;
+    }
+
+    const richFields = await resolveRichFields(raw, existing);
+    decisions.set(exhibitId, { kind: "write", row: { ...baseRow, ...richFields }, isNew: !existing });
+  }
+
   db.transaction((tx) => {
     for (const raw of items) {
       const exhibitId = toExhibitId(accountId, calendarId, raw.id);
       unseenIds.delete(exhibitId);
       const existing = existingById.get(exhibitId);
+      const decision = decisions.get(exhibitId)!;
 
-      if (raw.status === "cancelled") {
+      if (decision.kind === "cancelled") {
         if (existing) {
           tx.delete(cachedEvents).where(eq(cachedEvents.id, exhibitId)).run();
           toPublish.push({
@@ -304,47 +449,36 @@ async function syncOneCalendar(accountId: number, calendarId: string): Promise<v
             payload: { accountId, calendarId, eventId: raw.id, title: existing.title },
           });
         }
-        continue;
-      }
-
-      const row = toCacheRow(raw, accountId, calendarId);
-      // Unlike a full sync (server-side filtered to the window already), an
-      // incremental sync can return events anywhere on the calendar - drop
-      // (or prune, if previously cached) anything that has moved outside the
-      // window instead of caching it.
-      if (incremental && (row.start < startISO || row.start > endISO)) {
+      } else if (decision.kind === "prune") {
         if (existing) tx.delete(cachedEvents).where(eq(cachedEvents.id, exhibitId)).run();
-        continue;
+      } else if (decision.kind === "write") {
+        if (decision.isNew) {
+          tx.insert(cachedEvents).values(decision.row).run();
+          toPublish.push({
+            type: "calendar.event_created",
+            payload: {
+              accountId,
+              calendarId,
+              eventId: raw.id,
+              title: decision.row.title,
+              url: eventUrlFor(accountId, calendarId, raw.id),
+            },
+          });
+        } else {
+          tx.update(cachedEvents).set(decision.row).where(eq(cachedEvents.id, exhibitId)).run();
+          toPublish.push({
+            type: "calendar.event_updated",
+            payload: {
+              accountId,
+              calendarId,
+              eventId: raw.id,
+              title: decision.row.title,
+              url: eventUrlFor(accountId, calendarId, raw.id),
+            },
+          });
+        }
       }
-
-      if (!existing) {
-        tx.insert(cachedEvents).values(row).run();
-        toPublish.push({
-          type: "calendar.event_created",
-          payload: {
-            accountId,
-            calendarId,
-            eventId: raw.id,
-            title: row.title,
-            url: eventUrlFor(accountId, calendarId, raw.id),
-          },
-        });
-      } else if (existing.googleUpdatedAt !== row.googleUpdatedAt) {
-        tx.update(cachedEvents).set(row).where(eq(cachedEvents.id, exhibitId)).run();
-        toPublish.push({
-          type: "calendar.event_updated",
-          payload: {
-            accountId,
-            calendarId,
-            eventId: raw.id,
-            title: row.title,
-            url: eventUrlFor(accountId, calendarId, raw.id),
-          },
-        });
-      }
-      // Otherwise unchanged since the last sync (or already written through by
-      // this Chamber's own create/update path) - no-op, and importantly no
-      // duplicate publish.
+      // "unchanged" - no-op, and importantly no duplicate publish.
     }
 
     // Anything still unseen wasn't returned by Google at all this cycle. Only

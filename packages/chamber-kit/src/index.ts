@@ -7,6 +7,7 @@ export * from "./events.js";
 export * from "./eventMatching.js";
 export * from "./eventsReceive.js";
 export * from "./registry.js";
+export * from "./exhibitResolveClient.js";
 export * from "./settings.js";
 export * from "./routes.js";
 export * from "./wikilinks.js";

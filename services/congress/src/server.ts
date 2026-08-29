@@ -146,7 +146,11 @@ app.get("/congress/exhibits/search", requireSession, async (c) => {
   return c.json({ results });
 });
 
-app.post("/congress/exhibits/resolve", requireSession, async (c) => {
+// requireSessionOrInternalToken (not requireSession) - a Chamber's own
+// backend resolves exhibit tokens too now (e.g. chamber-calendar projecting
+// a rich value's tokens to plain labels before syncing to Google), and it
+// has no session cookie to present, only the shared internal token.
+app.post("/congress/exhibits/resolve", requireSessionOrInternalToken, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = capitolExhibitResolveRequestSchema.safeParse(body);
   if (!parsed.success) {

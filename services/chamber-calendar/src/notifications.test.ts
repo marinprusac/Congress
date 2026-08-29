@@ -18,6 +18,8 @@ function fakeEvent(startMs: number, overrides: Partial<CalendarEvent> = {}): Cal
     title: "Standup",
     description: null,
     location: null,
+    descriptionRich: null,
+    locationRich: null,
     allDay: false,
     start: new Date(startMs).toISOString(),
     end: new Date(startMs + 30 * 60 * 1000).toISOString(),

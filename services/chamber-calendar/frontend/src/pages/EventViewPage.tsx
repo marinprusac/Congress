@@ -1,7 +1,8 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ExhibitAnnotatedText,
+  ExhibitFieldEditor,
+  ExhibitInlineField,
   ExhibitActionBar,
   ExhibitLinksLayout,
   navigateToExhibit,
@@ -104,7 +105,16 @@ export function EventViewPage() {
           {event.location && (
             <div>
               <dt className="mb-1 text-xs uppercase tracking-wide text-dust">Location</dt>
-              <dd className="text-ink">{event.location}</dd>
+              <dd className="text-ink">
+                <ExhibitInlineField
+                  value={event.locationRich ?? event.location}
+                  onChange={() => {}}
+                  readOnly
+                  className=""
+                  renderIcon={(chamber) => getChamberIcon(chamber)}
+                  onNavigate={(r) => navigateToExhibit("calendar", r, navigate, shellHosted)}
+                />
+              </dd>
             </div>
           )}
           <div>
@@ -159,11 +169,13 @@ export function EventViewPage() {
             <div>
               <dt className="mb-1 text-xs uppercase tracking-wide text-dust">Description</dt>
               <dd className="text-ink">
-                <ExhibitAnnotatedText
-                  text={event.description}
+                <ExhibitFieldEditor
+                  value={event.description}
+                  onChange={() => {}}
+                  readOnly
+                  className="whitespace-pre-wrap"
                   renderIcon={(chamber) => getChamberIcon(chamber)}
                   onNavigate={(r) => navigateToExhibit("calendar", r, navigate, shellHosted)}
-                  className="whitespace-pre-wrap"
                 />
               </dd>
             </div>

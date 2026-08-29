@@ -16,10 +16,13 @@ import {
   getCachedEvent,
   upsertCachedEventFromGoogle,
   deleteCachedEvent,
+  buildLabelResolver,
+  type RichOverride,
 } from "./cache.js";
+import { projectRichToPlain } from "./richTextMirror.js";
 import { toExhibitId, parseExhibitId } from "./eventId.js";
 import { pushExhibitSync } from "../exhibits.js";
-import { extractOutgoingExhibitRefs } from "@congress/chamber-kit";
+import { extractOutgoingExhibitRefs, extractExhibitTokensWithLabels } from "@congress/chamber-kit";
 import { listManualRefs, deleteManualRefsForEvent } from "../refs.js";
 import { publishEvent } from "../events.js";
 import { computeGoogleAttendance, resolveAttendance, setLocalNotAttending, deleteLocalAttendance } from "../attendance.js";
@@ -85,6 +88,12 @@ function normalizeGoogleEvent(
     title: raw.summary ?? "(untitled)",
     description: raw.description ?? null,
     location: raw.location ?? null,
+    // This path never touches the cache (it's the out-of-cache-window
+    // fallback for listEvents, see below) so there's no stored rich value
+    // to reconcile against - treat the plain text as the rich value
+    // verbatim, same as the "no previous rich value" case elsewhere.
+    descriptionRich: raw.description ?? null,
+    locationRich: raw.location ?? null,
     allDay,
     start: allDay ? raw.start.date! : raw.start.dateTime!,
     end: allDay ? raw.end.date! : raw.end.dateTime!,
@@ -125,6 +134,44 @@ function toGoogleEventBody(input: {
       : { dateTime: toRfc3339DateTime(input.end), timeZone: input.timeZone };
   }
   return body;
+}
+
+// The web frontend populates descriptionRich/locationRich (the CM6 editor's
+// authored text, tokens intact); an API/MCP caller with no concept of
+// exhibit chips instead populates plain description/location, which is
+// treated as the rich value verbatim (no tokens to resolve, so the
+// projection is a no-op). Either way, this resolves every token once via a
+// single batched Congress round trip and returns both the plain text to
+// actually send to Google and the rich override to record locally - see
+// upsertCachedEventFromGoogle's own RichOverride contract for why a field
+// this request didn't touch at all must stay absent here rather than
+// defaulting to something.
+async function resolveRichAndPlainFields(input: {
+  description?: string;
+  location?: string;
+  descriptionRich?: string;
+  locationRich?: string;
+}): Promise<{ plain: { description?: string; location?: string }; richOverride: RichOverride }> {
+  const richDescription = input.descriptionRich ?? input.description;
+  const richLocation = input.locationRich ?? input.location;
+
+  const tokens = [
+    ...(richDescription !== undefined ? extractExhibitTokensWithLabels(richDescription) : []),
+    ...(richLocation !== undefined ? extractExhibitTokensWithLabels(richLocation) : []),
+  ];
+  const resolveLabel = await buildLabelResolver(tokens);
+
+  const plain: { description?: string; location?: string } = {};
+  const richOverride: RichOverride = {};
+  if (richDescription !== undefined) {
+    plain.description = projectRichToPlain(richDescription, resolveLabel);
+    richOverride.descriptionRich = richDescription;
+  }
+  if (richLocation !== undefined) {
+    plain.location = projectRichToPlain(richLocation, resolveLabel);
+    richOverride.locationRich = richLocation;
+  }
+  return { plain, richOverride };
 }
 
 function requireAccount(accountId: number) {
@@ -216,7 +263,7 @@ export async function getEvent(accountId: number, calendarId: string, eventId: s
       deleteCachedEvent(exhibitId);
       throw new GoogleApiError(404, "Event not found");
     }
-    return upsertCachedEventFromGoogle(raw, accountId, calendarId);
+    return await upsertCachedEventFromGoogle(raw, accountId, calendarId);
   } catch (err) {
     // A confirmed 404/cancelled is real - propagate it rather than serving a
     // stale cached copy of an event that no longer exists. Anything else
@@ -230,13 +277,19 @@ export async function getEvent(accountId: number, calendarId: string, eventId: s
 }
 
 // The set of Exhibits this event points at is the union of what's embedded
-// in its description ("[[" tokens) and what was added explicitly via the
-// References side panel - pushed to Capitol as one outgoingRefs list
-// either way. Same shape as chamber-notes/src/notes.ts's syncNoteExhibit.
-async function syncEventExhibit(result: CalendarEvent): Promise<void> {
+// in its description/location ("[[" tokens - read from the *rich* fields,
+// since the plain description/location Google stores never contains raw
+// token syntax) and what was added explicitly via the References side
+// panel - pushed to Capitol as one outgoingRefs list either way. Same shape
+// as chamber-notes/src/notes.ts's syncNoteExhibit.
+export async function syncEventExhibit(result: CalendarEvent): Promise<void> {
   const exhibitId = toExhibitId(result.accountId, result.calendarId, result.id);
   const manual = listManualRefs(exhibitId) ?? [];
-  const outgoingRefs = new Set([...extractOutgoingExhibitRefs(result.description ?? ""), ...manual]);
+  const outgoingRefs = new Set([
+    ...extractOutgoingExhibitRefs(result.descriptionRich ?? ""),
+    ...extractOutgoingExhibitRefs(result.locationRich ?? ""),
+    ...manual,
+  ]);
   await pushExhibitSync({
     id: exhibitId,
     type: "event",
@@ -266,11 +319,12 @@ export async function resyncEventExhibit(exhibitId: string): Promise<void> {
 
 export async function createEvent(input: CreateEventRequest): Promise<CalendarEvent> {
   const account = requireAccount(input.accountId);
+  const { plain, richOverride } = await resolveRichAndPlainFields(input);
   const raw = (await googleCalendarFetch(account, `/calendars/${encodeURIComponent(input.calendarId)}/events`, {
     method: "POST",
-    body: JSON.stringify(toGoogleEventBody(input)),
+    body: JSON.stringify(toGoogleEventBody({ ...input, ...plain })),
   })) as GoogleEvent;
-  const result = upsertCachedEventFromGoogle(raw, input.accountId, input.calendarId);
+  const result = await upsertCachedEventFromGoogle(raw, input.accountId, input.calendarId, richOverride);
   await syncEventExhibit(result);
   void publishEvent({
     type: "calendar.event_created",
@@ -292,6 +346,7 @@ export async function updateEvent(
   input: UpdateEventRequest
 ): Promise<CalendarEvent> {
   const account = requireAccount(accountId);
+  const { plain, richOverride } = await resolveRichAndPlainFields(input);
   let raw: GoogleEvent;
   try {
     raw = (await googleCalendarFetch(
@@ -299,7 +354,7 @@ export async function updateEvent(
       `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
       {
         method: "PATCH",
-        body: JSON.stringify(toGoogleEventBody(input)),
+        body: JSON.stringify(toGoogleEventBody({ ...input, ...plain })),
       }
     )) as GoogleEvent;
   } catch (err) {
@@ -314,7 +369,7 @@ export async function updateEvent(
     }
     throw err;
   }
-  const result = upsertCachedEventFromGoogle(raw, accountId, calendarId);
+  const result = await upsertCachedEventFromGoogle(raw, accountId, calendarId, richOverride);
   await syncEventExhibit(result);
   void publishEvent({
     type: "calendar.event_updated",
@@ -357,7 +412,7 @@ export async function setEventAttendance(
   let result: CalendarEvent;
   if (!isInvitation) {
     setLocalNotAttending(toExhibitId(accountId, calendarId, eventId), notAttending);
-    result = upsertCachedEventFromGoogle(raw, accountId, calendarId);
+    result = await upsertCachedEventFromGoogle(raw, accountId, calendarId);
   } else {
     const attendees = (raw.attendees ?? []).map((a) =>
       a.self ? { ...a, responseStatus: notAttending ? "declined" : "accepted" } : a
@@ -367,7 +422,7 @@ export async function setEventAttendance(
       `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}?sendUpdates=all`,
       { method: "PATCH", body: JSON.stringify({ attendees }) }
     )) as GoogleEvent;
-    result = upsertCachedEventFromGoogle(updated, accountId, calendarId);
+    result = await upsertCachedEventFromGoogle(updated, accountId, calendarId);
   }
 
   void publishEvent({

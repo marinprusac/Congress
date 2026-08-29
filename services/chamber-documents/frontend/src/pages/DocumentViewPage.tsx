@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ExhibitTextarea,
+  ExhibitFieldEditor,
   ExhibitActionBar,
-  ExhibitAnnotatedText,
   ExhibitLinksLayout,
   navigateToExhibit,
   getChamberIcon,
@@ -58,12 +57,18 @@ export function DocumentViewPage() {
     onError: () => showToast("Failed to delete document.", "error"),
   });
 
+  // Loads drafts exactly once per document, not on every background refetch
+  // - the description is now always live (see below), so a resync gated on
+  // `!editing` (editing only ever toggles the title) would stomp
+  // in-progress description edits made while `editing` is false.
+  const initializedDocumentIdRef = useRef<number | null>(null);
   useEffect(() => {
-    if (documentQuery.data && !editing) {
+    if (documentQuery.data && initializedDocumentIdRef.current !== documentQuery.data.id) {
       setDraftTitle(documentQuery.data.title);
       setDraftDescription(documentQuery.data.description);
+      initializedDocumentIdRef.current = documentQuery.data.id;
     }
-  }, [documentQuery.data, editing]);
+  }, [documentQuery.data]);
 
   if (!Number.isInteger(documentId)) return <p className="font-mono text-sm text-alert">Invalid document id.</p>;
   if (documentQuery.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
@@ -79,6 +84,19 @@ export function DocumentViewPage() {
       titleFieldRef.current?.select();
     });
   }
+
+  function save() {
+    updateMutation.mutate({ title: draftTitle, description: draftDescription });
+  }
+
+  function cancel() {
+    setEditing(false);
+    setDraftTitle(doc.title);
+    setDraftDescription(doc.description);
+  }
+
+  const descriptionDirty = draftDescription !== doc.description;
+  const showSaveControls = editing || descriptionDirty;
 
   return (
     <article>
@@ -126,15 +144,12 @@ export function DocumentViewPage() {
         editable
         actions={
           <ExhibitActionBar>
-            {editing ? (
+            {showSaveControls ? (
               <>
-                <button
-                  onClick={() => updateMutation.mutate({ title: draftTitle, description: draftDescription })}
-                  className="tap-target text-accent hover:underline"
-                >
+                <button onClick={save} className="tap-target text-accent hover:underline">
                   Save
                 </button>
-                <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
+                <button onClick={cancel} className="tap-target text-slate hover:underline">
                   Cancel
                 </button>
               </>
@@ -154,24 +169,15 @@ export function DocumentViewPage() {
           </ExhibitActionBar>
         }
       >
-        {editing ? (
-          <ExhibitTextarea
-            value={draftDescription}
-            onChange={setDraftDescription}
-            rows={10}
-            className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-            renderIcon={(chamber) => getChamberIcon(chamber)}
-          />
-        ) : doc.description ? (
-          <ExhibitAnnotatedText
-            text={doc.description}
-            renderIcon={(chamber) => getChamberIcon(chamber)}
-            onNavigate={(r) => navigateToExhibit("documents", r, navigate, shellHosted)}
-            className="whitespace-pre-wrap font-mono text-sm text-ink"
-          />
-        ) : (
-          <p className="font-mono text-sm text-dust">— No description —</p>
-        )}
+        <ExhibitFieldEditor
+          value={draftDescription}
+          onChange={setDraftDescription}
+          minRows={10}
+          placeholder="— No description —"
+          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
+          renderIcon={(chamber) => getChamberIcon(chamber)}
+          onNavigate={(r) => navigateToExhibit("documents", r, navigate, shellHosted)}
+        />
       </ExhibitLinksLayout>
       <ConfirmSheet
         open={confirmingDelete}

@@ -2,8 +2,10 @@ import { parseExhibitToken } from "@congress/shared-types";
 
 // Same bracket syntax as Notes' original wikilinks: `[[target|alias]]`,
 // where `target` is expected to be an `exhibit:chamber:id` token (see
-// buildExhibitToken/parseExhibitToken in @congress/shared-types).
-const WIKILINK_PATTERN = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+// buildExhibitToken/parseExhibitToken in @congress/shared-types). Exported so
+// the CM6 chip-decoration ViewPlugin (codemirror/exhibitChipDecorations.ts)
+// scans for the exact same syntax rather than a fifth duplicated copy.
+export const WIKILINK_PATTERN = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 
 // Unique list of valid Exhibit tokens referenced in a body of text, in
 // first-seen order - used to batch-resolve before rendering.

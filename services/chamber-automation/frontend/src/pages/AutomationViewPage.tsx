@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ExhibitTextarea,
+  ExhibitFieldEditor,
   ExhibitActionBar,
-  ExhibitAnnotatedText,
   ExhibitLinksLayout,
   navigateToExhibit,
   getChamberIcon,
@@ -77,8 +76,14 @@ export function AutomationViewPage() {
     onError: () => showToast("Failed to delete automation.", "error"),
   });
 
+  // Loads the draft exactly once per automation, not on every background
+  // refetch - the body field is now always live (see below), so a resync
+  // gated on `!editing` (editing only ever toggles the trigger/condition/
+  // action fields) would stomp in-progress body edits made while `editing`
+  // is false.
+  const initializedAutomationIdRef = useRef<number | null>(null);
   useEffect(() => {
-    if (automationQuery.data && !editing) {
+    if (automationQuery.data && initializedAutomationIdRef.current !== automationQuery.data.id) {
       const a = automationQuery.data;
       setDraft({
         title: a.title,
@@ -91,8 +96,9 @@ export function AutomationViewPage() {
         argsTemplate: a.argsTemplate,
         enabled: a.enabled,
       });
+      initializedAutomationIdRef.current = a.id;
     }
-  }, [automationQuery.data, editing]);
+  }, [automationQuery.data]);
 
   if (!Number.isInteger(automationId)) return <p className="font-mono text-sm text-alert">Invalid automation id.</p>;
   if (automationQuery.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
@@ -104,9 +110,27 @@ export function AutomationViewPage() {
     updateMutation.mutate(draft, { onSuccess: () => setEditing(false) });
   }
 
+  function cancel() {
+    setEditing(false);
+    setDraft({
+      title: automation.title,
+      body: automation.body,
+      triggerEventType: automation.triggerEventType,
+      conditionField: automation.conditionField ?? undefined,
+      conditionEquals: automation.conditionEquals ?? undefined,
+      targetChamber: automation.targetChamber,
+      toolName: automation.toolName,
+      argsTemplate: automation.argsTemplate,
+      enabled: automation.enabled,
+    });
+  }
+
   function toggleEnabled() {
     updateMutation.mutate({ enabled: !automation.enabled });
   }
+
+  const bodyDirty = (draft.body ?? "") !== automation.body;
+  const showSaveControls = editing || bodyDirty;
 
   return (
     <article>
@@ -216,12 +240,12 @@ export function AutomationViewPage() {
         editable
         actions={
           <ExhibitActionBar>
-            {editing ? (
+            {showSaveControls ? (
               <>
                 <button onClick={save} className="tap-target text-accent hover:underline">
                   Save
                 </button>
-                <button onClick={() => setEditing(false)} className="tap-target text-slate hover:underline">
+                <button onClick={cancel} className="tap-target text-slate hover:underline">
                   Cancel
                 </button>
               </>
@@ -241,24 +265,15 @@ export function AutomationViewPage() {
           </ExhibitActionBar>
         }
       >
-        {editing ? (
-          <ExhibitTextarea
-            value={draft.body ?? ""}
-            onChange={(value) => setDraft((d) => ({ ...d, body: value }))}
-            rows={8}
-            className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-            renderIcon={(chamber) => getChamberIcon(chamber)}
-          />
-        ) : automation.body ? (
-          <ExhibitAnnotatedText
-            text={automation.body}
-            renderIcon={(chamber) => getChamberIcon(chamber)}
-            onNavigate={(r) => navigateToExhibit("automation", r, navigate, shellHosted)}
-            className="whitespace-pre-wrap text-base text-ink"
-          />
-        ) : (
-          <p className="whitespace-pre-wrap text-base text-dust">— No notes —</p>
-        )}
+        <ExhibitFieldEditor
+          value={draft.body ?? ""}
+          onChange={(value) => setDraft((d) => ({ ...d, body: value }))}
+          minRows={8}
+          placeholder="— No notes —"
+          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
+          renderIcon={(chamber) => getChamberIcon(chamber)}
+          onNavigate={(r) => navigateToExhibit("automation", r, navigate, shellHosted)}
+        />
       </ExhibitLinksLayout>
 
       <div className="mt-10 border-t border-dust pt-6">

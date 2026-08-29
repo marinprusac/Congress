@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExhibitTextarea, getChamberIcon } from "@congress/congress-ui";
+import { ExhibitFieldEditor, ExhibitInlineField, getChamberIcon } from "@congress/congress-ui";
 import { fetchSelectedCalendars } from "@/lib/api";
 
 export interface EventFormValues {
@@ -153,33 +153,25 @@ export function EventForm({
 
       <div>
         <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Location</label>
-        <input
-          type="text"
+        <ExhibitInlineField
           value={values.location}
-          onChange={(e) => set("location", e.target.value)}
+          onChange={(newValue) => set("location", newValue)}
           readOnly={readOnly}
-          className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
+          className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink focus-within:outline-none"
+          renderIcon={(chamber) => getChamberIcon(chamber)}
         />
       </div>
 
       <div>
         <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Description</label>
-        {readOnly ? (
-          <textarea
-            value={values.description}
-            readOnly
-            rows={4}
-            className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
-          />
-        ) : (
-          <ExhibitTextarea
-            value={values.description}
-            onChange={(newValue) => set("description", newValue)}
-            rows={4}
-            className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
-            renderIcon={(chamber) => getChamberIcon(chamber)}
-          />
-        )}
+        <ExhibitFieldEditor
+          value={values.description}
+          onChange={(newValue) => set("description", newValue)}
+          readOnly={readOnly}
+          minRows={4}
+          className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink focus-within:outline-none"
+          renderIcon={(chamber) => getChamberIcon(chamber)}
+        />
       </div>
 
       <div className="flex items-center justify-between border-t border-dust pt-4">
