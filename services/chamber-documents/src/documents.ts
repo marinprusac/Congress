@@ -153,7 +153,7 @@ export async function createDocument(input: CreateDocumentInput): Promise<Docume
   await syncDocumentExhibit(inserted.id, inserted.title, inserted.description);
   void publishEvent({
     type: "documents.created",
-    payload: { documentId: inserted.id, title: inserted.title, url: `/d/${inserted.id}`, priority: "low" },
+    payload: { documentId: inserted.id, title: inserted.title, url: `/d/${inserted.id}` },
   });
 
   return toDetail(inserted);
@@ -174,7 +174,7 @@ export async function updateDocument(id: number, input: UpdateDocumentRequest): 
   await syncDocumentExhibit(id, title, description);
   void publishEvent({
     type: "documents.updated",
-    payload: { documentId: id, title, url: `/d/${id}`, priority: "low" },
+    payload: { documentId: id, title, url: `/d/${id}` },
   });
 
   return getDocument(id);
@@ -200,7 +200,7 @@ export async function deleteDocument(id: number): Promise<boolean> {
     });
     void publishEvent({
       type: "documents.deleted",
-      payload: { documentId: id, title: existing.title, priority: "low" },
+      payload: { documentId: id, title: existing.title },
     });
   }
   return result.changes > 0;

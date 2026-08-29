@@ -301,7 +301,7 @@ async function syncOneCalendar(accountId: number, calendarId: string): Promise<v
           tx.delete(cachedEvents).where(eq(cachedEvents.id, exhibitId)).run();
           toPublish.push({
             type: "calendar.event_deleted",
-            payload: { accountId, calendarId, eventId: raw.id, title: existing.title, priority: "low" },
+            payload: { accountId, calendarId, eventId: raw.id, title: existing.title },
           });
         }
         continue;
@@ -327,7 +327,6 @@ async function syncOneCalendar(accountId: number, calendarId: string): Promise<v
             eventId: raw.id,
             title: row.title,
             url: eventUrlFor(accountId, calendarId, raw.id),
-            priority: "low",
           },
         });
       } else if (existing.googleUpdatedAt !== row.googleUpdatedAt) {
@@ -340,7 +339,6 @@ async function syncOneCalendar(accountId: number, calendarId: string): Promise<v
             eventId: raw.id,
             title: row.title,
             url: eventUrlFor(accountId, calendarId, raw.id),
-            priority: "low",
           },
         });
       }

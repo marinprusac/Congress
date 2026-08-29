@@ -13,9 +13,7 @@ import {
   ConfirmSheet,
   showToast,
 } from "@congress/congress-ui";
-import type { PriorityLevel } from "@congress/shared-types";
 import { fetchTask, updateTask, deleteTask, quickCreateTaskExhibit } from "@/lib/api";
-import { PrioritySelect, PriorityMark } from "@/components/PriorityControls";
 
 function toDateInputValue(iso: string | null): string {
   return iso ? iso.slice(0, 10) : "";
@@ -32,7 +30,6 @@ export function TaskViewPage() {
   const [draftName, setDraftName] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
   const [draftDueDate, setDraftDueDate] = useState("");
-  const [draftPriority, setDraftPriority] = useState<PriorityLevel>("normal");
 
   const taskQuery = useQuery({
     queryKey: ["task", taskId],
@@ -41,8 +38,7 @@ export function TaskViewPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (input: { name: string; description: string; dueDate: string | null; priority: PriorityLevel }) =>
-      updateTask(taskId, input),
+    mutationFn: (input: { name: string; description: string; dueDate: string | null }) => updateTask(taskId, input),
     onSuccess: (updated) => {
       queryClient.setQueryData(["task", taskId], updated);
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -72,7 +68,6 @@ export function TaskViewPage() {
       setDraftName(taskQuery.data.name);
       setDraftDescription(taskQuery.data.description);
       setDraftDueDate(toDateInputValue(taskQuery.data.dueDate));
-      setDraftPriority(taskQuery.data.priority);
     }
   }, [taskQuery.data, editing]);
 
@@ -90,7 +85,7 @@ export function TaskViewPage() {
 
   function save() {
     updateMutation.mutate(
-      { name: draftName, description: draftDescription, dueDate: draftDueDate || null, priority: draftPriority },
+      { name: draftName, description: draftDescription, dueDate: draftDueDate || null },
       { onSuccess: () => setEditing(false) }
     );
   }
@@ -107,7 +102,6 @@ export function TaskViewPage() {
         ) : (
           <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
             <span className={task.completed ? "line-through text-dust" : ""}>{task.name}</span>
-            <PriorityMark priority={task.priority} />
           </h2>
         )}
       </div>
@@ -130,14 +124,6 @@ export function TaskViewPage() {
             <p className="font-mono text-sm text-ink">
               {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "— None —"}
             </p>
-          )}
-        </div>
-        <div>
-          <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Priority</label>
-          {editing ? (
-            <PrioritySelect value={draftPriority} onChange={setDraftPriority} />
-          ) : (
-            <p className="font-mono text-sm text-ink">{task.priority}</p>
           )}
         </div>
       </div>

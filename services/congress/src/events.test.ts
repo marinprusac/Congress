@@ -10,38 +10,21 @@ describe("subscriptionMatches", () => {
   // Congress's coarse gate. Too narrow and a Chamber's own rules never get
   // the chance to run; too wide and every Chamber is woken for everything.
   it("matches an exact event type", () => {
-    expect(subscriptionMatches([{ type: "tasks.due_soon" }], "tasks.due_soon", "normal")).toBe(true);
-    expect(subscriptionMatches([{ type: "tasks.due_soon" }], "tasks.overdue", "normal")).toBe(false);
+    expect(subscriptionMatches([{ type: "tasks.due_soon" }], "tasks.due_soon")).toBe(true);
+    expect(subscriptionMatches([{ type: "tasks.due_soon" }], "tasks.overdue")).toBe(false);
   });
 
   it("matches everything through the '*' wildcard", () => {
-    expect(subscriptionMatches([{ type: "*" }], "anything.at.all", "low")).toBe(true);
+    expect(subscriptionMatches([{ type: "*" }], "anything.at.all")).toBe(true);
   });
 
   it("matches nothing when the chamber subscribes to nothing", () => {
-    expect(subscriptionMatches([], "tasks.due_soon", "urgent")).toBe(false);
-  });
-
-  it("treats an absent minPriority as 'relay everything of this type'", () => {
-    // Not the same as eventMatching's own "an unset level means normal"
-    // default: that one is about a publisher, this one about a subscriber
-    // that simply never set a floor.
-    expect(subscriptionMatches([{ type: "*" }], "x", "low")).toBe(true);
-  });
-
-  it("applies a minPriority floor inclusively", () => {
-    const subs = [{ type: "x", minPriority: "high" as const }];
-    expect(subscriptionMatches(subs, "x", "normal")).toBe(false);
-    expect(subscriptionMatches(subs, "x", "high")).toBe(true);
-    expect(subscriptionMatches(subs, "x", "urgent")).toBe(true);
+    expect(subscriptionMatches([], "tasks.due_soon")).toBe(false);
   });
 
   it("matches if any single subscription matches", () => {
-    const subs = [
-      { type: "a", minPriority: "urgent" as const },
-      { type: "b", minPriority: "low" as const },
-    ];
-    expect(subscriptionMatches(subs, "b", "low")).toBe(true);
+    const subs = [{ type: "a" }, { type: "b" }];
+    expect(subscriptionMatches(subs, "b")).toBe(true);
   });
 });
 
@@ -94,20 +77,6 @@ describe("publishEvent fan-out", () => {
 
     await waitFor(() => wanted.received.length > 0, 2_000, "delivery to relay-wanted");
     expect(ignored.received).toHaveLength(0);
-  });
-
-  it("applies the priority floor from the payload's own priority field", async () => {
-    const high = await subscriber("relay-high", [{ type: "noisy", minPriority: "high" }]);
-
-    publishEvent({ chamber: "x", type: "noisy", payload: { priority: "low" } });
-    publishEvent({ chamber: "x", type: "noisy", payload: { priority: "urgent" } });
-
-    await waitFor(() => high.received.length > 0, 2_000, "delivery to relay-high");
-    // Only the urgent one should ever arrive; give the low one a moment to
-    // prove it doesn't.
-    await new Promise((r) => setTimeout(r, 50));
-    expect(high.received).toHaveLength(1);
-    expect(JSON.parse(high.received[0]!.body).payload.priority).toBe("urgent");
   });
 
   it("skips a chamber that is registered but offline", async () => {

@@ -13,10 +13,8 @@ function toSummary(row: typeof eventSettings.$inferSelect): EventSettingsSummary
     label: row.label,
     description: row.description,
     recordToHistory: row.recordToHistory,
-    historyMinPriority: row.historyMinPriority,
     historyRetentionMs: row.historyRetentionMs,
     notify: row.notify,
-    notifyMinPriority: row.notifyMinPriority,
     notifyTitleTemplate: row.notifyTitleTemplate,
     notifyBodyTemplate: row.notifyBodyTemplate,
     notifyUrlTemplate: row.notifyUrlTemplate,
@@ -55,10 +53,8 @@ export async function updateEventSettings(eventType: string, input: UpdateEventS
 
   const next = {
     recordToHistory: input.recordToHistory ?? existing.recordToHistory,
-    historyMinPriority: input.historyMinPriority ?? existing.historyMinPriority,
     historyRetentionMs: input.historyRetentionMs !== undefined ? input.historyRetentionMs : existing.historyRetentionMs,
     notify: input.notify ?? existing.notify,
-    notifyMinPriority: input.notifyMinPriority ?? existing.notifyMinPriority,
     notifyTitleTemplate: input.notifyTitleTemplate !== undefined ? input.notifyTitleTemplate : existing.notifyTitleTemplate,
     notifyBodyTemplate: input.notifyBodyTemplate !== undefined ? input.notifyBodyTemplate : existing.notifyBodyTemplate,
     notifyUrlTemplate: input.notifyUrlTemplate !== undefined ? input.notifyUrlTemplate : existing.notifyUrlTemplate,
@@ -69,7 +65,7 @@ export async function updateEventSettings(eventType: string, input: UpdateEventS
 
   db.update(eventSettings).set(next).where(eq(eventSettings.eventType, eventType)).run();
   notifySubscriptionsChanged();
-  void publishEvent({ type: "logs.rule_updated", payload: { eventType, label: existing.label, priority: "low" } });
+  void publishEvent({ type: "logs.rule_updated", payload: { eventType, label: existing.label } });
 
   return getEventSettingsByType(eventType);
 }

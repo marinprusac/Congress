@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { priorityLevelSchema } from "@congress/shared-types";
 
 export const taskSummarySchema = z.object({
   id: z.number().int(),
@@ -7,7 +6,6 @@ export const taskSummarySchema = z.object({
   description: z.string(),
   dueDate: z.string().nullable(),
   completed: z.boolean(),
-  priority: priorityLevelSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -20,7 +18,6 @@ export const createTaskRequestSchema = z.object({
   name: z.string().min(1),
   description: z.string().default(""),
   dueDate: z.string().nullable().optional(),
-  priority: priorityLevelSchema.default("normal"),
 });
 export type CreateTaskRequest = z.infer<typeof createTaskRequestSchema>;
 
@@ -29,7 +26,6 @@ export const updateTaskRequestSchema = z.object({
   description: z.string().optional(),
   dueDate: z.string().nullable().optional(),
   completed: z.boolean().optional(),
-  priority: priorityLevelSchema.optional(),
 });
 export type UpdateTaskRequest = z.infer<typeof updateTaskRequestSchema>;
 

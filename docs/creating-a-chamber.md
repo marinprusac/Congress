@@ -279,12 +279,7 @@ never stores this or inspects `type`/`payload` — `POST
 active Chamber whose own declared subscriptions match (see "Receiving
 events" below), retrying a briefly-unreachable one with increasing delays
 rather than storing anything durably. Publishing works the same whether or
-not anything happens to be subscribed, or even registered. If `payload`
-includes a `priority` field, set it to one of `PRIORITY_LEVELS`
-(`shared-types`: `"low" | "normal" | "high" | "urgent"`) - a convention,
-not enforced - so a receiving Chamber's own rules and priority-filtered
-widgets can tell an urgent firing from a routine one; anything else
-defaults to `"normal"`.
+not anything happens to be subscribed, or even registered.
 
 Optionally declare the event types you may publish in your manifest's
 `events` array (mirrors `widgets`, but keyed by `type`/`label`/
@@ -326,26 +321,25 @@ mountEventReceiveRoute(app, env.CONGRESS_INTERNAL_TOKEN, async (event) => {
 // index.ts
 const { heartbeatNow } = createChamberBootstrap({
   // ...displayName, manifest, app, env, runMigrations, closeDb...
-  getSubscriptions: () => [{ type: "budget.overspent", minPriority: "high" }],
+  getSubscriptions: () => [{ type: "budget.overspent" }],
 });
 ```
 
 `getSubscriptions` is read fresh on every heartbeat (not baked into the
 static manifest), so it can — and for Logs/Automation Chamber, does —
 reflect owner-editable state: recompute it from whatever rules/automations
-currently reference a trigger type, aggregating to one entry per type using
-the *loosest* `minPriority` among them if several rules watch the same type
-at different thresholds (see `chamber-logs/src/subscriptions.ts` for the
-worked pattern). `type: "*"` subscribes to every event type regardless of
-what it's called — used by a Chamber whose own logic doesn't filter by type
-at all (Deputy Chamber). Congress's own filter is only ever a coarse "could
-this possibly interest this Chamber" gate; do your own precise per-rule
-matching (exact `minPriority`, condition fields, whatever else you need)
-inside `onEvent` after receiving, same as before this system moved off
-polling. If a rule/automation mutation changes what `getSubscriptions()`
-would now return, call the returned `heartbeatNow()` right after the
-mutation so Congress's copy updates immediately instead of waiting up to
-`HEARTBEAT_INTERVAL_MS` for the next scheduled beat.
+currently reference a trigger type, aggregating to one entry per type (see
+`chamber-logs/src/subscriptions.ts` for the worked pattern). `type: "*"`
+subscribes to every event type regardless of what it's called — used by a
+Chamber whose own logic doesn't filter by type at all (Deputy Chamber).
+Congress's own filter is only ever a coarse "could this possibly interest
+this Chamber" gate; do your own precise per-rule matching (condition
+fields, whatever else you need) inside `onEvent` after receiving, same as
+before this system moved off polling. If a rule/automation mutation
+changes what `getSubscriptions()` would now return, call the returned
+`heartbeatNow()` right after the mutation so Congress's copy updates
+immediately instead of waiting up to `HEARTBEAT_INTERVAL_MS` for the next
+scheduled beat.
 
 A Chamber that never expects to react to another Chamber's events omits
 `getSubscriptions` and `mountEventReceiveRoute` entirely — there's nothing

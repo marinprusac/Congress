@@ -127,7 +127,7 @@ export async function createAutomation(input: CreateAutomationRequest): Promise<
   notifySubscriptionsChanged();
   void publishEvent({
     type: "automation.created",
-    payload: { automationId: inserted.id, title: inserted.title, priority: "low" },
+    payload: { automationId: inserted.id, title: inserted.title },
   });
 
   return toSummary(inserted);
@@ -154,7 +154,7 @@ export async function updateAutomation(id: number, input: UpdateAutomationReques
 
   await syncAutomationExhibit(id, next.title, next.body);
   notifySubscriptionsChanged();
-  void publishEvent({ type: "automation.updated", payload: { automationId: id, title: next.title, priority: "low" } });
+  void publishEvent({ type: "automation.updated", payload: { automationId: id, title: next.title } });
 
   return getAutomation(id);
 }
@@ -175,7 +175,7 @@ export async function deleteAutomation(id: number): Promise<boolean> {
     notifySubscriptionsChanged();
     void publishEvent({
       type: "automation.deleted",
-      payload: { automationId: id, title: existing.title, priority: "low" },
+      payload: { automationId: id, title: existing.title },
     });
   }
   return result.changes > 0;

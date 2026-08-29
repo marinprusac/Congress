@@ -87,7 +87,6 @@ async function runAutomation(automation: ReturnType<typeof listEnabledAutomation
         targetChamber: automation.targetChamber,
         toolName: automation.toolName,
         error: errorMessage,
-        priority: "high",
       },
     });
     await markAutomationFired(automation.id);
@@ -106,7 +105,6 @@ async function runAutomation(automation: ReturnType<typeof listEnabledAutomation
         title: automation.title,
         targetChamber: automation.targetChamber,
         toolName: automation.toolName,
-        priority: "low",
       },
     });
   } catch (err) {
@@ -120,7 +118,6 @@ async function runAutomation(automation: ReturnType<typeof listEnabledAutomation
         targetChamber: automation.targetChamber,
         toolName: automation.toolName,
         error: errorMessage,
-        priority: "high",
       },
     });
   }

@@ -57,6 +57,13 @@
       "when": 1787325317249,
       "tag": "0007_skinny_amazoness",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1787962456182,
+      "tag": "0008_overjoyed_virginia_dare",
+      "breakpoints": true
     }
   ]
 }

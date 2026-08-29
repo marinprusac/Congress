@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { WidgetPreviewShell, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchOpenTasks } from "@/lib/api";
-import { PriorityMark } from "@/components/PriorityControls";
 
 function formatDueDate(value: string | null): string | null {
   if (!value) return null;
@@ -35,7 +34,6 @@ export function OpenTasksWidget() {
         >
           <span className="min-w-0 truncate">{task.name}</span>
           <span className="flex shrink-0 items-baseline gap-2">
-            <PriorityMark priority={task.priority} />
             {task.dueDate && <span className="font-mono text-xs text-dust">{formatDueDate(task.dueDate)}</span>}
           </span>
         </Link>

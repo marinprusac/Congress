@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getChamberIcon, showToast } from "@congress/congress-ui";
-import { PRIORITY_LEVELS, type PriorityLevel } from "@congress/shared-types";
 import { fetchEventSettings, updateEventSettings, fetchHistory } from "@/lib/api";
 import { PayloadView, summarizePayload } from "@/components/PayloadView";
 import type { EventHistoryEntry, UpdateEventSettingsRequest } from "../../../src/types";
@@ -14,21 +13,6 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function fieldLabel(children: React.ReactNode) {
   return <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">{children}</label>;
-}
-
-// No "no threshold" option - "low" is already the bottom of PRIORITY_LEVELS,
-// so it already matches every firing; a separate null/unset state would
-// just be a second spelling of the same thing.
-function PriorityThresholdSelect({ value, onChange }: { value: PriorityLevel; onChange: (v: PriorityLevel) => void }) {
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value as PriorityLevel)} className={inputClass}>
-      {PRIORITY_LEVELS.map((level) => (
-        <option key={level} value={level}>
-          {level}
-        </option>
-      ))}
-    </select>
-  );
 }
 
 // A settings row per known event type - no delete, no title/body/condition,
@@ -70,10 +54,8 @@ export function EventSettingsDetailPage() {
       const r = rowQuery.data;
       setDraft({
         recordToHistory: r.recordToHistory,
-        historyMinPriority: r.historyMinPriority,
         historyRetentionMs: r.historyRetentionMs,
         notify: r.notify,
-        notifyMinPriority: r.notifyMinPriority,
         notifyTitleTemplate: r.notifyTitleTemplate,
         notifyBodyTemplate: r.notifyBodyTemplate,
         notifyUrlTemplate: r.notifyUrlTemplate,
@@ -122,13 +104,6 @@ export function EventSettingsDetailPage() {
           {draft.recordToHistory && (
             <div className="mt-3 grid grid-cols-1 gap-4 pl-6 sm:grid-cols-2">
               <div>
-                {fieldLabel("Minimum priority")}
-                <PriorityThresholdSelect
-                  value={draft.historyMinPriority ?? "low"}
-                  onChange={(v) => set("historyMinPriority", v)}
-                />
-              </div>
-              <div>
                 {fieldLabel("Retention (days, optional)")}
                 <input
                   type="number"
@@ -150,10 +125,6 @@ export function EventSettingsDetailPage() {
           </label>
           {draft.notify && (
             <div className="mt-3 flex flex-col gap-4 pl-6">
-              <div>
-                {fieldLabel("Minimum priority")}
-                <PriorityThresholdSelect value={draft.notifyMinPriority ?? "low"} onChange={(v) => set("notifyMinPriority", v)} />
-              </div>
               <div>
                 {fieldLabel(`Title (optional — defaults to "${row.label}")`)}
                 <input
@@ -236,7 +207,6 @@ function HistoryEntryRow({ entry }: { entry: EventHistoryEntry }) {
             <span className="min-w-0 truncate text-dust">{summarizePayload(entry.payload)}</span>
           </span>
           <span className="flex shrink-0 items-baseline gap-2 text-dust">
-            <span>{entry.priority}</span>
             <span>{new Date(entry.occurredAt).toLocaleString()}</span>
           </span>
         </summary>

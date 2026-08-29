@@ -66,7 +66,6 @@ async function publishStartingSoon(accountId: number, calendarId: string, eventI
       title,
       minutesUntil,
       url: eventUrl(accountId, calendarId, eventId),
-      priority: "high",
     },
   });
 }

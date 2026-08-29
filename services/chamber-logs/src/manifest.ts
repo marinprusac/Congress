@@ -18,10 +18,6 @@ export const manifest: Manifest = {
   // user-resizable. See frontend/src/widgets/ for the matching components.
   widgets: [
     { id: "recent-logs", width: 2, height: 3, label: "Recent Logs" },
-    // A fixed priority >= "high" filter, not owner-configurable - see
-    // HistoryFeed's own comment for why this is a second declared widget
-    // rather than genuine per-widget configuration.
-    { id: "urgent-logs", width: 2, height: 3, label: "Urgent Logs" },
     // The bell+panel notification center itself - see NotificationsWidget's
     // own comment for why this replaced the old Capitol-header-mounted bell.
     { id: "bell", width: 1, height: 1, label: "Notifications" },

@@ -73,13 +73,13 @@ describe("registerChamber", () => {
     deregisterChamber("delta");
     registerChamber(makeManifest("delta"));
     expect(publishEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "congress.chamber_online", payload: { chamberName: "delta", priority: "low" } })
+      expect.objectContaining({ type: "congress.chamber_online", payload: { chamberName: "delta" } })
     );
   });
 
   it("stores the subscriptions sent with the registration", () => {
-    registerChamber(makeManifest("echo"), [{ type: "tasks.due_soon", minPriority: "high" }]);
-    expect(getChamber("echo")?.subscriptions).toEqual([{ type: "tasks.due_soon", minPriority: "high" }]);
+    registerChamber(makeManifest("echo"), [{ type: "tasks.due_soon" }]);
+    expect(getChamber("echo")?.subscriptions).toEqual([{ type: "tasks.due_soon" }]);
   });
 });
 
@@ -110,7 +110,7 @@ describe("recordHeartbeat", () => {
 
     expect(getChamber("hotel")?.status).toBe("active");
     expect(publishEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "congress.chamber_online", payload: { chamberName: "hotel", priority: "low" } })
+      expect.objectContaining({ type: "congress.chamber_online", payload: { chamberName: "hotel" } })
     );
   });
 
@@ -182,14 +182,14 @@ describe("sweepStaleChambers", () => {
     expect(getChamber("november")?.status).toBe("detached");
   });
 
-  it("announces each swept chamber at high priority", () => {
+  it("announces each swept chamber", () => {
     registerChamber(makeManifest("oscar"));
     db.update(chambers).set({ registeredAt: new Date(0), lastHeartbeatAt: null }).where(eq(chambers.name, "oscar")).run();
     sweepStaleChambers(30_000);
     expect(publishEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "congress.chamber_offline",
-        payload: { chamberName: "oscar", priority: "high" },
+        payload: { chamberName: "oscar" },
       })
     );
   });

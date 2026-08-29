@@ -1,10 +1,4 @@
-import { eq, and, desc, gte, lt } from "drizzle-orm";
-import type { PriorityLevel } from "@congress/shared-types";
-// Shared with chamber-automation and Congress's own relay filter - see
-// chamber-kit's eventMatching.ts. Re-exported because this module's own
-// callers (and its widgets' priority filters) have always imported the rank
-// helper from here.
-import { priorityRank as priorityRankFor, priorityLevelForRank } from "@congress/chamber-kit";
+import { eq, and, desc, lt } from "drizzle-orm";
 import { db } from "./db/client.js";
 import { eventHistory, eventSettings } from "./db/schema.js";
 import type { EventHistoryEntry } from "./types.js";
@@ -16,17 +10,12 @@ import type { EventHistoryEntry } from "./types.js";
 const DEFAULT_HISTORY_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 const LIST_LIMIT = 50;
 
-export { priorityRankFor };
-
-const priorityLevelFor = priorityLevelForRank;
-
 function toEntry(row: typeof eventHistory.$inferSelect, label: string): EventHistoryEntry {
   return {
     id: row.id,
     label,
     chamber: row.chamber,
     type: row.type,
-    priority: priorityLevelFor(row.priorityRank),
     payload: JSON.parse(row.payloadJson),
     occurredAt: row.occurredAt.toISOString(),
   };
@@ -40,7 +29,6 @@ function toEntry(row: typeof eventHistory.$inferSelect, label: string): EventHis
 export function recordHistory(opts: {
   chamber: string;
   type: string;
-  priority: PriorityLevel;
   payload: Record<string, unknown>;
   occurredAt: Date;
   retentionMs: number | null;
@@ -49,7 +37,6 @@ export function recordHistory(opts: {
     .values({
       chamber: opts.chamber,
       type: opts.type,
-      priorityRank: priorityRankFor(opts.priority),
       payloadJson: JSON.stringify(opts.payload),
       occurredAt: opts.occurredAt,
       expiresAt: new Date(opts.occurredAt.getTime() + (opts.retentionMs ?? DEFAULT_HISTORY_RETENTION_MS)),
@@ -57,19 +44,15 @@ export function recordHistory(opts: {
     .run();
 }
 
-// Powers both the history list/detail pages and the "recent-logs"/
-// "urgent-logs" widgets - `minPriority` set means "urgent-logs" (a real >=
-// query against priorityRank, not an app-level filter), unset means
-// "recent-logs". Joined against eventSettings for each entry's own display
-// label (a settings row is never deleted, but the join is still a
-// left-join-shaped best-effort in case a row's own event type has since
-// gone stale).
-export function listHistory(opts: { minPriority?: PriorityLevel; eventType?: string; limit?: number } = {}): EventHistoryEntry[] {
+// Powers both the history list/detail pages and the "recent-logs" widget.
+// Joined against eventSettings for each entry's own display label (a
+// settings row is never deleted, but the join is still a left-join-shaped
+// best-effort in case a row's own event type has since gone stale).
+export function listHistory(opts: { eventType?: string; limit?: number } = {}): EventHistoryEntry[] {
   const limit = opts.limit ?? LIST_LIMIT;
-  const conditions = [
-    opts.minPriority ? gte(eventHistory.priorityRank, priorityRankFor(opts.minPriority)) : undefined,
-    opts.eventType !== undefined ? eq(eventHistory.type, opts.eventType) : undefined,
-  ].filter((c) => c !== undefined);
+  const conditions = [opts.eventType !== undefined ? eq(eventHistory.type, opts.eventType) : undefined].filter(
+    (c) => c !== undefined
+  );
   const rows = db
     .select({ history: eventHistory, label: eventSettings.label })
     .from(eventHistory)

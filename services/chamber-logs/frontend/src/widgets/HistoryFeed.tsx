@@ -1,21 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { WidgetPreviewShell, useShellHosted, resolveChamberPath, getChamberIcon } from "@congress/congress-ui";
-import type { PriorityLevel } from "@congress/shared-types";
 import { fetchHistory } from "@/lib/api";
 
-// Shared by RecentLogsWidget (unfiltered) and UrgentLogsWidget (a fixed
-// priority >= high query filter) - the two declared widgets from a
-// "declare N fixed widgets, the owner places what they want" approach
-// rather than building general per-widget configuration into Capitol's
-// canvas (which has none today) just for this one filter. Each history
-// entry links to the event type's own settings page, not a page of its
-// own - history rows aren't independently addressable Exhibits.
-export function HistoryFeed({ label, minPriority, emptyLabel }: { label: string; minPriority?: PriorityLevel; emptyLabel: string }) {
+// Backs the "recent-logs" widget. Each history entry links to the event
+// type's own settings page, not a page of its own - history rows aren't
+// independently addressable Exhibits.
+export function HistoryFeed({ label, emptyLabel }: { label: string; emptyLabel: string }) {
   const shellHosted = useShellHosted();
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["history", minPriority ?? "all"],
-    queryFn: () => fetchHistory({ minPriority, limit: 10 }),
+    queryKey: ["history"],
+    queryFn: () => fetchHistory({ limit: 10 }),
   });
 
   return (

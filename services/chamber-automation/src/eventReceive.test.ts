@@ -217,7 +217,7 @@ describe("run recording", () => {
     expect(JSON.parse(run.payloadJson)).toEqual({ name: "Taxes" });
   });
 
-  it("records a failed call with its error, and announces it at high priority", async () => {
+  it("records a failed call with its error, and announces it", async () => {
     vi.mocked(callChamberTool).mockRejectedValue(new Error("tool exploded"));
     automation();
     await deliver("tasks.due_soon");
@@ -226,7 +226,7 @@ describe("run recording", () => {
     expect(publishEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "automation.run_failed",
-        payload: expect.objectContaining({ error: "tool exploded", priority: "high" }),
+        payload: expect.objectContaining({ error: "tool exploded" }),
       })
     );
   });
@@ -240,12 +240,10 @@ describe("run recording", () => {
     expect(db.select().from(automationRuns).get()).toMatchObject({ ok: false });
   });
 
-  it("announces a success at low priority, leaving the decision to surface it to the Logs Chamber", async () => {
+  it("announces a success, leaving the decision to surface it to the Logs Chamber", async () => {
     automation();
     await deliver("tasks.due_soon");
-    expect(publishEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "automation.run_succeeded", payload: expect.objectContaining({ priority: "low" }) })
-    );
+    expect(publishEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "automation.run_succeeded" }));
   });
 
   // Only Date is faked, so the awaits below still resolve normally - the

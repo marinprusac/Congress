@@ -1,9 +1,9 @@
 // A single in-process job queue, concurrency 1 - never two `claude`
 // subprocesses acting on Congress at once (docs/deputy-chamber-plan.md §6).
-// Chat, periodic checkups, and the urgent fast path all funnel through this
-// same queue: a chat message arriving mid-checkup queues behind it rather
-// than racing it. Deliberately not a library (p-queue etc.) - a
-// concurrency-1 FIFO is a five-line primitive, not worth a dependency.
+// Chat and every scheduled directive run funnel through this same queue: a
+// chat message arriving mid-run queues behind it rather than racing it.
+// Deliberately not a library (p-queue etc.) - a concurrency-1 FIFO is a
+// five-line primitive, not worth a dependency.
 type QueuedJob = () => Promise<void>;
 
 const queue: QueuedJob[] = [];

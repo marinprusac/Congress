@@ -18,8 +18,8 @@ export const directives = sqliteTable("directives", {
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   // Own schedule, separate from the free-text body (still not structurally
   // parsed - see the comment above): null means this directive only ever
-  // runs on demand (play button) or as part of an urgent/chat bundle, never
-  // on its own timer. checkup.ts arms a single self-rescheduling timer for
+  // runs on demand (play button) or as part of a chat bundle, never on its
+  // own timer. checkup.ts arms a single self-rescheduling timer for
   // whichever enabled+scheduled directive's (lastRunAt + intervalMs) is
   // soonest - the same "one timer for the soonest deadline" idiom
   // chamber-tasks uses for due-date checks, just per-directive here instead
@@ -100,17 +100,15 @@ export const settings = sqliteTable("settings", {
   pausedReason: text("paused_reason"),
 });
 
-// This Chamber's own short-lived buffer of events received since the last
-// periodic checkup (see checkup.ts) - deliberately separate from `settings`
-// above (owner-facing). Congress no longer keeps a replayable log of its
-// own (see services/congress/src/events.ts), so a Chamber that wants to
-// fold "everything since last time" into a periodic prompt has to persist
-// that itself instead of re-polling a cursor against Congress's own
-// storage. Drained (read + deleted) in one step every time any directive's
-// own scheduled tick actually fires (eventReceive.ts's handleReceivedEvent
-// inserts, checkup.ts's tick drains) - an urgent event both lands here *and*
-// separately preempts an immediate run, same two-track behavior the old
-// poller's lastUrgentEventId/lastCheckupEventId split gave it.
+// This Chamber's own short-lived buffer of events received since a
+// directive last ran (see checkup.ts) - deliberately separate from
+// `settings` above (owner-facing). Congress no longer keeps a replayable
+// log of its own (see services/congress/src/events.ts), so a Chamber that
+// wants to fold "everything since last time" into a directive's prompt has
+// to persist that itself instead of re-polling a cursor against Congress's
+// own storage. Drained (read + deleted) in one step every time any
+// directive's own scheduled tick actually fires (eventReceive.ts's
+// handleReceivedEvent inserts, checkup.ts's tick drains).
 export const pendingCheckupEvents = sqliteTable(
   "pending_checkup_events",
   {

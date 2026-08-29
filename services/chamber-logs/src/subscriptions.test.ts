@@ -37,48 +37,28 @@ describe("computeSubscriptions", () => {
   });
 
   it("subscribes to a type that only records", () => {
-    settingsFor("tasks.due_soon", { recordToHistory: true, historyMinPriority: "normal" });
-    expect(computeSubscriptions()).toEqual([{ type: "tasks.due_soon", minPriority: "normal" }]);
+    settingsFor("tasks.due_soon", { recordToHistory: true });
+    expect(computeSubscriptions()).toEqual([{ type: "tasks.due_soon" }]);
   });
 
   it("subscribes to a type that only notifies", () => {
-    settingsFor("tasks.due_soon", { notify: true, notifyMinPriority: "high" });
-    expect(computeSubscriptions()).toEqual([{ type: "tasks.due_soon", minPriority: "high" }]);
+    settingsFor("tasks.due_soon", { notify: true });
+    expect(computeSubscriptions()).toEqual([{ type: "tasks.due_soon" }]);
   });
 
-  it("asks for the loosest of the two thresholds when both actions are on", () => {
-    // Congress's gate has to be at least as permissive as the loosest thing
-    // this Chamber might do with the event; the precise per-action check
-    // happens after delivery.
-    settingsFor("tasks.due_soon", {
-      recordToHistory: true,
-      historyMinPriority: "low",
-      notify: true,
-      notifyMinPriority: "urgent",
-    });
-    expect(computeSubscriptions()).toEqual([{ type: "tasks.due_soon", minPriority: "low" }]);
-  });
-
-  it("ignores the threshold of an action that is switched off", () => {
-    // A disabled notify action's "low" must not widen the gate for a
-    // recording action that only wants urgent events.
-    settingsFor("tasks.due_soon", {
-      recordToHistory: true,
-      historyMinPriority: "urgent",
-      notify: false,
-      notifyMinPriority: "low",
-    });
-    expect(computeSubscriptions()).toEqual([{ type: "tasks.due_soon", minPriority: "urgent" }]);
+  it("subscribes once when both actions are on", () => {
+    settingsFor("tasks.due_soon", { recordToHistory: true, notify: true });
+    expect(computeSubscriptions()).toEqual([{ type: "tasks.due_soon" }]);
   });
 
   it("returns one entry per active event type", () => {
-    settingsFor("tasks.due_soon", { recordToHistory: true, historyMinPriority: "low" });
-    settingsFor("tasks.overdue", { notify: true, notifyMinPriority: "high" });
+    settingsFor("tasks.due_soon", { recordToHistory: true });
+    settingsFor("tasks.overdue", { notify: true });
     settingsFor("notes.created");
 
     expect(computeSubscriptions().sort((a, b) => a.type.localeCompare(b.type))).toEqual([
-      { type: "tasks.due_soon", minPriority: "low" },
-      { type: "tasks.overdue", minPriority: "high" },
+      { type: "tasks.due_soon" },
+      { type: "tasks.overdue" },
     ]);
   });
 

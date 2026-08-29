@@ -191,7 +191,7 @@ export async function createNote(input: CreateNoteRequest): Promise<NoteDetail> 
   await syncNoteExhibit(inserted.id, inserted.title, body);
   void publishEvent({
     type: "notes.created",
-    payload: { noteId: inserted.id, title: inserted.title, url: `/n/${inserted.id}`, priority: "low" },
+    payload: { noteId: inserted.id, title: inserted.title, url: `/n/${inserted.id}` },
   });
 
   const created = await getNote(inserted.id);
@@ -230,7 +230,7 @@ export async function updateNote(id: number, input: UpdateNoteRequest): Promise<
   await syncNoteExhibit(id, finalTitle, body);
   void publishEvent({
     type: "notes.updated",
-    payload: { noteId: id, title: finalTitle, url: `/n/${id}`, priority: "low" },
+    payload: { noteId: id, title: finalTitle, url: `/n/${id}` },
   });
 
   return getNote(id);
@@ -249,7 +249,7 @@ export async function deleteNote(id: number): Promise<boolean> {
       outgoingRefs: [],
       deleted: true,
     });
-    void publishEvent({ type: "notes.deleted", payload: { noteId: id, title: existing.title, priority: "low" } });
+    void publishEvent({ type: "notes.deleted", payload: { noteId: id, title: existing.title } });
   }
   return result.changes > 0;
 }

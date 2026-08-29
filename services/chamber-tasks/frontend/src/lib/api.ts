@@ -47,7 +47,7 @@ export async function deleteTask(id: number): Promise<void> {
 // chamber-notes/frontend/src/lib/api.ts's quickCreateNoteExhibit is scoped
 // to Notes: each Chamber can only quick-create its own Exhibit type.
 export async function quickCreateTaskExhibit(title: string): Promise<CapitolExhibitSearchResult> {
-  const task = await createTask({ name: title, description: "", dueDate: null, priority: "normal" });
+  const task = await createTask({ name: title, description: "", dueDate: null });
   return { chamber: "tasks", id: `task-${task.id}`, type: "task", name: task.name, url: `/t/${task.id}` };
 }
 

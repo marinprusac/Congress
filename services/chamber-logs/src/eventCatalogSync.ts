@@ -50,9 +50,7 @@ export async function syncEventCatalog(): Promise<void> {
           label: event.label,
           description: event.description ?? null,
           recordToHistory: true,
-          historyMinPriority: "low",
           notify: false,
-          notifyMinPriority: "low",
           createdAt: now,
           updatedAt: now,
         })

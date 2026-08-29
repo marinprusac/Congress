@@ -1,6 +1,5 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
-import type { PriorityLevel } from "@congress/shared-types";
 import { env } from "./env.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { recordSpend, todaySpendUsd } from "./spend.js";
@@ -35,20 +34,6 @@ export interface SpawnResult {
   inputTokens: number | null;
   outputTokens: number | null;
   durationMs: number;
-  priority: PriorityLevel;
-}
-
-// Trailing "PRIORITY: <level>" line convention - see promptAssembly.ts's
-// base identity prompt for why the model is asked to emit this instead of
-// Deputy having a bespoke reporting MCP tool (it exposes none, see
-// mcp/tools.ts).
-const PRIORITY_LINE_RE = /\n?PRIORITY:\s*(low|normal|high|urgent)\s*$/i;
-
-function extractPriority(response: string | null): { text: string | null; priority: PriorityLevel } {
-  if (!response) return { text: response, priority: "normal" };
-  const match = response.match(PRIORITY_LINE_RE);
-  if (!match) return { text: response, priority: "normal" };
-  return { text: response.slice(0, match.index).trimEnd(), priority: match[1]!.toLowerCase() as PriorityLevel };
 }
 
 function stringifyToolContent(content: unknown): string {
@@ -173,11 +158,9 @@ async function spawnClaude(opts: { prompt: string; mcpConfigPath: string; model:
     errorMessage = stderrOutput.trim() || `claude exited with code ${exitCode}`;
   }
 
-  const { text, priority } = extractPriority(response);
-
   return {
     ok,
-    response: text,
+    response,
     sessionId,
     errorMessage,
     transcript,
@@ -185,27 +168,26 @@ async function spawnClaude(opts: { prompt: string; mcpConfigPath: string; model:
     inputTokens,
     outputTokens,
     durationMs: Date.now() - startedAt,
-    priority,
   };
 }
 
 // One event type for every run, whichever of the four triggers produced it -
 // deputy.report used to exist alongside this as a second, near-identical
-// event for the bundled chat/urgent case, which just meant every Logs rule
-// the owner wanted "when Deputy does something" had to be set up twice.
-// Kept the deputy.directive_run name over deputy.report since it stays the
-// more descriptive of the two even once it covers every trigger - a
-// chat/urgent run is still fundamentally carrying out (some of) the same
-// directives, just bundled rather than one at a time. `directive` is only
-// ever present for manual/scheduled runs (chat/urgent still bundle every
-// enabled directive into one prompt, so there's no single directive to
-// attribute the report to). A directive-scoped run publishes on every
-// completion, not gated on having taken action, since Deputy keeps no run
-// history of its own any more and whether any of this is worth durably
-// keeping or notifying on is entirely the receiving Logs Chamber rule's call
-// (recordToHistory/minPriority/notify); a chat/urgent run keeps the older
-// "only worth mentioning if it actually did something" gate instead, since
-// its own turn is already visible in the Chat page.
+// event for the bundled chat case, which just meant every Logs rule the
+// owner wanted "when Deputy does something" had to be set up twice. Kept
+// the deputy.directive_run name over deputy.report since it stays the more
+// descriptive of the two even once it covers every trigger - a chat run is
+// still fundamentally carrying out (some of) the same directives, just
+// bundled rather than one at a time. `directive` is only ever present for
+// manual/scheduled runs (chat still bundles every enabled directive into
+// one prompt, so there's no single directive to attribute the report to).
+// A directive-scoped run publishes on every completion, not gated on
+// having taken action, since Deputy keeps no run history of its own any
+// more and whether any of this is worth durably keeping or notifying on is
+// entirely the receiving Logs Chamber rule's call (recordToHistory/
+// notify); a chat run keeps the older "only worth mentioning if it
+// actually did something" gate instead, since its own turn is already
+// visible in the Chat page.
 export async function reportRun(trigger: DeputyRunTrigger, spawnResult: SpawnResult, directive?: DirectiveSummary): Promise<void> {
   const actionTaken = spawnResult.transcript.length > 0;
   if (!directive && (!spawnResult.ok || !actionTaken)) return;
@@ -226,9 +208,6 @@ export async function reportRun(trigger: DeputyRunTrigger, spawnResult: SpawnRes
       inputTokens: spawnResult.inputTokens,
       outputTokens: spawnResult.outputTokens,
       durationMs: spawnResult.durationMs,
-      // The model only emits a PRIORITY line when it took action (see
-      // extractPriority above) - a no-op tick is never worth more than low.
-      priority: actionTaken ? spawnResult.priority : "low",
     },
   });
 }

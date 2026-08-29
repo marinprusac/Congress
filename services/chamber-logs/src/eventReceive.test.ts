@@ -57,7 +57,7 @@ function deliver(type: string, payload: Record<string, unknown> = {}) {
 
 describe("an event type with no settings row", () => {
   it("is ignored entirely", async () => {
-    await deliver("tasks.unknown", { priority: "urgent" });
+    await deliver("tasks.unknown");
     expect(listHistory()).toHaveLength(0);
     expect(listNotifications().notifications).toHaveLength(0);
   });
@@ -99,57 +99,6 @@ describe("the two actions gate independently", () => {
     expect(listNotifications().notifications).toHaveLength(1);
   });
 
-  it("applies a separate priority floor to each, so recording can be noisier than notifying", async () => {
-    settingsFor("tasks.due_soon", {
-      recordToHistory: true,
-      historyMinPriority: "low",
-      notify: true,
-      notifyMinPriority: "high",
-    });
-
-    await deliver("tasks.due_soon", { priority: "normal" });
-    expect(listHistory()).toHaveLength(1);
-    expect(listNotifications().notifications).toHaveLength(0);
-
-    await deliver("tasks.due_soon", { priority: "urgent" });
-    expect(listHistory()).toHaveLength(2);
-    expect(listNotifications().notifications).toHaveLength(1);
-  });
-
-  it("treats a threshold as inclusive", async () => {
-    settingsFor("tasks.due_soon", { notify: true, notifyMinPriority: "high" });
-    await deliver("tasks.due_soon", { priority: "high" });
-    expect(listNotifications().notifications).toHaveLength(1);
-  });
-});
-
-describe("priority defaulting", () => {
-  it("treats an event with no priority as normal", async () => {
-    settingsFor("tasks.due_soon", { recordToHistory: true, historyMinPriority: "normal" });
-    await deliver("tasks.due_soon");
-    expect(listHistory()[0]?.priority).toBe("normal");
-  });
-
-  it("treats an unrecognized priority as normal rather than rejecting the event", async () => {
-    settingsFor("tasks.due_soon", { recordToHistory: true, historyMinPriority: "normal" });
-    await deliver("tasks.due_soon", { priority: "catastrophic" });
-    expect(listHistory()[0]?.priority).toBe("normal");
-  });
-
-  it("stores the priority so a filtered widget query can use it", async () => {
-    settingsFor("tasks.overdue", { recordToHistory: true });
-    await deliver("tasks.overdue", { priority: "urgent" });
-
-    expect(listHistory({ minPriority: "high" })).toHaveLength(1);
-    expect(listHistory({ minPriority: "urgent" })).toHaveLength(1);
-  });
-
-  it("excludes a below-threshold row from a filtered query", async () => {
-    settingsFor("tasks.due_soon", { recordToHistory: true });
-    await deliver("tasks.due_soon", { priority: "low" });
-    expect(listHistory({ minPriority: "high" })).toHaveLength(0);
-    expect(listHistory()).toHaveLength(1);
-  });
 });
 
 describe("notification content", () => {
@@ -252,16 +201,6 @@ describe("lastFiredAt", () => {
     expect(db.select().from(eventSettings).get()?.lastFiredAt).not.toBeNull();
   });
 
-  it("is not stamped when every action was gated out by its threshold", async () => {
-    settingsFor("tasks.due_soon", {
-      recordToHistory: true,
-      historyMinPriority: "urgent",
-      notify: true,
-      notifyMinPriority: "urgent",
-    });
-    await deliver("tasks.due_soon", { priority: "low" });
-    expect(db.select().from(eventSettings).get()?.lastFiredAt).toBeNull();
-  });
 });
 
 describe("history retention", () => {

@@ -12,9 +12,8 @@ import {
   flushDraftConnections,
   FormErrorMessage,
 } from "@congress/congress-ui";
-import type { CapitolExhibitSearchResult, PriorityLevel } from "@congress/shared-types";
+import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createTask, quickCreateTaskExhibit } from "@/lib/api";
-import { PrioritySelect } from "@/components/PriorityControls";
 
 // Mirrors TaskViewPage's editing state exactly (name input, due date,
 // ExhibitTextarea, ExhibitLinksLayout with a live Connections panel) rather
@@ -29,12 +28,11 @@ export function NewTaskPage() {
   const [name, setName] = useState(searchParams.get("name") ?? "");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [priority, setPriority] = useState<PriorityLevel>("normal");
   const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const created = await createTask({ name, description, dueDate: dueDate || null, priority });
+      const created = await createTask({ name, description, dueDate: dueDate || null });
       await flushDraftConnections(`task-${created.id}`, draftConnections);
       return created;
     },
@@ -73,10 +71,6 @@ export function NewTaskPage() {
             onChange={(e) => setDueDate(e.target.value)}
             className="border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           />
-        </div>
-        <div>
-          <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Priority</label>
-          <PrioritySelect value={priority} onChange={setPriority} />
         </div>
       </div>
 

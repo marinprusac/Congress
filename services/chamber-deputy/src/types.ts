@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { priorityLevelSchema } from "@congress/shared-types";
 
 export const directiveSummarySchema = z.object({
   id: z.number().int(),
@@ -76,9 +75,9 @@ export type DeputyTranscriptEntry = z.infer<typeof deputyTranscriptEntrySchema>;
 
 // "scheduled" - this directive's own timer came due (checkup.ts).
 // "manual" - the owner hit the play button on one directive.
-// "chat"/"urgent" still bundle every enabled directive into one prompt,
-// unchanged from before this split.
-export const deputyRunTriggerSchema = z.enum(["chat", "scheduled", "urgent", "manual"]);
+// "chat" bundles every enabled directive into one prompt instead of
+// targeting a single one.
+export const deputyRunTriggerSchema = z.enum(["chat", "scheduled", "manual"]);
 export type DeputyRunTrigger = z.infer<typeof deputyRunTriggerSchema>;
 
 export const settingsSchema = z.object({
@@ -102,5 +101,3 @@ export const updateSettingsRequestSchema = z.object({
   pausedReason: z.string().nullable().optional(),
 });
 export type UpdateSettingsRequest = z.infer<typeof updateSettingsRequestSchema>;
-
-export { priorityLevelSchema };

@@ -1,10 +1,7 @@
 import type { EventDelivery } from "@congress/shared-types";
-// getPath/interpolate/priority comparison are shared with chamber-automation
-// (and Congress's own relay filter) rather than re-declared here - see
-// chamber-kit's eventMatching.ts. "low" (the bottom of PRIORITY_LEVELS)
-// already matches every firing, so there's no separate "no threshold" case
-// to special-case at the call sites below.
-import { interpolate, priorityAtLeast, priorityOf } from "@congress/chamber-kit";
+// interpolate is shared with chamber-automation (and Congress's own relay
+// filter) rather than re-declared here - see chamber-kit's eventMatching.ts.
+import { interpolate } from "@congress/chamber-kit";
 import { getEventSettingsRowByType, markEventSettingsFired } from "./eventSettings.js";
 import { pushNotification } from "./notifications.js";
 import { recordHistory } from "./eventHistory.js";
@@ -12,19 +9,17 @@ import { recordHistory } from "./eventHistory.js";
 // Handed to mountEventReceiveRoute (@congress/chamber-kit) - looks up the
 // single settings row for this event type (auto-derived by
 // eventCatalogSync.ts, one row per type) and runs its two independent
-// actions, each gated by its own priority threshold.
+// actions.
 export async function handleReceivedEvent(event: EventDelivery): Promise<void> {
   const row = getEventSettingsRowByType(event.type);
   if (!row) return;
 
-  const priority = priorityOf(event.payload);
   let fired = false;
 
-  if (row.recordToHistory && priorityAtLeast(priority, row.historyMinPriority)) {
+  if (row.recordToHistory) {
     recordHistory({
       chamber: event.chamber,
       type: event.type,
-      priority,
       payload: event.payload,
       occurredAt: new Date(event.occurredAt),
       retentionMs: row.historyRetentionMs,
@@ -32,7 +27,7 @@ export async function handleReceivedEvent(event: EventDelivery): Promise<void> {
     fired = true;
   }
 
-  if (row.notify && priorityAtLeast(priority, row.notifyMinPriority)) {
+  if (row.notify) {
     // The dedupe key template is an optional field the owner rarely fills
     // in - default to a key scoped to this event type so repeat firings
     // still update the one notification in place instead of piling up.

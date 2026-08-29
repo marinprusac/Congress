@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { priorityLevelSchema } from "@congress/shared-types";
 
 // One row per known event type - auto-derived by eventCatalogSync.ts, never
 // user-created/deleted (see eventSettings.ts). eventType/chamber/label/
@@ -12,10 +11,8 @@ export const eventSettingsSummarySchema = z.object({
   label: z.string(),
   description: z.string().nullable(),
   recordToHistory: z.boolean(),
-  historyMinPriority: priorityLevelSchema,
   historyRetentionMs: z.number().int().positive().nullable(),
   notify: z.boolean(),
-  notifyMinPriority: priorityLevelSchema,
   notifyTitleTemplate: z.string().nullable(),
   notifyBodyTemplate: z.string().nullable(),
   notifyUrlTemplate: z.string().nullable(),
@@ -34,10 +31,8 @@ export type EventSettingsDetail = z.infer<typeof eventSettingsDetailSchema>;
 // request.
 export const updateEventSettingsRequestSchema = z.object({
   recordToHistory: z.boolean().optional(),
-  historyMinPriority: priorityLevelSchema.optional(),
   historyRetentionMs: z.number().int().positive().nullable().optional(),
   notify: z.boolean().optional(),
-  notifyMinPriority: priorityLevelSchema.optional(),
   notifyTitleTemplate: z.string().nullable().optional(),
   notifyBodyTemplate: z.string().nullable().optional(),
   notifyUrlTemplate: z.string().nullable().optional(),
@@ -54,7 +49,6 @@ export const eventHistoryEntrySchema = z.object({
   label: z.string(),
   chamber: z.string(),
   type: z.string(),
-  priority: priorityLevelSchema,
   payload: z.record(z.string(), z.unknown()),
   occurredAt: z.string(),
 });

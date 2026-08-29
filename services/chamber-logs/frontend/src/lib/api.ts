@@ -1,5 +1,4 @@
 import type { EventSettingsSummary, EventSettingsDetail, UpdateEventSettingsRequest, EventHistoryEntry } from "../../../src/types";
-import type { PriorityLevel } from "@congress/shared-types";
 import { resolveApiBase, parseJsonResponse as json } from "@congress/congress-ui";
 
 const API_BASE = resolveApiBase("logs", import.meta.env.PROD);
@@ -20,9 +19,8 @@ export function updateEventSettings(eventType: string, input: UpdateEventSetting
   }).then((res) => json(res));
 }
 
-export function fetchHistory(opts: { minPriority?: PriorityLevel; eventType?: string; limit?: number } = {}): Promise<EventHistoryEntry[]> {
+export function fetchHistory(opts: { eventType?: string; limit?: number } = {}): Promise<EventHistoryEntry[]> {
   const params = new URLSearchParams();
-  if (opts.minPriority) params.set("minPriority", opts.minPriority);
   if (opts.eventType !== undefined) params.set("eventType", opts.eventType);
   if (opts.limit) params.set("limit", String(opts.limit));
   const qs = params.toString();

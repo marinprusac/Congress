@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getPath, interpolate, priorityAtLeast, priorityLevelForRank, priorityOf, priorityRank } from "./eventMatching.js";
+import { getPath, interpolate } from "./eventMatching.js";
 
 describe("getPath", () => {
   it("reads a top-level key", () => {
@@ -63,66 +63,5 @@ describe("interpolate", () => {
     expect(interpolate("{{name}}", { name: "x" })).toBe("{{name}}");
     expect(interpolate("{{payload.a + payload.b}}", { a: 1, b: 2 })).toBe("{{payload.a + payload.b}}");
     expect(interpolate("100% {{ not a template", {})).toBe("100% {{ not a template");
-  });
-});
-
-describe("priorityRank", () => {
-  it("orders low < normal < high < urgent", () => {
-    const ranks = (["low", "normal", "high", "urgent"] as const).map(priorityRank);
-    expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
-    expect(new Set(ranks).size).toBe(4);
-  });
-
-  it("treats an unset level as normal", () => {
-    expect(priorityRank(undefined)).toBe(priorityRank("normal"));
-  });
-});
-
-describe("priorityLevelForRank", () => {
-  it("inverts priorityRank", () => {
-    for (const level of ["low", "normal", "high", "urgent"] as const) {
-      expect(priorityLevelForRank(priorityRank(level))).toBe(level);
-    }
-  });
-
-  it("falls back to normal for a rank outside the scale", () => {
-    expect(priorityLevelForRank(-1)).toBe("normal");
-    expect(priorityLevelForRank(99)).toBe("normal");
-  });
-});
-
-describe("priorityOf", () => {
-  it("reads a valid payload.priority", () => {
-    expect(priorityOf({ priority: "urgent" })).toBe("urgent");
-  });
-
-  it("defaults to normal when absent or unrecognized", () => {
-    // payload.priority is a convention, not an enforced field - a publisher
-    // that omits it (or sends nonsense) must not have its event rejected.
-    expect(priorityOf({})).toBe("normal");
-    expect(priorityOf({ priority: "critical" })).toBe("normal");
-    expect(priorityOf({ priority: 3 })).toBe("normal");
-    expect(priorityOf({ priority: null })).toBe("normal");
-  });
-});
-
-describe("priorityAtLeast", () => {
-  it("is inclusive at the threshold", () => {
-    expect(priorityAtLeast("high", "high")).toBe(true);
-  });
-
-  it("passes anything above the threshold", () => {
-    expect(priorityAtLeast("urgent", "high")).toBe(true);
-  });
-
-  it("rejects anything below the threshold", () => {
-    expect(priorityAtLeast("normal", "high")).toBe(false);
-    expect(priorityAtLeast("low", "normal")).toBe(false);
-  });
-
-  it("passes everything when the threshold is the bottom of the scale", () => {
-    for (const level of ["low", "normal", "high", "urgent"] as const) {
-      expect(priorityAtLeast(level, "low")).toBe(true);
-    }
   });
 });

@@ -46,7 +46,7 @@ async function pollTick(): Promise<void> {
     if (consecutiveFailures === FAILURE_ALERT_THRESHOLD) {
       await publishEvent({
         type: "map.traccar_poll_failing",
-        payload: { consecutiveFailures, lastError: message, priority: "high" },
+        payload: { consecutiveFailures, lastError: message },
       });
     }
   }

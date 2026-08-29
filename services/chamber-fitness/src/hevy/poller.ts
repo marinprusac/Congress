@@ -43,7 +43,7 @@ export async function processHevyEvents(rawEvents: unknown[], apiKey: string): P
     if (result.created) {
       await publishEvent({
         type: "fitness.workout_synced",
-        payload: { workoutId: result.id, title: normalized.title, priority: "normal" },
+        payload: { workoutId: result.id, title: normalized.title },
       });
     }
   }
@@ -98,7 +98,7 @@ export async function doPoll(): Promise<void> {
     if (consecutiveFailures === FAILURE_ALERT_THRESHOLD) {
       await publishEvent({
         type: "fitness.sync_failing",
-        payload: { consecutiveFailures, lastError: message, priority: "high" },
+        payload: { consecutiveFailures, lastError: message },
       });
     }
   }

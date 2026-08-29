@@ -88,7 +88,7 @@ export function registerChamber(manifest: Manifest, subscriptions: ChamberSubscr
     publishEvent({
       chamber: "congress",
       type: "congress.chamber_online",
-      payload: { chamberName: manifest.name, priority: "low" },
+      payload: { chamberName: manifest.name },
     });
   }
   const entry = toEntry(row);
@@ -138,7 +138,7 @@ export function recordHeartbeat(name: string, subscriptions?: ChamberSubscriptio
     publishEvent({
       chamber: "congress",
       type: "congress.chamber_online",
-      payload: { chamberName: name, priority: "low" },
+      payload: { chamberName: name },
     });
   }
   const entry = row ? toEntry(row) : null;
@@ -206,7 +206,7 @@ export function sweepStaleChambers(timeoutMs: number): string[] {
     publishEvent({
       chamber: "congress",
       type: "congress.chamber_offline",
-      payload: { chamberName: row.name, priority: "high" },
+      payload: { chamberName: row.name },
     });
   }
 

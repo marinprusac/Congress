@@ -1,5 +1,4 @@
 import { sqliteTable, text, integer, uniqueIndex, index } from "drizzle-orm/sqlite-core";
-import { PRIORITY_LEVELS } from "@congress/shared-types";
 
 // One row per event type any registered Chamber declares in its own
 // manifest (manifest.events, shared-types) - auto-populated and kept
@@ -8,9 +7,9 @@ import { PRIORITY_LEVELS } from "@congress/shared-types";
 // Chamber's own declared catalog entry, refreshed on every sync; everything
 // else is the owner's own configuration for what to do when this event type
 // fires (eventReceive.ts): record to this Chamber's own durable history
-// and/or push a notification, independently, either or both, each gated by
-// its own separate priority floor. A row with both actions off is simply a
-// known-but-inert event type, same as no matching row ever existed.
+// and/or push a notification, independently, either or both. A row with
+// both actions off is simply a known-but-inert event type, same as no
+// matching row ever existed.
 export const eventSettings = sqliteTable(
   "event_settings",
   {
@@ -20,14 +19,6 @@ export const eventSettings = sqliteTable(
     label: text("label").notNull(),
     description: text("description"),
     recordToHistory: integer("record_to_history", { mode: "boolean" }).notNull().default(true),
-    // Ordered low < normal < high < urgent (PRIORITY_LEVELS, shared-types).
-    // No "no threshold" option - "low" already matches every firing (it's
-    // the bottom of the order), so a separate null/unset state would just
-    // be a second spelling of the same thing. ">=" is deliberately the only
-    // comparison this supports (see eventReceive.ts's priorityMatches).
-    // Kept separate from notifyMinPriority below so recording and notifying
-    // can be tuned to different noise levels for the same event type.
-    historyMinPriority: text("history_min_priority", { enum: PRIORITY_LEVELS }).notNull().default("low"),
     // How long a history row this event type writes sticks around before
     // being pruned. Null means "use eventHistory.ts's own
     // DEFAULT_HISTORY_RETENTION_MS" - deliberately not a single global
@@ -36,7 +27,6 @@ export const eventSettings = sqliteTable(
     // be.
     historyRetentionMs: integer("history_retention_ms"),
     notify: integer("notify", { mode: "boolean" }).notNull().default(false),
-    notifyMinPriority: text("notify_min_priority", { enum: PRIORITY_LEVELS }).notNull().default("low"),
     // {{payload.x}} interpolated against the firing event's payload (see
     // eventReceive.ts's interpolate()); unset falls back to the cached
     // label/description above.
@@ -60,42 +50,24 @@ export const eventSettings = sqliteTable(
 // append-only, unlike `notifications` below: every matching firing gets its
 // own row, including repeats of a still-true condition, since a history is
 // meant to show what actually happened over time, not just current state.
-// `priority` is copied from the firing event's own payload at record time
-// (defaulting to "normal" when the publishing Chamber didn't set one) so
-// the "urgent-logs" widget can filter on it without re-parsing
-// `payloadJson` per query. `expiresAt` is computed once at record time from
-// the recording event type's own `historyRetentionMs` (or eventHistory.ts's
-// default), same pattern as Congress's own events.expiresAt. `type` is
-// enough to join back to `eventSettings` for display (one row per event
-// type, no separate rule id needed).
+// `expiresAt` is computed once at record time from the recording event
+// type's own `historyRetentionMs` (or eventHistory.ts's default), same
+// pattern as Congress's own events.expiresAt. `type` is enough to join back
+// to `eventSettings` for display (one row per event type, no separate rule
+// id needed).
 export const eventHistory = sqliteTable(
   "event_history",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     chamber: text("chamber").notNull(),
     type: text("type").notNull(),
-    // An index into PRIORITY_LEVELS (shared-types), not the text label -
-    // "high" >= "low" doesn't sort correctly as a string (alphabetically
-    // "high" < "low"), and the "urgent-logs" widget needs a real >= query
-    // (see eventHistory.ts's listHistory), not an app-level filter over
-    // every row. priorityRankFor()/priorityLevelFor() (eventHistory.ts)
-    // convert to/from the string label at the boundary.
-    priorityRank: integer("priority_rank").notNull().default(1),
     payloadJson: text("payload_json").notNull(),
     occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull(),
     expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [
     index("event_history_type_idx").on(table.type),
-    // recent-logs is unfiltered (ORDER BY occurredAt desc only) - kept as
-    // its own index since the composite below can't serve a sort with no
-    // leading priorityRank filter.
     index("event_history_occurred_at_idx").on(table.occurredAt),
-    // urgent-logs (and any other minPriority-filtered listHistory call)
-    // filters priorityRank >= X, then orders by occurredAt desc - one
-    // composite index serves both instead of a priorityRank-only one plus
-    // a separate sort step.
-    index("event_history_priority_rank_occurred_at_idx").on(table.priorityRank, table.occurredAt),
     index("event_history_expires_at_idx").on(table.expiresAt),
   ]
 );

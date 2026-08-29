@@ -11,20 +11,6 @@ import { z } from "zod";
 // "<chamber>.<event>" (e.g. "tasks.due_soon") so it's self-namespacing
 // without a separate chamber filter downstream - see manifestEventSchema
 // (manifest.ts) for how a Chamber declares its own catalog of these.
-// A convention, not an enforced part of the request shape below - a
-// publishing Chamber may set `payload.priority` to one of these to signal
-// how much attention an instance of an event deserves (a task due in 5
-// minutes vs. one due tomorrow, say), ordered low to urgent. Congress uses
-// this only for coarse per-chamber-subscription routing (see
-// chamberSubscriptionSchema); a receiving Chamber's own rules (e.g. Logs
-// Chamber's minPriority threshold) still do their own precise check after
-// receiving. Kept here rather than chamber-local so any publishing Chamber
-// and any subscriber agree on the same vocabulary/ordering without
-// importing from each other.
-export const PRIORITY_LEVELS = ["low", "normal", "high", "urgent"] as const;
-export const priorityLevelSchema = z.enum(PRIORITY_LEVELS);
-export type PriorityLevel = z.infer<typeof priorityLevelSchema>;
-
 export const eventPublishRequestSchema = z.object({
   chamber: z.string().min(1),
   type: z.string().min(1),
@@ -66,14 +52,11 @@ export type EventLogEntry = z.infer<typeof eventLogEntrySchema>;
 // are edited) so Congress knows who to push a given publish to without
 // broadcasting to every registered Chamber regardless of interest. `type`
 // of "*" means "every event type" (used by a Chamber whose own logic
-// doesn't filter by type at all, e.g. Deputy). `minPriority` is this
-// Chamber's own loosest threshold across everything it cares about for that
-// type - Congress's own filter is a coarse "could this possibly interest
-// this Chamber" gate; the Chamber still does its own precise per-rule
-// matching after receiving (see docs/creating-a-chamber.md's Events
-// section).
+// doesn't filter by type at all, e.g. Deputy). Congress's own filter is a
+// coarse "could this possibly interest this Chamber" gate; the Chamber
+// still does its own precise per-rule matching after receiving (see
+// docs/creating-a-chamber.md's Events section).
 export const chamberSubscriptionSchema = z.object({
   type: z.string().min(1),
-  minPriority: priorityLevelSchema.optional(),
 });
 export type ChamberSubscription = z.infer<typeof chamberSubscriptionSchema>;

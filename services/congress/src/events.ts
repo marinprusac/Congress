@@ -1,9 +1,4 @@
-import type { EventPublishRequest, PriorityLevel, ChamberSubscription } from "@congress/shared-types";
-// The same priority vocabulary every subscribing Chamber matches against -
-// see chamber-kit's eventMatching.ts. Congress's filter has to agree with
-// theirs exactly, since a mismatch here means a Chamber's own rules never
-// get the chance to run at all.
-import { priorityAtLeast, priorityOf } from "@congress/chamber-kit";
+import type { EventPublishRequest, ChamberSubscription } from "@congress/shared-types";
 import { listChambers, getChamber } from "./registry.js";
 import { env } from "./env.js";
 
@@ -24,19 +19,11 @@ const DELIVERY_TIMEOUT_MS = 5_000;
 // (carried on its heartbeat - see registry.ts's subscriptionsJson) cover
 // this publish at all. "*" subscribes to every type (used by a Chamber
 // whose own logic doesn't filter by type, e.g. Deputy). A Chamber's own
-// precise per-rule matching (exact minPriority, condition fields, ...)
-// still happens after it receives the delivery - this is only ever a
-// superset filter, never the final word on whether something "matches".
-export function subscriptionMatches(
-  subscriptions: ChamberSubscription[],
-  type: string,
-  priority: PriorityLevel
-): boolean {
-  // An absent minPriority means "low" here specifically - i.e. relay
-  // everything of that type - rather than eventMatching's own "treat an
-  // unset level as normal" default, which is about a *publisher* that
-  // didn't declare a priority, not a subscriber that didn't set a floor.
-  return subscriptions.some((s) => (s.type === "*" || s.type === type) && priorityAtLeast(priority, s.minPriority ?? "low"));
+// precise per-rule matching (condition fields, ...) still happens after it
+// receives the delivery - this is only ever a superset filter, never the
+// final word on whether something "matches".
+export function subscriptionMatches(subscriptions: ChamberSubscription[], type: string): boolean {
+  return subscriptions.some((s) => s.type === "*" || s.type === type);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -71,19 +58,16 @@ async function deliverToChamber(chamberName: string, body: unknown): Promise<voi
 
 // Push-relays a published domain event to every currently-active,
 // currently-subscribed Chamber instead of storing it - Congress never
-// inspects `type`/`payload` beyond the priority convention below, and keeps
-// no record of what it relayed. Fire-and-forget from the publisher's own
-// perspective (see POST /congress/events/publish in server.ts, which
-// doesn't await this): each interested Chamber's own delivery retries
-// independently in the background.
+// inspects `type`/`payload` at all, and keeps no record of what it
+// relayed. Fire-and-forget from the publisher's own perspective (see POST
+// /congress/events/publish in server.ts, which doesn't await this): each
+// interested Chamber's own delivery retries independently in the
+// background.
 export function publishEvent(req: EventPublishRequest): void {
-  const priority = priorityOf(req.payload);
   const occurredAt = req.occurredAt ?? new Date().toISOString();
   const body = { chamber: req.chamber, type: req.type, payload: req.payload, occurredAt };
 
-  const targets = listChambers().filter(
-    (c) => c.status === "active" && subscriptionMatches(c.subscriptions, req.type, priority)
-  );
+  const targets = listChambers().filter((c) => c.status === "active" && subscriptionMatches(c.subscriptions, req.type));
   for (const chamber of targets) {
     void deliverToChamber(chamber.name, body);
   }

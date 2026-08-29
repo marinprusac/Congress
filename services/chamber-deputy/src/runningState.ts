@@ -1,7 +1,7 @@
 // Tracks which directive, if any, currently has a `claude` run actually in
 // flight - jobQueue.ts is concurrency-1, so at most one directive-tied run
-// is ever executing at once. Chat/urgent runs have no directive and never
-// touch this. Exposed via GET /api/directives/running so the directives
+// is ever executing at once. Chat runs have no directive and never touch
+// this. Exposed via GET /api/directives/running so the directives
 // list's play-button ring can show a live spinner for a run kicked off
 // anywhere - this tab's own play button, another tab, or checkup.ts's own
 // scheduler - not just ones this browser session started itself.

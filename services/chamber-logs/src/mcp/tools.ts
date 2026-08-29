@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult as textResult } from "@congress/chamber-kit";
-import { priorityLevelSchema } from "@congress/shared-types";
 import { listEventSettings, getEventSettingsByType, updateEventSettings } from "../eventSettings.js";
 import { listHistory } from "../eventHistory.js";
 import { listNotifications, dismissNotification } from "../notifications.js";
@@ -37,14 +36,12 @@ export function registerTools(server: McpServer) {
     {
       title: "Update Event Settings",
       description:
-        "Update an event type's settings - whether to record firings to this Chamber's durable history and/or push a templated notification, each independently gated by its own minimum priority threshold. There is no create/delete: every known event type already has a row.",
+        "Update an event type's settings - whether to record firings to this Chamber's durable history and/or push a templated notification, independently. There is no create/delete: every known event type already has a row.",
       inputSchema: {
         eventType: z.string().min(1),
         recordToHistory: z.boolean().optional(),
-        historyMinPriority: priorityLevelSchema.optional(),
         historyRetentionMs: z.number().int().positive().nullable().optional(),
         notify: z.boolean().optional(),
-        notifyMinPriority: priorityLevelSchema.optional(),
         notifyTitleTemplate: z.string().nullable().optional(),
         notifyBodyTemplate: z.string().nullable().optional(),
         notifyUrlTemplate: z.string().nullable().optional(),
@@ -62,10 +59,10 @@ export function registerTools(server: McpServer) {
     "list_event_history",
     {
       title: "List Event History",
-      description: "List this Chamber's recorded event history, most recent first, optionally filtered to a minimum priority.",
-      inputSchema: { minPriority: priorityLevelSchema.optional(), limit: z.number().int().positive().optional() },
+      description: "List this Chamber's recorded event history, most recent first.",
+      inputSchema: { limit: z.number().int().positive().optional() },
     },
-    async ({ minPriority, limit }) => textResult(listHistory({ minPriority, limit }))
+    async ({ limit }) => textResult(listHistory({ limit }))
   );
 
   server.registerTool(

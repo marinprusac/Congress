@@ -55,7 +55,6 @@ function toSummary(row: typeof tasks.$inferSelect): TaskSummary {
     description: row.description,
     dueDate: row.dueDate ? row.dueDate.toISOString() : null,
     completed: row.completed,
-    priority: row.priority,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -104,7 +103,6 @@ export async function createTask(input: CreateTaskRequest): Promise<TaskDetail> 
       name: input.name,
       description: input.description,
       dueDate: input.dueDate ? new Date(input.dueDate) : null,
-      priority: input.priority,
       createdAt: now,
       updatedAt: now,
     })
@@ -130,7 +128,6 @@ export async function updateTask(id: number, input: UpdateTaskRequest): Promise<
     description: input.description ?? existing.description,
     dueDate: input.dueDate === undefined ? existing.dueDate : input.dueDate ? new Date(input.dueDate) : null,
     completed: input.completed ?? existing.completed,
-    priority: input.priority ?? existing.priority,
     updatedAt: new Date(),
   };
 

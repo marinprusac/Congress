@@ -98,7 +98,7 @@ export function upsertAccountFromOAuth(input: {
     .get();
   void publishEvent({
     type: "calendar.account_connected",
-    payload: { accountId: row.id, label: row.label, priority: "low" },
+    payload: { accountId: row.id, label: row.label },
   });
   return toDTO(row);
 }
@@ -121,7 +121,7 @@ export async function disconnectAccount(id: number): Promise<boolean> {
   if (result.changes > 0) {
     void publishEvent({
       type: "calendar.account_disconnected",
-      payload: { accountId: id, label: existing.label, priority: "high" },
+      payload: { accountId: id, label: existing.label },
     });
   }
   return result.changes > 0;

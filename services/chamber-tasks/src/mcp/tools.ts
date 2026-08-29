@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult as textResult } from "@congress/chamber-kit";
-import { priorityLevelSchema } from "@congress/shared-types";
 import { listTasks, listOpenTasks, searchTasks, getTask, createTask, updateTask, deleteTask } from "../tasks.js";
 
 export function registerTools(server: McpServer) {
@@ -53,16 +52,14 @@ export function registerTools(server: McpServer) {
     "create_task",
     {
       title: "Create Task",
-      description: "Create a new task, optionally with a due date (ISO 8601) and priority (default normal).",
+      description: "Create a new task, optionally with a due date (ISO 8601).",
       inputSchema: {
         name: z.string().min(1),
         description: z.string().default(""),
         dueDate: z.string().optional(),
-        priority: priorityLevelSchema.default("normal"),
       },
     },
-    async ({ name, description, dueDate, priority }) =>
-      textResult(await createTask({ name, description, dueDate, priority }))
+    async ({ name, description, dueDate }) => textResult(await createTask({ name, description, dueDate }))
   );
 
   server.registerTool(
@@ -76,11 +73,10 @@ export function registerTools(server: McpServer) {
         description: z.string().optional(),
         dueDate: z.string().nullable().optional(),
         completed: z.boolean().optional(),
-        priority: priorityLevelSchema.optional(),
       },
     },
-    async ({ id, name, description, dueDate, completed, priority }) => {
-      const updated = await updateTask(id, { name, description, dueDate, completed, priority });
+    async ({ id, name, description, dueDate, completed }) => {
+      const updated = await updateTask(id, { name, description, dueDate, completed });
       if (!updated) return textResult({ error: "not_found", id });
       return textResult(updated);
     }

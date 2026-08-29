@@ -280,7 +280,6 @@ export async function createEvent(input: CreateEventRequest): Promise<CalendarEv
       eventId: result.id,
       title: result.title,
       url: `/e/${result.accountId}/${encodeURIComponent(result.calendarId)}/${encodeURIComponent(result.id)}`,
-      priority: "low",
     },
   });
   return result;
@@ -325,7 +324,6 @@ export async function updateEvent(
       eventId: result.id,
       title: result.title,
       url: `/e/${result.accountId}/${encodeURIComponent(result.calendarId)}/${encodeURIComponent(result.id)}`,
-      priority: "low",
     },
   });
   return result;
@@ -381,7 +379,6 @@ export async function setEventAttendance(
       title: result.title,
       notAttending,
       url: `/e/${result.accountId}/${encodeURIComponent(result.calendarId)}/${encodeURIComponent(result.id)}`,
-      priority: "normal",
     },
   });
   return result;
@@ -411,6 +408,6 @@ export async function deleteEvent(accountId: number, calendarId: string, eventId
   });
   void publishEvent({
     type: "calendar.event_deleted",
-    payload: { accountId, calendarId, eventId, title: existing.title, priority: "low" },
+    payload: { accountId, calendarId, eventId, title: existing.title },
   });
 }

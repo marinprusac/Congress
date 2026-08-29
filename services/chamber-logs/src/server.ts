@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
-import { pushSubscriptionRequestSchema, pushUnsubscribeRequestSchema, priorityLevelSchema } from "@congress/shared-types";
+import { pushSubscriptionRequestSchema, pushUnsubscribeRequestSchema } from "@congress/shared-types";
 import { updateEventSettingsRequestSchema, updateSettingsRequestSchema } from "./types.js";
 import { mountManifestAndHealth, mountSettingsRoutes, mountStaticFrontend, mountEventReceiveRoute } from "@congress/chamber-kit";
 import { manifest } from "./manifest.js";
@@ -50,16 +50,13 @@ app.put("/api/event-settings/:eventType", async (c) => {
 mountSettingsRoutes(app, { getSettings, updateSettings }, updateSettingsRequestSchema);
 
 // This Chamber's own durable record of every event an event type's settings
-// chose to keep - see db/schema.ts's eventHistory. `minPriority` set is
-// what backs the "urgent-logs" widget's fixed filter; unset is
-// "recent-logs".
+// chose to keep - see db/schema.ts's eventHistory. Backs the "recent-logs"
+// widget.
 app.get("/api/history", (c) => {
-  const rawMinPriority = c.req.query("minPriority");
-  const minPriority = rawMinPriority ? priorityLevelSchema.safeParse(rawMinPriority).data : undefined;
   const eventType = c.req.query("eventType") ?? undefined;
   const rawLimit = c.req.query("limit");
   const limit = rawLimit && Number.isInteger(Number(rawLimit)) ? Number(rawLimit) : undefined;
-  return c.json(listHistory({ minPriority, eventType, limit }));
+  return c.json(listHistory({ eventType, limit }));
 });
 
 // The notification center itself - formerly owned by Congress

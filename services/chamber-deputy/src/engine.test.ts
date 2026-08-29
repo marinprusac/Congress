@@ -31,7 +31,6 @@ function spawnResult(overrides: Partial<SpawnResult> = {}): SpawnResult {
     inputTokens: 100,
     outputTokens: 20,
     durationMs: 500,
-    priority: "normal",
     ...overrides,
   };
 }
@@ -49,9 +48,6 @@ describe("a directive-scoped run (manual/scheduled)", () => {
     expect(event.payload.directiveId).toBe(7);
     expect(event.payload.directiveTitle).toBe("Water the plants");
     expect(event.payload.actionTaken).toBe(false);
-    // A no-op tick is never worth more than low, regardless of what the
-    // model would have tagged an action with.
-    expect(event.payload.priority).toBe("low");
   });
 
   it("publishes even when the run failed", async () => {
@@ -64,17 +60,16 @@ describe("a directive-scoped run (manual/scheduled)", () => {
     expect(event.payload.errorMessage).toBe("boom");
   });
 
-  it("keeps the model's own priority when it did take action", async () => {
+  it("marks actionTaken when the model did take action", async () => {
     publishEvent.mockClear();
-    await reportRun("scheduled", spawnResult({ transcript: [toolCall], priority: "urgent" }), directive);
+    await reportRun("scheduled", spawnResult({ transcript: [toolCall] }), directive);
 
     const [event] = publishEvent.mock.calls[0]!;
     expect(event.payload.actionTaken).toBe(true);
-    expect(event.payload.priority).toBe("urgent");
   });
 });
 
-describe("a bundled run (chat/urgent, no single directive)", () => {
+describe("a bundled chat run (no single directive)", () => {
   it("does not publish when it took no action", async () => {
     publishEvent.mockClear();
     await reportRun("chat", spawnResult({ transcript: [] }));
@@ -84,7 +79,7 @@ describe("a bundled run (chat/urgent, no single directive)", () => {
 
   it("does not publish when the run failed, even with a transcript", async () => {
     publishEvent.mockClear();
-    await reportRun("urgent", spawnResult({ ok: false, transcript: [toolCall] }));
+    await reportRun("chat", spawnResult({ ok: false, transcript: [toolCall] }));
 
     expect(publishEvent).not.toHaveBeenCalled();
   });

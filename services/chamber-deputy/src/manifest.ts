@@ -16,15 +16,15 @@ export const manifest: Manifest = {
   healthUrl: `${base}/health`,
   // §12: a quick "message Deputy" box. Deputy keeps no run-history page or
   // widget of its own any more - see deputy.directive_run below, which the
-  // Logs Chamber's own widgets (recent-logs/urgent-logs) can surface instead
-  // once the owner sets up a rule for it.
+  // Logs Chamber's own "recent-logs" widget can surface instead once the
+  // owner sets up a rule for it.
   widgets: [{ id: "message", width: 2, height: 1, label: "Message Deputy" }],
   events: [
     {
       type: "deputy.directive_run",
       label: "Directive run",
       description:
-        "Published with a run's full transcript every time a directive's own scheduled or manual run completes, or when a chat/urgent run takes a real action (calls a tool) worth surfacing to the owner.",
+        "Published with a run's full transcript every time a directive's own scheduled or manual run completes, or when a bundled chat run takes a real action (calls a tool) worth surfacing to the owner.",
     },
   ],
 };
