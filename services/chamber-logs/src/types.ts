@@ -1,15 +1,19 @@
 import { z } from "zod";
+import { manifestEventFieldSchema } from "@congress/shared-types";
 
 // One row per known event type - auto-derived by eventCatalogSync.ts, never
 // user-created/deleted (see eventSettings.ts). eventType/chamber/label/
-// description are a read-only cache of that event's own manifest catalog
-// entry; everything else is the owner's own configuration.
+// description/payloadFields are a read-only cache of that event's own
+// manifest catalog entry; everything else is the owner's own configuration.
 export const eventSettingsSummarySchema = z.object({
   id: z.number().int(),
   eventType: z.string(),
   chamber: z.string(),
   label: z.string(),
   description: z.string().nullable(),
+  // Known {{payload.x}} paths for this event type, for the notify-template
+  // inputs' field picker - null when the publisher declared no fields.
+  payloadFields: z.record(z.string(), manifestEventFieldSchema).nullable(),
   recordToHistory: z.boolean(),
   historyRetentionMs: z.number().int().positive().nullable(),
   notify: z.boolean(),

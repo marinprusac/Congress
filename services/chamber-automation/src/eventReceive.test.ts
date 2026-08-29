@@ -128,7 +128,11 @@ describe("buildArgs", () => {
   });
 
   it("passes an object or array through as its real shape", () => {
-    expect(buildArgs({ tags: "{{payload.tags}}" }, { tags: ["a", "b"] })).toEqual({ tags: "a,b" });
+    // interpolate() JSON-stringifies a non-primitive value rather than
+    // String()-ing it (which would comma-join an array, losing its shape and
+    // producing a string JSON.parse can't recover), so a whole-array payload
+    // field round-trips correctly here.
+    expect(buildArgs({ tags: "{{payload.tags}}" }, { tags: ["a", "b"] })).toEqual({ tags: ["a", "b"] });
     expect(buildArgs({ tags: '["a","b"]' }, {})).toEqual({ tags: ["a", "b"] });
   });
 

@@ -12,6 +12,7 @@ function toSummary(row: typeof eventSettings.$inferSelect): EventSettingsSummary
     chamber: row.chamber,
     label: row.label,
     description: row.description,
+    payloadFields: row.payloadFieldsJson ? JSON.parse(row.payloadFieldsJson) : null,
     recordToHistory: row.recordToHistory,
     historyRetentionMs: row.historyRetentionMs,
     notify: row.notify,

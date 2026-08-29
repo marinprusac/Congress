@@ -19,10 +19,15 @@ export function getPath(payload: Record<string, unknown>, path: string): unknown
 // no arbitrary expressions, just a dotted-path lookup against the firing
 // event's own payload. A path that resolves to null/undefined renders as the
 // empty string rather than "null"/"undefined"; anything the pattern doesn't
-// match is left in the string verbatim.
+// match is left in the string verbatim. An array/object value is rendered as
+// JSON rather than via `String()` - `String([...])` comma-joins elements
+// (lossy for arrays of objects, and not valid JSON), which matters because
+// `buildArgs` in chamber-automation feeds this straight into `JSON.parse` to
+// pass a whole payload field through as a tool argument.
 export function interpolate(template: string, payload: Record<string, unknown>): string {
   return template.replace(/\{\{\s*payload\.([a-zA-Z0-9_.]+)\s*\}\}/g, (_match, path: string) => {
     const value = getPath(payload, path);
-    return value === undefined || value === null ? "" : String(value);
+    if (value === undefined || value === null) return "";
+    return typeof value === "object" ? JSON.stringify(value) : String(value);
   });
 }

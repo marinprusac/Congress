@@ -16,8 +16,23 @@ export const notesManifest: Manifest = {
   healthUrl: `${base}/health`,
   widgets: [{ id: "pinned", width: 3, height: 2, label: "Pinned" }],
   events: [
-    { type: "notes.created", label: "Note created", description: "A new note was created." },
-    { type: "notes.updated", label: "Note updated", description: "A note's title or content changed." },
-    { type: "notes.deleted", label: "Note deleted", description: "A note was deleted." },
+    {
+      type: "notes.created",
+      label: "Note created",
+      description: "A new note was created.",
+      payloadFields: { noteId: { type: "number" }, title: { type: "string" }, url: { type: "string" } },
+    },
+    {
+      type: "notes.updated",
+      label: "Note updated",
+      description: "A note's title or content changed.",
+      payloadFields: { noteId: { type: "number" }, title: { type: "string" }, url: { type: "string" } },
+    },
+    {
+      type: "notes.deleted",
+      label: "Note deleted",
+      description: "A note was deleted.",
+      payloadFields: { noteId: { type: "number" }, title: { type: "string" } },
+    },
   ],
 };

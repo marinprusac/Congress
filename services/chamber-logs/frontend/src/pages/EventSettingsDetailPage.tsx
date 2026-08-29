@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getChamberIcon, showToast } from "@congress/congress-ui";
+import { getChamberIcon, showToast, PayloadFieldPicker } from "@congress/congress-ui";
 import { fetchEventSettings, updateEventSettings, fetchHistory } from "@/lib/api";
 import { PayloadView, summarizePayload } from "@/components/PayloadView";
 import type { EventHistoryEntry, UpdateEventSettingsRequest } from "../../../src/types";
@@ -25,6 +25,10 @@ export function EventSettingsDetailPage() {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<UpdateEventSettingsRequest>({});
   const [dirty, setDirty] = useState(false);
+  const titleRef = useRef<HTMLInputElement | null>(null);
+  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const urlRef = useRef<HTMLInputElement | null>(null);
+  const dedupeRef = useRef<HTMLInputElement | null>(null);
 
   const rowQuery = useQuery({
     queryKey: ["event-settings", eventType],
@@ -126,8 +130,18 @@ export function EventSettingsDetailPage() {
           {draft.notify && (
             <div className="mt-3 flex flex-col gap-4 pl-6">
               <div>
-                {fieldLabel(`Title (optional — defaults to "${row.label}")`)}
+                <div className="mb-1 flex items-baseline justify-between gap-2">
+                  {fieldLabel(`Title (optional — defaults to "${row.label}")`)}
+                  <PayloadFieldPicker
+                    fields={row.payloadFields}
+                    targetRef={titleRef}
+                    value={draft.notifyTitleTemplate ?? ""}
+                    onChange={(next) => set("notifyTitleTemplate", next || null)}
+                    label="Insert field into title"
+                  />
+                </div>
                 <input
+                  ref={titleRef}
                   value={draft.notifyTitleTemplate ?? ""}
                   onChange={(e) => set("notifyTitleTemplate", e.target.value || null)}
                   placeholder="{{payload.x}} interpolated"
@@ -135,8 +149,18 @@ export function EventSettingsDetailPage() {
                 />
               </div>
               <div>
-                {fieldLabel("Body (optional)")}
+                <div className="mb-1 flex items-baseline justify-between gap-2">
+                  {fieldLabel("Body (optional)")}
+                  <PayloadFieldPicker
+                    fields={row.payloadFields}
+                    targetRef={bodyRef}
+                    value={draft.notifyBodyTemplate ?? ""}
+                    onChange={(next) => set("notifyBodyTemplate", next || null)}
+                    label="Insert field into body"
+                  />
+                </div>
                 <textarea
+                  ref={bodyRef}
                   value={draft.notifyBodyTemplate ?? ""}
                   onChange={(e) => set("notifyBodyTemplate", e.target.value || null)}
                   placeholder="{{payload.x}} interpolated"
@@ -145,8 +169,18 @@ export function EventSettingsDetailPage() {
                 />
               </div>
               <div>
-                {fieldLabel("Link (optional)")}
+                <div className="mb-1 flex items-baseline justify-between gap-2">
+                  {fieldLabel("Link (optional)")}
+                  <PayloadFieldPicker
+                    fields={row.payloadFields}
+                    targetRef={urlRef}
+                    value={draft.notifyUrlTemplate ?? ""}
+                    onChange={(next) => set("notifyUrlTemplate", next || null)}
+                    label="Insert field into link"
+                  />
+                </div>
                 <input
+                  ref={urlRef}
                   value={draft.notifyUrlTemplate ?? ""}
                   onChange={(e) => set("notifyUrlTemplate", e.target.value || null)}
                   placeholder="{{payload.x}} interpolated"
@@ -154,8 +188,18 @@ export function EventSettingsDetailPage() {
                 />
               </div>
               <div>
-                {fieldLabel("Dedupe key (optional — defaults to one notification per event type)")}
+                <div className="mb-1 flex items-baseline justify-between gap-2">
+                  {fieldLabel("Dedupe key (optional — defaults to one notification per event type)")}
+                  <PayloadFieldPicker
+                    fields={row.payloadFields}
+                    targetRef={dedupeRef}
+                    value={draft.notifyDedupeKeyTemplate ?? ""}
+                    onChange={(next) => set("notifyDedupeKeyTemplate", next || null)}
+                    label="Insert field into dedupe key"
+                  />
+                </div>
                 <input
+                  ref={dedupeRef}
                   value={draft.notifyDedupeKeyTemplate ?? ""}
                   onChange={(e) => set("notifyDedupeKeyTemplate", e.target.value || null)}
                   placeholder="e.g. {{payload.taskId}} for one per entity"

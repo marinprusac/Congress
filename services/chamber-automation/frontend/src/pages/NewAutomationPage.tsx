@@ -52,6 +52,7 @@ export function NewAutomationPage() {
     enabled: !!targetChamber,
   });
   const tool = toolsQuery.data?.find((t) => t.name === toolName);
+  const triggerPayloadFields = catalogQuery.data?.find((e) => e.type === triggerEventType)?.payloadFields;
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -119,7 +120,13 @@ export function NewAutomationPage() {
         </div>
 
         <div className="sm:col-span-2">
-          <ArgsEditor tool={tool} argsTemplate={argsTemplate} onChange={setArgsTemplate} inputClassName={inputClass} />
+          <ArgsEditor
+            tool={tool}
+            argsTemplate={argsTemplate}
+            onChange={setArgsTemplate}
+            inputClassName={inputClass}
+            triggerPayloadFields={triggerPayloadFields}
+          />
         </div>
       </div>
 

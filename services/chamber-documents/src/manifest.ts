@@ -16,8 +16,23 @@ export const documentsManifest: Manifest = {
   healthUrl: `${base}/health`,
   widgets: [{ id: "recent", width: 3, height: 2, label: "Recent" }],
   events: [
-    { type: "documents.created", label: "Document created", description: "A new document was uploaded." },
-    { type: "documents.updated", label: "Document updated", description: "A document's title or description changed." },
-    { type: "documents.deleted", label: "Document deleted", description: "A document was deleted." },
+    {
+      type: "documents.created",
+      label: "Document created",
+      description: "A new document was uploaded.",
+      payloadFields: { documentId: { type: "number" }, title: { type: "string" }, url: { type: "string" } },
+    },
+    {
+      type: "documents.updated",
+      label: "Document updated",
+      description: "A document's title or description changed.",
+      payloadFields: { documentId: { type: "number" }, title: { type: "string" }, url: { type: "string" } },
+    },
+    {
+      type: "documents.deleted",
+      label: "Document deleted",
+      description: "A document was deleted.",
+      payloadFields: { documentId: { type: "number" }, title: { type: "string" } },
+    },
   ],
 };

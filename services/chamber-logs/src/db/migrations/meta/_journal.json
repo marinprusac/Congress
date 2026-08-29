@@ -64,6 +64,13 @@
       "when": 1787962456182,
       "tag": "0008_overjoyed_virginia_dare",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1787963861575,
+      "tag": "0009_high_wasp",
+      "breakpoints": true
     }
   ]
 }

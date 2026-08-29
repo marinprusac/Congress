@@ -25,6 +25,21 @@ export const manifest: Manifest = {
       label: "Directive run",
       description:
         "Published with a run's full transcript every time a directive's own scheduled or manual run completes, or when a bundled chat run takes a real action (calls a tool) worth surfacing to the owner.",
+      payloadFields: {
+        trigger: { type: "string", description: "chat | scheduled | manual" },
+        directiveId: { type: "number" },
+        directiveTitle: { type: "string" },
+        ok: { type: "boolean" },
+        actionTaken: { type: "boolean" },
+        summary: { type: "string" },
+        errorMessage: { type: "string" },
+        toolCallCount: { type: "number" },
+        transcript: { type: "array", description: "{ toolName, input, output, error }[]" },
+        costUsd: { type: "number" },
+        inputTokens: { type: "number" },
+        outputTokens: { type: "number" },
+        durationMs: { type: "number" },
+      },
     },
   ],
 };

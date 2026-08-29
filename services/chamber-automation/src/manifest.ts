@@ -20,18 +20,46 @@ export const manifest: Manifest = {
   // user-resizable. See frontend/src/widgets/ for the matching component.
   widgets: [{ id: "recent", width: 2, height: 3, label: "Recent" }],
   events: [
-    { type: "automation.created", label: "Automation created", description: "A new automation was created." },
-    { type: "automation.updated", label: "Automation updated", description: "An automation's rule changed." },
-    { type: "automation.deleted", label: "Automation deleted", description: "An automation was deleted." },
+    {
+      type: "automation.created",
+      label: "Automation created",
+      description: "A new automation was created.",
+      payloadFields: { automationId: { type: "number" }, title: { type: "string" } },
+    },
+    {
+      type: "automation.updated",
+      label: "Automation updated",
+      description: "An automation's rule changed.",
+      payloadFields: { automationId: { type: "number" }, title: { type: "string" } },
+    },
+    {
+      type: "automation.deleted",
+      label: "Automation deleted",
+      description: "An automation was deleted.",
+      payloadFields: { automationId: { type: "number" }, title: { type: "string" } },
+    },
     {
       type: "automation.run_succeeded",
       label: "Automation run succeeded",
       description: "An automation fired and its tool call succeeded. Triggering another automation off this can loop if misconfigured - target this Chamber with care.",
+      payloadFields: {
+        automationId: { type: "number" },
+        title: { type: "string" },
+        targetChamber: { type: "string" },
+        toolName: { type: "string" },
+      },
     },
     {
       type: "automation.run_failed",
       label: "Automation run failed",
       description: "An automation fired but its tool call failed, or its target Chamber/tool wasn't reachable. Triggering another automation off this can loop if misconfigured - target this Chamber with care.",
+      payloadFields: {
+        automationId: { type: "number" },
+        title: { type: "string" },
+        targetChamber: { type: "string" },
+        toolName: { type: "string" },
+        error: { type: "string" },
+      },
     },
   ],
 };

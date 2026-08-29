@@ -57,6 +57,7 @@ export function AutomationViewPage() {
     enabled: !!draft.targetChamber,
   });
   const draftTool = toolsQuery.data?.find((t) => t.name === draft.toolName);
+  const triggerPayloadFields = catalogQuery.data?.find((e) => e.type === draft.triggerEventType)?.payloadFields;
 
   const updateMutation = useMutation({
     mutationFn: (input: UpdateAutomationRequest) => updateAutomation(automationId, input),
@@ -189,6 +190,7 @@ export function AutomationViewPage() {
               argsTemplate={draft.argsTemplate ?? {}}
               onChange={(argsTemplate) => setDraft((d) => ({ ...d, argsTemplate }))}
               inputClassName={inputClass}
+              triggerPayloadFields={triggerPayloadFields}
             />
           </div>
         )}

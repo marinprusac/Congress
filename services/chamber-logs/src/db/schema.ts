@@ -18,6 +18,13 @@ export const eventSettings = sqliteTable(
     chamber: text("chamber").notNull(),
     label: text("label").notNull(),
     description: text("description"),
+    // JSON-serialized ManifestEventField map (shared-types), same
+    // display-only cache treatment as label/description above - refreshed
+    // from that event type's own manifest entry on every sync, never
+    // user-edited. Lets the notify-template inputs below offer known
+    // {{payload.x}} paths instead of requiring the owner to already know the
+    // shape. Null for an event type whose publisher declared no fields.
+    payloadFieldsJson: text("payload_fields_json"),
     recordToHistory: integer("record_to_history", { mode: "boolean" }).notNull().default(true),
     // How long a history row this event type writes sticks around before
     // being pruned. Null means "use eventHistory.ts's own

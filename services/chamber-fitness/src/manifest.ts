@@ -19,11 +19,17 @@ export const manifest: Manifest = {
     { id: "week-stats", width: 2, height: 1, label: "This Week" },
   ],
   events: [
-    { type: "fitness.workout_synced", label: "Workout synced", description: "A new workout was pulled in from Hevy." },
+    {
+      type: "fitness.workout_synced",
+      label: "Workout synced",
+      description: "A new workout was pulled in from Hevy.",
+      payloadFields: { workoutId: { type: "number" }, title: { type: "string" } },
+    },
     {
       type: "fitness.sync_failing",
       label: "Hevy sync failing",
       description: "The Hevy poll loop has failed several times in a row.",
+      payloadFields: { consecutiveFailures: { type: "number" }, lastError: { type: "string" } },
     },
   ],
 };

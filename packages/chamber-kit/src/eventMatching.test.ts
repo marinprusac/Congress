@@ -57,6 +57,21 @@ describe("interpolate", () => {
     expect(interpolate("{{payload.a}}-{{payload.a}}", { a: "x" })).toBe("x-x");
   });
 
+  it("JSON-stringifies an array value rather than comma-joining it", () => {
+    expect(interpolate("{{payload.items}}", { items: ["a", "b"] })).toBe('["a","b"]');
+    expect(interpolate("{{payload.items}}", { items: [{ x: 1 }] })).toBe('[{"x":1}]');
+  });
+
+  it("JSON-stringifies an object value", () => {
+    expect(interpolate("{{payload.obj}}", { obj: { a: 1, b: "y" } })).toBe('{"a":1,"b":"y"}');
+  });
+
+  it("round-trips an interpolated array/object back through JSON.parse", () => {
+    const payload = { items: ["a", "b,c"], obj: { nested: [1, 2] } };
+    expect(JSON.parse(interpolate("{{payload.items}}", payload))).toEqual(payload.items);
+    expect(JSON.parse(interpolate("{{payload.obj}}", payload))).toEqual(payload.obj);
+  });
+
   it("leaves anything that is not a payload template untouched", () => {
     // No expression language by design: only `payload.`-rooted dotted paths
     // are substituted, and everything else is literal text.

@@ -36,9 +36,10 @@ export async function syncEventCatalog(): Promise<void> {
 
   for (const chamber of [...registry, ...syntheticChambers]) {
     for (const event of chamber.events) {
+      const payloadFieldsJson = event.payloadFields ? JSON.stringify(event.payloadFields) : null;
       if (knownTypes.has(event.type)) {
         db.update(eventSettings)
-          .set({ chamber: chamber.name, label: event.label, description: event.description ?? null })
+          .set({ chamber: chamber.name, label: event.label, description: event.description ?? null, payloadFieldsJson })
           .where(eq(eventSettings.eventType, event.type))
           .run();
         continue;
@@ -49,6 +50,7 @@ export async function syncEventCatalog(): Promise<void> {
           chamber: chamber.name,
           label: event.label,
           description: event.description ?? null,
+          payloadFieldsJson,
           recordToHistory: true,
           notify: false,
           createdAt: now,

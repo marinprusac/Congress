@@ -24,23 +24,65 @@ export const manifest: Manifest = {
   // pickers - Congress never enforces or inspects this. Published via
   // events.ts's publishEvent from tracking.ts/poller.ts.
   events: [
-    { type: "map.arrived_at_place", label: "Arrived at place", description: "The tracked device arrived at a known place." },
-    { type: "map.departed_place", label: "Departed place", description: "The tracked device left a known place." },
-    { type: "map.trip_completed", label: "Trip completed", description: "A trip between two visits was summarized." },
+    {
+      type: "map.arrived_at_place",
+      label: "Arrived at place",
+      description: "The tracked device arrived at a known place.",
+      payloadFields: {
+        visitId: { type: "number" },
+        placeId: { type: "number" },
+        placeName: { type: "string" },
+        category: { type: "string" },
+        at: { type: "string", description: "ISO datetime" },
+      },
+    },
+    {
+      type: "map.departed_place",
+      label: "Departed place",
+      description: "The tracked device left a known place.",
+      payloadFields: {
+        visitId: { type: "number" },
+        placeId: { type: "number" },
+        placeName: { type: "string" },
+        durationMinutes: { type: "number" },
+        at: { type: "string", description: "ISO datetime" },
+      },
+    },
+    {
+      type: "map.trip_completed",
+      label: "Trip completed",
+      description: "A trip between two visits was summarized.",
+      payloadFields: {
+        tripId: { type: "number" },
+        fromPlace: { type: "string" },
+        toPlace: { type: "string" },
+        distanceKm: { type: "number" },
+        mode: { type: "string", description: "walk | bike | transit | unknown" },
+        durationMinutes: { type: "number" },
+      },
+    },
     {
       type: "map.unclassified_dwell_pending",
       label: "Unclassified dwell pending",
       description: "The device has been dwelling at an unrecognized location and needs classification.",
+      payloadFields: {
+        visitId: { type: "number" },
+        clusterLatitude: { type: "number" },
+        clusterLongitude: { type: "number" },
+        dwellMinutes: { type: "number" },
+      },
     },
     {
       type: "map.trip_needs_label",
       label: "Trip needs a label",
       description: "A round trip to the same known place with no stop recorded in between needs a purpose label.",
+      payloadFields: { tripId: { type: "number" }, placeName: { type: "string" }, durationMinutes: { type: "number" } },
     },
     {
       type: "map.traccar_poll_failing",
       label: "Traccar poll failing",
       description: "Polling the Traccar server has failed several times in a row.",
+      payloadFields: { consecutiveFailures: { type: "number" }, lastError: { type: "string" } },
     },
   ],
 };

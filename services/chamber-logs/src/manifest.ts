@@ -27,6 +27,7 @@ export const manifest: Manifest = {
       type: "logs.rule_updated",
       label: "Log rule updated",
       description: "The owner changed a per-event-type record/notify setting - useful for spotting why an expected notification went quiet.",
+      payloadFields: { eventType: { type: "string" }, label: { type: "string" } },
     },
   ],
 };

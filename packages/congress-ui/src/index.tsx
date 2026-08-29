@@ -47,6 +47,7 @@ export { ListSearchInput, ListLoadingState, ListErrorState, ListEmptyState } fro
 export { FormLabel, FormTextInput, FormErrorMessage, FormSubmitButton } from "./FormPrimitives.js";
 export { formatTimestamp } from "./formatTimestamp.js";
 export { ConfirmSheet } from "./ConfirmSheet.js";
+export { PayloadFieldPicker } from "./PayloadFieldPicker.js";
 export type { ConfirmSheetProps } from "./ConfirmSheet.js";
 export { ToastHost } from "./ToastHost.js";
 export { showToast } from "./toast.js";

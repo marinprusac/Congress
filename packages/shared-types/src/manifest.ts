@@ -31,6 +31,25 @@ export const manifestWidgetSchema = z.object({
 });
 export type ManifestWidget = z.infer<typeof manifestWidgetSchema>;
 
+// Describes one field of a declared event's payload - deliberately the same
+// shape as an MCP tool's own JSON-Schema `properties` entries (see
+// chamber-automation's ArgsEditor.tsx), so both sides of a
+// trigger-event-payload -> tool-argument template share one mental model.
+// Flat only, same restraint ArgsEditor already commits to for tool args: no
+// nested objects, and `items` describes an array field's elements one level
+// deep, not recursively.
+export const manifestEventFieldSchema = z.object({
+  type: z.enum(["string", "number", "boolean", "array"]).optional(),
+  description: z.string().optional(),
+  items: z
+    .object({
+      type: z.enum(["string", "number", "boolean"]).optional(),
+      description: z.string().optional(),
+    })
+    .optional(),
+});
+export type ManifestEventField = z.infer<typeof manifestEventFieldSchema>;
+
 // One entry per domain event a Chamber may publish (POST
 // /congress/events/publish) - purely a declared catalog for other Chambers'
 // own UI (e.g. an automation editor's event-type picker) to read off the
@@ -38,11 +57,17 @@ export type ManifestWidget = z.infer<typeof manifestWidgetSchema>;
 // and returning it; see events.ts for the actual publish/push-relay
 // contract. `type` is conventionally "<chamber>.<event>" (e.g.
 // "tasks.due_soon") so it's self-namespacing without a separate chamber
-// filter downstream.
+// filter downstream. `payloadFields` is likewise purely descriptive - it
+// documents the shape of the object literal passed to `publishEvent` at each
+// of that event's actual call sites, kept in sync by hand rather than
+// derived, so a template-editing UI (notify title/body/link, an automation's
+// arg template) can offer known payload paths instead of requiring the owner
+// to already know the shape from reading source.
 export const manifestEventSchema = z.object({
   type: z.string().min(1),
   label: z.string().min(1),
   description: z.string().optional(),
+  payloadFields: z.record(z.string(), manifestEventFieldSchema).optional(),
 });
 export type ManifestEvent = z.infer<typeof manifestEventSchema>;
 
@@ -59,11 +84,13 @@ export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
     type: "congress.chamber_offline",
     label: "Chamber went offline",
     description: "A registered Chamber missed its heartbeat threshold and was marked offline.",
+    payloadFields: { chamberName: { type: "string" } },
   },
   {
     type: "congress.chamber_online",
     label: "Chamber came back online",
     description: "A previously-offline Chamber registered or heartbeated again.",
+    payloadFields: { chamberName: { type: "string" } },
   },
 ];
 
