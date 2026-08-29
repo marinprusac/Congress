@@ -324,7 +324,16 @@ export function MapPage() {
           {displayEntries.map((e) =>
             e.kind === "visit" ? (
               <li key={`visit-${e.visit.id}`} className="py-2">
-                <span className="font-display text-ink">{e.visit.placeName ?? e.visit.adhocLabel ?? "Unclassified location"}</span>
+                {e.visit.placeId !== null ? (
+                  <Link
+                    to={resolveChamberPath(`/p/${e.visit.placeId}`, "map", shellHosted)}
+                    className="font-display text-ink hover:underline"
+                  >
+                    {e.visit.placeName ?? e.visit.adhocLabel ?? "Unclassified location"}
+                  </Link>
+                ) : (
+                  <span className="font-display text-ink">{e.visit.placeName ?? e.visit.adhocLabel ?? "Unclassified location"}</span>
+                )}
                 <span className="ml-2 text-sm text-dust">
                   {formatTimeMaybeDated(e.visit.arrivedAt, date)}
                   {e.visit.departedAt ? ` – ${formatTimeMaybeDated(e.visit.departedAt, date)}` : " – now"}

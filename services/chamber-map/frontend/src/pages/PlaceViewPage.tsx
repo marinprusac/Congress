@@ -61,7 +61,7 @@ export function PlaceViewPage() {
   useEffect(() => {
     if (placeQuery.data && !editing) {
       const p = placeQuery.data;
-      setDraft({ name: p.name, body: p.body, category: p.category, latitude: p.latitude, longitude: p.longitude, radiusMeters: p.radiusMeters });
+      setDraft({ name: p.name, body: p.body, latitude: p.latitude, longitude: p.longitude, radiusMeters: p.radiusMeters });
     }
   }, [placeQuery.data, editing]);
 
@@ -93,7 +93,6 @@ export function PlaceViewPage() {
         ) : (
           <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
             <span>{place.name}</span>
-            <span className="font-mono text-sm text-dust">{place.category}</span>
           </h2>
         )}
       </div>
@@ -101,20 +100,6 @@ export function PlaceViewPage() {
       {updateMutation.isError && <p className="mb-4 font-mono text-sm text-alert">{(updateMutation.error as Error).message}</p>}
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          {fieldLabel("Category")}
-          {editing ? (
-            <input
-              value={draft.category ?? ""}
-              onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
-              placeholder="home, work, gym, ignored, ..."
-              className={inputClass}
-            />
-          ) : (
-            <p className="font-mono text-sm text-ink">{place.category}</p>
-          )}
-        </div>
-
         <div>
           {fieldLabel("Geofence radius (meters)")}
           {editing ? (
@@ -196,7 +181,7 @@ export function PlaceViewPage() {
       <ConfirmSheet
         open={confirmingDelete}
         title="Delete place"
-        message={`Delete "${place.name}"? Past visits keep their history but lose this place's name/category.`}
+        message={`Delete "${place.name}"? Past visits keep their history but lose this place's name.`}
         confirmLabel="Delete"
         onConfirm={() => {
           setConfirmingDelete(false);

@@ -65,7 +65,6 @@ function toSummary(row: typeof places.$inferSelect): PlaceSummary {
     id: row.id,
     name: row.name,
     body: row.body,
-    category: row.category,
     latitude: row.latitude,
     longitude: row.longitude,
     radiusMeters: row.radiusMeters,
@@ -120,7 +119,6 @@ export async function createPlace(
     .values({
       name: input.name,
       body: input.body,
-      category: input.category,
       latitude: input.latitude,
       longitude: input.longitude,
       radiusMeters: input.radiusMeters,
@@ -150,7 +148,6 @@ export async function updatePlace(id: number, input: UpdatePlaceRequest): Promis
   const next = {
     name: input.name ?? existing.name,
     body: input.body ?? existing.body,
-    category: input.category ?? existing.category,
     latitude: input.latitude ?? existing.latitude,
     longitude: input.longitude ?? existing.longitude,
     radiusMeters: input.radiusMeters ?? existing.radiusMeters,

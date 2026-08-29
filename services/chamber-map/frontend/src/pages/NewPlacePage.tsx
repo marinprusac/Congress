@@ -23,11 +23,11 @@ function fieldLabel(children: React.ReactNode) {
   return <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">{children}</label>;
 }
 
-// Mirrors PlaceViewPage's editing state exactly (name input, category/
-// radius/picker fields, ExhibitTextarea, ExhibitLinksLayout with a live
-// Connections panel) rather than a plain form. Connections picked here are
-// staged (ExhibitLinksLayout's `exhibitId={null}` mode) and only actually
-// written once the create mutation below hands them a real id to attach to.
+// Mirrors PlaceViewPage's editing state exactly (name input, radius/picker
+// fields, ExhibitTextarea, ExhibitLinksLayout with a live Connections panel)
+// rather than a plain form. Connections picked here are staged
+// (ExhibitLinksLayout's `exhibitId={null}` mode) and only actually written
+// once the create mutation below hands them a real id to attach to.
 export function NewPlacePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -35,7 +35,6 @@ export function NewPlacePage() {
   const queryClient = useQueryClient();
   const [name, setName] = useState(searchParams.get("name") ?? "");
   const [body, setBody] = useState("");
-  const [category, setCategory] = useState("place");
   const [radiusMeters, setRadiusMeters] = useState(100);
   const [coords, setCoords] = useState({ latitude: 0, longitude: 0 });
   const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
@@ -53,7 +52,7 @@ export function NewPlacePage() {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const created = await createPlace({ name, body, category, radiusMeters, ...coords });
+      const created = await createPlace({ name, body, radiusMeters, ...coords });
       await flushDraftConnections(`place-${created.id}`, draftConnections);
       return created;
     },
@@ -83,18 +82,8 @@ export function NewPlacePage() {
 
       {mutation.isError && <FormErrorMessage>{(mutation.error as Error).message}</FormErrorMessage>}
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          {fieldLabel("Category")}
-          <input
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="home, work, gym, ignored, ..."
-            className={inputClass}
-          />
-        </div>
-
-        <div>
+      <div className="mb-6 flex flex-col gap-4">
+        <div className="sm:w-1/2">
           {fieldLabel("Geofence radius (meters)")}
           <input
             type="number"
@@ -105,7 +94,7 @@ export function NewPlacePage() {
           />
         </div>
 
-        <div className="sm:col-span-2">
+        <div>
           {fieldLabel("Location (click or drag the pin to adjust)")}
           <PlacePicker latitude={coords.latitude} longitude={coords.longitude} radiusMeters={radiusMeters} onChange={setCoords} />
         </div>

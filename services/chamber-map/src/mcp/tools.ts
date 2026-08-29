@@ -17,7 +17,6 @@ async function summarizeVisits(from?: string, to?: string) {
     .filter((v) => v.status === "confirmed" || v.status === "adhoc")
     .map((v) => ({
       place: v.placeName ?? v.adhocLabel ?? "Unknown location",
-      category: v.placeCategory,
       arrivedAt: v.arrivedAt,
       departedAt: v.departedAt,
       durationMinutes: v.durationMinutes,

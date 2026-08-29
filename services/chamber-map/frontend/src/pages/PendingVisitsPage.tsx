@@ -9,7 +9,6 @@ import type { PlaceSummary, Visit } from "../../../src/types";
 function PendingVisitCard({ visit, places }: { visit: Visit; places: PlaceSummary[] }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
-  const [category, setCategory] = useState("place");
   const [radiusMeters, setRadiusMeters] = useState(100);
   const [adhocLabel, setAdhocLabel] = useState("");
   const [existingPlaceId, setExistingPlaceId] = useState("");
@@ -17,7 +16,7 @@ function PendingVisitCard({ visit, places }: { visit: Visit; places: PlaceSummar
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["visits"] });
 
   const saveMutation = useMutation({
-    mutationFn: () => classifyVisit(visit.id, { action: "save_place", name, category, radiusMeters, body: "" }),
+    mutationFn: () => classifyVisit(visit.id, { action: "save_place", name, radiusMeters, body: "" }),
     onSuccess: () => {
       invalidate();
       showToast(`Saved "${name}"`);
@@ -65,7 +64,7 @@ function PendingVisitCard({ visit, places }: { visit: Visit; places: PlaceSummar
       )}
 
       {places.length > 0 && (
-        <div className="mb-4 flex items-start gap-3">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start">
           <select
             value={existingPlaceId}
             onChange={(e) => setExistingPlaceId(e.target.value)}
@@ -81,34 +80,33 @@ function PendingVisitCard({ visit, places }: { visit: Visit; places: PlaceSummar
           <button
             disabled={!existingPlaceId || pending}
             onClick={() => assignMutation.mutate()}
-            className="tap-target mt-0.5 shrink-0 border border-accent px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-accent hover:bg-accent hover:text-parchment disabled:opacity-50"
+            className="shrink-0 border border-accent px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-accent hover:bg-accent hover:text-parchment disabled:opacity-50"
           >
             Use this place
           </button>
         </div>
       )}
 
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormTextInput placeholder="Place name" value={name} onChange={(e) => setName(e.target.value)} />
-        <FormTextInput placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} />
         <FormTextInput type="number" min={10} placeholder="Radius (m)" value={radiusMeters} onChange={(e) => setRadiusMeters(Number(e.target.value))} />
       </div>
       <button
         disabled={!name.trim() || pending}
         onClick={() => saveMutation.mutate()}
-        className="tap-target mr-4 mb-4 border border-accent px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-accent hover:bg-accent hover:text-parchment disabled:opacity-50"
+        className="mb-4 border border-accent px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-accent hover:bg-accent hover:text-parchment disabled:opacity-50"
       >
         Save as new place
       </button>
 
-      <div className="mb-4 flex items-start gap-3">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="min-w-0 flex-1">
           <FormTextInput placeholder='One-off label (e.g. "errand")' value={adhocLabel} onChange={(e) => setAdhocLabel(e.target.value)} />
         </div>
         <button
           disabled={!adhocLabel.trim() || pending}
           onClick={() => adhocMutation.mutate()}
-          className="tap-target mt-0.5 shrink-0 border border-dust px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-slate hover:border-accent hover:text-accent disabled:opacity-50"
+          className="shrink-0 border border-dust px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-slate hover:border-accent hover:text-accent disabled:opacity-50"
         >
           Label just this once
         </button>

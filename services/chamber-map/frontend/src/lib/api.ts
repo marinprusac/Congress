@@ -64,7 +64,7 @@ export async function deletePlace(id: number): Promise<void> {
 // geofence since the picker's title-only prompt has no coordinates to give -
 // the owner is expected to open the new place and set its location for real.
 export async function quickCreatePlaceExhibit(title: string): Promise<CapitolExhibitSearchResult> {
-  const place = await createPlace({ name: title, body: "", category: "place", latitude: 0, longitude: 0, radiusMeters: 100 });
+  const place = await createPlace({ name: title, body: "", latitude: 0, longitude: 0, radiusMeters: 100 });
   return { chamber: "map", id: `place-${place.id}`, type: "place", name: place.name, url: `/p/${place.id}` };
 }
 

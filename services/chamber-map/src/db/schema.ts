@@ -33,12 +33,6 @@ export const places = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     name: text("name").notNull(),
     body: text("body").notNull().default(""),
-    // User-defined ("home", "work", "gym", ...). "ignored" is not a distinct
-    // mechanism - it's just a place with this category, so a spot the owner
-    // never wants prompted about again is saved once and future visits there
-    // become ordinary confirmed visits, filtered out by category wherever it
-    // matters (widgets, MCP tools) - see visits.ts's classifyVisit.
-    category: text("category").notNull().default("place"),
     latitude: real("latitude").notNull(),
     longitude: real("longitude").notNull(),
     radiusMeters: integer("radius_meters").notNull().default(100),

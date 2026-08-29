@@ -32,7 +32,6 @@ export const manifest: Manifest = {
         visitId: { type: "number" },
         placeId: { type: "number" },
         placeName: { type: "string" },
-        category: { type: "string" },
         at: { type: "string", description: "ISO datetime" },
       },
     },

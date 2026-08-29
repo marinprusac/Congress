@@ -4,7 +4,6 @@ export const placeSummarySchema = z.object({
   id: z.number().int(),
   name: z.string(),
   body: z.string(),
-  category: z.string(),
   latitude: z.number(),
   longitude: z.number(),
   radiusMeters: z.number().int(),
@@ -19,7 +18,6 @@ export type PlaceDetail = z.infer<typeof placeDetailSchema>;
 export const createPlaceRequestSchema = z.object({
   name: z.string().min(1),
   body: z.string().default(""),
-  category: z.string().min(1).default("place"),
   latitude: z.number(),
   longitude: z.number(),
   radiusMeters: z.number().int().positive().default(100),
@@ -29,7 +27,6 @@ export type CreatePlaceRequest = z.infer<typeof createPlaceRequestSchema>;
 export const updatePlaceRequestSchema = z.object({
   name: z.string().min(1).optional(),
   body: z.string().optional(),
-  category: z.string().min(1).optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   radiusMeters: z.number().int().positive().optional(),
@@ -39,16 +36,15 @@ export type UpdatePlaceRequest = z.infer<typeof updatePlaceRequestSchema>;
 export const visitStatusSchema = z.enum(["confirmed", "pending", "adhoc", "ignored"]);
 export type VisitStatus = z.infer<typeof visitStatusSchema>;
 
-// placeName/placeCategory/latitude/longitude are denormalized onto the
-// visit at read time (a join, not stored) so the frontend/MCP tools never
-// need a second lookup - see visits.ts's toVisit. latitude/longitude are the
-// place's own coordinates for a confirmed visit, or clusterLatitude/
-// clusterLongitude for a pending/adhoc/ignored one - whichever is set.
+// placeName/latitude/longitude are denormalized onto the visit at read time
+// (a join, not stored) so the frontend/MCP tools never need a second lookup -
+// see visits.ts's toVisit. latitude/longitude are the place's own coordinates
+// for a confirmed visit, or clusterLatitude/clusterLongitude for a
+// pending/adhoc/ignored one - whichever is set.
 export const visitSchema = z.object({
   id: z.number().int(),
   placeId: z.number().int().nullable(),
   placeName: z.string().nullable(),
-  placeCategory: z.string().nullable(),
   status: visitStatusSchema,
   adhocLabel: z.string().nullable(),
   clusterLatitude: z.number().nullable(),
@@ -65,7 +61,6 @@ export const classifyVisitRequestSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("save_place"),
     name: z.string().min(1),
-    category: z.string().min(1).default("place"),
     radiusMeters: z.number().int().positive().default(100),
     body: z.string().default(""),
   }),

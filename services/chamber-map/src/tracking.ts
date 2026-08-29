@@ -34,7 +34,6 @@ interface CandidateStop {
 interface PlaceCandidate {
   id: number;
   name: string;
-  category: string;
   latitude: number;
   longitude: number;
   radiusMeters: number;
@@ -227,7 +226,6 @@ async function handleTransition(
         visitId: next.id,
         placeId: next.placeId,
         placeName: place?.name ?? null,
-        category: place?.category ?? null,
         at: atFixTime.toISOString(),
       },
     });
@@ -258,7 +256,6 @@ export async function processPositions(
   const candidates: PlaceCandidate[] = placeRows.map((r) => ({
     id: r.id,
     name: r.name,
-    category: r.category,
     latitude: r.latitude,
     longitude: r.longitude,
     radiusMeters: r.radiusMeters,

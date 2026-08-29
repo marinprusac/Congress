@@ -17,7 +17,6 @@ function toVisit(row: { visit: VisitRow; place: typeof places.$inferSelect | nul
     id: visit.id,
     placeId: visit.placeId,
     placeName: place?.name ?? null,
-    placeCategory: place?.category ?? null,
     status: visit.status,
     adhocLabel: visit.adhocLabel,
     clusterLatitude: visit.clusterLatitude,
@@ -136,13 +135,10 @@ export async function classifyVisit(id: number, request: ClassifyVisitRequest): 
   if (!existing) return null;
 
   if (request.action === "save_place") {
-    // Saving a spot with category "ignored" *is* the "stop asking about
-    // this" mechanism - see db/schema.ts's comment on places.category.
     const place = await createPlace(
       {
         name: request.name,
         body: request.body,
-        category: request.category,
         latitude: existing.clusterLatitude ?? 0,
         longitude: existing.clusterLongitude ?? 0,
         radiusMeters: request.radiusMeters,

@@ -49,7 +49,6 @@ export function PlacesListPage() {
               className="block border-b border-dust px-1 py-3 hover:bg-ink/[0.03]"
             >
               <span className="font-display text-lg text-ink">{place.name}</span>
-              <span className="ml-2 font-mono text-xs text-dust">{place.category}</span>
             </Link>
           ))}
       </div>
