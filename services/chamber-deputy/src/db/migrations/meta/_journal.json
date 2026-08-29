@@ -36,6 +36,13 @@
       "when": 1787878652301,
       "tag": "0004_deputy_per_directive_schedule",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1787966066493,
+      "tag": "0005_smart_darkhawk",
+      "breakpoints": true
     }
   ]
 }

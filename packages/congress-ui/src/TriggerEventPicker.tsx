@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { getChamberIcon } from "@congress/congress-ui";
-import type { EventCatalogEntry } from "@/lib/eventCatalog";
+import { getChamberIcon } from "./ChamberMarks.js";
+import type { EventCatalogEntry } from "./eventCatalog.js";
 
 interface TriggerEventPickerProps {
   value: string;
@@ -18,9 +18,11 @@ interface ChamberOption {
 // Two linked pickers - which Chamber, then which of that Chamber's own
 // declared events - replacing a freetext "type and hope it matches" input.
 // Built entirely from the live registry's manifest.events catalog (see
-// lib/eventCatalog.ts), so it only ever offers event types a
-// currently-registered Chamber actually declares; nothing here is
-// hardcoded to a specific Chamber or event name.
+// eventCatalog.ts), so it only ever offers event types a currently-
+// registered Chamber actually declares; nothing here is hardcoded to a
+// specific Chamber or event name. Shared between chamber-automation's rule
+// editor and chamber-deputy's event-triggered directives - both pick "which
+// Chamber, which of its event types" against the exact same live catalog.
 export function TriggerEventPicker({ value, onChange, catalog, loading, selectClassName }: TriggerEventPickerProps) {
   const selectedEntry = catalog.find((entry) => entry.type === value);
 

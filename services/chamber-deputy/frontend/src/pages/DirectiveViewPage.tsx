@@ -12,13 +12,12 @@ import {
   resolveChamberPath,
   ConfirmSheet,
   showToast,
+  fetchEventCatalog,
 } from "@congress/congress-ui";
 import { fetchDirective, updateDirective, deleteDirective, runDirective } from "@/lib/api";
 import type { UpdateDirectiveRequest } from "../../../src/types";
-
-function intervalMsToMinutesInput(intervalMs: number | null | undefined): string {
-  return intervalMs != null ? String(Math.round(intervalMs / 60_000)) : "";
-}
+import { ScheduleEditor, EMPTY_SCHEDULE, type ScheduleDraft } from "@/components/ScheduleEditor";
+import { formatSchedule } from "@/lib/formatSchedule";
 
 export function DirectiveViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -29,13 +28,15 @@ export function DirectiveViewPage() {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draft, setDraft] = useState<UpdateDirectiveRequest>({});
-  const [intervalMinutesInput, setIntervalMinutesInput] = useState("");
+  const [schedule, setSchedule] = useState<ScheduleDraft>(EMPTY_SCHEDULE);
 
   const directiveQuery = useQuery({
     queryKey: ["directive", directiveId],
     queryFn: () => fetchDirective(directiveId),
     enabled: Number.isInteger(directiveId),
   });
+
+  const catalogQuery = useQuery({ queryKey: ["event-catalog"], queryFn: fetchEventCatalog, enabled: editing });
 
   const updateMutation = useMutation({
     mutationFn: (input: UpdateDirectiveRequest) => updateDirective(directiveId, input),
@@ -67,8 +68,16 @@ export function DirectiveViewPage() {
   useEffect(() => {
     if (directiveQuery.data && !editing) {
       const d = directiveQuery.data;
-      setDraft({ title: d.title, body: d.body, enabled: d.enabled, intervalMs: d.intervalMs });
-      setIntervalMinutesInput(intervalMsToMinutesInput(d.intervalMs));
+      setDraft({ title: d.title, body: d.body, enabled: d.enabled });
+      setSchedule({
+        scheduleType: d.scheduleType,
+        intervalMs: d.intervalMs,
+        scheduleHour: d.scheduleHour,
+        scheduleMinute: d.scheduleMinute,
+        scheduleDayOfWeek: d.scheduleDayOfWeek,
+        scheduleTimeZone: d.scheduleTimeZone,
+        triggerEventType: d.triggerEventType,
+      });
     }
   }, [directiveQuery.data, editing]);
 
@@ -77,10 +86,10 @@ export function DirectiveViewPage() {
   if (directiveQuery.isError || !directiveQuery.data) return <p className="font-mono text-sm text-alert">Directive not found.</p>;
 
   const directive = directiveQuery.data;
+  const scheduleLabel = formatSchedule(directive);
 
   function save() {
-    const intervalMs = intervalMinutesInput.trim() ? Number(intervalMinutesInput) * 60_000 : null;
-    updateMutation.mutate({ ...draft, intervalMs }, { onSuccess: () => setEditing(false) });
+    updateMutation.mutate({ ...draft, ...schedule }, { onSuccess: () => setEditing(false) });
   }
 
   function toggleEnabled() {
@@ -97,9 +106,12 @@ export function DirectiveViewPage() {
             className="w-full font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           />
         ) : (
-          <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
-            <span className={directive.enabled ? "" : "text-dust line-through"}>{directive.title}</span>
-          </h2>
+          <>
+            <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
+              <span className={directive.enabled ? "" : "text-dust line-through"}>{directive.title}</span>
+            </h2>
+            {scheduleLabel && <p className="mt-1 font-mono text-xs uppercase tracking-wide text-dust">{scheduleLabel}</p>}
+          </>
         )}
       </div>
 
@@ -149,18 +161,7 @@ export function DirectiveViewPage() {
               className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
               renderIcon={(chamber) => getChamberIcon(chamber)}
             />
-            <label className="mt-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-slate">
-              Run automatically every
-              <input
-                type="number"
-                min={1}
-                value={intervalMinutesInput}
-                onChange={(e) => setIntervalMinutesInput(e.target.value)}
-                placeholder="manual only"
-                className="w-24 border border-dust bg-parchment px-2 py-1 text-ink normal-case tracking-normal focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-              />
-              minutes (blank = play button only)
-            </label>
+            <ScheduleEditor value={schedule} onChange={setSchedule} eventCatalog={catalogQuery.data ?? []} eventCatalogLoading={catalogQuery.isLoading} />
           </>
         ) : directive.body ? (
           <ExhibitAnnotatedText

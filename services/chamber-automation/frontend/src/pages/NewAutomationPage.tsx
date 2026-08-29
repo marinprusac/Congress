@@ -11,11 +11,11 @@ import {
   resolveChamberPath,
   flushDraftConnections,
   FormErrorMessage,
+  fetchEventCatalog,
+  TriggerEventPicker,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createAutomation, fetchChamberTools } from "@/lib/api";
-import { fetchEventCatalog } from "@/lib/eventCatalog";
-import { TriggerEventPicker } from "@/components/TriggerEventPicker";
 import { ChamberToolPicker } from "@/components/ChamberToolPicker";
 import { ArgsEditor } from "@/components/ArgsEditor";
 

@@ -33,7 +33,7 @@ function formatEvents(events: EventLogEntry[]): string {
 }
 
 export interface PromptContext {
-  trigger: "chat" | "scheduled" | "manual";
+  trigger: "chat" | "scheduled" | "event" | "manual";
   chatMessage?: string;
   events?: EventLogEntry[];
   // The one directive this run is about - only set for "scheduled"/"manual"
@@ -63,6 +63,10 @@ export async function buildPrompt(ctx: PromptContext): Promise<string> {
   } else if (ctx.trigger === "scheduled") {
     parts.push(
       `## Scheduled run\nThis directive's own timer came due - handle it now, considering only this one directive. Consult your own journal (a note you maintain in Notes Chamber, if you keep one) to avoid repeating work you've already done. Events received since this directive last ran:\n${formatEvents(ctx.events ?? [])}`
+    );
+  } else if (ctx.trigger === "event") {
+    parts.push(
+      `## Event-triggered run\nThis directive's own trigger event just fired - handle it now, considering only this one directive. The triggering event:\n${formatEvents(ctx.events ?? [])}`
     );
   } else {
     parts.push(`## Manual run\nThe owner asked you to run this one directive right now, outside its normal schedule.`);

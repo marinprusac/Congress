@@ -1,10 +1,11 @@
-import { and, desc, eq, isNotNull, like, or } from "drizzle-orm";
+import { and, desc, eq, inArray, like, or } from "drizzle-orm";
 import type { DirectiveSummary, DirectiveDetail, CreateDirectiveRequest, UpdateDirectiveRequest } from "./types.js";
 import { extractOutgoingExhibitRefs, createManualRefsByExhibitId } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
 import { directives } from "./db/schema.js";
 import { toExhibitId, parseDirectiveId, pushExhibitSync } from "./exhibits.js";
 import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForDirective } from "./refs.js";
+import { nextRunAt as computeNextRunAt } from "./scheduling.js";
 
 // The set of Exhibits a directive points at is the union of what's embedded
 // in its body ("[[" tokens) and what was added explicitly via the
@@ -44,36 +45,60 @@ export async function resyncDirectiveExhibitByExhibitId(exhibitId: string): Prom
   if (id !== null) await resyncDirectiveExhibit(id);
 }
 
+// The periodic-timer schedule types - "event" is deliberately excluded
+// (see listEventTriggeredDirectives below): it never runs off this timer at
+// all, only off a received event matching its own triggerEventType.
+const TIMER_SCHEDULE_TYPES = ["interval", "daily", "weekly"] as const;
+
+function directiveNextRunAt(row: typeof directives.$inferSelect): number | null {
+  return computeNextRunAt(
+    {
+      scheduleType: row.scheduleType,
+      intervalMs: row.intervalMs,
+      scheduleHour: row.scheduleHour,
+      scheduleMinute: row.scheduleMinute,
+      scheduleDayOfWeek: row.scheduleDayOfWeek,
+      scheduleTimeZone: row.scheduleTimeZone,
+    },
+    row.lastRunAt ? row.lastRunAt.getTime() : null,
+    row.createdAt.getTime()
+  );
+}
+
 function toSummary(row: typeof directives.$inferSelect): DirectiveSummary {
+  const nextRunAtMs = directiveNextRunAt(row);
   return {
     id: row.id,
     title: row.title,
     body: row.body,
     enabled: row.enabled,
+    scheduleType: row.scheduleType,
     intervalMs: row.intervalMs,
+    scheduleHour: row.scheduleHour,
+    scheduleMinute: row.scheduleMinute,
+    scheduleDayOfWeek: row.scheduleDayOfWeek,
+    scheduleTimeZone: row.scheduleTimeZone,
+    triggerEventType: row.triggerEventType,
+    nextRunAt: nextRunAtMs !== null ? new Date(nextRunAtMs).toISOString() : null,
     lastRunAt: row.lastRunAt ? row.lastRunAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-// Every enabled directive with its own timer set - the pool checkup.ts's
-// scheduler picks due directives from and computes the next wake delay
-// against. Fetched into JS rather than done with SQL date arithmetic since
-// the directive count here is small (a personal system's own standing
-// instructions), not worth the query complexity.
+// Every enabled directive with its own periodic timer set - the pool
+// checkup.ts's scheduler picks due directives from and computes the next
+// wake delay against. Fetched into JS rather than done with SQL date
+// arithmetic since the directive count here is small (a personal system's
+// own standing instructions), not worth the query complexity - the
+// daily/weekly zoned-time math in particular has no clean SQL equivalent.
 async function listEnabledScheduledDirectives(): Promise<DirectiveSummary[]> {
   const rows = db
     .select()
     .from(directives)
-    .where(and(eq(directives.enabled, true), isNotNull(directives.intervalMs)))
+    .where(and(eq(directives.enabled, true), inArray(directives.scheduleType, TIMER_SCHEDULE_TYPES)))
     .all();
   return rows.map(toSummary);
-}
-
-function dueAt(d: DirectiveSummary): number {
-  const last = d.lastRunAt ? new Date(d.lastRunAt).getTime() : 0;
-  return last + (d.intervalMs as number);
 }
 
 // checkup.ts's tick() runs everything this returns, each as its own
@@ -81,7 +106,7 @@ function dueAt(d: DirectiveSummary): number {
 export async function listDueScheduledDirectives(): Promise<DirectiveSummary[]> {
   const now = Date.now();
   const rows = await listEnabledScheduledDirectives();
-  return rows.filter((d) => dueAt(d) <= now);
+  return rows.filter((d) => d.nextRunAt !== null && new Date(d.nextRunAt).getTime() <= now);
 }
 
 // Delay in ms until the soonest enabled+scheduled directive comes due, or
@@ -90,10 +115,24 @@ export async function listDueScheduledDirectives(): Promise<DirectiveSummary[]> 
 // the soonest deadline" idiom chamber-tasks uses for due-date checks.
 export async function nextScheduledWakeDelayMs(): Promise<number | null> {
   const rows = await listEnabledScheduledDirectives();
-  if (rows.length === 0) return null;
+  const dueTimes = rows.map((d) => (d.nextRunAt !== null ? new Date(d.nextRunAt).getTime() : null)).filter((t): t is number => t !== null);
+  if (dueTimes.length === 0) return null;
   const now = Date.now();
-  const soonest = Math.min(...rows.map(dueAt));
+  const soonest = Math.min(...dueTimes);
   return Math.max(0, soonest - now);
+}
+
+// Every enabled directive whose own scheduleType is "event" and whose
+// triggerEventType matches - eventReceive.ts calls this on every received
+// event to find which directives (if any) should fire immediately, bypassing
+// the periodic checkup timer entirely.
+export async function listEventTriggeredDirectives(eventType: string): Promise<DirectiveSummary[]> {
+  const rows = db
+    .select()
+    .from(directives)
+    .where(and(eq(directives.enabled, true), eq(directives.scheduleType, "event"), eq(directives.triggerEventType, eventType)))
+    .all();
+  return rows.map(toSummary);
 }
 
 // Stamped the moment a scheduled or manual run is kicked off, not when it
@@ -146,7 +185,13 @@ export async function createDirective(input: CreateDirectiveRequest): Promise<Di
       title: input.title,
       body: input.body,
       enabled: input.enabled,
+      scheduleType: input.scheduleType,
       intervalMs: input.intervalMs,
+      scheduleHour: input.scheduleHour,
+      scheduleMinute: input.scheduleMinute,
+      scheduleDayOfWeek: input.scheduleDayOfWeek,
+      scheduleTimeZone: input.scheduleTimeZone,
+      triggerEventType: input.triggerEventType,
       createdAt: now,
       updatedAt: now,
     })
@@ -162,14 +207,22 @@ export async function updateDirective(id: number, input: UpdateDirectiveRequest)
   const existing = db.select().from(directives).where(eq(directives.id, id)).get();
   if (!existing) return null;
 
+  // Every schedule field (scheduleType down through triggerEventType) can
+  // legitimately be set back to null (unschedule, or clear a companion
+  // field when switching schedule kinds), so an absent field (not sent at
+  // all) is what falls back to the existing value here - not `?? ` against
+  // null, same reasoning intervalMs alone used to carry on its own.
   const next = {
     title: input.title ?? existing.title,
     body: input.body ?? existing.body,
     enabled: input.enabled ?? existing.enabled,
-    // intervalMs can be legitimately set back to null (unschedule), so an
-    // absent field (not sent at all) is what falls back to the existing
-    // value here - not `?? ` against null.
+    scheduleType: input.scheduleType !== undefined ? input.scheduleType : existing.scheduleType,
     intervalMs: input.intervalMs !== undefined ? input.intervalMs : existing.intervalMs,
+    scheduleHour: input.scheduleHour !== undefined ? input.scheduleHour : existing.scheduleHour,
+    scheduleMinute: input.scheduleMinute !== undefined ? input.scheduleMinute : existing.scheduleMinute,
+    scheduleDayOfWeek: input.scheduleDayOfWeek !== undefined ? input.scheduleDayOfWeek : existing.scheduleDayOfWeek,
+    scheduleTimeZone: input.scheduleTimeZone !== undefined ? input.scheduleTimeZone : existing.scheduleTimeZone,
+    triggerEventType: input.triggerEventType !== undefined ? input.triggerEventType : existing.triggerEventType,
     updatedAt: new Date(),
   };
 

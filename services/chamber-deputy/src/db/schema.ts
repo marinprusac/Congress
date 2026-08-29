@@ -19,12 +19,38 @@ export const directives = sqliteTable("directives", {
   // Own schedule, separate from the free-text body (still not structurally
   // parsed - see the comment above): null means this directive only ever
   // runs on demand (play button) or as part of a chat bundle, never on its
-  // own timer. checkup.ts arms a single self-rescheduling timer for
-  // whichever enabled+scheduled directive's (lastRunAt + intervalMs) is
-  // soonest - the same "one timer for the soonest deadline" idiom
-  // chamber-tasks uses for due-date checks, just per-directive here instead
-  // of per-task.
+  // own timer or an event. "interval"/"daily"/"weekly" all still go through
+  // checkup.ts's single self-rescheduling timer, armed for whichever
+  // enabled+scheduled directive's own scheduling.ts#nextRunAt() is soonest -
+  // the same "one timer for the soonest deadline" idiom chamber-tasks uses
+  // for due-date checks, just per-directive here instead of per-task.
+  // "event" instead runs immediately off eventReceive.ts's own match
+  // against `triggerEventType`, never off this timer at all - see its own
+  // comment below.
+  scheduleType: text("schedule_type", { enum: ["interval", "daily", "weekly", "event"] }),
+  // "interval" only - every this-many-ms, anchored off lastRunAt (a never-
+  // run directive is due immediately). See scheduling.ts#nextRunAt.
   intervalMs: integer("interval_ms"),
+  // "daily"/"weekly" only - the wall-clock time of day to run at, read in
+  // `scheduleTimeZone` (captured from the owner's browser at creation time,
+  // not the server's own - the VPS this runs on has no fixed zone of its
+  // own and isn't necessarily the owner's). See scheduling.ts for the
+  // zoned-time math this feeds.
+  scheduleHour: integer("schedule_hour"),
+  scheduleMinute: integer("schedule_minute"),
+  // "weekly" only - 0 (Sunday) through 6 (Saturday), matching
+  // Date#getUTCDay()'s own convention (scheduling.ts relies on this).
+  scheduleDayOfWeek: integer("schedule_day_of_week"),
+  scheduleTimeZone: text("schedule_time_zone"),
+  // "event" only - one event type from the live cross-Chamber catalog
+  // (manifest.events, same TriggerEventPicker/fetchEventCatalog congress-ui
+  // already gives chamber-automation's own rule editor). eventReceive.ts
+  // fires this directive the instant a matching event arrives, bypassing
+  // the periodic checkup entirely - the "urgent fast path" the original
+  // plan doc described, rebuilt as an explicit per-directive subscription
+  // now that the payload.priority convention it used to key off no longer
+  // exists.
+  triggerEventType: text("trigger_event_type"),
   // Stamped the moment a scheduled or manual run for this directive is
   // kicked off (not when it finishes) - see checkup.ts/directives.ts -
   // so a slow `claude` invocation can't cause the next tick to re-fire the
@@ -87,8 +113,8 @@ export const deputySpend = sqliteTable(
 // settings row, Deputy has real owner-tunable knobs from day one (see
 // docs/deputy-chamber-plan.md §12): background context, chat behavior, the
 // budget cap, model choice, retention, and the pause/kill switch. Scheduling
-// is no longer a single global knob here - see directives.ts's own
-// intervalMs, one per directive.
+// is no longer a single global knob here - see each directive's own
+// scheduleType/intervalMs/etc above.
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
   contextPrompt: text("context_prompt").notNull().default(""),

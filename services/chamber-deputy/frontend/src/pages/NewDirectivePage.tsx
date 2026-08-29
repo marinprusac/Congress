@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ExhibitTextarea,
   ExhibitActionBar,
@@ -11,9 +11,11 @@ import {
   resolveChamberPath,
   flushDraftConnections,
   FormErrorMessage,
+  fetchEventCatalog,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createDirective } from "@/lib/api";
+import { ScheduleEditor, EMPTY_SCHEDULE, type ScheduleDraft } from "@/components/ScheduleEditor";
 
 // Mirrors DirectiveViewPage's editing state exactly (title input,
 // ExhibitTextarea, ExhibitLinksLayout with a live Connections panel) rather
@@ -27,13 +29,14 @@ export function NewDirectivePage() {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState(searchParams.get("name") ?? "");
   const [body, setBody] = useState("");
-  const [intervalMinutes, setIntervalMinutes] = useState("");
+  const [schedule, setSchedule] = useState<ScheduleDraft>(EMPTY_SCHEDULE);
   const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
+
+  const catalogQuery = useQuery({ queryKey: ["event-catalog"], queryFn: fetchEventCatalog });
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const intervalMs = intervalMinutes.trim() ? Number(intervalMinutes) * 60_000 : null;
-      const created = await createDirective({ title, body, enabled: true, intervalMs });
+      const created = await createDirective({ title, body, enabled: true, ...schedule });
       await flushDraftConnections(`directive-${created.id}`, draftConnections);
       return created;
     },
@@ -92,18 +95,7 @@ export function NewDirectivePage() {
           className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           renderIcon={(chamber) => getChamberIcon(chamber)}
         />
-        <label className="mt-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-slate">
-          Run automatically every
-          <input
-            type="number"
-            min={1}
-            value={intervalMinutes}
-            onChange={(e) => setIntervalMinutes(e.target.value)}
-            placeholder="manual only"
-            className="w-24 border border-dust bg-parchment px-2 py-1 text-ink normal-case tracking-normal focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-          />
-          minutes (blank = play button only)
-        </label>
+        <ScheduleEditor value={schedule} onChange={setSchedule} eventCatalog={catalogQuery.data ?? []} eventCatalogLoading={catalogQuery.isLoading} />
       </ExhibitLinksLayout>
     </article>
   );

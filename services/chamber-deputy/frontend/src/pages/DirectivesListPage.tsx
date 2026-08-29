@@ -15,6 +15,7 @@ import {
 import { fetchDirectives, fetchDirective, searchDirectives, runDirective, fetchRunningDirective } from "@/lib/api";
 import { DirectiveProgressRing } from "@/components/DirectiveProgressRing";
 import { directiveProgressFraction } from "@/lib/directiveProgress";
+import { formatSchedule } from "@/lib/formatSchedule";
 
 // Drives both the progress rings' live fill and how fresh the list itself
 // (lastRunAt/intervalMs) needs to be - short enough that a scheduled run
@@ -49,16 +50,6 @@ function PlayIcon({ className }: { className?: string }) {
       <path d="M6 4.5v15l13-7.5z" />
     </svg>
   );
-}
-
-// Minutes for a clean multiple of an hour/day, otherwise raw minutes - just
-// enough to make a directive's own schedule scannable in the list without a
-// full duration-formatting utility for what's always a short round number.
-function formatInterval(intervalMs: number): string {
-  const minutes = Math.round(intervalMs / 60_000);
-  if (minutes % 1440 === 0) return `every ${minutes / 1440}d`;
-  if (minutes % 60 === 0) return `every ${minutes / 60}h`;
-  return `every ${minutes}m`;
 }
 
 export function DirectivesListPage() {
@@ -120,7 +111,7 @@ export function DirectivesListPage() {
           !isError &&
           data?.map((directive) => {
             const running = runningDirectiveId === directive.id || (runMutation.isPending && runMutation.variables === directive.id);
-            const fraction = directiveProgressFraction(directive.lastRunAt, directive.intervalMs, now);
+            const fraction = directiveProgressFraction(directive.lastRunAt, directive.nextRunAt, directive.createdAt, now);
             return (
               <div key={directive.id} className="flex items-stretch gap-1 border-b border-dust">
                 <Link
@@ -132,7 +123,7 @@ export function DirectivesListPage() {
                   <div className="flex items-baseline justify-between gap-2">
                     <span className={`font-display text-lg ${directive.enabled ? "text-ink" : "text-dust line-through"}`}>{directive.title}</span>
                     <span className="flex shrink-0 items-center gap-2 font-mono text-xs text-dust">
-                      {directive.intervalMs != null && formatInterval(directive.intervalMs)}
+                      {formatSchedule(directive)}
                       {!directive.enabled && "disabled"}
                     </span>
                   </div>

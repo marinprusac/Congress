@@ -12,10 +12,10 @@ import {
   resolveChamberPath,
   ConfirmSheet,
   showToast,
+  fetchEventCatalog,
+  TriggerEventPicker,
 } from "@congress/congress-ui";
 import { fetchAutomation, updateAutomation, deleteAutomation, fetchAutomationRuns, fetchChamberTools } from "@/lib/api";
-import { fetchEventCatalog } from "@/lib/eventCatalog";
-import { TriggerEventPicker } from "@/components/TriggerEventPicker";
 import { ChamberToolPicker } from "@/components/ChamberToolPicker";
 import { ArgsEditor } from "@/components/ArgsEditor";
 import type { UpdateAutomationRequest } from "../../../src/types";
