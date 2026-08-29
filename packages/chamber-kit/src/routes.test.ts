@@ -288,6 +288,15 @@ describe("mountStaticFrontend", () => {
     expect(await res.text()).toContain("shell");
   });
 
+  it("falls back to the SPA shell for a navigation path whose last segment contains a dot", async () => {
+    // Regression: chamber-logs' /events/:eventType route (e.g.
+    // "tasks.due_soon") used to 404 on reload because the fallback treated
+    // any dot in the last segment as a static-asset request.
+    const res = await app.request("/events/tasks.due_soon");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("shell");
+  });
+
   it("caches content-hashed assets for a year", async () => {
     const res = await app.request("/assets/app-abc123.js");
     expect(res.status).toBe(200);

@@ -138,6 +138,12 @@ export function mountManualRefsRoutes(
 // only ever sets Last-Modified, so without this every one of these requests
 // was a full round trip (Caddy -> Congress -> the owning Chamber) for a
 // 304 at best.
+// Recognized static-asset extensions for the SPA-fallback check below -
+// deliberately a fixed allowlist, not "has a dot", since a route param
+// (an event type, a version string, ...) can legitimately contain one too.
+const STATIC_ASSET_EXTENSION =
+  /\.(js|mjs|css|map|json|html|ico|png|jpe?g|gif|svg|webp|avif|woff2?|ttf|eot|otf|wasm|txt|xml|webmanifest|br|gz|pdf)$/i;
+
 function cacheControlFor(path: string): string | undefined {
   if (path.includes("/assets/")) {
     return "public, max-age=31536000, immutable";
@@ -186,18 +192,21 @@ export function mountStaticFrontend(app: ChamberApp): void {
       root: "./frontend/public",
     })
   );
-  // Only a navigation-shaped miss (no file extension on the last path
-  // segment - "/settings", "/notes/n42", ...) falls back to the SPA shell.
-  // Anything that looks like a static asset request (remote-entry.js,
+  // Only a request that actually looks like a static asset (a recognized
+  // file extension on the last path segment - remote-entry.js,
   // vendor/react-query.js, a mistyped asset URL, ...) 404s instead of
   // silently getting index.html's markup back with a 200 - without this, a
   // build step that never ran (e.g. a skipped `build:vendor`) failed
   // completely silently: the browser got a 200 for a `.js` URL whose body
   // was actually index.html, which fails ES module parsing with no console
   // error and no failing network request pointing at the real cause.
+  // Deliberately an extension allowlist rather than "last segment contains
+  // a dot" - a route param can legitimately contain one (chamber-logs'
+  // /events/:eventType, e.g. "tasks.due_soon", used to 404 on reload
+  // because of exactly that).
   app.get("*", (c, next) => {
     const lastSegment = c.req.path.slice(c.req.path.lastIndexOf("/") + 1);
-    if (lastSegment.includes(".")) return next();
+    if (STATIC_ASSET_EXTENSION.test(lastSegment)) return next();
     return serveStatic({ path: "./frontend/dist/index.html" })(c, next);
   });
 }
