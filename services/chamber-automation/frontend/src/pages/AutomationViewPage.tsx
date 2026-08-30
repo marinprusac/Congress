@@ -35,6 +35,7 @@ export function AutomationViewPage() {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draft, setDraft] = useState<UpdateAutomationRequest>({});
+  const titleFieldRef = useRef<HTMLInputElement | null>(null);
 
   const automationQuery = useQuery({
     queryKey: ["automation", automationId],
@@ -106,6 +107,14 @@ export function AutomationViewPage() {
 
   const automation = automationQuery.data;
 
+  function editTitle() {
+    setEditing(true);
+    requestAnimationFrame(() => {
+      titleFieldRef.current?.focus();
+      titleFieldRef.current?.select();
+    });
+  }
+
   function save() {
     updateMutation.mutate(draft, { onSuccess: () => setEditing(false) });
   }
@@ -137,12 +146,18 @@ export function AutomationViewPage() {
       <div className="mb-6 border-b border-dust pb-4">
         {editing ? (
           <input
+            ref={titleFieldRef}
             value={draft.title ?? ""}
             onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-            className="w-full font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+            placeholder="Untitled"
+            className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           />
         ) : (
-          <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
+          <h2
+            className="flex min-w-0 cursor-text items-center gap-3 font-display text-3xl text-ink"
+            onClick={editTitle}
+            title="Click to edit"
+          >
             <span className={automation.enabled ? "" : "text-dust line-through"}>{automation.title}</span>
           </h2>
         )}
@@ -270,7 +285,7 @@ export function AutomationViewPage() {
           onChange={(value) => setDraft((d) => ({ ...d, body: value }))}
           minRows={8}
           placeholder="— No notes —"
-          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
+          className="w-full bg-parchment p-3 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onNavigate={(r) => navigateToExhibit("automation", r, navigate, shellHosted)}
         />

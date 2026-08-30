@@ -93,7 +93,7 @@ export function NewNotePage() {
           onChange={setContent}
           minRows={20}
           placeholder={"---\ntags: []\n---\nStart writing. Type @ to reference a note, event, or other Exhibit."}
-          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
+          className="w-full bg-parchment p-3 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onCreate={onCreateExhibit}
         />

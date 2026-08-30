@@ -157,7 +157,8 @@ export function EventForm({
           value={values.location}
           onChange={(newValue) => set("location", newValue)}
           readOnly={readOnly}
-          className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink focus-within:outline-none"
+          placeholder="Location (optional)"
+          className="w-full border border-dust bg-parchment px-3 py-2 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
         />
       </div>
@@ -169,7 +170,8 @@ export function EventForm({
           onChange={(newValue) => set("description", newValue)}
           readOnly={readOnly}
           minRows={4}
-          className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink focus-within:outline-none"
+          placeholder="Description (optional), @ to reference an Exhibit"
+          className="w-full bg-parchment px-3 py-2 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
         />
       </div>

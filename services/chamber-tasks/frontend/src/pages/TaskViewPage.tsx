@@ -29,6 +29,7 @@ export function TaskViewPage() {
   const [draftName, setDraftName] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
   const [draftDueDate, setDraftDueDate] = useState("");
+  const titleFieldRef = useRef<HTMLInputElement | null>(null);
 
   const taskQuery = useQuery({
     queryKey: ["task", taskId],
@@ -88,6 +89,14 @@ export function TaskViewPage() {
     return result;
   }
 
+  function editTitle() {
+    setEditing(true);
+    requestAnimationFrame(() => {
+      titleFieldRef.current?.focus();
+      titleFieldRef.current?.select();
+    });
+  }
+
   function save() {
     updateMutation.mutate(
       { name: draftName, description: draftDescription, dueDate: draftDueDate || null },
@@ -110,12 +119,18 @@ export function TaskViewPage() {
       <div className="mb-6 border-b border-dust pb-4">
         {editing ? (
           <input
+            ref={titleFieldRef}
             value={draftName}
             onChange={(e) => setDraftName(e.target.value)}
-            className="w-full font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+            placeholder="Untitled"
+            className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           />
         ) : (
-          <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
+          <h2
+            className="flex min-w-0 cursor-text items-center gap-3 font-display text-3xl text-ink"
+            onClick={editTitle}
+            title="Click to edit"
+          >
             <span className={task.completed ? "line-through text-dust" : ""}>{task.name}</span>
           </h2>
         )}
@@ -187,7 +202,7 @@ export function TaskViewPage() {
           onChange={setDraftDescription}
           minRows={12}
           placeholder="— No description —"
-          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
+          className="w-full bg-parchment p-3 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onNavigate={(r) => navigateToExhibit("tasks", r, navigate, shellHosted)}
           onCreate={onCreateExhibit}

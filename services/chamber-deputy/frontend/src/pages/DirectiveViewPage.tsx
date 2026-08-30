@@ -28,6 +28,7 @@ export function DirectiveViewPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draft, setDraft] = useState<UpdateDirectiveRequest>({});
   const [schedule, setSchedule] = useState<ScheduleDraft>(EMPTY_SCHEDULE);
+  const titleFieldRef = useRef<HTMLInputElement | null>(null);
 
   const directiveQuery = useQuery({
     queryKey: ["directive", directiveId],
@@ -93,6 +94,14 @@ export function DirectiveViewPage() {
   const directive = directiveQuery.data;
   const scheduleLabel = formatSchedule(directive);
 
+  function editTitle() {
+    setEditing(true);
+    requestAnimationFrame(() => {
+      titleFieldRef.current?.focus();
+      titleFieldRef.current?.select();
+    });
+  }
+
   function save() {
     updateMutation.mutate({ ...draft, ...schedule }, { onSuccess: () => setEditing(false) });
   }
@@ -123,13 +132,19 @@ export function DirectiveViewPage() {
       <div className="mb-6 border-b border-dust pb-4">
         {editing ? (
           <input
+            ref={titleFieldRef}
             value={draft.title ?? ""}
             onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-            className="w-full font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+            placeholder="Untitled"
+            className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           />
         ) : (
           <>
-            <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
+            <h2
+              className="flex min-w-0 cursor-text items-center gap-3 font-display text-3xl text-ink"
+              onClick={editTitle}
+              title="Click to edit"
+            >
               <span className={directive.enabled ? "" : "text-dust line-through"}>{directive.title}</span>
             </h2>
             {scheduleLabel && <p className="mt-1 font-mono text-xs uppercase tracking-wide text-dust">{scheduleLabel}</p>}
@@ -179,7 +194,7 @@ export function DirectiveViewPage() {
           onChange={(value) => setDraft((d) => ({ ...d, body: value }))}
           minRows={10}
           placeholder="— No instructions —"
-          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
+          className="w-full bg-parchment p-3 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onNavigate={(r) => navigateToExhibit("deputy", r, navigate, shellHosted)}
         />

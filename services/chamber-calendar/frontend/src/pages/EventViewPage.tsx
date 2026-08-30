@@ -67,7 +67,22 @@ export function EventViewPage() {
   return (
     <section>
       <div className="mb-6 border-b border-dust pb-4">
-        <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
+        <h2
+          className={`flex min-w-0 items-center gap-3 font-display text-3xl text-ink${event.editable ? " cursor-text" : ""}`}
+          onClick={
+            event.editable
+              ? () =>
+                  navigate(
+                    resolveChamberPath(
+                      `/e/${event.accountId}/${encodeURIComponent(event.calendarId)}/${encodeURIComponent(event.id)}/edit`,
+                      "calendar",
+                      shellHosted
+                    )
+                  )
+              : undefined
+          }
+          title={event.editable ? "Click to edit" : undefined}
+        >
           {event.title}
         </h2>
       </div>

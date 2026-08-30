@@ -96,7 +96,7 @@ export function UploadDocumentPage() {
           onChange={setDescription}
           minRows={8}
           placeholder="Description (optional), @ to reference an Exhibit"
-          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
+          className="w-full bg-parchment p-3 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
         />
       </ExhibitLinksLayout>

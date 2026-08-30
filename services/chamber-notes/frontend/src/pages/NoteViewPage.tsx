@@ -181,7 +181,8 @@ export function NoteViewPage() {
         <input
           value={draftTitle}
           onChange={(e) => setDraftTitle(e.target.value)}
-          className="w-full font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          placeholder="Untitled"
+          className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
         />
       </div>
 
@@ -237,7 +238,8 @@ export function NoteViewPage() {
           value={draftContent}
           onChange={setDraftContent}
           minRows={20}
-          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
+          placeholder="Start writing. Type @ to reference a note, event, or other Exhibit."
+          className="w-full bg-parchment p-3 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onNavigate={(r) => navigateToExhibit("notes", r, navigate, shellHosted)}
           onCreate={onCreateExhibit}

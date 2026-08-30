@@ -32,6 +32,7 @@ export function PlaceViewPage() {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draft, setDraft] = useState<UpdatePlaceRequest>({});
+  const titleFieldRef = useRef<HTMLInputElement | null>(null);
 
   const placeQuery = useQuery({
     queryKey: ["place", placeId],
@@ -82,6 +83,14 @@ export function PlaceViewPage() {
     return result;
   }
 
+  function editTitle() {
+    setEditing(true);
+    requestAnimationFrame(() => {
+      titleFieldRef.current?.focus();
+      titleFieldRef.current?.select();
+    });
+  }
+
   function save() {
     updateMutation.mutate(draft, { onSuccess: () => setEditing(false) });
   }
@@ -99,12 +108,18 @@ export function PlaceViewPage() {
       <div className="mb-6 border-b border-dust pb-4">
         {editing ? (
           <input
+            ref={titleFieldRef}
             value={draft.name ?? ""}
             onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-            className="w-full font-display text-3xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+            placeholder="Untitled"
+            className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           />
         ) : (
-          <h2 className="flex min-w-0 items-center gap-3 font-display text-3xl text-ink">
+          <h2
+            className="flex min-w-0 cursor-text items-center gap-3 font-display text-3xl text-ink"
+            onClick={editTitle}
+            title="Click to edit"
+          >
             <span>{place.name}</span>
           </h2>
         )}
@@ -175,7 +190,7 @@ export function PlaceViewPage() {
           onChange={(value) => setDraft((d) => ({ ...d, body: value }))}
           minRows={8}
           placeholder="— No notes —"
-          className="w-full border border-dust bg-parchment p-3 font-mono text-base text-ink focus-within:outline-none"
+          className="w-full bg-parchment p-3 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
           onNavigate={(r) => navigateToExhibit("map", r, navigate, shellHosted)}
           onCreate={onCreateExhibit}
