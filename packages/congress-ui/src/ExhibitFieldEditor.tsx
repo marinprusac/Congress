@@ -68,7 +68,7 @@ export function ExhibitFieldEditor({
         className={className}
         style={minRows ? { minHeight: `calc(${minRows} * 1.6em)` } : undefined}
       />
-      {!readOnly && <ExhibitPickerDropdown picker={picker} renderIcon={renderIcon} className="exhibit-picker-dropdown docked-sheet" />}
+      {!readOnly && <ExhibitPickerDropdown picker={picker} renderIcon={renderIcon} className="exhibit-picker-dropdown" />}
     </div>
   );
 }

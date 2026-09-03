@@ -65,29 +65,43 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
 
   const { results, loading } = useExhibitSearch(trigger?.query ?? "", trigger !== null && !readOnly);
 
-  // The "@" anchor's own position never moves while the query after it keeps
-  // changing, so this only re-measures (a real DOM layout read, via CM6's
-  // own coordsAtPos) when triggerStart itself changes - a new trigger
-  // opening, or the caret jumping to a different existing one - mirroring
-  // the old useExhibitPicker's identical optimization. This must run
-  // outside CM6's own update cycle (a plain React effect, not from inside
-  // the trigger-detection ViewPlugin) - CM6 throws if layout is read
-  // synchronously from inside a ViewPlugin's update().
+  // The "@" anchor's own position only *changes* (a real DOM layout read,
+  // via CM6's own coordsAtPos) when triggerStart itself changes - a new
+  // trigger opening, or the caret jumping to a different existing one -
+  // mirroring the old useExhibitPicker's identical optimization; a re-
+  // measure on plain scroll/resize below is cheap in comparison and keeps
+  // the dropdown honest about where the caret currently sits on screen
+  // while it stays open through either. This must run outside CM6's own
+  // update cycle (a plain React effect, not from inside the trigger-
+  // detection ViewPlugin) - CM6 throws if layout is read synchronously from
+  // inside a ViewPlugin's update(). Client/viewport coordinates (exactly
+  // what coordsAtPos already returns - CM6 doesn't offset these to the
+  // editor's own DOM node), not editor-relative ones: ExhibitPickerDropdown
+  // positions itself with `position: fixed` against these directly, so it
+  // can float freely above or below the caret's own line and clamp itself
+  // against the real screen edges/keyboard, the same as any other viewport-
+  // anchored overlay in this app.
   const triggerStart = trigger?.triggerStart ?? null;
-  const [caretPosition, setCaretPosition] = useState<{ top: number; left: number } | null>(null);
+  const [caretPosition, setCaretPosition] = useState<{ top: number; bottom: number; left: number } | null>(null);
   useEffect(() => {
     const view = viewRef.current;
     if (!view || triggerStart === null) {
       setCaretPosition(null);
       return;
     }
-    const coords = view.coordsAtPos(triggerStart);
-    if (!coords) {
-      setCaretPosition(null);
-      return;
+    function measure() {
+      const coords = view!.coordsAtPos(triggerStart!);
+      setCaretPosition(coords ? { top: coords.top, bottom: coords.bottom, left: coords.left } : null);
     }
-    const editorRect = view.dom.getBoundingClientRect();
-    setCaretPosition({ top: coords.bottom - editorRect.top, left: coords.left - editorRect.left });
+    measure();
+    // Capture phase so a scroll on any ancestor scroll container (not just
+    // the window/document) is caught too.
+    window.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("scroll", measure, true);
+      window.removeEventListener("resize", measure);
+    };
   }, [triggerStart]);
 
   const trimmedQuery = (trigger?.query ?? "").trim();

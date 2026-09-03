@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { useKeyboardInset } from "./useKeyboardInset.js";
 
@@ -18,10 +18,10 @@ export interface ExhibitPickerState {
   creating: boolean;
   createError: string | null;
   createNew: () => void;
-  // Anchor point for the dropdown, relative to the .exhibit-field wrapper -
-  // consumed only by the desktop CSS rule (see shared.css), which is caret-
-  // anchored; the mobile rule stays fixed-to-viewport and ignores this.
-  caretPosition: { top: number; left: number } | null;
+  // Client/viewport coordinates (exactly what CM6's own coordsAtPos
+  // returns) of the "[[" trigger's own line - the one anchor placePicker
+  // below positions this dropdown against, on every viewport size.
+  caretPosition: { top: number; bottom: number; left: number } | null;
 }
 
 interface ExhibitPickerDropdownProps {
@@ -30,10 +30,52 @@ interface ExhibitPickerDropdownProps {
   className?: string;
 }
 
-// Positioned by CSS as a viewport-anchored overlay (not caret-positioned) -
-// the textarea keeps focus throughout, so keyboard nav (handled in
-// useExhibitPicker) and click selection both work regardless of where this
-// renders.
+const GAP_PX = 6; // clearance between the caret's own line and the popup
+const MARGIN_PX = 8; // never closer than this to any viewport edge
+const WIDTH_PX = 320; // compact, fixed - never the full screen width
+const MAX_HEIGHT_PX = 280; // compact, Obsidian-sized - not a half-screen sheet
+const MIN_HEIGHT_PX = 88; // never shrunk tighter than this, even on the cramped side
+const PREFERRED_BELOW_PX = 160; // "enough room below" - skip flipping above it
+
+// Where to place the popup relative to the caret it's anchored to: below by
+// default (reading order, and where the on-screen keyboard already isn't),
+// flipped above only when below is genuinely cramped and above has more
+// room to offer - the same rule Obsidian's own "[[" picker uses, so the
+// line being written is never covered by its own picker and the picker
+// itself is never clipped by a screen edge or the keyboard. Pure position:
+// fixed math against the caret's own viewport coordinates (already
+// keyboard-exclusive - the caret can't sit under the keyboard while it's
+// being typed into, and the browser keeps it scrolled into view) rather
+// than a measure-then-reposition render pass, so there's no first-frame
+// flicker while this settles - `max-height` + the dropdown's own
+// `overflow-y: auto` do the rest for however many results actually render
+// short of that.
+function placePicker(
+  caret: { top: number; bottom: number; left: number },
+  keyboardInset: number
+): CSSProperties {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const usableBottom = viewportHeight - keyboardInset;
+
+  const width = Math.min(WIDTH_PX, Math.max(0, viewportWidth - MARGIN_PX * 2));
+  const left = Math.min(Math.max(caret.left, MARGIN_PX), Math.max(MARGIN_PX, viewportWidth - width - MARGIN_PX));
+
+  const spaceBelow = usableBottom - caret.bottom - GAP_PX;
+  const spaceAbove = caret.top - GAP_PX - MARGIN_PX;
+  const below = spaceBelow >= PREFERRED_BELOW_PX || spaceBelow >= spaceAbove;
+  const maxHeight = Math.max(MIN_HEIGHT_PX, Math.min(MAX_HEIGHT_PX, below ? spaceBelow : spaceAbove));
+
+  return below
+    ? { top: caret.bottom + GAP_PX, left, width, maxHeight }
+    : { bottom: viewportHeight - caret.top + GAP_PX, left, width, maxHeight };
+}
+
+// Positioned by placePicker as a caret-anchored overlay (position: fixed
+// applies its own top/bottom/left/width/maxHeight inline, per-render) - the
+// editor keeps focus throughout, so keyboard nav (handled in
+// useExhibitEditorCore) and click selection both work regardless of where
+// this renders.
 //
 // Always renders its container, toggling only the `hidden` attribute -
 // mounting/unmounting this DOM node exactly when "[[" is typed was enough to
@@ -42,23 +84,14 @@ interface ExhibitPickerDropdownProps {
 // happening right as the focused element changes.
 export function ExhibitPickerDropdown({ picker, renderIcon, className }: ExhibitPickerDropdownProps) {
   const keyboardInset = useKeyboardInset();
-
-  const style: Record<string, string> = {};
-  if (keyboardInset > 0) style.bottom = `calc(0.5rem + ${keyboardInset}px)`;
-  // Consumed only by the desktop rule (see styles.css) - the mobile rule
-  // stays fixed-to-viewport and ignores these, since a caret-relative
-  // position makes no sense once the picker sits above the keyboard.
-  if (picker.caretPosition) {
-    style["--picker-caret-top"] = `${picker.caretPosition.top}px`;
-    style["--picker-caret-left"] = `${picker.caretPosition.left}px`;
-  }
+  const style = picker.caretPosition ? placePicker(picker.caretPosition, keyboardInset) : undefined;
 
   return (
     <div
       className={className}
       role="listbox"
       hidden={!picker.open}
-      style={Object.keys(style).length > 0 ? style : undefined}
+      style={style}
     >
       {picker.loading && picker.results.length === 0 && (
         <div className="exhibit-picker-empty">Searching —</div>

@@ -6,14 +6,15 @@ import { useEffect, useRef, useState } from "react";
 // own edge-swipe-back recognizer - see that comment for why this is still
 // worth keeping as a distinct, narrower zone even now that opening also
 // works from anywhere (below).
-const EDGE_ZONE_PX = 24;
+const EDGE_ZONE_PX = 32;
 // Below this, a horizontal drag is still ambiguous with normal touch jitter
 // (a slightly-off-axis tap, a finger settling before a vertical scroll) -
 // only once a from-anywhere drag clears this many px horizontally do we
 // treat it as a deliberate swipe and start stealing the touch sequence.
 // The dedicated edge zone above skips this - starting a drag that close to
-// the edge is already unambiguous intent.
-const ANYWHERE_COMMIT_PX = 12;
+// the edge is already unambiguous intent. Kept low so a from-anywhere open
+// commits almost as readily as the dedicated edge zone does.
+const ANYWHERE_COMMIT_PX = 8;
 
 // Whether a from-anywhere touch should be left alone rather than tracked as
 // a candidate nav-panel-open swipe: an element that opted out explicitly
@@ -42,13 +43,21 @@ function isNavSwipeIgnored(target: EventTarget | null): boolean {
 // Matches `min(80vw, 18rem)` in styles.css's `.nav-panel-mobile` - used only
 // before the panel has ever been measured (its ref not attached yet).
 const PANEL_WIDTH_FALLBACK_PX = 288;
-// Fraction of the panel's own width the finger has to have dragged past,
-// at release, for the gesture to resolve to "open" (or stay open) rather
-// than snap back - the standard drawer/bottom-sheet heuristic, and why this
-// replaces the old fixed-pixel open/close thresholds now that the panel
-// tracks the finger continuously instead of jumping the instant a fixed
-// distance is crossed.
-const SNAP_OPEN_RATIO = 0.5;
+// Fraction of the panel's own width the finger has to have dragged past, at
+// release, for a from-closed drag to resolve to "open" rather than snap
+// back - the standard drawer/bottom-sheet heuristic, and why this replaces
+// the old fixed-pixel open threshold now that the panel tracks the finger
+// continuously instead of jumping the instant a fixed distance is crossed.
+// Deliberately well under half: opening is the gesture used constantly (no
+// other trigger exists for it - see NavPanel's own top comment), so a short,
+// easy flick should be enough; accidentally closing an open panel is the
+// rarer, more costly mistake (it takes another full gesture, or a tap on
+// Settings/a Chamber, to reopen), so CLOSE_SNAP_RATIO below stays at the
+// standard halfway point instead of matching this.
+const OPEN_SNAP_RATIO = 0.3;
+// Same idea, for a from-open drag (closing) - see OPEN_SNAP_RATIO above for
+// why this is deliberately higher.
+const CLOSE_SNAP_RATIO = 0.5;
 
 // Mobile-only off-canvas open/close state for NavPanel, driven by a
 // right-swipe to open - from the screen's left edge reliably, or from
@@ -70,7 +79,7 @@ const SNAP_OPEN_RATIO = 0.5;
 // directly by an inline style that follows the finger 1:1, instead of
 // jumping to fully open/closed the moment a threshold is crossed - `open`
 // itself only updates once, on release, based on which side of
-// `SNAP_OPEN_RATIO` the finger ended up on.
+// `OPEN_SNAP_RATIO`/`CLOSE_SNAP_RATIO` the finger ended up on.
 export function useNavPanelSwipe(): {
   open: boolean;
   // translateX value (px, <= 0) for the panel while actively dragging; null
@@ -117,11 +126,21 @@ export function useNavPanelSwipe(): {
   useEffect(() => {
     // A non-passive touchmove listener tells the browser it may call
     // preventDefault, which forces the compositor to wait for this handler
-    // before it can scroll *anything* in the app - not just this gesture.
-    // Registered only for the lifetime of a qualifying drag (added once
-    // onTouchStart accepts it, removed on release) instead of for the
-    // whole mounted lifetime of this hook, so every other scroll in the app
-    // stays compositor-only the rest of the time.
+    // before it can scroll *anything* in the app - not just this gesture,
+    // and not just when preventDefault is actually called: merely being
+    // non-passive is enough to push Safari off the async/compositor
+    // scrolling path onto its slow main-thread one for as long as the
+    // listener is attached, which visibly desyncs any position: fixed
+    // chrome (a bottom search bar, say) from the viewport mid-scroll until
+    // the gesture ends and it snaps back - confirmed live as exactly this
+    // symptom on ordinary list pages, not just while an actual nav-swipe was
+    // in progress. So this stays passive (free - Safari keeps the fast
+    // path) for as long as a touch's horizontal-vs-vertical intent is still
+    // ambiguous, and only upgrades to non-passive - see the addEventListener
+    // call inside onTouchMove below - once it actually commits to being a
+    // horizontal nav-swipe rather than an ordinary scroll. Removed on
+    // release either way (stopTracking), not held for the whole mounted
+    // lifetime of this hook.
     function stopTracking() {
       window.removeEventListener("touchmove", onTouchMove);
       endDrag();
@@ -139,14 +158,15 @@ export function useNavPanelSwipe(): {
       startRef.current = { x: touch.clientX, y: touch.clientY };
       trackingRef.current = true;
       panelWidthRef.current = panelElRef.current?.getBoundingClientRect().width || PANEL_WIDTH_FALLBACK_PX;
-      window.addEventListener("touchmove", onTouchMove, { passive: false });
       // Closing an open panel, or opening right from the edge, is
       // unambiguous the instant the touch lands - commit immediately rather
       // than waiting for movement like the from-anywhere case below does.
-      // This only decides how far updateDrag's baseline tracking starts
-      // from, not whether to preventDefault - see below for why those two
-      // are kept separate.
+      // This also decides whether the listener below can start passive (the
+      // ordinary from-anywhere case, still ambiguous) or has to start
+      // non-passive right away (these two cases, which already know they're
+      // stealing the gesture).
       committedRef.current = !closed || inEdgeZone;
+      window.addEventListener("touchmove", onTouchMove, { passive: !committedRef.current });
       if (committedRef.current) {
         updateDrag(openRef.current ? panelWidthRef.current : 0);
       }
@@ -213,7 +233,10 @@ export function useNavPanelSwipe(): {
       // it on the next unrelated tap anywhere on screen.
       if (trackingRef.current && committedRef.current) {
         const width = panelWidthRef.current;
-        setOpen(width > 0 && offsetRef.current / width > SNAP_OPEN_RATIO);
+        // openRef.current still reflects the state this drag started from -
+        // setOpen below is the first thing that can change it.
+        const threshold = openRef.current ? CLOSE_SNAP_RATIO : OPEN_SNAP_RATIO;
+        setOpen(width > 0 && offsetRef.current / width > threshold);
       }
       stopTracking();
     }

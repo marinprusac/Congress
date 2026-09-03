@@ -53,7 +53,7 @@ export function ExhibitInlineField({
   return (
     <div className={wrapperClassName}>
       <div ref={containerRef} className={className} />
-      {!readOnly && <ExhibitPickerDropdown picker={picker} renderIcon={renderIcon} className="exhibit-picker-dropdown docked-sheet" />}
+      {!readOnly && <ExhibitPickerDropdown picker={picker} renderIcon={renderIcon} className="exhibit-picker-dropdown" />}
     </div>
   );
 }

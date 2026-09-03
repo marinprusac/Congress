@@ -259,16 +259,6 @@
   white-space: nowrap;
 }
 
-/* Pinned above Settings at the bottom of the desktop sidebar (margin-top:
-   auto pushes both it and Settings down regardless of how long the
-   Chambers list above is) - keeps Settings visually apart from the
-   reorderable list rather than leading it. */
-.nav-panel-divider {
-  height: 1px;
-  margin: auto 0.5rem 0.75rem;
-  background-color: var(--color-dust);
-}
-
 .nav-panel-chambers,
 .nav-panel-mobile-chambers {
   display: flex;
@@ -283,10 +273,6 @@
 .nav-panel-search {
   flex-shrink: 0;
   margin-bottom: 1rem;
-}
-
-.nav-panel-search--mobile {
-  margin-bottom: 0.75rem;
 }
 
 .nav-panel-desktop {
@@ -337,6 +323,15 @@
   .capitol-shell,
   .chamber-host-unavailable {
     padding-left: calc(var(--chamber-picker-width) + env(safe-area-inset-left));
+  }
+
+  /* Pins Settings to the bottom of the sidebar without a divider line -
+     margin-top: auto consumes the remaining space in .nav-panel-desktop's
+     own flex column, same effect the old .nav-panel-divider's own
+     margin: auto had, just without a visible rule between it and the
+     Chambers list above. */
+  .nav-panel-desktop .nav-panel-link--settings {
+    margin-top: auto;
   }
 }
 
@@ -394,38 +389,35 @@
     transform: translateX(0);
   }
 
-  .nav-panel-mobile-top {
-    display: flex;
-    align-items: center;
-    gap: 1.25rem;
-    padding-bottom: 0.75rem;
-    margin-bottom: 0.75rem;
-    border-bottom: 1px solid var(--color-dust);
-  }
-
-  .nav-panel-close {
-    margin-left: auto;
-    display: flex;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    font-size: 1.4rem;
-    line-height: 1;
-    color: var(--color-dust);
-  }
-
-  /* Anchored to the panel's own bottom, not appended after Capitol/
-     Settings above - see this block's own top comment. */
+  /* Fills the panel above the bottom row below, so that row (Settings +
+     search) stays pinned to the panel's own bottom edge - see this block's
+     own top comment - regardless of how long the Chambers list is. */
   .nav-panel-mobile-chambers {
-    margin-top: auto;
+    flex: 1 1 auto;
     overflow-y: auto;
   }
 
   .nav-panel-mobile .nav-panel-link {
     font-size: 0.95rem;
     padding: 0.65rem 0.5rem;
+  }
+
+  /* Settings + search share one row at the very bottom of the panel, both
+     within one-handed thumb reach the instant it opens - no divider line
+     against the Chambers list above, just the gap this row's own
+     margin-top contributes once the Chambers list stops growing. */
+  .nav-panel-mobile-bottom {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+    margin-top: 0.75rem;
+  }
+
+  .nav-panel-mobile-bottom .nav-panel-search {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-bottom: 0;
   }
 }
 
@@ -743,14 +735,6 @@
   }
 }
 
-/* The field wrapper every [[ picker call site wraps its <textarea> +
-   <ExhibitPickerDropdown> in - gives the desktop rule below a positioning
-   anchor so the picker can render right under the field instead of pinned
-   to the viewport. */
-.exhibit-field {
-  position: relative;
-}
-
 .exhibit-action-bar {
   display: flex;
   align-items: center;
@@ -792,48 +776,21 @@
   }
 }
 
-/* Mobile default: fixed to the viewport, not positioned relative to the
-   textarea - a textarea can be far taller than the screen on mobile, which
-   left an earlier textarea-relative version rendered off-screen below the
-   fold, and it also sits above an on-screen keyboard this way. */
+/* Caret-anchored on every viewport size - top/bottom/left/width/max-height
+   all come from placePicker's inline style (ExhibitPickerDropdown.tsx),
+   computed fresh from the caret's own current viewport coordinates against
+   whichever side (above or below its line) actually has room, and clamped
+   to stay clear of the screen edges and any on-screen keyboard. This rule
+   only supplies what doesn't vary by placement: compact and floating
+   (never a full-width docked sheet), scrolling internally past its own
+   max-height rather than growing past it. */
 .exhibit-picker-dropdown {
   position: fixed;
-  left: 0.5rem;
-  right: 0.5rem;
-  /* --mobile-nav-height is never actually set anymore (NavPanel's mobile
-     variant is an off-canvas overlay, not persistent chrome reserving its
-     own space) - kept as a fallback-only var rather than a bare 0.5rem in
-     case that ever changes again, not because anything sets it today. */
-  bottom: calc(var(--mobile-nav-height, 0px) + 0.5rem);
   z-index: 50;
-  max-height: 40vh;
   overflow-y: auto;
   border: 1px solid var(--color-dust);
   background-color: var(--color-parchment);
-  box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
-}
-
-/* Desktop: no on-screen keyboard to dodge, but the field itself is often
-   far taller than the viewport (a long note auto-resizes to its full
-   content height) - anchoring under the *field* (top: 100%) put this
-   however many screens below the fold the field's bottom edge happened to
-   be, nowhere near the caret the user was actually typing at. --picker-
-   caret-top/-left (set inline by ExhibitPickerDropdown from
-   useExhibitPicker's caret-coordinate measurement) anchor it to the caret
-   itself instead; the top:100%/left:0 fallbacks only apply before the
-   first measurement or for a field this hook doesn't track. */
-@media (min-width: 641px) {
-  .exhibit-picker-dropdown {
-    position: absolute;
-    left: var(--picker-caret-left, 0);
-    right: auto;
-    top: var(--picker-caret-top, 100%);
-    bottom: auto;
-    width: min(22rem, calc(100% - var(--picker-caret-left, 0px)));
-    margin-top: 0;
-    max-height: 20rem;
-    box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 15%, transparent);
-  }
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 20%, transparent);
 }
 
 .exhibit-picker-dropdown[hidden] {

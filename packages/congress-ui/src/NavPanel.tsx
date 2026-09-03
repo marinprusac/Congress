@@ -185,12 +185,15 @@ function ChamberRow({
 // on desktop; on mobile, an off-canvas panel opened by swiping right from
 // the screen's left edge (useNavPanelSwipe) rather than a persistent bottom
 // bar, since that no longer leaves comfortable room for a reorderable list
-// or a Settings entry. The Chambers list is reorderable by long-press-and-
-// drag (useReorderableList, persisted per-device via useChamberOrder);
-// Settings isn't a Chamber and isn't part of that list, so it sits apart
-// from it (bottom of the sidebar on desktop, top of the panel on mobile)
-// rather than beside it. On mobile the Chambers list itself is anchored to
-// the bottom of the panel for one-handed thumb reach - it's the one part of
+// or a Settings entry - there's no separate open/close button either, the
+// swipe gesture is the only trigger. The Chambers list is reorderable by
+// long-press-and-drag (useReorderableList, persisted per-device via
+// useChamberOrder); Settings isn't a Chamber and isn't part of that list,
+// so it sits apart from it - pinned to the bottom of the sidebar on desktop
+// (no divider line, just margin-driven spacing - see .nav-panel-desktop
+// .nav-panel-link--settings in shared.css), and grouped with the search bar
+// in one bottom row on mobile, both within comfortable one-handed thumb
+// reach along with the Chambers list above them, which is the one part of
 // this panel used constantly. Desktop and mobile each get their own
 // useReorderableList instance (own row-ref bookkeeping) even though both
 // read/write the same underlying order - only one variant is ever on-screen
@@ -255,7 +258,6 @@ export function NavPanel({ current, currentLabel }: NavPanelProps) {
           className="nav-panel-search"
         />
         <div className="nav-panel-chambers">{renderChamberRows("desktop")}</div>
-        <div className="nav-panel-divider" />
         <SettingsRow current={current} to={settingsTo} shellHosted={shellHosted} onNavigate={close} variant="desktop" />
       </nav>
 
@@ -275,22 +277,19 @@ export function NavPanel({ current, currentLabel }: NavPanelProps) {
         ref={panelRef}
         style={dragOffsetPx !== null ? { transform: `translateX(${dragOffsetPx}px)`, transition: "none" } : undefined}
       >
-        <div className="nav-panel-mobile-top">
-          <SettingsRow current={current} to={settingsTo} shellHosted={shellHosted} onNavigate={close} variant="mobile" />
-          <button type="button" className="nav-panel-close" onClick={close} aria-label="Close navigation">
-            ×
-          </button>
-        </div>
-        <GlobalExhibitSearch
-          ownChamber={searchOwnChamber}
-          navigate={(path) => {
-            navigate(path);
-            close();
-          }}
-          renderIcon={getChamberIcon}
-          className="nav-panel-search nav-panel-search--mobile"
-        />
         <div className="nav-panel-mobile-chambers">{renderChamberRows("mobile")}</div>
+        <div className="nav-panel-mobile-bottom">
+          <SettingsRow current={current} to={settingsTo} shellHosted={shellHosted} onNavigate={close} variant="mobile" />
+          <GlobalExhibitSearch
+            ownChamber={searchOwnChamber}
+            navigate={(path) => {
+              navigate(path);
+              close();
+            }}
+            renderIcon={getChamberIcon}
+            className="nav-panel-search"
+          />
+        </div>
       </nav>
     </>
   );
