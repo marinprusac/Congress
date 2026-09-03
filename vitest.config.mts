@@ -10,7 +10,12 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts", "packages/*/src/**/*.test.ts", "services/*/src/**/*.test.ts"],
+    include: [
+      "tests/**/*.test.ts",
+      "packages/*/src/**/*.test.ts",
+      "services/*/src/**/*.test.ts",
+      "services/*/frontend/src/**/*.test.ts",
+    ],
     // Runs before each test file's own imports, which is what makes the
     // module-level `db`/`env` singletons in every service workable - see
     // packages/test-support/src/env.ts.

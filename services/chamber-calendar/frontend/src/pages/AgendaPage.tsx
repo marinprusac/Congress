@@ -8,7 +8,6 @@ import {
   formatEventStartTime,
   formatEventEndTime,
   formatWidgetEventTime,
-  formatSkippedDuration,
   formatGapDuration,
   formatClockTime,
 } from "@/lib/datetime";
@@ -44,10 +43,6 @@ function durationPx(minutes: number): number {
 // A block never renders shorter than this, regardless of the event's own
 // duration - short meetings still need room for a title and calendar name.
 const MIN_BLOCK_HEIGHT_PX = 24;
-// A cut marker's fixed height - deliberately smaller than a "real" gap of
-// comparable rendered size, so it reads as compressed rather than as an
-// unusually short lull.
-const CUT_HEIGHT_PX = 28;
 
 function addDays(date: Date, days: number): Date {
   const d = new Date(date);
@@ -117,7 +112,6 @@ export function AgendaPage() {
       }),
     [data, nowTick, anchor]
   );
-  const isEmpty = (data?.events.length ?? 0) === 0;
   // A leading now-marker (kind "now") can sit before the first date caption
   // without disturbing layout (it renders at zero height) - the caption
   // right after it should still get the "top of page" spacing, not the one
@@ -189,11 +183,6 @@ export function AgendaPage() {
 
       {!isSearching && isLoading && <ListLoadingState />}
       {!isSearching && isError && <p className="font-mono text-sm text-alert">Failed to reach the Calendar API.</p>}
-      {!isSearching && !isLoading && !isError && isEmpty && (
-        <p className="border-t border-dust px-1 py-3 font-mono text-sm text-dust">
-          — No events in this window —
-        </p>
-      )}
 
       {!isSearching &&
         !isLoading &&
@@ -267,31 +256,6 @@ export function AgendaPage() {
                 </div>
               );
 
-            case "cut":
-              return (
-                <div
-                  key={entry.key}
-                  className="flex gap-3 px-1"
-                  style={{ height: CUT_HEIGHT_PX }}
-                  title={formatSkippedDuration(entry.minutes)}
-                >
-                  <div className="w-16 shrink-0" aria-hidden="true" />
-                  <div className="relative flex-1" aria-hidden="true">
-                    {/* The line itself, broken into 3 short fragments spread across the
-                        marker's full height - one right where the line enters from above,
-                        one right where it resumes below, one in between - reads as
-                        "compressed" rather than "faded", unlike a plain gap's unbroken
-                        low-opacity line. */}
-                    <div className="absolute inset-y-0 left-0 flex flex-col items-center justify-between py-0.5">
-                      <span className="h-1 w-0 border-l-2 border-dust/50" />
-                      <span className="h-1 w-0 border-l-2 border-dust/50" />
-                      <span className="h-1 w-0 border-l-2 border-dust/50" />
-                    </div>
-                  </div>
-                  <span className="sr-only">{formatSkippedDuration(entry.minutes)}</span>
-                </div>
-              );
-
             case "now":
               return (
                 <div key={entry.key} className="relative z-10 flex gap-3 px-1" style={{ height: 0 }} aria-hidden="true">
@@ -358,12 +322,15 @@ export function AgendaPage() {
               // Genuine overlap: every block keeps the same full-width bar a
               // lone event gets (own top/height, own left-edge accent dash
               // still sitting right on the spine) rather than being
-              // squeezed into a narrow column - only the *text* staggers
-              // rightward per block.column, so overlapping titles don't sit
-              // directly on top of each other. Two overlapping bars' own
-              // translucent fills naturally stack into a visibly darker
-              // band wherever they actually overlap in time - real
-              // browser alpha compositing, not anything computed here.
+              // squeezed into a narrow column, unless it substantially
+              // overlaps another block in the cluster (see
+              // SUBSTANTIAL_OVERLAP_RATIO in datetime.ts) - only then does it
+              // get pushed into a share of columnCount, with its *text*
+              // staggered rightward per block.column so the two titles don't
+              // sit directly on top of each other. Two overlapping bars' own
+              // translucent fills naturally stack into a visibly darker band
+              // wherever they actually overlap in time - real browser alpha
+              // compositing, not anything computed here.
               //
               // Each block's own top/height come from durationPx applied
               // independently to its offset and its duration (not as a
@@ -375,8 +342,10 @@ export function AgendaPage() {
               // curve were applied cumulatively). The container then grows
               // to whichever is taller: the cluster's own compressed span,
               // or the bottom edge of its lowest block.
-              const blockLayouts = entry.blocks.map((block) => ({
+              const blockLayouts = entry.blocks.map((block, stackIndex) => ({
                 block,
+                stackIndex,
+                unconfirmed: isUnconfirmed(block.event),
                 top: durationPx(block.offsetMinutes),
                 height: Math.max(MIN_BLOCK_HEIGHT_PX, durationPx(block.durationMinutes)),
               }));
@@ -389,11 +358,12 @@ export function AgendaPage() {
                   </div>
                   <div className="relative min-w-0 flex-1" style={{ height: containerHeightPx }}>
                     {/* Paint layer: the full-width, alpha-blended bars described
-                        above. Purely visual (pointer-events-none) - when two
-                        blocks perfectly overlap, the higher-column bar would
-                        otherwise sit on top at full width and swallow every
-                        click meant for the one underneath it. */}
-                    {blockLayouts.map(({ block, top, height }) => {
+                        above. Purely visual (pointer-events-none) - stacking
+                        order comes from each block's chronological position in
+                        the cluster (stackIndex), not its column, since most
+                        blocks now share column 0 (see the hit layer's own note
+                        below) and would otherwise tie. */}
+                    {blockLayouts.map(({ block, stackIndex, unconfirmed, top, height }) => {
                       const event = block.event;
                       const textIndent = `calc(${(block.column / block.columnCount) * 100}% + 8px)`;
                       const nowPercent =
@@ -404,11 +374,13 @@ export function AgendaPage() {
                         <div
                           key={event.id}
                           aria-hidden="true"
-                          className="pointer-events-none absolute inset-x-0 overflow-hidden border-l-2 border-accent bg-accent/[0.08] py-1"
-                          style={{ top, height, zIndex: block.column + 1 }}
+                          className={`pointer-events-none absolute inset-x-0 overflow-hidden border-l-2 py-1 ${
+                            unconfirmed ? "border-dashed border-accent/50 bg-accent/[0.03]" : "border-accent bg-accent/[0.08]"
+                          }`}
+                          style={{ top, height, zIndex: stackIndex + 1 }}
                         >
                           <div
-                            className="truncate font-display text-xs leading-snug text-ink"
+                            className={`truncate font-display text-xs leading-snug ${unconfirmed ? "text-ink/70" : "text-ink"}`}
                             style={{ paddingLeft: textIndent, paddingRight: 8 }}
                           >
                             {event.title}
@@ -431,12 +403,17 @@ export function AgendaPage() {
                         </div>
                       );
                     })}
-                    {/* Hit layer: one exclusive click/tap/focus slice per
-                        column, always above the paint layer, so every
-                        overlapping event - including two with identical
-                        start/end - stays independently clickable regardless
-                        of paint stacking order. */}
-                    {blockLayouts.map(({ block, top, height }) => {
+                    {/* Hit layer: full-width unless this block substantially
+                        overlaps another in the cluster, in which case it gets
+                        an exclusive column-width slice instead - two blocks
+                        that only brush each other in time both stay fully
+                        tappable across their own true span; two that
+                        substantially (or exactly) coincide split the width so
+                        each stays independently reachable. Stacking again
+                        comes from stackIndex (always above the paint layer),
+                        so in a genuinely ambiguous full-width overlap the
+                        later-starting block wins the tap. */}
+                    {blockLayouts.map(({ block, stackIndex, top, height }) => {
                       const event = block.event;
                       const leftPercent = (block.column / block.columnCount) * 100;
                       const widthPercent = 100 / block.columnCount;
@@ -448,7 +425,7 @@ export function AgendaPage() {
                           onFocus={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
                           aria-label={`${event.title}, ${formatEventStartTime(event)}–${formatEventEndTime(event)}`}
                           className="absolute rounded-sm hover:bg-accent/20 focus-visible:bg-accent/20"
-                          style={{ top, height, left: `${leftPercent}%`, width: `${widthPercent}%`, zIndex: 100 + block.column }}
+                          style={{ top, height, left: `${leftPercent}%`, width: `${widthPercent}%`, zIndex: 100 + stackIndex }}
                         />
                       );
                     })}

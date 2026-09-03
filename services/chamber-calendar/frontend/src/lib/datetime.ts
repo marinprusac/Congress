@@ -102,26 +102,11 @@ export interface AgendaGapEntry {
   past: boolean;
 }
 
-// Idle time *between two days* at or above CUT_THRESHOLD_MINUTES -
-// condensed to a small fixed marker instead of reserving its true (often
-// huge) proportional height, so an ordinary night's sleep and a week with
-// nothing on the calendar are both "skipped" the same way. Subsumes what
-// used to be a separate day-count-based "skipped days" marker: a run of
-// entirely empty calendar days is just a very large idle gap between two
-// days that do have events. Never applies *within* a day - two events on
-// the same day always show their true gap, however long, so a slow
-// afternoon isn't mistaken for a missing chunk of the day.
-export interface AgendaCutEntry {
-  kind: "cut";
-  key: string;
-  minutes: number;
-}
-
 // The current-time indicator, placed at most once wherever "now" actually
-// falls in the timeline (mid-event, in a gap, in a cut, or - if today has
-// no events at all, or none scheduled yet - at the point in the flow
-// closest to it). Never emitted when "now" isn't inside the window being
-// rendered (see AgendaNowContext).
+// falls in the timeline (mid-event, in a gap, or - if today has no events
+// at all, or none scheduled yet - at the point in the flow closest to it).
+// Never emitted when "now" isn't inside the window being rendered (see
+// AgendaNowContext).
 export interface AgendaNowMarkerEntry {
   kind: "now";
   key: "now";
@@ -133,15 +118,7 @@ export type AgendaFlowEntry =
   | AgendaAllDayEntry
   | AgendaClusterEntry
   | AgendaGapEntry
-  | AgendaCutEntry
   | AgendaNowMarkerEntry;
-
-// Below this, idle time between two days is shown as real (if compact)
-// whitespace so a short late-night-to-early-morning gap still reads at a
-// glance; at or above it, the gap is condensed to a fixed-size cut marker
-// regardless of how long it actually is - an ordinary night and a two-week
-// trip read the same way, just "skipped".
-export const CUT_THRESHOLD_MINUTES = 90;
 
 // Bounds the current-time indicator to the window actually being rendered -
 // without this, paging the agenda forward/backward with Prev/Next would
@@ -159,39 +136,27 @@ const AGENDA_WEEKDAY_DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
   month: "short",
   day: "numeric",
 });
-const AGENDA_DATE_FORMAT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
-const AGENDA_DATE_WITH_YEAR_FORMAT = new Intl.DateTimeFormat(undefined, {
+const AGENDA_WEEKDAY_DATE_WITH_YEAR_FORMAT = new Intl.DateTimeFormat(undefined, {
+  weekday: "long",
   month: "short",
   day: "numeric",
   year: "numeric",
 });
 
-// Weekday only shown for the next 7 days out from today (regardless of the
-// agenda window's own anchor) - beyond that a weekday name stops being
-// useful at a glance and just adds noise.
+// Every rendered day carries its weekday name - the year suffix is the only
+// thing that varies, and only to disambiguate a date that's landed in a
+// different calendar year than today.
 function formatAgendaDayLabel(dateKey: string): string {
   const date = new Date(`${dateKey}T00:00:00`);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const diffDays = Math.round((date.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
-
-  if (diffDays >= 0 && diffDays <= 7) return AGENDA_WEEKDAY_DATE_FORMAT.format(date);
-  if (date.getFullYear() !== today.getFullYear()) return AGENDA_DATE_WITH_YEAR_FORMAT.format(date);
-  return AGENDA_DATE_FORMAT.format(date);
+  return date.getFullYear() !== today.getFullYear()
+    ? AGENDA_WEEKDAY_DATE_WITH_YEAR_FORMAT.format(date)
+    : AGENDA_WEEKDAY_DATE_FORMAT.format(date);
 }
 
-// Human text for a cut marker's tooltip/sr-only label, e.g. "9 days with no
-// events", "3 hours with no events", "90 minutes with no events".
-export function formatSkippedDuration(minutes: number): string {
-  const unit = (n: number, label: string) => `${n} ${label}${n === 1 ? "" : "s"} with no events`;
-  if (minutes >= 24 * 60) return unit(Math.round(minutes / (24 * 60)), "day");
-  if (minutes >= 60) return unit(Math.round(minutes / 60), "hour");
-  return unit(minutes, "minute");
-}
-
-// Compact label for a plain gap row itself (not a tooltip), e.g. "45 min",
-// "2h", "2h 15m" - short enough to sit as fine print in the gap's own blank
-// space rather than a full sentence like formatSkippedDuration's.
+// Compact label for a plain gap row, e.g. "45 min", "2h", "2h 15m" - short
+// enough to sit as fine print in the gap's own blank space.
 export function formatGapDuration(minutes: number): string {
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
@@ -205,7 +170,7 @@ interface DayGroup {
   timed: CalendarEvent[];
 }
 
-function groupByDay(events: CalendarEvent[]): DayGroup[] {
+function groupByDay(events: CalendarEvent[]): Map<string, DayGroup> {
   const groups = new Map<string, DayGroup>();
   for (const event of events) {
     const key = dayKey(event);
@@ -217,7 +182,21 @@ function groupByDay(events: CalendarEvent[]): DayGroup[] {
     if (event.allDay) group.allDay.push(event);
     else group.timed.push(event);
   }
-  return [...groups.values()].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  return groups;
+}
+
+// Every calendar day in [windowStartMs, windowEndMs), in order - the full
+// set of days the agenda renders a header for, regardless of which of them
+// actually have events (see buildAgendaTimeline).
+function enumerateDayKeys(windowStartMs: number, windowEndMs: number): string[] {
+  const keys: string[] = [];
+  const cursor = new Date(windowStartMs);
+  cursor.setHours(0, 0, 0, 0);
+  while (cursor.getTime() < windowEndMs) {
+    keys.push(localDateOnly(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return keys;
 }
 
 // One position in a day's own chronological sequence: either a cluster of
@@ -248,29 +227,48 @@ function itemEnd(item: DayItem): number {
   return item.kind === "now" ? item.nowMs : item.endMs;
 }
 
-// Greedy interval-graph coloring: sorted by start (guaranteed by the caller),
-// each event takes the lowest-numbered column whose last-placed event has
-// already ended by the time this one starts, or opens a new column if none
-// is free yet. Standard algorithm for "how many side-by-side lanes does this
-// group of overlapping events need, and which lane is each one in".
+// Two blocks only need their own side-by-side lane (rather than sharing one,
+// full-width) when they overlap enough that showing both at full width would
+// genuinely be confusing to tap - a 5-minute tail-overlap between two
+// hour-long meetings shouldn't cost either of them half their touch area.
+// "Enough" is measured against the *shorter* block's own span: if the
+// overlap covers most of it, the two really do read as "the same slot".
+const SUBSTANTIAL_OVERLAP_RATIO = 0.75;
+
+function substantiallyOverlaps(a: { startMs: number; endMs: number }, b: { startMs: number; endMs: number }): boolean {
+  const overlapMs = Math.min(a.endMs, b.endMs) - Math.max(a.startMs, b.startMs);
+  if (overlapMs <= 0) return false;
+  const shorterMs = Math.min(a.endMs - a.startMs, b.endMs - b.startMs);
+  return shorterMs > 0 && overlapMs / shorterMs >= SUBSTANTIAL_OVERLAP_RATIO;
+}
+
+// Greedy interval-graph coloring, same shape as the textbook exact-overlap
+// version: sorted by start (guaranteed by the caller), each event takes the
+// lowest-numbered column whose last-placed event doesn't substantially
+// overlap it, or opens a new column if none is free yet. Checking only each
+// column's *most recent* occupant (not its full history) is what lets two
+// blocks that never substantially overlap *each other* time-share a column
+// even if both happen to substantially overlap a third, longer block sitting
+// in a different column - exactly the common "one long meeting, several
+// short ones during it" shape.
 function assignColumns(blocks: DayClusterItem["blocks"]): void {
-  const columnEnds: number[] = [];
+  const columnLast: DayClusterItem["blocks"] = [];
   for (const block of blocks) {
     let placed = false;
-    for (let i = 0; i < columnEnds.length; i++) {
-      if (columnEnds[i]! <= block.startMs) {
+    for (let i = 0; i < columnLast.length; i++) {
+      if (!substantiallyOverlaps(columnLast[i]!, block)) {
         block.column = i;
-        columnEnds[i] = block.endMs;
+        columnLast[i] = block;
         placed = true;
         break;
       }
     }
     if (!placed) {
-      block.column = columnEnds.length;
-      columnEnds.push(block.endMs);
+      block.column = columnLast.length;
+      columnLast.push(block);
     }
   }
-  for (const block of blocks) block.columnCount = columnEnds.length;
+  for (const block of blocks) block.columnCount = columnLast.length;
 }
 
 // Groups a day's already-start-sorted timed events into clusters of mutually
@@ -337,38 +335,35 @@ function buildDayItems(day: DayGroup, nowMs: number | null): DayItem[] {
   return items;
 }
 
-// Builds the single continuous timeline the Agenda page renders: every day
-// that has at least one event (all-day or timed) is shown in full - "no
-// events" is the only thing ever skipped, whether that's an ordinary night
-// between two days that do have events, or a run of entirely empty
-// calendar days. A slow stretch *within* a day never gets skipped (see
-// AgendaCutEntry) - and today, specifically, is never considered to have
-// "no events" while the current time itself is inside the rendered window,
-// since the now-marker always gives it at least one item to anchor to.
-export function buildAgendaTimeline(events: CalendarEvent[], now: AgendaNowContext | null = null): AgendaFlowEntry[] {
-  const nowMs = now && now.nowMs >= now.windowStartMs && now.nowMs < now.windowEndMs ? now.nowMs : null;
+// Builds the single continuous timeline the Agenda page renders: every
+// calendar day in the window gets its own header, whether or not it has any
+// events - "no events" is never a reason to skip a day or compress the gap
+// around it, so a fully empty week reads as seven headers each with real,
+// sqrt-scaled blank space around it rather than a collapsed marker. A slow
+// stretch *within* a day is likewise always shown at its true (if
+// sqrt-compressed) proportional size. Today, specifically, is never
+// considered to have "no events" while the current time itself is inside
+// the rendered window, since the now-marker always gives it at least one
+// item to anchor to.
+export function buildAgendaTimeline(events: CalendarEvent[], window: AgendaNowContext): AgendaFlowEntry[] {
+  const nowMs = window.nowMs >= window.windowStartMs && window.nowMs < window.windowEndMs ? window.nowMs : null;
   const todayKey = nowMs !== null ? localDateOnly(new Date(nowMs)) : null;
 
-  const days = groupByDay(events);
-  if (todayKey !== null && !days.some((d) => d.dateKey === todayKey)) {
-    days.push({ dateKey: todayKey, allDay: [], timed: [] });
-    days.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
-  }
+  const byDay = groupByDay(events);
+  const days = enumerateDayKeys(window.windowStartMs, window.windowEndMs).map(
+    (key): DayGroup => byDay.get(key) ?? { dateKey: key, allDay: [], timed: [] }
+  );
 
   const timeline: AgendaFlowEntry[] = [];
 
   // The idle span between startMs and endMs, rendered as a plain
-  // proportional gap - or, only when allowCut is set (i.e. this is the span
-  // between two different days, never within one), condensed to a cut once
-  // it's long enough.
-  function pushGap(keyBase: string, startMs: number, endMs: number, allowCut: boolean) {
+  // proportional (sqrt-scaled) gap - covers everything from a few minutes
+  // between two events to an entire run of empty days, always at its true
+  // size, never condensed.
+  function pushGap(keyBase: string, startMs: number, endMs: number) {
     const minutes = Math.max(0, Math.round((endMs - startMs) / 60000));
     if (minutes <= 0) return;
-    if (allowCut && minutes >= CUT_THRESHOLD_MINUTES) {
-      timeline.push({ kind: "cut", key: `cut-${keyBase}`, minutes });
-    } else {
-      timeline.push({ kind: "gap", key: `gap-${keyBase}`, minutes, past: nowMs !== null && endMs <= nowMs });
-    }
+    timeline.push({ kind: "gap", key: `gap-${keyBase}`, minutes, past: nowMs !== null && endMs <= nowMs });
   }
 
   let previousAnchorEndMs: number | null = null;
@@ -378,7 +373,7 @@ export function buildAgendaTimeline(events: CalendarEvent[], now: AgendaNowConte
     const anchorEndMs = items.length > 0 ? itemEnd(items[items.length - 1]!) : anchorStartMs;
 
     if (previousAnchorEndMs !== null) {
-      pushGap(`day-${day.dateKey}`, previousAnchorEndMs, anchorStartMs, true);
+      pushGap(`day-${day.dateKey}`, previousAnchorEndMs, anchorStartMs);
     }
 
     timeline.push({ kind: "date", key: `date-${day.dateKey}`, label: formatAgendaDayLabel(day.dateKey) });
@@ -391,7 +386,7 @@ export function buildAgendaTimeline(events: CalendarEvent[], now: AgendaNowConte
     for (const item of items) {
       const startMs = itemStart(item);
       if (previousItemEndMs !== null) {
-        pushGap(`item-${item.kind === "now" ? "now" : item.blocks[0]!.event.id}`, previousItemEndMs, startMs, false);
+        pushGap(`item-${item.kind === "now" ? "now" : item.blocks[0]!.event.id}`, previousItemEndMs, startMs);
       }
 
       if (item.kind === "now") {
