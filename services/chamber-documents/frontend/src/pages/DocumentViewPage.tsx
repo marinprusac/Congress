@@ -27,11 +27,9 @@ export function DocumentViewPage() {
   const navigate = useNavigate();
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
-  const titleFieldRef = useRef<HTMLInputElement | null>(null);
 
   const documentQuery = useQuery({
     queryKey: ["document", documentId],
@@ -58,8 +56,7 @@ export function DocumentViewPage() {
   });
 
   // Loads drafts exactly once per document, not on every background refetch
-  // - a resync gated on `!editing` (editing only ever toggles the title)
-  // would stomp in-progress description edits made while `editing` is false.
+  // - otherwise a resync would stomp in-progress edits.
   const initializedDocumentIdRef = useRef<number | null>(null);
   const { markSaved } = useAutosave({
     value: { title: draftTitle, description: draftDescription },
@@ -83,35 +80,15 @@ export function DocumentViewPage() {
 
   const doc = documentQuery.data;
 
-  function editTitle() {
-    setEditing(true);
-    requestAnimationFrame(() => {
-      titleFieldRef.current?.focus();
-      titleFieldRef.current?.select();
-    });
-  }
-
   return (
     <article>
       <div className="mb-6 border-b border-dust pb-4">
-        {editing ? (
-          <input
-            ref={titleFieldRef}
-            value={draftTitle}
-            onChange={(e) => setDraftTitle(e.target.value)}
-            onBlur={() => setEditing(false)}
-            placeholder="Untitled"
-            className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-          />
-        ) : (
-          <h2
-            className="flex min-w-0 cursor-text items-center gap-3 font-display text-3xl text-ink"
-            onClick={editTitle}
-            title="Click to edit"
-          >
-            {doc.title}
-          </h2>
-        )}
+        <input
+          value={draftTitle}
+          onChange={(e) => setDraftTitle(e.target.value)}
+          placeholder="Untitled"
+          className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+        />
       </div>
 
       {updateMutation.isError && (
@@ -139,9 +116,6 @@ export function DocumentViewPage() {
         editable
         actions={
           <ExhibitActionBar>
-            <button onClick={editTitle} className="tap-target text-accent hover:underline">
-              Edit
-            </button>
             <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
               Delete
             </button>

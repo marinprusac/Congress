@@ -25,12 +25,10 @@ export function TaskViewPage() {
   const navigate = useNavigate();
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
   const [draftDueDate, setDraftDueDate] = useState("");
-  const titleFieldRef = useRef<HTMLInputElement | null>(null);
 
   const taskQuery = useQuery({
     queryKey: ["task", taskId],
@@ -65,8 +63,7 @@ export function TaskViewPage() {
   });
 
   // Loads drafts exactly once per task, not on every background refetch -
-  // a resync gated on `!editing` (editing only ever toggles the name/due-
-  // date inputs' visibility) would stomp in-progress description edits.
+  // otherwise a resync would stomp in-progress edits.
   const initializedTaskIdRef = useRef<number | null>(null);
   const { markSaved } = useAutosave({
     value: { name: draftName, description: draftDescription, dueDate: draftDueDate || null },
@@ -100,34 +97,15 @@ export function TaskViewPage() {
     return result;
   }
 
-  function editTitle() {
-    setEditing(true);
-    requestAnimationFrame(() => {
-      titleFieldRef.current?.focus();
-      titleFieldRef.current?.select();
-    });
-  }
-
   return (
     <article>
       <div className="mb-6 border-b border-dust pb-4">
-        {editing ? (
-          <input
-            ref={titleFieldRef}
-            value={draftName}
-            onChange={(e) => setDraftName(e.target.value)}
-            placeholder="Untitled"
-            className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-          />
-        ) : (
-          <h2
-            className="flex min-w-0 cursor-text items-center gap-3 font-display text-3xl text-ink"
-            onClick={editTitle}
-            title="Click to edit"
-          >
-            <span className={task.completed ? "line-through text-dust" : ""}>{task.name}</span>
-          </h2>
-        )}
+        <input
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
+          placeholder="Untitled"
+          className={`w-full font-display text-3xl placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent ${task.completed ? "line-through text-dust" : "text-ink"}`}
+        />
       </div>
 
       {updateMutation.isError && (
@@ -137,18 +115,12 @@ export function TaskViewPage() {
       <div className="mb-6 flex flex-wrap gap-6">
         <div>
           <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Due date</label>
-          {editing ? (
-            <input
-              type="date"
-              value={draftDueDate}
-              onChange={(e) => setDraftDueDate(e.target.value)}
-              className="border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-            />
-          ) : (
-            <p className="font-mono text-sm text-ink">
-              {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "— None —"}
-            </p>
-          )}
+          <input
+            type="date"
+            value={draftDueDate}
+            onChange={(e) => setDraftDueDate(e.target.value)}
+            className="border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+          />
         </div>
       </div>
 
@@ -165,12 +137,6 @@ export function TaskViewPage() {
               className="tap-target text-accent hover:underline"
             >
               {task.completed ? "Reopen" : "Complete"}
-            </button>
-            <button
-              onClick={() => (editing ? setEditing(false) : editTitle())}
-              className="tap-target text-accent hover:underline"
-            >
-              {editing ? "Done" : "Edit"}
             </button>
             <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
               Delete

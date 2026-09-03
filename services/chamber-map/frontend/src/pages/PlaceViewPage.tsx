@@ -30,10 +30,8 @@ export function PlaceViewPage() {
   const navigate = useNavigate();
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draft, setDraft] = useState<UpdatePlaceRequest>({});
-  const titleFieldRef = useRef<HTMLInputElement | null>(null);
 
   const placeQuery = useQuery({
     queryKey: ["place", placeId],
@@ -59,10 +57,8 @@ export function PlaceViewPage() {
     onError: () => showToast("Failed to delete place.", "error"),
   });
 
-  // Loads exactly once per place, not on every background refetch - the
-  // body field is always live (see below), so a resync gated on `!editing`
-  // (editing only ever toggles the name/radius/location fields' visibility)
-  // would stomp in-progress body edits.
+  // Loads exactly once per place, not on every background refetch -
+  // otherwise a resync would stomp in-progress edits.
   const initializedPlaceIdRef = useRef<number | null>(null);
   const { markSaved } = useAutosave({
     value: draft,
@@ -97,34 +93,15 @@ export function PlaceViewPage() {
     return result;
   }
 
-  function editTitle() {
-    setEditing(true);
-    requestAnimationFrame(() => {
-      titleFieldRef.current?.focus();
-      titleFieldRef.current?.select();
-    });
-  }
-
   return (
     <article>
       <div className="mb-6 border-b border-dust pb-4">
-        {editing ? (
-          <input
-            ref={titleFieldRef}
-            value={draft.name ?? ""}
-            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-            placeholder="Untitled"
-            className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-          />
-        ) : (
-          <h2
-            className="flex min-w-0 cursor-text items-center gap-3 font-display text-3xl text-ink"
-            onClick={editTitle}
-            title="Click to edit"
-          >
-            <span>{place.name}</span>
-          </h2>
-        )}
+        <input
+          value={draft.name ?? ""}
+          onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+          placeholder="Untitled"
+          className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+        />
       </div>
 
       {updateMutation.isError && <p className="mb-4 font-mono text-sm text-alert">{(updateMutation.error as Error).message}</p>}
@@ -132,17 +109,13 @@ export function PlaceViewPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           {fieldLabel("Geofence radius (meters)")}
-          {editing ? (
-            <input
-              type="number"
-              min={10}
-              value={draft.radiusMeters ?? place.radiusMeters}
-              onChange={(e) => setDraft((d) => ({ ...d, radiusMeters: Number(e.target.value) }))}
-              className={inputClass}
-            />
-          ) : (
-            <p className="font-mono text-sm text-ink">{place.radiusMeters} m</p>
-          )}
+          <input
+            type="number"
+            min={10}
+            value={draft.radiusMeters ?? place.radiusMeters}
+            onChange={(e) => setDraft((d) => ({ ...d, radiusMeters: Number(e.target.value) }))}
+            className={inputClass}
+          />
         </div>
 
         <div className="sm:col-span-2">
@@ -152,7 +125,6 @@ export function PlaceViewPage() {
             longitude={draft.longitude ?? place.longitude}
             radiusMeters={draft.radiusMeters ?? place.radiusMeters}
             onChange={(next) => setDraft((d) => ({ ...d, ...next }))}
-            readOnly={!editing}
           />
         </div>
       </div>
@@ -165,12 +137,6 @@ export function PlaceViewPage() {
         onCreateReference={onCreateExhibit}
         actions={
           <ExhibitActionBar>
-            <button
-              onClick={() => (editing ? setEditing(false) : editTitle())}
-              className="tap-target text-accent hover:underline"
-            >
-              {editing ? "Done" : "Edit"}
-            </button>
             <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
               Delete
             </button>

@@ -33,10 +33,8 @@ export function AutomationViewPage() {
   const navigate = useNavigate();
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draft, setDraft] = useState<UpdateAutomationRequest>({});
-  const titleFieldRef = useRef<HTMLInputElement | null>(null);
 
   const automationQuery = useQuery({
     queryKey: ["automation", automationId],
@@ -79,9 +77,7 @@ export function AutomationViewPage() {
   });
 
   // Loads the draft exactly once per automation, not on every background
-  // refetch - the body field is always live (see below), so a resync gated
-  // on `!editing` (editing only ever toggles the trigger/condition/action
-  // fields' visibility) would stomp in-progress body edits.
+  // refetch - otherwise a resync would stomp in-progress edits.
   const initializedAutomationIdRef = useRef<number | null>(null);
   const { markSaved } = useAutosave({
     value: draft,
@@ -114,14 +110,6 @@ export function AutomationViewPage() {
 
   const automation = automationQuery.data;
 
-  function editTitle() {
-    setEditing(true);
-    requestAnimationFrame(() => {
-      titleFieldRef.current?.focus();
-      titleFieldRef.current?.select();
-    });
-  }
-
   // Bypasses the debounce for an instant flip (toggles read from
   // `automation.enabled`, not `draft.enabled`, for their label/strikethrough
   // - a debounced round-trip would leave the button momentarily lying about
@@ -138,23 +126,12 @@ export function AutomationViewPage() {
   return (
     <article>
       <div className="mb-6 border-b border-dust pb-4">
-        {editing ? (
-          <input
-            ref={titleFieldRef}
-            value={draft.title ?? ""}
-            onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-            placeholder="Untitled"
-            className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-          />
-        ) : (
-          <h2
-            className="flex min-w-0 cursor-text items-center gap-3 font-display text-3xl text-ink"
-            onClick={editTitle}
-            title="Click to edit"
-          >
-            <span className={automation.enabled ? "" : "text-dust line-through"}>{automation.title}</span>
-          </h2>
-        )}
+        <input
+          value={draft.title ?? ""}
+          onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+          placeholder="Untitled"
+          className={`w-full font-display text-3xl placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent ${automation.enabled ? "text-ink" : "text-dust line-through"}`}
+        />
       </div>
 
       {updateMutation.isError && <p className="mb-4 font-mono text-sm text-alert">{(updateMutation.error as Error).message}</p>}
@@ -162,84 +139,53 @@ export function AutomationViewPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           {fieldLabel("Trigger event")}
-          {editing ? (
-            <TriggerEventPicker
-              value={draft.triggerEventType ?? ""}
-              onChange={(triggerEventType) => setDraft((d) => ({ ...d, triggerEventType }))}
-              catalog={catalogQuery.data ?? []}
-              loading={catalogQuery.isLoading}
-              selectClassName={inputClass}
-            />
-          ) : (
-            <p className="font-mono text-sm text-ink">{automation.triggerEventType}</p>
-          )}
+          <TriggerEventPicker
+            value={draft.triggerEventType ?? ""}
+            onChange={(triggerEventType) => setDraft((d) => ({ ...d, triggerEventType }))}
+            catalog={catalogQuery.data ?? []}
+            loading={catalogQuery.isLoading}
+            selectClassName={inputClass}
+          />
         </div>
 
         <div>
           {fieldLabel("Condition (optional)")}
-          {editing ? (
-            <div className="flex gap-2">
-              <input
-                placeholder="payload field"
-                value={draft.conditionField ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, conditionField: e.target.value || undefined }))}
-                className={inputClass}
-              />
-              <input
-                placeholder="equals"
-                value={draft.conditionEquals ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, conditionEquals: e.target.value || undefined }))}
-                className={inputClass}
-              />
-            </div>
-          ) : (
-            <p className="font-mono text-sm text-ink">
-              {automation.conditionField ? `${automation.conditionField} == ${automation.conditionEquals}` : "— None —"}
-            </p>
-          )}
+          <div className="flex gap-2">
+            <input
+              placeholder="payload field"
+              value={draft.conditionField ?? ""}
+              onChange={(e) => setDraft((d) => ({ ...d, conditionField: e.target.value || undefined }))}
+              className={inputClass}
+            />
+            <input
+              placeholder="equals"
+              value={draft.conditionEquals ?? ""}
+              onChange={(e) => setDraft((d) => ({ ...d, conditionEquals: e.target.value || undefined }))}
+              className={inputClass}
+            />
+          </div>
         </div>
 
         <div className="sm:col-span-2">
           {fieldLabel("Action - call a Chamber's tool")}
-          {editing ? (
-            <ChamberToolPicker
-              targetChamber={draft.targetChamber ?? ""}
-              toolName={draft.toolName ?? ""}
-              onChamberChange={(targetChamber) => setDraft((d) => ({ ...d, targetChamber, argsTemplate: {} }))}
-              onToolChange={(toolName) => setDraft((d) => ({ ...d, toolName, argsTemplate: {} }))}
-              selectClassName={inputClass}
-            />
-          ) : (
-            <p className="font-mono text-sm text-ink">
-              {automation.targetChamber}.{automation.toolName}
-            </p>
-          )}
+          <ChamberToolPicker
+            targetChamber={draft.targetChamber ?? ""}
+            toolName={draft.toolName ?? ""}
+            onChamberChange={(targetChamber) => setDraft((d) => ({ ...d, targetChamber, argsTemplate: {} }))}
+            onToolChange={(toolName) => setDraft((d) => ({ ...d, toolName, argsTemplate: {} }))}
+            selectClassName={inputClass}
+          />
         </div>
 
-        {editing && (
-          <div className="sm:col-span-2">
-            <ArgsEditor
-              tool={draftTool}
-              argsTemplate={draft.argsTemplate ?? {}}
-              onChange={(argsTemplate) => setDraft((d) => ({ ...d, argsTemplate }))}
-              inputClassName={inputClass}
-              triggerPayloadFields={triggerPayloadFields}
-            />
-          </div>
-        )}
-
-        {!editing && Object.keys(automation.argsTemplate).length > 0 && (
-          <div className="sm:col-span-2">
-            {fieldLabel("Arguments")}
-            <ul className="font-mono text-sm text-ink">
-              {Object.entries(automation.argsTemplate).map(([key, value]) => (
-                <li key={key}>
-                  {key} = {value}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <div className="sm:col-span-2">
+          <ArgsEditor
+            tool={draftTool}
+            argsTemplate={draft.argsTemplate ?? {}}
+            onChange={(argsTemplate) => setDraft((d) => ({ ...d, argsTemplate }))}
+            inputClassName={inputClass}
+            triggerPayloadFields={triggerPayloadFields}
+          />
+        </div>
       </div>
 
       <ExhibitLinksLayout
@@ -251,12 +197,6 @@ export function AutomationViewPage() {
           <ExhibitActionBar>
             <button onClick={toggleEnabled} className="tap-target text-accent hover:underline">
               {automation.enabled ? "Disable" : "Enable"}
-            </button>
-            <button
-              onClick={() => (editing ? setEditing(false) : editTitle())}
-              className="tap-target text-accent hover:underline"
-            >
-              {editing ? "Done" : "Edit"}
             </button>
             <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
               Delete
