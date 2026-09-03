@@ -11,7 +11,6 @@ import {
   getOpenVisit,
   getVisitActiveAt,
   guessTripMode,
-  labelTrip,
   listTrips,
   listVisits,
   openConfirmedVisit,
@@ -169,7 +168,7 @@ describe("createTrip", () => {
 });
 
 describe("needsLabel", () => {
-  async function roundTrip(samePlace: boolean) {
+  async function roundTrip(samePlace: boolean, label: string | null = null) {
     const a = makePlace("Home", 45, 9);
     const b = samePlace ? a : makePlace("Work", 45.1, 9);
     const v1 = openConfirmedVisit(a.id, new Date("2026-01-01T08:00:00Z"));
@@ -182,7 +181,8 @@ describe("needsLabel", () => {
       new Date("2026-01-01T09:00:00Z"),
       createTripFixAccumulator(),
       null,
-      null
+      null,
+      label
     );
   }
 
@@ -195,10 +195,9 @@ describe("needsLabel", () => {
   });
 
   it("stops asking once a label is given", async () => {
-    const trip = await roundTrip(true);
-    const labelled = await labelTrip(trip.id, { label: "school run" });
-    expect(labelled?.label).toBe("school run");
-    expect(labelled?.needsLabel).toBe(false);
+    const trip = await roundTrip(true, "school run");
+    expect(trip.label).toBe("school run");
+    expect(trip.needsLabel).toBe(false);
   });
 
   it("does not ask about a trip between two unclassified dwells, which have no place to be the same", async () => {
@@ -215,36 +214,6 @@ describe("needsLabel", () => {
       null
     );
     expect(trip.needsLabel).toBe(false);
-  });
-});
-
-describe("labelTrip", () => {
-  async function anyTrip() {
-    const a = makePlace("Home", 45, 9);
-    const v1 = openConfirmedVisit(a.id, new Date("2026-01-01T08:00:00Z"));
-    closeVisit(v1.id, new Date("2026-01-01T08:30:00Z"));
-    const v2 = openConfirmedVisit(a.id, new Date("2026-01-01T09:00:00Z"));
-    return createTrip(
-      v1.id,
-      v2.id,
-      new Date("2026-01-01T08:30:00Z"),
-      new Date("2026-01-01T09:00:00Z"),
-      createTripFixAccumulator(),
-      null,
-      null
-    );
-  }
-
-  it("clears a whitespace-only label back to null, keeping 'no label' one state", async () => {
-    const trip = await anyTrip();
-    await labelTrip(trip.id, { label: "something" });
-    const cleared = await labelTrip(trip.id, { label: "   " });
-    expect(cleared?.label).toBeNull();
-    expect(cleared?.needsLabel).toBe(true);
-  });
-
-  it("returns null for a trip that does not exist", async () => {
-    await expect(labelTrip(9999, { label: "x" })).resolves.toBeNull();
   });
 });
 

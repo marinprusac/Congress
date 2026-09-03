@@ -6,7 +6,7 @@ import { places, positions } from "./db/schema.js";
 import { claimStrength, overlapMs } from "./annotationMatching.js";
 import { healTrackingStateOnBoot, reprocessRange } from "./reprocess.js";
 import { processPositions, resetTrackingState } from "./tracking.js";
-import { classifyVisit, labelTrip, listTrips, listVisits } from "./visits.js";
+import { classifyVisit, listTrips, listVisits } from "./visits.js";
 import type { TraccarPosition } from "./traccar/client.js";
 
 beforeAll(() => runMigrations(migrationsDir("chamber-map")));
@@ -225,21 +225,6 @@ describe("annotations across a rebuild", () => {
 
     await reprocessRange(new Date(T0));
     expect((await listVisits({})).some((v) => v.status === "ignored")).toBe(true);
-  });
-
-  it("carries an owner-authored trip label onto the regenerated trip", async () => {
-    place("Home", HOME_LAT);
-    // A same-place round trip: out and back, which the classifier
-    // deliberately declines to name.
-    await processPositions(
-      [fix(HOME_LAT, 0), fix(45.02, 1), fix(45.03, 2), fix(HOME_LAT, 10)],
-      { publishEvents: false }
-    );
-    const trip = (await listTrips({}))[0]!;
-    await labelTrip(trip.id, { label: "school run" });
-
-    await reprocessRange(new Date(T0));
-    expect((await listTrips({}))[0]?.label).toBe("school run");
   });
 
   it("does not double-count a label the replay reproduced on its own", async () => {

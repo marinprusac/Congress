@@ -4,7 +4,7 @@ import { db } from "./db/client.js";
 import { visits, places, trips } from "./db/schema.js";
 import { createPlace } from "./places.js";
 import { haversineMeters } from "./geo.js";
-import type { Visit, VisitStatus, ClassifyVisitRequest, Trip, TripMode, LabelTripRequest } from "./types.js";
+import type { Visit, VisitStatus, ClassifyVisitRequest, Trip, TripMode } from "./types.js";
 
 export type VisitRow = typeof visits.$inferSelect;
 
@@ -347,15 +347,4 @@ export async function createTrip(
   const trip = await getTrip(inserted.id);
   if (!trip) throw new Error(`failed to read back inserted trip ${inserted.id}`);
   return trip;
-}
-
-export async function labelTrip(id: number, request: LabelTripRequest): Promise<Trip | null> {
-  const existing = db.select().from(trips).where(eq(trips.id, id)).get();
-  if (!existing) return null;
-  // An empty/whitespace-only label clears it back to null rather than
-  // storing "" - keeps "no label" a single representable state (also what
-  // makes a same-place round trip's needsLabel true again).
-  const label = request.label.trim() === "" ? null : request.label;
-  db.update(trips).set({ label }).where(eq(trips.id, id)).run();
-  return getTrip(id);
 }

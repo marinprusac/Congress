@@ -100,10 +100,6 @@ export const tripSchema = z.object({
 });
 export type Trip = z.infer<typeof tripSchema>;
 
-// An empty label clears it (see visits.ts's labelTrip) - not rejected here.
-export const labelTripRequestSchema = z.object({ label: z.string() });
-export type LabelTripRequest = z.infer<typeof labelTripRequestSchema>;
-
 // Only the user-facing tunables - see db/schema.ts's comment on why
 // lastProcessedAt/lastPollSucceededAt/lastPollError live on the same table
 // row but outside this type.

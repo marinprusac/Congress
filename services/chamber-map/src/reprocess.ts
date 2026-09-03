@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
 import { db } from "./db/client.js";
 import { visits, trips } from "./db/schema.js";
 import { findEarliestFixNear, listPositionsBetween } from "./positions.js";
@@ -16,11 +16,11 @@ import type { ReprocessResult } from "./types.js";
 // hand-patching rows.
 //
 // What it deliberately does NOT recompute is anything the owner authored:
-// adhoc labels, "ignored" dwells, and trip labels are snapshotted before
-// the delete and re-applied to whatever the replay produced in their place
-// (see restoreVisitAnnotations/restoreTripLabels). Everything else -
-// confirmed visits, pending dwells, trips - is fully derivable and simply
-// regenerated.
+// adhoc labels and "ignored" dwells are snapshotted before the delete and
+// re-applied to whatever the replay produced in their place (see
+// restoreVisitAnnotations). Everything else - confirmed visits, pending
+// dwells, trips (including their auto-derived labels, which regenerate
+// identically) - is fully derivable and simply regenerated.
 
 // How far back adding or moving a place is willing to rewrite history. A
 // place never visited reprocesses nothing at all (reprocessForPlace returns
@@ -30,14 +30,9 @@ import type { ReprocessResult } from "./types.js";
 const PLACE_LOOKBACK_DAYS = 90;
 
 type VisitRow = typeof visits.$inferSelect;
-type TripRow = typeof trips.$inferSelect;
 
 function visitSpan(row: VisitRow, openEnd: number): { start: number; end: number } {
   return { start: row.arrivedAt.getTime(), end: row.departedAt?.getTime() ?? openEnd };
-}
-
-function tripSpan(row: TripRow): { start: number; end: number } {
-  return { start: row.departedAt.getTime(), end: row.arrivedAt.getTime() };
 }
 
 // Re-attaches an owner-authored visit annotation to whichever regenerated
@@ -73,43 +68,6 @@ function restoreVisitAnnotations(saved: VisitRow[], openEnd: number): { restored
   return { restored, lost };
 }
 
-// Only ever fills a trip whose label came back empty. A trip between two
-// different known places labels itself ("commute to X") during the replay,
-// and that regenerated label is by definition current - carrying the old
-// one over it would at best duplicate it and at worst stamp a stale
-// destination onto a trip that no longer goes there. What's left unlabelled
-// after a replay is exactly the same-place round trip the classifier
-// deliberately declines to name (see visits.ts's needsLabel), which is
-// where an owner-authored label lives.
-function restoreTripLabels(saved: TripRow[], from: Date): { restored: number; lost: number } {
-  const inRange = db.select().from(trips).where(gte(trips.departedAt, from)).all();
-  const candidates = inRange.filter((row) => row.label === null);
-  const claimed = new Set<number>();
-  let restored = 0;
-  let lost = 0;
-
-  for (const snapshot of saved) {
-    const span = tripSpan(snapshot);
-    // A label the replay reproduced by itself is already current, so it
-    // counts as neither restored nor lost - it never went anywhere.
-    if (inRange.some((row) => row.label === snapshot.label && claimStrength(span, tripSpan(row)) > 0)) continue;
-    let best: { row: TripRow; overlap: number } | null = null;
-    for (const candidate of candidates) {
-      if (claimed.has(candidate.id)) continue;
-      const overlap = claimStrength(span, tripSpan(candidate));
-      if (overlap > 0 && (!best || overlap > best.overlap)) best = { row: candidate, overlap };
-    }
-    if (!best) {
-      lost += 1;
-      continue;
-    }
-    db.update(trips).set({ label: snapshot.label }).where(eq(trips.id, best.row.id)).run();
-    claimed.add(best.row.id);
-    restored += 1;
-  }
-  return { restored, lost };
-}
-
 // Recomputes every visit and trip from `from` onward out of the raw
 // position log, against the places and settings in effect right now.
 //
@@ -128,11 +86,6 @@ export async function reprocessRange(from: Date, to: Date = new Date()): Promise
       .select()
       .from(visits)
       .where(and(gte(visits.arrivedAt, from), inArray(visits.status, ["adhoc", "ignored"])))
-      .all();
-    const savedTripLabels = db
-      .select()
-      .from(trips)
-      .where(and(gte(trips.departedAt, from), isNotNull(trips.label)))
       .all();
 
     const visitsDeleted = db.select().from(visits).where(gte(visits.arrivedAt, from)).all().length;
@@ -165,7 +118,6 @@ export async function reprocessRange(from: Date, to: Date = new Date()): Promise
     resetTrackingState();
 
     const visitAnnotations = restoreVisitAnnotations(savedVisitAnnotations, openEnd);
-    const tripAnnotations = restoreTripLabels(savedTripLabels, from);
 
     return {
       from: from.toISOString(),
@@ -175,8 +127,8 @@ export async function reprocessRange(from: Date, to: Date = new Date()): Promise
       visitsCreated: db.select().from(visits).where(gte(visits.arrivedAt, from)).all().length,
       tripsDeleted,
       tripsCreated: db.select().from(trips).where(gte(trips.departedAt, from)).all().length,
-      annotationsRestored: visitAnnotations.restored + tripAnnotations.restored,
-      annotationsLost: visitAnnotations.lost + tripAnnotations.lost,
+      annotationsRestored: visitAnnotations.restored,
+      annotationsLost: visitAnnotations.lost,
     };
   });
 }

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Link } from "react-router-dom";
-import { useShellHosted, resolveChamberPath, useAutosave } from "@congress/congress-ui";
-import { fetchVisits, fetchTrips, fetchVisit, fetchVisitActiveAt, labelTrip } from "@/lib/api";
+import { useShellHosted, resolveChamberPath } from "@congress/congress-ui";
+import { fetchVisits, fetchTrips, fetchVisit, fetchVisitActiveAt } from "@/lib/api";
 import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
 import { formatDuration } from "@/lib/formatDuration";
 import { placeMarkerIcon } from "@/lib/markerIcon";
@@ -98,62 +98,14 @@ function FitToDay({ markers, paths }: { markers: Visit[]; paths: [number, number
 // A commute between two different known places auto-labels itself
 // ("commute to Work" - see tracking.ts's handleTransition); a same-place
 // round trip (t.needsLabel - see visits.ts's toTrip) stays genuinely
-// unlabeled instead, but still starts collapsed like every other trip - only
-// an explicit click opens the editor, never the page load itself.
+// unlabeled - there's no owner-facing way to name one.
 function TripEntry({ trip }: { trip: Trip }) {
-  const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
-  const [label, setLabel] = useState(trip.label ?? "");
-  const editRef = useRef<HTMLSpanElement>(null);
-
-  const mutation = useMutation({
-    mutationFn: (l: string) => labelTrip(trip.id, { label: l }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["trips"] }),
-  });
-
-  // `label`'s initial value already matches the last-saved label (set from
-  // the `trip` prop above), so the hook's own baseline is correct from
-  // mount - no separate load-then-markSaved step needed, unlike a page
-  // whose draft only becomes real once an async query resolves.
-  useAutosave({ value: label, onSave: (l) => mutation.mutate(l) });
-
-  // A click anywhere outside the input closes the inline editor - same as
-  // Escape below, just for the "clicked elsewhere" case. Typed text is
-  // already autosaving as it's typed, so this only ever hides the input,
-  // never discards anything.
-  useEffect(() => {
-    if (!editing) return;
-    function onPointerDown(e: PointerEvent) {
-      if (editRef.current && !editRef.current.contains(e.target as Node)) setEditing(false);
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [editing]);
-
   return (
     <li className="py-1 pl-6 text-xs text-dust">
       <span className="italic">
         {trip.mode} · {formatDuration(trip.durationMinutes)} · {trip.distanceKm.toFixed(1)} km
         {trip.label ? ` · "${trip.label}"` : ""}
-      </span>{" "}
-      {editing ? (
-        <span ref={editRef} className="inline-flex items-center gap-1 align-middle">
-          <input
-            autoFocus
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === "Escape") setEditing(false);
-            }}
-            placeholder='e.g. "walking the dog"'
-            className="w-36 border-b border-dust bg-transparent px-1 text-xs text-ink focus:outline-none focus-visible:border-accent"
-          />
-        </span>
-      ) : (
-        <button onClick={() => setEditing(true)} className="text-accent hover:underline">
-          {trip.label ? "rename" : "label"}
-        </button>
-      )}
+      </span>
     </li>
   );
 }
