@@ -152,6 +152,12 @@ export async function ensureFreshAccessToken(account: AccountRow): Promise<strin
         .set({ needsReconnect: true, updatedAt: new Date() })
         .where(eq(googleAccounts.id, account.id))
         .run();
+      if (!account.needsReconnect) {
+        void publishEvent({
+          type: "calendar.account_needs_reconnect",
+          payload: { accountId: account.id, label: account.label },
+        });
+      }
       throw new AccountNeedsReconnectError(account.id, account.label);
     }
     throw err;

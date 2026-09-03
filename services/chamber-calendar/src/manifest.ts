@@ -88,5 +88,11 @@ export const calendarManifest: Manifest = {
       description: "A Google account was disconnected.",
       payloadFields: { accountId: { type: "number" }, label: { type: "string" } },
     },
+    {
+      type: "calendar.account_needs_reconnect",
+      label: "Account needs reconnect",
+      description: "A connected Google account's refresh token was revoked and needs to be reconnected.",
+      payloadFields: { accountId: { type: "number" }, label: { type: "string" } },
+    },
   ],
 };
