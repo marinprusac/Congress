@@ -28,14 +28,16 @@ preventPinchZoom();
 // Also logs a congress.app_updated event for this - a Logs Chamber rule can
 // turn "the app updated" into a push notification/history entry the same
 // way any other Chamber's own event does, and this is the one place in the
-// system that actually observes a new version taking over.
+// system that actually observes a new version taking over. Awaited before
+// reloading (notifyAppUpdated's own timeout bounds the wait) rather than
+// fired-and-forgotten alongside the reload - see its comment on why
+// `keepalive` alone isn't trustworthy enough here to fire-and-forget.
 if ("serviceWorker" in navigator) {
   let reloaded = false;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (reloaded) return;
     reloaded = true;
-    void notifyAppUpdated();
-    window.location.reload();
+    void notifyAppUpdated().finally(() => window.location.reload());
   });
 }
 

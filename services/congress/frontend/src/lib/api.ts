@@ -19,10 +19,19 @@ export async function logout(): Promise<void> {
   await fetch("/auth/logout", { method: "POST" });
 }
 
-// `keepalive` so the request survives the page reload that follows it right
-// away (see main.tsx's controllerchange handler) - without it, a normal
-// fetch racing a navigation can be aborted mid-flight before it reaches the
-// server.
+const APP_UPDATED_TIMEOUT_MS = 1500;
+
+// `keepalive` is meant to let a fetch survive the page reload that follows
+// it right away (see main.tsx's controllerchange handler), but WebKit's
+// support for that has a long history of not actually surviving a
+// same-tick navigation - the exact browser this fires in on an installed
+// iOS PWA. So main.tsx awaits this (bounded by a short timeout, not left
+// to hang if the network is briefly unreachable mid-deploy) before
+// reloading, rather than relying on keepalive alone to win the race.
 export async function notifyAppUpdated(): Promise<void> {
-  await fetch("/congress/events/app-updated", { method: "POST", keepalive: true }).catch(() => {});
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), APP_UPDATED_TIMEOUT_MS);
+  await fetch("/congress/events/app-updated", { method: "POST", keepalive: true, signal: controller.signal })
+    .catch(() => {})
+    .finally(() => clearTimeout(timeout));
 }
