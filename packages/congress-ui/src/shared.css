@@ -1292,7 +1292,11 @@
    would on an absolutely-positioned one). */
 .list-search-row {
   position: fixed;
-  z-index: 40;
+  /* Below .nav-panel-backdrop/.nav-panel-mobile (39/40) on purpose - this is
+     ordinary persistent page chrome, not a popover, so the nav drawer must
+     be able to cover it when open. It tied with .nav-panel-mobile's own 40
+     before, and same z-index + later DOM order meant this always won. */
+  z-index: 20;
   left: 0.5rem;
   right: 0.5rem;
   bottom: calc(var(--mobile-nav-height, 0px) + 0.5rem);
