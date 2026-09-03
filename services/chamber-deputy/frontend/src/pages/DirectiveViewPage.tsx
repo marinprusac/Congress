@@ -12,6 +12,7 @@ import {
   ConfirmSheet,
   showToast,
   fetchEventCatalog,
+  useAutosave,
 } from "@congress/congress-ui";
 import { fetchDirective, updateDirective, deleteDirective, runDirective } from "@/lib/api";
 import type { UpdateDirectiveRequest } from "../../../src/types";
@@ -66,15 +67,20 @@ export function DirectiveViewPage() {
   });
 
   // Loads exactly once per directive, not on every background refetch - the
-  // body field is now always live (see below), so a resync gated on
-  // `!editing` (editing only ever toggles the title/schedule fields) would
-  // stomp in-progress body edits made while `editing` is false.
+  // body field is always live (see below), so a resync gated on `!editing`
+  // (editing only ever toggles the title/schedule fields' visibility) would
+  // stomp in-progress body edits.
   const initializedDirectiveIdRef = useRef<number | null>(null);
+  const { markSaved } = useAutosave({
+    value: { ...draft, ...schedule },
+    enabled: initializedDirectiveIdRef.current !== null,
+    onSave: (merged) => updateMutation.mutate(merged),
+  });
   useEffect(() => {
     if (directiveQuery.data && initializedDirectiveIdRef.current !== directiveQuery.data.id) {
       const d = directiveQuery.data;
-      setDraft({ title: d.title, body: d.body, enabled: d.enabled });
-      setSchedule({
+      const loadedDraft: UpdateDirectiveRequest = { title: d.title, body: d.body, enabled: d.enabled };
+      const loadedSchedule: ScheduleDraft = {
         scheduleType: d.scheduleType,
         intervalMs: d.intervalMs,
         scheduleHour: d.scheduleHour,
@@ -82,10 +88,13 @@ export function DirectiveViewPage() {
         scheduleDayOfWeek: d.scheduleDayOfWeek,
         scheduleTimeZone: d.scheduleTimeZone,
         triggerEventType: d.triggerEventType,
-      });
+      };
+      setDraft(loadedDraft);
+      setSchedule(loadedSchedule);
+      markSaved({ ...loadedDraft, ...loadedSchedule });
       initializedDirectiveIdRef.current = d.id;
     }
-  }, [directiveQuery.data]);
+  }, [directiveQuery.data, markSaved]);
 
   if (!Number.isInteger(directiveId)) return <p className="font-mono text-sm text-alert">Invalid directive id.</p>;
   if (directiveQuery.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
@@ -102,30 +111,18 @@ export function DirectiveViewPage() {
     });
   }
 
-  function save() {
-    updateMutation.mutate({ ...draft, ...schedule }, { onSuccess: () => setEditing(false) });
-  }
-
-  function cancel() {
-    setEditing(false);
-    setDraft({ title: directive.title, body: directive.body, enabled: directive.enabled });
-    setSchedule({
-      scheduleType: directive.scheduleType,
-      intervalMs: directive.intervalMs,
-      scheduleHour: directive.scheduleHour,
-      scheduleMinute: directive.scheduleMinute,
-      scheduleDayOfWeek: directive.scheduleDayOfWeek,
-      scheduleTimeZone: directive.scheduleTimeZone,
-      triggerEventType: directive.triggerEventType,
-    });
-  }
-
+  // Bypasses the debounce for an instant flip (the button's label/strike-
+  // through reads from `directive.enabled`, not `draft.enabled`, so a
+  // debounced round-trip would leave it momentarily lying about the current
+  // state). Folds the toggle into `draft` and marks the merged value saved
+  // so a debounce already pending from an unrelated field edit can't re-
+  // send a stale `enabled` value moments later and flip it back.
   function toggleEnabled() {
-    updateMutation.mutate({ enabled: !directive.enabled });
+    const nextDraft: UpdateDirectiveRequest = { ...draft, enabled: !directive.enabled };
+    setDraft(nextDraft);
+    markSaved({ ...nextDraft, ...schedule });
+    updateMutation.mutate({ ...nextDraft, ...schedule });
   }
-
-  const bodyDirty = (draft.body ?? "") !== directive.body;
-  const showSaveControls = editing || bodyDirty;
 
   return (
     <article>
@@ -161,31 +158,21 @@ export function DirectiveViewPage() {
         editable
         actions={
           <ExhibitActionBar>
-            {showSaveControls ? (
-              <>
-                <button onClick={save} className="tap-target text-accent hover:underline">
-                  Save
-                </button>
-                <button onClick={cancel} className="tap-target text-slate hover:underline">
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <>
-                <button onClick={() => runMutation.mutate()} disabled={runMutation.isPending} className="tap-target text-accent hover:underline disabled:opacity-50">
-                  {runMutation.isPending ? "Running —" : "Run now"}
-                </button>
-                <button onClick={toggleEnabled} className="tap-target text-accent hover:underline">
-                  {directive.enabled ? "Disable" : "Enable"}
-                </button>
-                <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
-                  Edit
-                </button>
-                <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
-                  Delete
-                </button>
-              </>
-            )}
+            <button onClick={() => runMutation.mutate()} disabled={runMutation.isPending} className="tap-target text-accent hover:underline disabled:opacity-50">
+              {runMutation.isPending ? "Running —" : "Run now"}
+            </button>
+            <button onClick={toggleEnabled} className="tap-target text-accent hover:underline">
+              {directive.enabled ? "Disable" : "Enable"}
+            </button>
+            <button
+              onClick={() => (editing ? setEditing(false) : editTitle())}
+              className="tap-target text-accent hover:underline"
+            >
+              {editing ? "Done" : "Edit"}
+            </button>
+            <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
+              Delete
+            </button>
           </ExhibitActionBar>
         }
       >

@@ -17,9 +17,14 @@ interface EventFormProps {
   values: EventFormValues;
   onChange: (values: EventFormValues) => void;
   calendarLocked?: boolean;
-  onSubmit: () => void;
+  // Omit entirely for an autosaving caller (editing an existing event) -
+  // the form then has no submit button at all, since every field change is
+  // already persisted by the caller's own autosave. Pass it only for a
+  // creation flow, where the record doesn't exist yet and one explicit
+  // action is still what instantiates it.
+  onSubmit?: () => void;
   submitting?: boolean;
-  submitLabel: string;
+  submitLabel?: string;
   onDelete?: () => void;
   deleting?: boolean;
   error?: string | null;
@@ -68,7 +73,7 @@ export function EventForm({
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit();
+        onSubmit?.();
       }}
     >
       {error && <div className="border border-alert px-3 py-2 font-mono text-sm text-alert">{error}</div>}
@@ -177,9 +182,7 @@ export function EventForm({
       </div>
 
       <div className="flex items-center justify-between border-t border-dust pt-4">
-        {readOnly ? (
-          <span />
-        ) : (
+        {!readOnly && onSubmit ? (
           <button
             type="submit"
             disabled={submitting}
@@ -187,6 +190,8 @@ export function EventForm({
           >
             {submitting ? "Saving —" : submitLabel}
           </button>
+        ) : (
+          <span />
         )}
         {onDelete && (
           <button

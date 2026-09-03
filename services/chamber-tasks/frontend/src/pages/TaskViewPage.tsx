@@ -11,6 +11,7 @@ import {
   resolveChamberPath,
   ConfirmSheet,
   showToast,
+  useAutosave,
 } from "@congress/congress-ui";
 import { fetchTask, updateTask, deleteTask, quickCreateTaskExhibit } from "@/lib/api";
 
@@ -64,18 +65,28 @@ export function TaskViewPage() {
   });
 
   // Loads drafts exactly once per task, not on every background refetch -
-  // the description is now always live (see below), so a resync gated on
-  // `!editing` (editing only ever toggles name/due-date) would stomp
-  // in-progress description edits made while `editing` is false.
+  // a resync gated on `!editing` (editing only ever toggles the name/due-
+  // date inputs' visibility) would stomp in-progress description edits.
   const initializedTaskIdRef = useRef<number | null>(null);
+  const { markSaved } = useAutosave({
+    value: { name: draftName, description: draftDescription, dueDate: draftDueDate || null },
+    enabled: initializedTaskIdRef.current !== null,
+    onSave: (draft) => updateMutation.mutate(draft),
+  });
   useEffect(() => {
     if (taskQuery.data && initializedTaskIdRef.current !== taskQuery.data.id) {
-      setDraftName(taskQuery.data.name);
-      setDraftDescription(taskQuery.data.description);
-      setDraftDueDate(toDateInputValue(taskQuery.data.dueDate));
+      const draft = {
+        name: taskQuery.data.name,
+        description: taskQuery.data.description,
+        dueDate: toDateInputValue(taskQuery.data.dueDate) || null,
+      };
+      setDraftName(draft.name);
+      setDraftDescription(draft.description);
+      setDraftDueDate(draft.dueDate ?? "");
+      markSaved(draft);
       initializedTaskIdRef.current = taskQuery.data.id;
     }
-  }, [taskQuery.data]);
+  }, [taskQuery.data, markSaved]);
 
   if (!Number.isInteger(taskId)) return <p className="font-mono text-sm text-alert">Invalid task id.</p>;
   if (taskQuery.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
@@ -96,23 +107,6 @@ export function TaskViewPage() {
       titleFieldRef.current?.select();
     });
   }
-
-  function save() {
-    updateMutation.mutate(
-      { name: draftName, description: draftDescription, dueDate: draftDueDate || null },
-      { onSuccess: () => setEditing(false) }
-    );
-  }
-
-  function cancel() {
-    setEditing(false);
-    setDraftName(task.name);
-    setDraftDescription(task.description);
-    setDraftDueDate(toDateInputValue(task.dueDate));
-  }
-
-  const descriptionDirty = draftDescription !== task.description;
-  const showSaveControls = editing || descriptionDirty;
 
   return (
     <article>
@@ -166,34 +160,21 @@ export function TaskViewPage() {
         onCreateReference={onCreateExhibit}
         actions={
           <ExhibitActionBar>
-            {showSaveControls ? (
-              <>
-                <button onClick={save} className="tap-target text-accent hover:underline">
-                  Save
-                </button>
-                <button onClick={cancel} className="tap-target text-slate hover:underline">
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => completeMutation.mutate(!task.completed)}
-                  className="tap-target text-accent hover:underline"
-                >
-                  {task.completed ? "Reopen" : "Complete"}
-                </button>
-                <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
-                  Edit
-                </button>
-                <button
-                  onClick={() => setConfirmingDelete(true)}
-                  className="tap-target text-alert hover:underline"
-                >
-                  Delete
-                </button>
-              </>
-            )}
+            <button
+              onClick={() => completeMutation.mutate(!task.completed)}
+              className="tap-target text-accent hover:underline"
+            >
+              {task.completed ? "Reopen" : "Complete"}
+            </button>
+            <button
+              onClick={() => (editing ? setEditing(false) : editTitle())}
+              className="tap-target text-accent hover:underline"
+            >
+              {editing ? "Done" : "Edit"}
+            </button>
+            <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
+              Delete
+            </button>
           </ExhibitActionBar>
         }
       >

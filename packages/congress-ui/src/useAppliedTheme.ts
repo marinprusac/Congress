@@ -46,8 +46,7 @@ const THEME_STORAGE_KEY = "congress-theme";
 // a data-theme attribute on the document root, which styles.css's dark
 // palette override keys off. Called once near the root of every Congress
 // frontend - Capitol and each Chamber - so the preference holds no matter
-// which app is currently open, the same "one setting, every device/app"
-// requirement Notes' autosave setting already established.
+// which app is currently open.
 //
 // A Chamber's homepage widget (rendered in an <iframe>, see Capitol's
 // WidgetGrid) is its own separate document - CSS custom properties don't

@@ -43,6 +43,13 @@
       "when": 1787325310378,
       "tag": "0005_pink_secret_warriors",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788403365782,
+      "tag": "0006_brief_typhoid_mary",
+      "breakpoints": true
     }
   ]
 }

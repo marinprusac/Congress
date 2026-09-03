@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PageHeader, FormLabel, FormTextInput, FormSubmitButton, showToast } from "@congress/congress-ui";
+import { PageHeader, FormLabel, FormTextInput, showToast, useAutosave } from "@congress/congress-ui";
 import { fetchSettings, updateSettings, fetchSyncHealth, triggerSync } from "@/lib/api";
 
 export function SettingsPage() {
@@ -10,19 +10,31 @@ export function SettingsPage() {
 
   const [hevyApiKey, setHevyApiKey] = useState("");
 
-  useEffect(() => {
-    if (settingsQuery.data) setHevyApiKey(settingsQuery.data.hevyApiKey ?? "");
-  }, [settingsQuery.data]);
-
   const mutation = useMutation({
-    mutationFn: () => updateSettings({ hevyApiKey: hevyApiKey.trim() || null }),
+    mutationFn: (key: string) => updateSettings({ hevyApiKey: key.trim() || null }),
     onSuccess: (updated) => {
       queryClient.setQueryData(["settings"], updated);
       queryClient.invalidateQueries({ queryKey: ["sync-health"] });
-      showToast("Settings saved");
     },
     onError: () => showToast("Failed to save settings.", "error"),
   });
+
+  // Loads the key exactly once - a background refetch (e.g. the sync-health
+  // panel's own poll) must never stomp an in-progress edit.
+  const initializedRef = useRef(false);
+  const { markSaved } = useAutosave({
+    value: hevyApiKey,
+    enabled: initializedRef.current,
+    onSave: (key) => mutation.mutate(key),
+  });
+  useEffect(() => {
+    if (settingsQuery.data && !initializedRef.current) {
+      const key = settingsQuery.data.hevyApiKey ?? "";
+      setHevyApiKey(key);
+      markSaved(key);
+      initializedRef.current = true;
+    }
+  }, [settingsQuery.data, markSaved]);
 
   const sync = useMutation({
     mutationFn: () => triggerSync(),
@@ -40,13 +52,7 @@ export function SettingsPage() {
     <section>
       <PageHeader title="Settings" />
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          mutation.mutate();
-        }}
-        className="mb-10"
-      >
+      <div className="mb-10">
         <FormLabel>Hevy API key</FormLabel>
         <FormTextInput
           type="password"
@@ -56,11 +62,9 @@ export function SettingsPage() {
           onChange={(e) => setHevyApiKey(e.target.value)}
         />
         <p className="-mt-3 mb-4 font-mono text-xs text-dust">
-          Found in the Hevy app under Settings → API. Clear this field and save to stop syncing.
+          Found in the Hevy app under Settings → API. Clear this field to stop syncing.
         </p>
-
-        <FormSubmitButton disabled={mutation.isPending}>{mutation.isPending ? "Saving —" : "Save Settings"}</FormSubmitButton>
-      </form>
+      </div>
 
       <div className="border-t border-dust pt-6">
         <p className="mb-3 font-mono text-xs uppercase tracking-wide text-dust">Hevy sync health</p>

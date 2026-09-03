@@ -1,7 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useShellHosted, resolveChamberPath, PageHeader, ExhibitLinksLayout, navigateToExhibit, getChamberIcon } from "@congress/congress-ui";
+import {
+  useShellHosted,
+  resolveChamberPath,
+  PageHeader,
+  ExhibitLinksLayout,
+  navigateToExhibit,
+  getChamberIcon,
+  useAutosave,
+} from "@congress/congress-ui";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { fetchEvent, updateEvent, deleteEvent } from "@/lib/api";
 import { getBrowserTimeZone, toDatetimeLocalInput } from "@/lib/datetime";
@@ -39,28 +47,41 @@ export function EditEventPage() {
     enabled: Boolean(accountId && calendarId && eventId),
   });
 
-  useEffect(() => {
-    if (data) setValues(toFormValues(data));
-  }, [data]);
-
   const updateMutation = useMutation({
-    mutationFn: () => {
-      if (!values) throw new Error("Form not loaded");
-      return updateEvent(Number(accountId), calendarId!, eventId!, {
-        title: values.title,
-        descriptionRich: values.description || undefined,
-        locationRich: values.location || undefined,
-        allDay: values.allDay,
-        start: values.start,
-        end: values.end,
+    mutationFn: (v: EventFormValues) =>
+      updateEvent(Number(accountId), calendarId!, eventId!, {
+        title: v.title,
+        descriptionRich: v.description || undefined,
+        locationRich: v.location || undefined,
+        allDay: v.allDay,
+        start: v.start,
+        end: v.end,
         timeZone: getBrowserTimeZone(),
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["events"] });
-      navigate(resolveChamberPath("/", "calendar", shellHosted));
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["events"] }),
+  });
+
+  // Loads form values from the server exactly once per event - a
+  // background refetch of the same event must never stomp in-progress
+  // local edits, but navigating to a different event must reset them.
+  const eventKey = accountId && calendarId && eventId ? `${accountId}::${calendarId}::${eventId}` : null;
+  const initializedEventKeyRef = useRef<string | null>(null);
+  const readOnly = data ? !data.editable : false;
+  const { markSaved } = useAutosave({
+    value: values,
+    enabled: values !== null && !readOnly,
+    onSave: (v) => {
+      if (v) updateMutation.mutate(v);
     },
   });
+  useEffect(() => {
+    if (data && eventKey && initializedEventKeyRef.current !== eventKey) {
+      const formValues = toFormValues(data);
+      setValues(formValues);
+      markSaved(formValues);
+      initializedEventKeyRef.current = eventKey;
+    }
+  }, [data, eventKey, markSaved]);
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteEvent(Number(accountId), calendarId!, eventId!),
@@ -90,10 +111,7 @@ export function EditEventPage() {
           values={values}
           onChange={setValues}
           calendarLocked
-          readOnly={data ? !data.editable : false}
-          onSubmit={() => updateMutation.mutate()}
-          submitting={updateMutation.isPending}
-          submitLabel="Save Changes"
+          readOnly={readOnly}
           onDelete={() => deleteMutation.mutate()}
           deleting={deleteMutation.isPending}
           error={

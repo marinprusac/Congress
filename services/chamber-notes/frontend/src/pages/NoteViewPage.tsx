@@ -11,8 +11,9 @@ import {
   resolveChamberPath,
   ConfirmSheet,
   showToast,
+  useAutosave,
 } from "@congress/congress-ui";
-import { fetchNote, updateNote, deleteNote, setPinned, fetchSettings, quickCreateNoteExhibit } from "@/lib/api";
+import { fetchNote, updateNote, deleteNote, setPinned, quickCreateNoteExhibit } from "@/lib/api";
 import type { NoteSummary } from "../../../src/types";
 
 export function NoteViewPage() {
@@ -24,24 +25,12 @@ export function NoteViewPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftContent, setDraftContent] = useState("");
-  const articleRef = useRef<HTMLElement>(null);
-  // Mirror the latest draft state into refs so the click-outside and ⌘S
-  // effects below (both stable, added once) can read the current draft
-  // without re-subscribing on every keystroke.
-  const draftTitleRef = useRef(draftTitle);
-  draftTitleRef.current = draftTitle;
-  const draftContentRef = useRef(draftContent);
-  draftContentRef.current = draftContent;
 
   const noteQuery = useQuery({
     queryKey: ["note", noteId],
     queryFn: () => fetchNote(noteId),
     enabled: Number.isInteger(noteId),
   });
-  const noteDataRef = useRef(noteQuery.data);
-  noteDataRef.current = noteQuery.data;
-
-  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
 
   const updateMutation = useMutation({
     mutationFn: (input: { title: string; content: string }) => updateNote(noteId, input),
@@ -49,9 +38,9 @@ export function NoteViewPage() {
       queryClient.setQueryData(["note", noteId], updated);
       // Keeps the home list's title/excerpt/pinned/updatedAt in sync live,
       // without the network round-trip a full invalidate would cost - an
-      // autosave firing every 1.2s while typing used to invalidate ["notes"]
-      // outright, refetching every note's body just to redraw one row's
-      // excerpt. A real resync still happens on explicit save/unmount below.
+      // autosave firing on every debounced edit would otherwise invalidate
+      // ["notes"] outright, refetching every note's body just to redraw one
+      // row's excerpt. A real resync still happens on unmount below.
       queryClient.setQueryData<NoteSummary[]>(["notes"], (list) =>
         list?.map((n) =>
           n.id === updated.id
@@ -68,24 +57,6 @@ export function NoteViewPage() {
       );
     },
   });
-
-  // Always reads the latest draft via refs (below) rather than closing over
-  // `draftTitle`/`draftContent` state directly, so it stays correct even
-  // when called from a stale closure captured by an effect that no longer
-  // re-runs on every keystroke (see the outside-click/⌘S effects).
-  function saveExplicit() {
-    updateMutation.mutate(
-      { title: draftTitleRef.current, content: draftContentRef.current },
-      { onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notes"] }) }
-    );
-  }
-
-  function cancelEdits() {
-    const data = noteDataRef.current;
-    if (!data) return;
-    setDraftTitle(data.title);
-    setDraftContent(data.content);
-  }
 
   // A real resync on leaving the page, even if every intermediate autosave
   // only patched the list cache in place above - covers drift the patch
@@ -119,48 +90,20 @@ export function NoteViewPage() {
   // in-progress local edits, but navigating to a *different* note (a new
   // `noteId`, hence a fresh id on the fetched data) must reset them.
   const initializedNoteIdRef = useRef<number | null>(null);
+  const { markSaved } = useAutosave({
+    value: { title: draftTitle, content: draftContent },
+    enabled: initializedNoteIdRef.current !== null,
+    onSave: (draft) => updateMutation.mutate(draft),
+  });
   useEffect(() => {
     if (noteQuery.data && initializedNoteIdRef.current !== noteQuery.data.id) {
-      setDraftTitle(noteQuery.data.title);
-      setDraftContent(noteQuery.data.content);
+      const draft = { title: noteQuery.data.title, content: noteQuery.data.content };
+      setDraftTitle(draft.title);
+      setDraftContent(draft.content);
+      markSaved(draft);
       initializedNoteIdRef.current = noteQuery.data.id;
     }
-  }, [noteQuery.data]);
-
-  useEffect(() => {
-    if (!settingsQuery.data?.autoSave || !noteQuery.data) return;
-    if (draftTitle === noteQuery.data.title && draftContent === noteQuery.data.content) return;
-    const timer = setTimeout(() => {
-      updateMutation.mutate({ title: draftTitle, content: draftContent });
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, [settingsQuery.data?.autoSave, draftTitle, draftContent, noteQuery.data]);
-
-  useEffect(() => {
-    function onOutsideDown(e: MouseEvent) {
-      if (!(e.target instanceof Node) || articleRef.current?.contains(e.target)) return;
-      const data = noteDataRef.current;
-      if (!data) return;
-      if (draftTitleRef.current !== data.title || draftContentRef.current !== data.content) {
-        saveExplicit();
-      }
-    }
-    document.addEventListener("mousedown", onOutsideDown);
-    return () => document.removeEventListener("mousedown", onOutsideDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        saveExplicit();
-      }
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [noteQuery.data, markSaved]);
 
   async function onCreateExhibit(title: string) {
     const result = await quickCreateNoteExhibit(title);
@@ -176,7 +119,7 @@ export function NoteViewPage() {
   const note = noteQuery.data;
 
   return (
-    <article ref={articleRef}>
+    <article>
       <div className="mb-6 border-b border-dust pb-4">
         <input
           value={draftTitle}
@@ -209,16 +152,6 @@ export function NoteViewPage() {
         onCreateReference={onCreateExhibit}
         actions={
           <ExhibitActionBar>
-            {!settingsQuery.data?.autoSave && (
-              <>
-                <button onClick={saveExplicit} className="tap-target text-accent hover:underline">
-                  Save
-                </button>
-                <button onClick={cancelEdits} className="tap-target text-slate hover:underline">
-                  Cancel
-                </button>
-              </>
-            )}
             <button
               onClick={() => pinMutation.mutate(!note.pinned)}
               className="tap-target text-accent hover:underline"

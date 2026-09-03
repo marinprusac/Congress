@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FormLabel } from "@congress/congress-ui";
+import { FormLabel, useAutosave } from "@congress/congress-ui";
 import { fetchSettings, updateSettings, fetchSpend } from "@/lib/api";
 import type { UpdateSettingsRequest } from "../../../src/types";
 
@@ -13,23 +13,34 @@ export function SettingsPage() {
 
   const [draft, setDraft] = useState<UpdateSettingsRequest>({});
 
+  const mutation = useMutation({
+    mutationFn: (input: UpdateSettingsRequest) => updateSettings(input),
+    onSuccess: (updated) => queryClient.setQueryData(["settings"], updated),
+  });
+
+  // Loads the draft exactly once - a background refetch (e.g. the spend
+  // panel's own poll) must never stomp an in-progress edit.
+  const initializedRef = useRef(false);
+  const { markSaved } = useAutosave({
+    value: draft,
+    enabled: initializedRef.current,
+    onSave: (d) => mutation.mutate(d),
+  });
   useEffect(() => {
-    if (settingsQuery.data) {
+    if (settingsQuery.data && !initializedRef.current) {
       const s = settingsQuery.data;
-      setDraft({
+      const loaded: UpdateSettingsRequest = {
         contextPrompt: s.contextPrompt,
         chatIdleWindowMs: s.chatIdleWindowMs,
         budgetCapUsd: s.budgetCapUsd,
         model: s.model,
         retentionDays: s.retentionDays,
-      });
+      };
+      setDraft(loaded);
+      markSaved(loaded);
+      initializedRef.current = true;
     }
-  }, [settingsQuery.data]);
-
-  const mutation = useMutation({
-    mutationFn: (input: UpdateSettingsRequest) => updateSettings(input),
-    onSuccess: (updated) => queryClient.setQueryData(["settings"], updated),
-  });
+  }, [settingsQuery.data, markSaved]);
 
   const pauseMutation = useMutation({
     mutationFn: (paused: boolean) => updateSettings({ paused, pausedReason: paused ? "Paused by owner." : null }),
@@ -40,10 +51,6 @@ export function SettingsPage() {
   if (settingsQuery.isError || !settingsQuery.data) return <p className="font-mono text-sm text-alert">Failed to reach the settings API.</p>;
 
   const settings = settingsQuery.data;
-
-  function save() {
-    mutation.mutate(draft);
-  }
 
   return (
     <section>
@@ -67,12 +74,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          save();
-        }}
-      >
+      <div>
         <FormLabel>Context</FormLabel>
         <textarea
           value={draft.contextPrompt ?? ""}
@@ -121,15 +123,7 @@ export function SettingsPage() {
         </div>
 
         {mutation.isError && <p className="mb-4 font-mono text-sm text-alert">{(mutation.error as Error).message}</p>}
-
-        <button
-          type="submit"
-          disabled={mutation.isPending}
-          className="border border-accent px-4 py-2 font-mono text-xs uppercase tracking-wide text-accent hover:bg-accent hover:text-parchment disabled:opacity-50"
-        >
-          {mutation.isPending ? "Saving —" : "Save Settings"}
-        </button>
-      </form>
+      </div>
     </section>
   );
 }

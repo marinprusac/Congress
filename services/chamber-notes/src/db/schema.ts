@@ -30,9 +30,3 @@ export const noteRefs = sqliteTable(
   },
   (table) => [uniqueIndex("note_refs_note_target_idx").on(table.noteId, table.targetExhibitId)]
 );
-
-// Single-row table (id is always 1) - Notes has one chamber-wide settings scope, not per-user.
-export const settings = sqliteTable("settings", {
-  id: integer("id").primaryKey().default(1),
-  autoSave: integer("auto_save", { mode: "boolean" }).notNull().default(false),
-});

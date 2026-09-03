@@ -50,4 +50,5 @@ export { PayloadFieldPicker } from "./PayloadFieldPicker.js";
 export type { ConfirmSheetProps } from "./ConfirmSheet.js";
 export { ToastHost } from "./ToastHost.js";
 export { showToast } from "./toast.js";
+export { useAutosave } from "./useAutosave.js";
 export type { ToastDetail } from "./toast.js";

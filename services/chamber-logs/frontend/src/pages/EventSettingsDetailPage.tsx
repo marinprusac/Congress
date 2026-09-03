@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getChamberIcon, showToast, PayloadFieldPicker } from "@congress/congress-ui";
+import { getChamberIcon, showToast, PayloadFieldPicker, useAutosave } from "@congress/congress-ui";
 import { fetchEventSettings, updateEventSettings, fetchHistory } from "@/lib/api";
 import { PayloadView, summarizePayload } from "@/components/PayloadView";
 import type { EventHistoryEntry, UpdateEventSettingsRequest } from "../../../src/types";
@@ -24,7 +24,6 @@ export function EventSettingsDetailPage() {
   const eventType = rawEventType ? decodeURIComponent(rawEventType) : "";
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<UpdateEventSettingsRequest>({});
-  const [dirty, setDirty] = useState(false);
   const titleRef = useRef<HTMLInputElement | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement | null>(null);
   const urlRef = useRef<HTMLInputElement | null>(null);
@@ -47,16 +46,22 @@ export function EventSettingsDetailPage() {
     onSuccess: (updated) => {
       queryClient.setQueryData(["event-settings", eventType], updated);
       queryClient.invalidateQueries({ queryKey: ["event-settings"] });
-      setDirty(false);
-      showToast("Saved");
     },
     onError: () => showToast("Failed to save.", "error"),
   });
 
+  // Loads the draft exactly once per event type - a background refetch of
+  // the same row must never stomp an in-progress edit.
+  const initializedEventTypeRef = useRef<string | null>(null);
+  const { markSaved } = useAutosave({
+    value: draft,
+    enabled: initializedEventTypeRef.current !== null,
+    onSave: (d) => updateMutation.mutate(d),
+  });
   useEffect(() => {
-    if (rowQuery.data && !dirty) {
+    if (rowQuery.data && initializedEventTypeRef.current !== rowQuery.data.eventType) {
       const r = rowQuery.data;
-      setDraft({
+      const loaded: UpdateEventSettingsRequest = {
         recordToHistory: r.recordToHistory,
         historyRetentionMs: r.historyRetentionMs,
         notify: r.notify,
@@ -64,9 +69,12 @@ export function EventSettingsDetailPage() {
         notifyBodyTemplate: r.notifyBodyTemplate,
         notifyUrlTemplate: r.notifyUrlTemplate,
         notifyDedupeKeyTemplate: r.notifyDedupeKeyTemplate,
-      });
+      };
+      setDraft(loaded);
+      markSaved(loaded);
+      initializedEventTypeRef.current = r.eventType;
     }
-  }, [rowQuery.data, dirty]);
+  }, [rowQuery.data, markSaved]);
 
   if (!eventType) return <p className="font-mono text-sm text-alert">Invalid event type.</p>;
   if (rowQuery.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
@@ -76,11 +84,6 @@ export function EventSettingsDetailPage() {
 
   function set<K extends keyof UpdateEventSettingsRequest>(key: K, value: UpdateEventSettingsRequest[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
-    setDirty(true);
-  }
-
-  function save() {
-    updateMutation.mutate(draft);
   }
 
   return (
@@ -210,15 +213,6 @@ export function EventSettingsDetailPage() {
           )}
         </div>
       </div>
-
-      <button
-        type="button"
-        onClick={save}
-        disabled={!dirty || updateMutation.isPending}
-        className="tap-target border border-accent px-4 py-2 font-mono text-xs uppercase tracking-wide text-accent hover:bg-accent hover:text-parchment disabled:opacity-50"
-      >
-        {updateMutation.isPending ? "Saving —" : "Save"}
-      </button>
 
       <div className="mt-10 border-t border-dust pt-6">
         <p className="mb-3 font-mono text-xs uppercase tracking-wide text-dust">Recent history</p>

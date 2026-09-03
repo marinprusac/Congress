@@ -32,13 +32,3 @@ export const updateNoteRequestSchema = z.object({
   pinned: z.boolean().optional(),
 });
 export type UpdateNoteRequest = z.infer<typeof updateNoteRequestSchema>;
-
-export const notesSettingsSchema = z.object({
-  autoSave: z.boolean(),
-});
-export type NotesSettings = z.infer<typeof notesSettingsSchema>;
-
-export const updateNotesSettingsRequestSchema = z.object({
-  autoSave: z.boolean().optional(),
-});
-export type UpdateNotesSettingsRequest = z.infer<typeof updateNotesSettingsRequestSchema>;

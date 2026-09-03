@@ -13,6 +13,7 @@ import {
   showToast,
   fetchEventCatalog,
   TriggerEventPicker,
+  useAutosave,
 } from "@congress/congress-ui";
 import { fetchAutomation, updateAutomation, deleteAutomation, fetchAutomationRuns, fetchChamberTools } from "@/lib/api";
 import { ChamberToolPicker } from "@/components/ChamberToolPicker";
@@ -78,15 +79,19 @@ export function AutomationViewPage() {
   });
 
   // Loads the draft exactly once per automation, not on every background
-  // refetch - the body field is now always live (see below), so a resync
-  // gated on `!editing` (editing only ever toggles the trigger/condition/
-  // action fields) would stomp in-progress body edits made while `editing`
-  // is false.
+  // refetch - the body field is always live (see below), so a resync gated
+  // on `!editing` (editing only ever toggles the trigger/condition/action
+  // fields' visibility) would stomp in-progress body edits.
   const initializedAutomationIdRef = useRef<number | null>(null);
+  const { markSaved } = useAutosave({
+    value: draft,
+    enabled: initializedAutomationIdRef.current !== null,
+    onSave: (d) => updateMutation.mutate(d),
+  });
   useEffect(() => {
     if (automationQuery.data && initializedAutomationIdRef.current !== automationQuery.data.id) {
       const a = automationQuery.data;
-      setDraft({
+      const loaded: UpdateAutomationRequest = {
         title: a.title,
         body: a.body,
         triggerEventType: a.triggerEventType,
@@ -96,10 +101,12 @@ export function AutomationViewPage() {
         toolName: a.toolName,
         argsTemplate: a.argsTemplate,
         enabled: a.enabled,
-      });
+      };
+      setDraft(loaded);
+      markSaved(loaded);
       initializedAutomationIdRef.current = a.id;
     }
-  }, [automationQuery.data]);
+  }, [automationQuery.data, markSaved]);
 
   if (!Number.isInteger(automationId)) return <p className="font-mono text-sm text-alert">Invalid automation id.</p>;
   if (automationQuery.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
@@ -115,31 +122,18 @@ export function AutomationViewPage() {
     });
   }
 
-  function save() {
-    updateMutation.mutate(draft, { onSuccess: () => setEditing(false) });
-  }
-
-  function cancel() {
-    setEditing(false);
-    setDraft({
-      title: automation.title,
-      body: automation.body,
-      triggerEventType: automation.triggerEventType,
-      conditionField: automation.conditionField ?? undefined,
-      conditionEquals: automation.conditionEquals ?? undefined,
-      targetChamber: automation.targetChamber,
-      toolName: automation.toolName,
-      argsTemplate: automation.argsTemplate,
-      enabled: automation.enabled,
-    });
-  }
-
+  // Bypasses the debounce for an instant flip (toggles read from
+  // `automation.enabled`, not `draft.enabled`, for their label/strikethrough
+  // - a debounced round-trip would leave the button momentarily lying about
+  // the current state). Folds the toggle into `draft` and marks it saved so
+  // a debounce already pending from an unrelated field edit can't re-send a
+  // stale `enabled` value moments later and flip it back.
   function toggleEnabled() {
-    updateMutation.mutate({ enabled: !automation.enabled });
+    const next: UpdateAutomationRequest = { ...draft, enabled: !automation.enabled };
+    setDraft(next);
+    markSaved(next);
+    updateMutation.mutate(next);
   }
-
-  const bodyDirty = (draft.body ?? "") !== automation.body;
-  const showSaveControls = editing || bodyDirty;
 
   return (
     <article>
@@ -255,28 +249,18 @@ export function AutomationViewPage() {
         editable
         actions={
           <ExhibitActionBar>
-            {showSaveControls ? (
-              <>
-                <button onClick={save} className="tap-target text-accent hover:underline">
-                  Save
-                </button>
-                <button onClick={cancel} className="tap-target text-slate hover:underline">
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <>
-                <button onClick={toggleEnabled} className="tap-target text-accent hover:underline">
-                  {automation.enabled ? "Disable" : "Enable"}
-                </button>
-                <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
-                  Edit
-                </button>
-                <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
-                  Delete
-                </button>
-              </>
-            )}
+            <button onClick={toggleEnabled} className="tap-target text-accent hover:underline">
+              {automation.enabled ? "Disable" : "Enable"}
+            </button>
+            <button
+              onClick={() => (editing ? setEditing(false) : editTitle())}
+              className="tap-target text-accent hover:underline"
+            >
+              {editing ? "Done" : "Edit"}
+            </button>
+            <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
+              Delete
+            </button>
           </ExhibitActionBar>
         }
       >

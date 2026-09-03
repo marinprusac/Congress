@@ -11,6 +11,7 @@ import {
   resolveChamberPath,
   ConfirmSheet,
   showToast,
+  useAutosave,
 } from "@congress/congress-ui";
 import { fetchDocument, updateDocument, deleteDocument, downloadUrl } from "@/lib/api";
 
@@ -43,7 +44,6 @@ export function DocumentViewPage() {
     onSuccess: (updated) => {
       queryClient.setQueryData(["document", documentId], updated);
       queryClient.invalidateQueries({ queryKey: ["documents"] });
-      setEditing(false);
     },
   });
 
@@ -58,17 +58,23 @@ export function DocumentViewPage() {
   });
 
   // Loads drafts exactly once per document, not on every background refetch
-  // - the description is now always live (see below), so a resync gated on
-  // `!editing` (editing only ever toggles the title) would stomp
-  // in-progress description edits made while `editing` is false.
+  // - a resync gated on `!editing` (editing only ever toggles the title)
+  // would stomp in-progress description edits made while `editing` is false.
   const initializedDocumentIdRef = useRef<number | null>(null);
+  const { markSaved } = useAutosave({
+    value: { title: draftTitle, description: draftDescription },
+    enabled: initializedDocumentIdRef.current !== null,
+    onSave: (draft) => updateMutation.mutate(draft),
+  });
   useEffect(() => {
     if (documentQuery.data && initializedDocumentIdRef.current !== documentQuery.data.id) {
-      setDraftTitle(documentQuery.data.title);
-      setDraftDescription(documentQuery.data.description);
+      const draft = { title: documentQuery.data.title, description: documentQuery.data.description };
+      setDraftTitle(draft.title);
+      setDraftDescription(draft.description);
+      markSaved(draft);
       initializedDocumentIdRef.current = documentQuery.data.id;
     }
-  }, [documentQuery.data]);
+  }, [documentQuery.data, markSaved]);
 
   if (!Number.isInteger(documentId)) return <p className="font-mono text-sm text-alert">Invalid document id.</p>;
   if (documentQuery.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
@@ -85,19 +91,6 @@ export function DocumentViewPage() {
     });
   }
 
-  function save() {
-    updateMutation.mutate({ title: draftTitle, description: draftDescription });
-  }
-
-  function cancel() {
-    setEditing(false);
-    setDraftTitle(doc.title);
-    setDraftDescription(doc.description);
-  }
-
-  const descriptionDirty = draftDescription !== doc.description;
-  const showSaveControls = editing || descriptionDirty;
-
   return (
     <article>
       <div className="mb-6 border-b border-dust pb-4">
@@ -106,6 +99,7 @@ export function DocumentViewPage() {
             ref={titleFieldRef}
             value={draftTitle}
             onChange={(e) => setDraftTitle(e.target.value)}
+            onBlur={() => setEditing(false)}
             placeholder="Untitled"
             className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           />
@@ -145,28 +139,12 @@ export function DocumentViewPage() {
         editable
         actions={
           <ExhibitActionBar>
-            {showSaveControls ? (
-              <>
-                <button onClick={save} className="tap-target text-accent hover:underline">
-                  Save
-                </button>
-                <button onClick={cancel} className="tap-target text-slate hover:underline">
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <>
-                <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
-                  Edit
-                </button>
-                <button
-                  onClick={() => setConfirmingDelete(true)}
-                  className="tap-target text-alert hover:underline"
-                >
-                  Delete
-                </button>
-              </>
-            )}
+            <button onClick={editTitle} className="tap-target text-accent hover:underline">
+              Edit
+            </button>
+            <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
+              Delete
+            </button>
           </ExhibitActionBar>
         }
       >

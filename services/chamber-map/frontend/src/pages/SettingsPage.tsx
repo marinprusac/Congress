@@ -1,44 +1,66 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PageHeader, FormLabel, FormTextInput, FormSubmitButton, showToast } from "@congress/congress-ui";
+import { PageHeader, FormLabel, FormTextInput, showToast, useAutosave } from "@congress/congress-ui";
 import { fetchSettings, updateSettings, fetchPollHealth, reprocessHistory } from "@/lib/api";
+
+interface SettingsDraft {
+  unknownClusterRadiusMeters: number;
+  minDwellMinutes: number;
+  stoppedSpeedKmh: number;
+  pollIntervalSeconds: number;
+  staleThresholdHours: number;
+}
+
+const DEFAULT_DRAFT: SettingsDraft = {
+  unknownClusterRadiusMeters: 150,
+  minDwellMinutes: 15,
+  stoppedSpeedKmh: 3,
+  pollIntervalSeconds: 120,
+  staleThresholdHours: 12,
+};
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
   const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
   const healthQuery = useQuery({ queryKey: ["poll-health"], queryFn: fetchPollHealth, refetchInterval: 30000 });
 
-  const [unknownClusterRadiusMeters, setUnknownClusterRadiusMeters] = useState(150);
-  const [minDwellMinutes, setMinDwellMinutes] = useState(15);
-  const [stoppedSpeedKmh, setStoppedSpeedKmh] = useState(3);
-  const [pollIntervalSeconds, setPollIntervalSeconds] = useState(120);
-  const [staleThresholdHours, setStaleThresholdHours] = useState(12);
-
-  useEffect(() => {
-    if (settingsQuery.data) {
-      setUnknownClusterRadiusMeters(settingsQuery.data.unknownClusterRadiusMeters);
-      setMinDwellMinutes(Math.round(settingsQuery.data.minDwellMs / 60000));
-      setStoppedSpeedKmh(settingsQuery.data.stoppedSpeedKmh);
-      setPollIntervalSeconds(Math.round(settingsQuery.data.pollIntervalMs / 1000));
-      setStaleThresholdHours(settingsQuery.data.staleThresholdMs / 3600000);
-    }
-  }, [settingsQuery.data]);
+  const [draft, setDraft] = useState<SettingsDraft>(DEFAULT_DRAFT);
 
   const mutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (d: SettingsDraft) =>
       updateSettings({
-        unknownClusterRadiusMeters,
-        minDwellMs: minDwellMinutes * 60000,
-        stoppedSpeedKmh,
-        pollIntervalMs: pollIntervalSeconds * 1000,
-        staleThresholdMs: staleThresholdHours * 3600000,
+        unknownClusterRadiusMeters: d.unknownClusterRadiusMeters,
+        minDwellMs: d.minDwellMinutes * 60000,
+        stoppedSpeedKmh: d.stoppedSpeedKmh,
+        pollIntervalMs: d.pollIntervalSeconds * 1000,
+        staleThresholdMs: d.staleThresholdHours * 3600000,
       }),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(["settings"], updated);
-      showToast("Settings saved");
-    },
+    onSuccess: (updated) => queryClient.setQueryData(["settings"], updated),
     onError: () => showToast("Failed to save settings.", "error"),
   });
+
+  // Loads the draft exactly once - a background refetch (e.g. the health
+  // panel's own poll) must never stomp an in-progress edit.
+  const initializedRef = useRef(false);
+  const { markSaved } = useAutosave({
+    value: draft,
+    enabled: initializedRef.current,
+    onSave: (d) => mutation.mutate(d),
+  });
+  useEffect(() => {
+    if (settingsQuery.data && !initializedRef.current) {
+      const loaded: SettingsDraft = {
+        unknownClusterRadiusMeters: settingsQuery.data.unknownClusterRadiusMeters,
+        minDwellMinutes: Math.round(settingsQuery.data.minDwellMs / 60000),
+        stoppedSpeedKmh: settingsQuery.data.stoppedSpeedKmh,
+        pollIntervalSeconds: Math.round(settingsQuery.data.pollIntervalMs / 1000),
+        staleThresholdHours: settingsQuery.data.staleThresholdMs / 3600000,
+      };
+      setDraft(loaded);
+      markSaved(loaded);
+      initializedRef.current = true;
+    }
+  }, [settingsQuery.data, markSaved]);
 
   // Two-step rather than a browser confirm(): a rebuild throws away every
   // derived visit and trip and recomputes them, so it shouldn't fire on one
@@ -65,24 +87,23 @@ export function SettingsPage() {
     <section>
       <PageHeader title="Settings" />
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          mutation.mutate();
-        }}
-        className="mb-10"
-      >
+      <div className="mb-10">
         <FormLabel>Unknown-location cluster radius (meters)</FormLabel>
         <FormTextInput
           type="number"
           min={10}
-          value={unknownClusterRadiusMeters}
-          onChange={(e) => setUnknownClusterRadiusMeters(Number(e.target.value))}
+          value={draft.unknownClusterRadiusMeters}
+          onChange={(e) => setDraft((d) => ({ ...d, unknownClusterRadiusMeters: Number(e.target.value) }))}
         />
         <p className="-mt-3 mb-4 font-mono text-xs text-dust">How close two unmatched fixes must be to count as the same unrecognized spot.</p>
 
         <FormLabel>Minimum dwell before asking about a spot (minutes)</FormLabel>
-        <FormTextInput type="number" min={1} value={minDwellMinutes} onChange={(e) => setMinDwellMinutes(Number(e.target.value))} />
+        <FormTextInput
+          type="number"
+          min={1}
+          value={draft.minDwellMinutes}
+          onChange={(e) => setDraft((d) => ({ ...d, minDwellMinutes: Number(e.target.value) }))}
+        />
         <p className="-mt-3 mb-4 font-mono text-xs text-dust">
           A shorter stop than this never shows up on the Pending page - it's treated as a quick stop, not a place worth naming.
         </p>
@@ -92,8 +113,8 @@ export function SettingsPage() {
           type="number"
           min={0.5}
           step={0.5}
-          value={stoppedSpeedKmh}
-          onChange={(e) => setStoppedSpeedKmh(Number(e.target.value))}
+          value={draft.stoppedSpeedKmh}
+          onChange={(e) => setDraft((d) => ({ ...d, stoppedSpeedKmh: Number(e.target.value) }))}
         />
         <p className="-mt-3 mb-4 font-mono text-xs text-dust">
           Below this speed an unmatched fix counts as "stopped somewhere" instead of transit. Raise it if a slow drive keeps
@@ -101,7 +122,12 @@ export function SettingsPage() {
         </p>
 
         <FormLabel>Traccar poll interval (seconds)</FormLabel>
-        <FormTextInput type="number" min={15} value={pollIntervalSeconds} onChange={(e) => setPollIntervalSeconds(Number(e.target.value))} />
+        <FormTextInput
+          type="number"
+          min={15}
+          value={draft.pollIntervalSeconds}
+          onChange={(e) => setDraft((d) => ({ ...d, pollIntervalSeconds: Number(e.target.value) }))}
+        />
         <p className="-mt-3 mb-4 font-mono text-xs text-dust">
           How often this Chamber asks Traccar for new fixes. Only helps if your device is actually reporting more often than
           this - it can't recover location the device itself never sent.
@@ -112,17 +138,15 @@ export function SettingsPage() {
           type="number"
           min={1}
           step={1}
-          value={staleThresholdHours}
-          onChange={(e) => setStaleThresholdHours(Number(e.target.value))}
+          value={draft.staleThresholdHours}
+          onChange={(e) => setDraft((d) => ({ ...d, staleThresholdHours: Number(e.target.value) }))}
         />
         <p className="-mt-3 mb-4 font-mono text-xs text-dust">
           If the device hasn't sent a real position in this long, a Traccar poll can still succeed with nothing new to show
           for it - a phone-side issue (permissions, background refresh, the tracker app closed), not something this Chamber
           can recover from. Fires a notification via the Logs Chamber instead of leaving it to be noticed as missing visits.
         </p>
-
-        <FormSubmitButton disabled={mutation.isPending}>{mutation.isPending ? "Saving —" : "Save Settings"}</FormSubmitButton>
-      </form>
+      </div>
 
       <div className="border-t border-dust pt-6">
         <p className="mb-3 font-mono text-xs uppercase tracking-wide text-dust">Traccar polling health</p>

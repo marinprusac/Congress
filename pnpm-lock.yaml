@@ -99,7 +99,7 @@ importers:
       '@fontsource/ibm-plex-mono':
         specifier: ^5.1.0
         version: 5.3.0
-      '@fontsource/ibm-plex-sans':
+      '@fontsource/ibm-plex-sans-condensed':
         specifier: ^5.1.0
         version: 5.3.0
       '@lezer/common':
@@ -198,7 +198,7 @@ importers:
       '@fontsource/ibm-plex-mono':
         specifier: ^5.1.0
         version: 5.3.0
-      '@fontsource/ibm-plex-sans':
+      '@fontsource/ibm-plex-sans-condensed':
         specifier: ^5.1.0
         version: 5.3.0
       '@hono/node-server':
@@ -304,7 +304,7 @@ importers:
       '@fontsource/ibm-plex-mono':
         specifier: ^5.1.0
         version: 5.3.0
-      '@fontsource/ibm-plex-sans':
+      '@fontsource/ibm-plex-sans-condensed':
         specifier: ^5.1.0
         version: 5.3.0
       '@hono/node-server':
@@ -404,7 +404,7 @@ importers:
       '@fontsource/ibm-plex-mono':
         specifier: ^5.1.0
         version: 5.3.0
-      '@fontsource/ibm-plex-sans':
+      '@fontsource/ibm-plex-sans-condensed':
         specifier: ^5.1.0
         version: 5.3.0
       '@hono/node-server':
@@ -510,7 +510,7 @@ importers:
       '@fontsource/ibm-plex-mono':
         specifier: ^5.1.0
         version: 5.3.0
-      '@fontsource/ibm-plex-sans':
+      '@fontsource/ibm-plex-sans-condensed':
         specifier: ^5.1.0
         version: 5.3.0
       '@hono/node-server':
@@ -610,7 +610,7 @@ importers:
       '@fontsource/ibm-plex-mono':
         specifier: ^5.1.0
         version: 5.3.0
-      '@fontsource/ibm-plex-sans':
+      '@fontsource/ibm-plex-sans-condensed':
         specifier: ^5.1.0
         version: 5.3.0
       '@hono/node-server':
@@ -716,7 +716,7 @@ importers:
       '@fontsource/ibm-plex-mono':
         specifier: ^5.1.0
         version: 5.3.0
-      '@fontsource/ibm-plex-sans':
+      '@fontsource/ibm-plex-sans-condensed':
         specifier: ^5.1.0
         version: 5.3.0
       '@hono/node-server':
@@ -816,7 +816,7 @@ importers:
       '@fontsource/ibm-plex-mono':
         specifier: ^5.1.0
         version: 5.3.0
-      '@fontsource/ibm-plex-sans':
+      '@fontsource/ibm-plex-sans-condensed':
         specifier: ^5.1.0
         version: 5.3.0
       '@hono/node-server':
@@ -928,7 +928,7 @@ importers:
       '@fontsource/ibm-plex-mono':
         specifier: ^5.1.0
         version: 5.3.0
-      '@fontsource/ibm-plex-sans':
+      '@fontsource/ibm-plex-sans-condensed':
         specifier: ^5.1.0
         version: 5.3.0
       '@hono/node-server':
@@ -1043,7 +1043,7 @@ importers:
       '@fontsource/ibm-plex-mono':
         specifier: ^5.1.0
         version: 5.3.0
-      '@fontsource/ibm-plex-sans':
+      '@fontsource/ibm-plex-sans-condensed':
         specifier: ^5.1.0
         version: 5.3.0
       '@hono/node-server':
@@ -1152,7 +1152,7 @@ importers:
       '@fontsource/ibm-plex-mono':
         specifier: ^5.1.0
         version: 5.3.0
-      '@fontsource/ibm-plex-sans':
+      '@fontsource/ibm-plex-sans-condensed':
         specifier: ^5.1.0
         version: 5.3.0
       '@hono/node-server':
@@ -1258,7 +1258,7 @@ importers:
       '@fontsource/ibm-plex-mono':
         specifier: ^5.1.0
         version: 5.3.0
-      '@fontsource/ibm-plex-sans':
+      '@fontsource/ibm-plex-sans-condensed':
         specifier: ^5.1.0
         version: 5.3.0
       '@hono/node-server':
@@ -2368,8 +2368,8 @@ packages:
   '@fontsource/ibm-plex-mono@5.3.0':
     resolution: {integrity: sha512-eTgnZjZEGk1QtD3ZstF+Vclo2HLAni8YMy34/DxllwZvyz1lR/1RF/xTiAquOBO7MvqBx8D2Ig2WCPMVfdZu7Q==}
 
-  '@fontsource/ibm-plex-sans@5.3.0':
-    resolution: {integrity: sha512-CbE4CbbEEZJX860XyUiRpsksXIQR8Rp2XDva2VO53NJox9tVNtusrysd2x5YkUEY3ErQ66W1IiiQL8/wihhw5w==}
+  '@fontsource/ibm-plex-sans-condensed@5.3.0':
+    resolution: {integrity: sha512-fQyBpwbkguP4azjq7Cw8h/J3C/d8MFAzXOiSoFxyKCUK4x0XKrWEh3tGdTxhDM0HctVRQilQo1zGoyxDHLm5jQ==}
 
   '@hono/node-server@2.1.0':
     resolution: {integrity: sha512-XovyyCCnBzW+zKu+z/zq8hwNs4KOR5rEMAOxo2f40Q5xoOI37IMm6MIg2COOUtUApo0i6850MTBKH2u4QLGIqg==}
@@ -5926,7 +5926,7 @@ snapshots:
 
   '@fontsource/ibm-plex-mono@5.3.0': {}
 
-  '@fontsource/ibm-plex-sans@5.3.0': {}
+  '@fontsource/ibm-plex-sans-condensed@5.3.0': {}
 
   '@hono/node-server@2.1.0(hono@4.13.1)':
     dependencies:

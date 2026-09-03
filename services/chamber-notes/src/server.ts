@@ -1,10 +1,9 @@
 import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
-import { createNoteRequestSchema, updateNoteRequestSchema, updateNotesSettingsRequestSchema } from "./types.js";
+import { createNoteRequestSchema, updateNoteRequestSchema } from "./types.js";
 import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,
-  mountSettingsRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
 } from "@congress/chamber-kit";
@@ -23,7 +22,6 @@ import {
   resyncNoteExhibitByExhibitId,
   TitleConflictError,
 } from "./notes.js";
-import { getSettings, updateSettings } from "./settings.js";
 import { searchNoteExhibits, resolveNoteExhibits, chipNoteExhibit } from "./exhibits.js";
 import { mcpApp } from "./mcp/server.js";
 
@@ -105,8 +103,6 @@ mountManualRefsRoutes(
   { list: listManualRefsByExhibitId, add: addManualRefByExhibitId, remove: removeManualRefByExhibitId },
   resyncNoteExhibitByExhibitId
 );
-
-mountSettingsRoutes(app, { getSettings, updateSettings }, updateNotesSettingsRequestSchema);
 
 app.route("/mcp", mcpApp);
 

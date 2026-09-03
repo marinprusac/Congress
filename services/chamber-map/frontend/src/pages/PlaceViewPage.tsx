@@ -11,6 +11,7 @@ import {
   resolveChamberPath,
   ConfirmSheet,
   showToast,
+  useAutosave,
 } from "@congress/congress-ui";
 import { fetchPlace, updatePlace, deletePlace, quickCreatePlaceExhibit } from "@/lib/api";
 import { PlacePicker } from "@/components/PlacePicker";
@@ -59,17 +60,30 @@ export function PlaceViewPage() {
   });
 
   // Loads exactly once per place, not on every background refetch - the
-  // body field is now always live (see below), so a resync gated on
-  // `!editing` (editing only ever toggles the name/radius/location fields)
-  // would stomp in-progress body edits made while `editing` is false.
+  // body field is always live (see below), so a resync gated on `!editing`
+  // (editing only ever toggles the name/radius/location fields' visibility)
+  // would stomp in-progress body edits.
   const initializedPlaceIdRef = useRef<number | null>(null);
+  const { markSaved } = useAutosave({
+    value: draft,
+    enabled: initializedPlaceIdRef.current !== null,
+    onSave: (d) => updateMutation.mutate(d),
+  });
   useEffect(() => {
     if (placeQuery.data && initializedPlaceIdRef.current !== placeQuery.data.id) {
       const p = placeQuery.data;
-      setDraft({ name: p.name, body: p.body, latitude: p.latitude, longitude: p.longitude, radiusMeters: p.radiusMeters });
+      const loaded: UpdatePlaceRequest = {
+        name: p.name,
+        body: p.body,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        radiusMeters: p.radiusMeters,
+      };
+      setDraft(loaded);
+      markSaved(loaded);
       initializedPlaceIdRef.current = p.id;
     }
-  }, [placeQuery.data]);
+  }, [placeQuery.data, markSaved]);
 
   if (!Number.isInteger(placeId)) return <p className="font-mono text-sm text-alert">Invalid place id.</p>;
   if (placeQuery.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
@@ -90,18 +104,6 @@ export function PlaceViewPage() {
       titleFieldRef.current?.select();
     });
   }
-
-  function save() {
-    updateMutation.mutate(draft, { onSuccess: () => setEditing(false) });
-  }
-
-  function cancel() {
-    setEditing(false);
-    setDraft({ name: place.name, body: place.body, latitude: place.latitude, longitude: place.longitude, radiusMeters: place.radiusMeters });
-  }
-
-  const bodyDirty = (draft.body ?? "") !== place.body;
-  const showSaveControls = editing || bodyDirty;
 
   return (
     <article>
@@ -163,25 +165,15 @@ export function PlaceViewPage() {
         onCreateReference={onCreateExhibit}
         actions={
           <ExhibitActionBar>
-            {showSaveControls ? (
-              <>
-                <button onClick={save} className="tap-target text-accent hover:underline">
-                  Save
-                </button>
-                <button onClick={cancel} className="tap-target text-slate hover:underline">
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <>
-                <button onClick={() => setEditing(true)} className="tap-target text-accent hover:underline">
-                  Edit
-                </button>
-                <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
-                  Delete
-                </button>
-              </>
-            )}
+            <button
+              onClick={() => (editing ? setEditing(false) : editTitle())}
+              className="tap-target text-accent hover:underline"
+            >
+              {editing ? "Done" : "Edit"}
+            </button>
+            <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
+              Delete
+            </button>
           </ExhibitActionBar>
         }
       >

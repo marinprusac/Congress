@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Link } from "react-router-dom";
-import { useShellHosted, resolveChamberPath, showToast } from "@congress/congress-ui";
+import { useShellHosted, resolveChamberPath, useAutosave } from "@congress/congress-ui";
 import { fetchVisits, fetchTrips, fetchVisit, fetchVisitActiveAt, labelTrip } from "@/lib/api";
 import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
 import { formatDuration } from "@/lib/formatDuration";
@@ -107,16 +107,20 @@ function TripEntry({ trip }: { trip: Trip }) {
   const editRef = useRef<HTMLSpanElement>(null);
 
   const mutation = useMutation({
-    mutationFn: () => labelTrip(trip.id, { label }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["trips"] });
-      showToast(label.trim() ? "Labeled" : "Label cleared");
-      setEditing(false);
-    },
+    mutationFn: (l: string) => labelTrip(trip.id, { label: l }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["trips"] }),
   });
 
-  // A click anywhere outside the input/save control closes editing without
-  // saving - same as Escape below, just for the "clicked elsewhere" case.
+  // `label`'s initial value already matches the last-saved label (set from
+  // the `trip` prop above), so the hook's own baseline is correct from
+  // mount - no separate load-then-markSaved step needed, unlike a page
+  // whose draft only becomes real once an async query resolves.
+  useAutosave({ value: label, onSave: (l) => mutation.mutate(l) });
+
+  // A click anywhere outside the input closes the inline editor - same as
+  // Escape below, just for the "clicked elsewhere" case. Typed text is
+  // already autosaving as it's typed, so this only ever hides the input,
+  // never discards anything.
   useEffect(() => {
     if (!editing) return;
     function onPointerDown(e: PointerEvent) {
@@ -139,15 +143,11 @@ function TripEntry({ trip }: { trip: Trip }) {
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") mutation.mutate();
-              if (e.key === "Escape") setEditing(false);
+              if (e.key === "Enter" || e.key === "Escape") setEditing(false);
             }}
             placeholder='e.g. "walking the dog"'
             className="w-36 border-b border-dust bg-transparent px-1 text-xs text-ink focus:outline-none focus-visible:border-accent"
           />
-          <button disabled={mutation.isPending} onClick={() => mutation.mutate()} className="text-accent hover:underline disabled:opacity-50">
-            save
-          </button>
         </span>
       ) : (
         <button onClick={() => setEditing(true)} className="text-accent hover:underline">

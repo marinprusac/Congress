@@ -1,11 +1,4 @@
-import type {
-  NoteSummary,
-  NoteDetail,
-  CreateNoteRequest,
-  UpdateNoteRequest,
-  NotesSettings,
-  UpdateNotesSettingsRequest,
-} from "../../../src/types";
+import type { NoteSummary, NoteDetail, CreateNoteRequest, UpdateNoteRequest } from "../../../src/types";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
@@ -63,16 +56,4 @@ export function setPinned(id: number, pinned: boolean): Promise<NoteDetail> {
 export async function quickCreateNoteExhibit(title: string): Promise<CapitolExhibitSearchResult> {
   const note = await createNote({ title, content: "" });
   return { chamber: "notes", id: `note-${note.id}`, type: "note", name: note.title, url: `/n/${note.id}` };
-}
-
-export function fetchSettings(): Promise<NotesSettings> {
-  return fetch(`${API_BASE}/settings`).then((res) => json(res));
-}
-
-export function updateSettings(input: UpdateNotesSettingsRequest): Promise<NotesSettings> {
-  return fetch(`${API_BASE}/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  }).then((res) => json(res));
 }
