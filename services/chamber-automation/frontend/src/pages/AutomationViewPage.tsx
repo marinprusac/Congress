@@ -203,7 +203,7 @@ export function AutomationViewPage() {
         <ExhibitFieldEditor
           value={draft.body ?? ""}
           onChange={(value) => setDraft((d) => ({ ...d, body: value }))}
-          minRows={8}
+          minRows={3}
           placeholder="— No notes —"
           className="w-full bg-parchment p-3 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}

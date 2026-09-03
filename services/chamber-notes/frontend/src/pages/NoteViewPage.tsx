@@ -170,7 +170,7 @@ export function NoteViewPage() {
         <ExhibitFieldEditor
           value={draftContent}
           onChange={setDraftContent}
-          minRows={20}
+          minRows={3}
           placeholder="Start writing. Type @ to reference a note, event, or other Exhibit."
           className="w-full bg-parchment p-3 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}

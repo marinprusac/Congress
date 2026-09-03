@@ -125,7 +125,7 @@ export function DocumentViewPage() {
         <ExhibitFieldEditor
           value={draftDescription}
           onChange={setDraftDescription}
-          minRows={10}
+          minRows={3}
           placeholder="— No description —"
           className="w-full bg-parchment p-3 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
