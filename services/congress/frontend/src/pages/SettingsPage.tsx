@@ -65,7 +65,6 @@ function useChamberSettingsPanels(chambers: { name: string; displayName: string 
       return resolved.filter((panel): panel is ChamberSettingsPanel => panel !== null);
     },
     enabled: chambers.length > 0,
-    staleTime: Infinity,
   });
 }
 
