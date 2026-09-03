@@ -9,17 +9,18 @@ import { fetchRegistry, loadRemoteModule, evictRemoteModule } from "@congress/co
 // instead of a full navigation. The underlying module+stylesheet fetch
 // itself is cached in congress-ui's loadRemoteModule (shared with Capitol's
 // canvas, which resolves the same remote-entry.js's `widgets` export) -
-// this cache is just this file's own lazy()-wrapper layer on top.
+// this cache is just this file's own lazy()-wrapper layer on top. A Chamber
+// is deliberately never fetched before this - no eager warmup of every
+// registered Chamber on boot, since that was proactively racing 9 unwanted
+// background fetches against whichever one the owner actually opened,
+// starving it of connection budget on a slow network. The tradeoff is a
+// real loading-bar flash the first time a given Chamber is ever opened in
+// this browser (React's lazy() unavoidably suspends on its very first
+// render regardless of how fast the fetch resolves) - acceptable since the
+// underlying remote-entry.js/.css is then cached by the service worker for
+// good (see sw.ts's chamber-remotes route), so every visit after the first
+// one, in this session or a future one, renders from cache immediately.
 const componentCache = new Map<string, LazyExoticComponent<ComponentType>>();
-
-// Kicks off (or reuses) a Chamber's module+stylesheet fetch without waiting
-// on it. Called for every active Chamber as soon as the registry loads (see
-// App.tsx), so navigating to any Chamber - from Capitol or from another
-// Chamber - never shows ChamberHost's loading bar for a fetch that's already
-// well underway or finished.
-export function preloadChamber(chamberName: string): void {
-  void loadRemoteModule(chamberName);
-}
 
 function getChamberComponent(chamberName: string): LazyExoticComponent<ComponentType> {
   let component = componentCache.get(chamberName);
@@ -28,64 +29,6 @@ function getChamberComponent(chamberName: string): LazyExoticComponent<Component
     componentCache.set(chamberName, component);
   }
   return component;
-}
-
-// Force-resolves the given Chamber's lazy() component by actually rendering
-// it once, off-screen. Network-preloading the module (preloadChamber) alone
-// isn't enough to make the first real navigation instant: a thenable's
-// .then() callback can never fire synchronously, even for an
-// already-settled promise, so React's lazy() unavoidably suspends on the
-// very first render it's ever given - no matter how far in advance the
-// underlying promise resolved - and only a *later* render of that same
-// lazy() object can render synchronously. Doing that first, throwaway
-// render here means it happens invisibly, well before the user ever clicks
-// into this Chamber, instead of during ChamberHost's real Suspense
-// boundary - which is what was still showing the loading bar (and briefly
-// unmounting the whole shell, nav included, since it all lives inside that
-// one boundary) even once everything was fully preloaded.
-//
-// Mounted (not "rendered and discarded") because the resolution has to
-// stick - a component that unmounts before its lazy import resolves throws
-// the warm-up away with it. Kept in a `display: none` container rather than
-// never rendered at all. The target Chamber's own <Routes> won't match
-// the shell's actual current URL unless this happens to be the active
-// Chamber, so nothing beyond its top-level App() (a cheap, idempotent
-// settings fetch - see useAppliedTheme) actually does anything.
-function ChamberWarmup({ chamberName }: { chamberName: string }) {
-  const Component = getChamberComponent(chamberName);
-  return (
-    <Suspense fallback={null}>
-      <Component />
-    </Suspense>
-  );
-}
-
-// Renders one hidden, error-isolated ChamberWarmup per active Chamber other
-// than whichever one (if any) is genuinely on-screen right now - that one's
-// already being rendered for real by ChamberHost, so warming it again here
-// would just be a redundant full mount. Each gets its own
-// ChamberErrorBoundary for the same reason ChamberHost's real render does:
-// an uncaught error from a failed import doesn't care that its subtree is
-// invisible, it still propagates up and would otherwise take down the
-// entire shell.
-export function ChamberWarmups({
-  activeChamberNames,
-  currentChamberName,
-}: {
-  activeChamberNames: string[];
-  currentChamberName: string | undefined;
-}) {
-  return (
-    <div style={{ display: "none" }} aria-hidden="true">
-      {activeChamberNames
-        .filter((name) => name !== currentChamberName)
-        .map((name) => (
-          <ChamberErrorBoundary key={name} chamberName={name}>
-            <ChamberWarmup chamberName={name} />
-          </ChamberErrorBoundary>
-        ))}
-    </div>
-  );
 }
 
 function ChamberLoadingBar() {

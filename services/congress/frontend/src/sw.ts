@@ -66,11 +66,13 @@ registerRoute(
 );
 
 // Every Chamber's own remote-entry.js/.css (its actual UI code and styles,
-// not just data) - the same fetches App.tsx's existing preloadChamber/
-// ChamberWarmups already make to warm ChamberHost's in-memory module cache
-// transparently populate this persistent one too, so a cold tab (new tab,
-// reload, returning after a while) serves a Chamber's real interface from
-// Cache Storage instead of a fresh network fetch.
+// not just data) - populated the first time a Chamber is actually opened
+// (ChamberHost's own lazy import, or Settings/a widget resolving that same
+// remote-entry.js), never eagerly for Chambers nobody has visited. Once an
+// entry lands here it stays - a cold tab (new tab, reload, returning after
+// a while, even a future session) serves that Chamber's real interface from
+// Cache Storage instead of a fresh network fetch, for as long as this
+// BUILD_ID's cache is current.
 registerRoute(
   ({ url }) => /^\/[^/]+\/remote-entry\.(js|css)$/.test(url.pathname),
   new StaleWhileRevalidate({

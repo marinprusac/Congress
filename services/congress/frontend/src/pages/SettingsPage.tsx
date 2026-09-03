@@ -46,9 +46,11 @@ interface ChamberSettingsPanel {
 }
 
 // Resolves every active Chamber's own `settings` export (see RemoteModule)
-// out of the same remote-entry.js ChamberWarmups already preloads on
-// registry load - a Chamber with nothing configurable, or one that fails to
-// load, is simply excluded from the tab strip rather than shown broken. Only
+// out of that Chamber's own remote-entry.js, fetching it on demand the same
+// way ChamberHost does for a full Chamber visit - opening Settings is itself
+// the trigger, there's no separate eager preload to lean on. A Chamber with
+// nothing configurable, or one that fails to load, is simply excluded from
+// the tab strip rather than shown broken. Only
 // serializable {name, displayName} pairs go into this query's data - Congress
 // wraps every query in PersistedQueryProvider, which round-trips cached data
 // through IndexedDB via JSON, and a live component reference doesn't survive
