@@ -21,13 +21,9 @@ export async function logout(): Promise<void> {
 
 const APP_UPDATED_TIMEOUT_MS = 1500;
 
-// `keepalive` is meant to let a fetch survive the page reload that follows
-// it right away (see main.tsx's controllerchange handler), but WebKit's
-// support for that has a long history of not actually surviving a
-// same-tick navigation - the exact browser this fires in on an installed
-// iOS PWA. So main.tsx awaits this (bounded by a short timeout, not left
-// to hang if the network is briefly unreachable mid-deploy) before
-// reloading, rather than relying on keepalive alone to win the race.
+// `keepalive` alone doesn't reliably survive the reload that follows this
+// right away on WebKit, so main.tsx awaits this (bounded by a short
+// timeout) before reloading instead of racing it.
 export async function notifyAppUpdated(): Promise<void> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), APP_UPDATED_TIMEOUT_MS);

@@ -98,17 +98,11 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
     // the window/document) is caught too.
     window.addEventListener("scroll", measure, true);
     window.addEventListener("resize", measure);
-    // On iOS Safari, the on-screen keyboard (and its QuickType suggestion
-    // bar, which grows/shrinks as you type) resizes and scrolls the
-    // *visual* viewport without firing a `window` resize/scroll event -
-    // window.innerHeight and scrollY don't change, only visualViewport's
-    // own dimensions/offset do. Without this, the caret can be scrolled to
-    // a new on-screen position (e.g. as the QuickType bar toggles while
-    // typing the query) that this measurement never learns about, leaving
-    // the dropdown anchored to a stale position - exactly the "picker
-    // covers the line it's being written to" bug this whole placement
-    // scheme exists to avoid. useKeyboardInset already listens to these
-    // same events for the other half of the position math; this mirrors it.
+    // iOS Safari's keyboard/QuickType bar resizes and scrolls the *visual*
+    // viewport without firing a `window` resize/scroll event, leaving a
+    // stale caret position behind as you type. useKeyboardInset already
+    // listens to these same visualViewport events for the other half of
+    // the position math; this mirrors it.
     const vv = window.visualViewport;
     vv?.addEventListener("resize", measure);
     vv?.addEventListener("scroll", measure);

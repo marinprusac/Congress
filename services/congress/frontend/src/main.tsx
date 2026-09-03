@@ -26,18 +26,26 @@ preventPinchZoom();
 // vite-plugin-pwa default with no reload-on-update logic of its own.
 //
 // Also logs a congress.app_updated event for this - a Logs Chamber rule can
-// turn "the app updated" into a push notification/history entry the same
-// way any other Chamber's own event does, and this is the one place in the
-// system that actually observes a new version taking over. Awaited before
-// reloading (notifyAppUpdated's own timeout bounds the wait) rather than
-// fired-and-forgotten alongside the reload - see its comment on why
-// `keepalive` alone isn't trustworthy enough here to fire-and-forget.
+// turn "the app updated" into a push notification/history entry. Awaited
+// before reloading rather than fired-and-forgotten - see notifyAppUpdated's
+// own comment on why `keepalive` alone isn't trustworthy enough here.
 if ("serviceWorker" in navigator) {
   let reloaded = false;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (reloaded) return;
     reloaded = true;
     void notifyAppUpdated().finally(() => window.location.reload());
+  });
+
+  // registerSW.js only ever checks for an update once, at initial
+  // registration - an installed PWA that's backgrounded and resumed
+  // (rather than freshly navigated) never triggers another check on its
+  // own, so the controllerchange chain above can go a long time without
+  // firing even across several real deploys. `.update()` on every
+  // foreground closes that gap.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    void navigator.serviceWorker.getRegistration().then((reg) => reg?.update());
   });
 }
 
