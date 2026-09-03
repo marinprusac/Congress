@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { ChamberLayout, ChamberMark, getChamberIcon, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
+import { ChamberLayout, ChamberMark, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 
 // Map's home is the map itself, not a list page - Places and Pending are
 // separate sections with no "default page" to collapse into, same reasoning
@@ -35,7 +35,6 @@ export function Layout() {
       icon={<ChamberMark name="map" className="h-8 w-8 text-ink" />}
       title="Map"
       ownChamber="map"
-      renderIcon={getChamberIcon}
       extraActions={<MapHeaderLinks />}
     />
   );

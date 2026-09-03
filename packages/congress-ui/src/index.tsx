@@ -23,9 +23,6 @@ export {
   updateCapitolSettings,
 } from "./useAppliedTheme.js";
 export { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
-export { MobileSearchReveal } from "./MobileSearchReveal.js";
-export { usePullGesture } from "./usePullGesture.js";
-export type { PullZone } from "./usePullGesture.js";
 export { ChamberMark, CapitolMark, getChamberIcon } from "./ChamberMarks.js";
 export { WidgetPreviewShell } from "./WidgetPreviewShell.js";
 export { fetchRegistry } from "./registry.js";
@@ -37,7 +34,7 @@ export { markShellHosted, useShellHosted, resolveChamberPath } from "./ShellHost
 export { preventPinchZoom } from "./preventZoom.js";
 export { resolveApiBase, parseJsonResponse, assertDeleteOk } from "./api.js";
 export { createQueryClient } from "./queryClient.js";
-export { PersistedQueryProvider, clearAppCaches } from "./queryPersistence.js";
+export { PersistedQueryProvider } from "./queryPersistence.js";
 export { loadRemoteModule, evictRemoteModule } from "./remoteModule.js";
 export type { RemoteModule } from "./remoteModule.js";
 export { PageHeader } from "./PageHeader.js";

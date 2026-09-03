@@ -168,8 +168,9 @@
   overflow: hidden;
 }
 
-/* NavPanel - persistent cross-Chamber nav plus the one Settings entry
-   point. Shell-hosted, Congress's own App.tsx mounts exactly one, as a
+/* NavPanel - persistent cross-Chamber nav, the one global search bar
+   (GlobalExhibitSearch, see .nav-panel-search below), and the one Settings
+   entry point. Shell-hosted, Congress's own App.tsx mounts exactly one, as a
    sibling of ChamberHost rather than nested inside it, so it survives a
    Chamber failing to load instead of unmounting along with that Chamber's
    own subtree. Standalone (a Chamber's own dev boot, or a direct full-page
@@ -182,7 +183,10 @@
    there's no persistent trigger button, which is also why
    .nav-panel-mobile-chambers below anchors the Chambers list to the panel's
    own bottom edge rather than its top, for one-handed thumb reach the
-   instant it opens. */
+   instant it opens. Search sits above that anchored list on both variants
+   (top of the desktop sidebar, just under the Settings/close row on
+   mobile) instead - it's reached for far less often than switching
+   Chambers, so it doesn't compete for the same thumb-reach real estate. */
 .nav-panel-link {
   display: flex;
   align-items: center;
@@ -272,6 +276,19 @@
   gap: 0.15rem;
 }
 
+/* Wraps .global-search (see below) for its one placement now, inside
+   NavPanel rather than a Chamber's own header - full sidebar width on
+   desktop, full panel width on mobile, with room below it before the
+   Chambers list starts. */
+.nav-panel-search {
+  flex-shrink: 0;
+  margin-bottom: 1rem;
+}
+
+.nav-panel-search--mobile {
+  margin-bottom: 0.75rem;
+}
+
 .nav-panel-desktop {
   position: fixed;
   top: 0;
@@ -281,7 +298,7 @@
   display: none;
   flex-direction: column;
   gap: 0.15rem;
-  width: var(--chamber-picker-width, 12rem);
+  width: var(--chamber-picker-width, 16rem);
   overflow-y: auto;
   padding: calc(1rem + env(safe-area-inset-top)) 0.75rem 1rem calc(0.75rem + env(safe-area-inset-left));
   border-right: 1px solid var(--color-dust);
@@ -306,9 +323,14 @@
      Congress's own shell chrome (ChamberHost's offline/not-found state),
      not a Chamber's own content - included here too since NavPanel (now
      mounted as its sibling, not nested inside it) still reserves the same
-     strip of the viewport while it's on screen. */
+     strip of the viewport while it's on screen. 16rem (not the 12rem this
+     sidebar carried before it grew a search box) is the narrowest width
+     that still fits .global-search-input's own "Search Congress —"
+     placeholder in full at this font/padding - matches the fixed 16rem
+     .global-search used to get back when it only ever sat in a Chamber's
+     own (much wider) header. */
   :root {
-    --chamber-picker-width: 12rem;
+    --chamber-picker-width: 16rem;
   }
 
   .chamber-shell,
@@ -987,92 +1009,7 @@
 
 .global-search {
   position: relative;
-  flex: 1;
-  min-width: 0;
-}
-
-/* The header's own search slot is desktop-only - a phone screen has no room
-   for it next to a 2.25rem title, and MobileSearchReveal's pull gesture is
-   the mobile entry point instead. Scoped to .chamber-header-actions so it
-   doesn't also hide the copy MobileSearchReveal itself mounts when its
-   pulled-open overlay renders a <GlobalExhibitSearch> of its own. */
-.chamber-header-actions .global-search {
-  display: none;
-}
-
-@media (min-width: 641px) {
-  .global-search {
-    flex: none;
-    width: 16rem;
-  }
-
-  .chamber-header-actions .global-search {
-    display: block;
-  }
-}
-
-.mobile-pull-indicator {
-  position: fixed;
-  top: calc(0.75rem + env(safe-area-inset-top));
-  left: 50%;
-  transform: translateX(-50%);
-  /* Below .nav-panel-mobile/.nav-panel-backdrop (z-index 40/39) - the
-     off-canvas nav panel is modal-ish once open and must stack above this,
-     not the other way around. */
-  z-index: 35;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border: 1px solid var(--color-dust);
-  background: var(--color-parchment);
-  color: var(--color-ink);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  pointer-events: none;
-}
-
-.mobile-pull-indicator[data-zone="refresh"] {
-  color: var(--color-accent);
-  border-color: var(--color-accent);
-}
-
-.mobile-search-reveal-expanded {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  /* Same reasoning as .mobile-pull-indicator above - stay below the
-     off-canvas nav panel rather than painting over it. */
-  z-index: 35;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  padding-top: calc(0.75rem + env(safe-area-inset-top));
-  background: var(--color-parchment);
-  border-bottom: 1px solid var(--color-dust);
-}
-
-.mobile-search-reveal-expanded .global-search {
-  flex: 1;
-}
-
-.mobile-search-reveal-close {
-  color: var(--color-slate);
-  font-size: 1.25rem;
-  line-height: 1;
-}
-
-.mobile-search-reveal-close:hover {
-  color: var(--color-accent);
-}
-
-@media (min-width: 641px) {
-  .mobile-pull-indicator,
-  .mobile-search-reveal-expanded {
-    display: none;
-  }
+  width: 100%;
 }
 
 .global-search-input {
@@ -1111,17 +1048,35 @@
   padding: 0 0.4em;
 }
 
+/* Mobile: fixed to the panel's own edges rather than anchored under the
+   input, same idiom as .exhibit-picker-dropdown/.exhibit-ref-add-popover -
+   .nav-panel-mobile is itself always `transform`-ed (even at rest, to slide
+   off-canvas), which makes it the containing block for any `position: fixed`
+   descendant, so this still reads as "pinned to the open panel's own box",
+   not the true document viewport, without any extra plumbing. */
 .global-search-dropdown {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 0.375rem);
-  left: 0;
-  right: 0;
-  max-height: 20rem;
+  position: fixed;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 50;
+  max-height: 40vh;
   overflow-y: auto;
   border: 1px solid var(--color-dust);
   background: var(--color-parchment);
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 15%, transparent);
+  box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
+}
+
+@media (min-width: 641px) {
+  .global-search-dropdown {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 0.375rem);
+    bottom: auto;
+    max-height: 20rem;
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 15%, transparent);
+  }
 }
 
 .global-search-dropdown[hidden] {

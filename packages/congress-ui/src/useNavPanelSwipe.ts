@@ -60,10 +60,9 @@ const SNAP_OPEN_RATIO = 0.5;
 //
 // The from-anywhere case has to stay opt-out-able: a full-bleed surface with
 // its own horizontal drag meaning (the Map chamber's pan/zoom) tags itself
-// `data-nav-swipe-ignore` (mirroring `data-pull-gesture-ignore` on
-// usePullGesture) to keep this window-level listener from stealing the
-// touch out from under it; a genuinely horizontally-scrollable element (a
-// wide table, a code block) is detected and left alone the same way,
+// `data-nav-swipe-ignore` to keep this window-level listener from stealing
+// the touch out from under it; a genuinely horizontally-scrollable element
+// (a wide table, a code block) is detected and left alone the same way,
 // without needing its own opt-out tag.
 //
 // While a gesture is active, `dragOffsetPx`/`dragProgress` track the raw

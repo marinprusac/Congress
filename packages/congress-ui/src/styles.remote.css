@@ -98,9 +98,7 @@ html[data-theme="dark"] {
     overflow-x: hidden;
     /* A standalone PWA should feel rigid, not like a webpage - scrolling to
        the end of the content should just stop there, not rubber-band into
-       empty space. The custom pull-to-refresh/search gesture (usePullGesture)
-       is unaffected: it's driven entirely by JS touch tracking, not by the
-       native overscroll this disables. */
+       empty space. */
     overscroll-behavior-y: none;
     /* Also suppresses iOS's edge-swipe-back gesture in a standalone PWA -
        that gesture rides the same overscroll/rubber-band mechanism at the

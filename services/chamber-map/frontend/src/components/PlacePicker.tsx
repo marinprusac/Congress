@@ -47,7 +47,6 @@ export function PlacePicker({ latitude, longitude, radiusMeters, onChange, heigh
     <div
       style={{ height }}
       className="overflow-hidden rounded border border-dust"
-      data-pull-gesture-ignore
       data-nav-swipe-ignore
     >
       <MapContainer center={initialCenter.current} zoom={16} style={{ height: "100%", width: "100%" }} dragging={!readOnly} scrollWheelZoom={!readOnly}>

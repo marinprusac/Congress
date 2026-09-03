@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { fetchRegistry } from "./registry.js";
-import { ChamberMark } from "./ChamberMarks.js";
+import { ChamberMark, getChamberIcon } from "./ChamberMarks.js";
+import { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
 import { useShellHosted } from "./ShellHostContext.js";
 import { useChamberOrder } from "./useChamberOrder.js";
 import { useNavPanelSwipe } from "./useNavPanelSwipe.js";
@@ -116,11 +117,16 @@ function CrossAppLink({
 // one more entry in the list it sits apart from.
 function SettingsRow({
   current,
+  to,
   shellHosted,
   onNavigate,
   variant,
 }: {
   current: string;
+  // Carries the Chamber navigated away from (see NavPanel's own comment on
+  // settingsHref) so SettingsPage can default to that Chamber's own tab
+  // instead of always landing on General.
+  to: string;
   shellHosted: boolean;
   onNavigate: () => void;
   variant: "desktop" | "mobile";
@@ -128,7 +134,7 @@ function SettingsRow({
   const isCurrent = current === "settings";
   const className = `nav-panel-link nav-panel-link--settings nav-panel-link--${variant}${isCurrent ? " active" : ""}`;
   return (
-    <CrossAppLink to="/settings" shellHosted={shellHosted} onNavigate={onNavigate} className={className} ariaLabel="Settings">
+    <CrossAppLink to={to} shellHosted={shellHosted} onNavigate={onNavigate} className={className} ariaLabel="Settings">
       <SettingsIcon className="nav-panel-icon-settings" />
     </CrossAppLink>
   );
@@ -194,6 +200,22 @@ export function NavPanel({ current, currentLabel }: NavPanelProps) {
   const shellHosted = useShellHosted();
   const { open, dragOffsetPx, dragProgress, panelRef, close } = useNavPanelSwipe();
   const dragging = dragOffsetPx !== null;
+  // Whichever Router this panel happens to be mounted under (Congress's own
+  // top-level one when shell-hosted, or a standalone Chamber's own) - see
+  // this file's own top comment on why that's always safe to call here
+  // directly rather than threading a navigate prop through from every
+  // caller the way GlobalExhibitSearch used to require of ChamberHeader.
+  const navigate = useNavigate();
+  // Search results from Capitol/Settings itself never route locally - only
+  // an actual Chamber owns exhibits (see GlobalExhibitSearch's own
+  // ownChamber doc).
+  const searchOwnChamber = current === "capitol" || current === "settings" ? "" : current;
+  // Carries the Chamber being left behind into Settings' own query string,
+  // so NavPanel's single Settings entry point opens straight to that
+  // Chamber's own tab instead of always defaulting to General - see
+  // SettingsPage's own reading of "from". Already on Settings: nothing to
+  // carry.
+  const settingsTo = current === "settings" ? "/settings" : `/settings?from=${encodeURIComponent(current)}`;
 
   const registryChambers = (data ?? []).filter((c) => c.status === "active");
   const chambers = buildChamberList(registryChambers, current, currentLabel);
@@ -226,15 +248,20 @@ export function NavPanel({ current, currentLabel }: NavPanelProps) {
   return (
     <>
       <nav className="nav-panel-desktop" aria-label="Navigation">
+        <GlobalExhibitSearch
+          ownChamber={searchOwnChamber}
+          navigate={navigate}
+          renderIcon={getChamberIcon}
+          className="nav-panel-search"
+        />
         <div className="nav-panel-chambers">{renderChamberRows("desktop")}</div>
         <div className="nav-panel-divider" />
-        <SettingsRow current={current} shellHosted={shellHosted} onNavigate={close} variant="desktop" />
+        <SettingsRow current={current} to={settingsTo} shellHosted={shellHosted} onNavigate={close} variant="desktop" />
       </nav>
 
       <div
         className="nav-panel-backdrop"
         data-open={open}
-        data-pull-gesture-ignore
         onClick={close}
         aria-hidden={!open}
         style={dragProgress !== null ? { opacity: dragProgress, transition: "none" } : undefined}
@@ -245,16 +272,24 @@ export function NavPanel({ current, currentLabel }: NavPanelProps) {
         aria-label="Navigation"
         data-open={open}
         data-dragging={dragging}
-        data-pull-gesture-ignore
         ref={panelRef}
         style={dragOffsetPx !== null ? { transform: `translateX(${dragOffsetPx}px)`, transition: "none" } : undefined}
       >
         <div className="nav-panel-mobile-top">
-          <SettingsRow current={current} shellHosted={shellHosted} onNavigate={close} variant="mobile" />
+          <SettingsRow current={current} to={settingsTo} shellHosted={shellHosted} onNavigate={close} variant="mobile" />
           <button type="button" className="nav-panel-close" onClick={close} aria-label="Close navigation">
             ×
           </button>
         </div>
+        <GlobalExhibitSearch
+          ownChamber={searchOwnChamber}
+          navigate={(path) => {
+            navigate(path);
+            close();
+          }}
+          renderIcon={getChamberIcon}
+          className="nav-panel-search nav-panel-search--mobile"
+        />
         <div className="nav-panel-mobile-chambers">{renderChamberRows("mobile")}</div>
       </nav>
     </>

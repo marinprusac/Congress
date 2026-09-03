@@ -238,7 +238,6 @@ export function MapPage() {
 
       <div
         className="mb-4 h-80 overflow-hidden rounded border border-dust"
-        data-pull-gesture-ignore
         data-nav-swipe-ignore
       >
         <MapContainer

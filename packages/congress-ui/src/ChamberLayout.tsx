@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { ChamberHeader } from "./ChamberHeader.js";
 import { NavPanel } from "./NavPanel.js";
 import { useShellHosted } from "./ShellHostContext.js";
@@ -7,11 +7,9 @@ import { useShellHosted } from "./ShellHostContext.js";
 interface ChamberLayoutProps {
   icon: ReactNode;
   title: string;
-  // Identifies this Chamber to the global search bar (see GlobalExhibitSearch)
-  // and its own icon lookup for rendering other Chambers' results.
+  // Identifies this Chamber to titleHref's own resolution (see ChamberHeader).
   ownChamber: string;
-  renderIcon: (chamber: string) => ReactNode;
-  // Extra header chrome beyond search/settings - passed straight through to
+  // Extra header chrome beyond title - passed straight through to
   // ChamberHeader's own prop of the same name (e.g. Deputy's Directives/
   // History links). Most Chambers don't need this.
   extraActions?: ReactNode;
@@ -29,21 +27,13 @@ interface ChamberLayoutProps {
 // persistent NavPanel outside ChamberHost, so it survives this Chamber
 // failing to load instead of unmounting along with it. Rendering it again
 // here too would just double it up.
-export function ChamberLayout({ icon, title, ownChamber, renderIcon, extraActions }: ChamberLayoutProps) {
-  const navigate = useNavigate();
+export function ChamberLayout({ icon, title, ownChamber, extraActions }: ChamberLayoutProps) {
   const shellHosted = useShellHosted();
 
   return (
     <div className="chamber-shell">
       {!shellHosted && <NavPanel current={ownChamber} currentLabel={title} />}
-      <ChamberHeader
-        icon={icon}
-        title={title}
-        ownChamber={ownChamber}
-        renderIcon={renderIcon}
-        navigate={navigate}
-        extraActions={extraActions}
-      />
+      <ChamberHeader icon={icon} title={title} ownChamber={ownChamber} extraActions={extraActions} />
       <main className="chamber-main">
         <Outlet />
       </main>

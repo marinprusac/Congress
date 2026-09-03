@@ -1,5 +1,15 @@
-import { Component, lazy, Suspense, useState, type ComponentType, type LazyExoticComponent, type ReactNode } from "react";
+import {
+  Component,
+  lazy,
+  Suspense,
+  useEffect,
+  useState,
+  type ComponentType,
+  type LazyExoticComponent,
+  type ReactNode,
+} from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import {
   ChamberHeader,
   ChamberMark,
@@ -162,19 +172,39 @@ function GeneralTab() {
 export function SettingsPage() {
   useAppliedTheme();
 
+  // NavPanel's Settings entry carries whichever Chamber it was clicked from
+  // as "?from=" (see NavPanel's own settingsTo) - opening straight to that
+  // Chamber's own tab is much more useful than always landing on General,
+  // which is what a bare "/settings" (already on Settings, or a stale/typed
+  // link with no "from") still falls back to.
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get("from");
+
   const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
   const activeChambers = (registry ?? []).filter((c) => c.status === "active");
   const { data: panels } = useChamberSettingsPanels(
     activeChambers.map((c) => ({ name: c.name, displayName: c.displayName }))
   );
 
-  const [tab, setTab] = useState<string>("general");
+  const [tab, setTab] = useState<string>(requestedTab ?? "general");
+  // The requested Chamber might not actually have a settings panel (or
+  // might not even be a real/active Chamber) - only knowable once `panels`
+  // itself has resolved, so this can't just be the initial state above.
+  // Once it's known one way or the other, a still-missing tab falls back to
+  // General rather than leaving the page stuck on a tab strip entry that
+  // will never appear (see the fallback render below for the loading gap
+  // in between).
+  useEffect(() => {
+    if (!panels || tab === "general") return;
+    if (!panels.some((panel) => panel.name === tab)) setTab("general");
+  }, [panels, tab]);
+
   const activePanel = (panels ?? []).find((p) => p.name === tab);
   const ActivePanelComponent = activePanel ? getSettingsComponent(activePanel.name) : null;
 
   return (
     <div className="chamber-shell">
-      <ChamberHeader icon={<SettingsGearIcon />} title="Settings" showSearch={false} />
+      <ChamberHeader icon={<SettingsGearIcon />} title="Settings" />
       <main className="chamber-main">
         <div className="settings-tabs" role="tablist" aria-label="Settings categories">
           <button
@@ -203,15 +233,17 @@ export function SettingsPage() {
         <section className="settings-tab-panel">
           {tab === "general" ? (
             <GeneralTab />
+          ) : ActivePanelComponent && activePanel ? (
+            <SettingsPanelErrorBoundary key={activePanel.name} chamberName={activePanel.displayName}>
+              <Suspense fallback={<p className="font-mono text-sm text-dust">Loading —</p>}>
+                <ActivePanelComponent />
+              </Suspense>
+            </SettingsPanelErrorBoundary>
           ) : (
-            ActivePanelComponent &&
-            activePanel && (
-              <SettingsPanelErrorBoundary key={activePanel.name} chamberName={activePanel.displayName}>
-                <Suspense fallback={<p className="font-mono text-sm text-dust">Loading —</p>}>
-                  <ActivePanelComponent />
-                </Suspense>
-              </SettingsPanelErrorBoundary>
-            )
+            // Either the panel list hasn't resolved yet, or it just has and
+            // the effect above is about to redirect this tab to General -
+            // either way there's nothing to render for `tab` yet.
+            <p className="font-mono text-sm text-dust">Loading —</p>
           )}
         </section>
       </main>

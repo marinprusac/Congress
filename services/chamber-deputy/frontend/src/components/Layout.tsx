@@ -1,8 +1,7 @@
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { NavPanel, ChamberHeader, ChamberMark, getChamberIcon, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
+import { Outlet, useLocation } from "react-router-dom";
+import { NavPanel, ChamberHeader, ChamberMark, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 
 export function Layout() {
-  const navigate = useNavigate();
   const shellHosted = useShellHosted();
   const { pathname } = useLocation();
   // Chat is the one page here that must fit the viewport with no
@@ -15,13 +14,7 @@ export function Layout() {
   return (
     <div className={`chamber-shell${isChat ? " chamber-shell--canvas" : ""}`}>
       {!shellHosted && <NavPanel current="deputy" currentLabel="Deputy" />}
-      <ChamberHeader
-        icon={<ChamberMark name="deputy" className="h-8 w-8 text-ink" />}
-        title="Deputy"
-        ownChamber="deputy"
-        renderIcon={getChamberIcon}
-        navigate={navigate}
-      />
+      <ChamberHeader icon={<ChamberMark name="deputy" className="h-8 w-8 text-ink" />} title="Deputy" ownChamber="deputy" />
       <main className={`chamber-main${isChat ? " chamber-main--canvas" : ""}`}>
         <Outlet />
       </main>
