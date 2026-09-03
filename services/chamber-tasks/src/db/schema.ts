@@ -40,3 +40,14 @@ export const taskRefs = sqliteTable(
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
 });
+
+// Persisted counterpart of the old in-memory "what did I last publish for
+// this task" map in notifications.ts - a plain JS Map reset to empty on
+// every restart, so a deploy made every still-due task look "new" again and
+// re-fire its event. No FK to `tasks`: a row surviving its task's deletion
+// is what lets checkDueTasks() still notice the task is gone and publish
+// tasks.due_cleared for it.
+export const dueNotifications = sqliteTable("due_notifications", {
+  taskId: integer("task_id").primaryKey(),
+  state: text("state").notNull(),
+});

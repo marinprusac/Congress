@@ -50,6 +50,13 @@
       "when": 1787962462627,
       "tag": "0006_milky_mariko_yashida",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788476921862,
+      "tag": "0007_bizarre_legion",
+      "breakpoints": true
     }
   ]
 }

@@ -31,10 +31,9 @@ beforeEach(async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
 
-  // The "what did I last publish for this task" map is module-level and
-  // deliberately in-memory (it resets on restart by design), so it outlives
-  // an individual test. With no tasks left in the table, one check drains it
-  // by publishing a clear for whatever the previous test left behind.
+  // "What did I last publish for this task" is now persisted (dueNotifications
+  // table), which outlives an individual test the same way the db itself
+  // does. With no tasks left in the table, one check drains it.
   publishSpy.mockResolvedValue(undefined);
   await checkDueTasks();
   publishSpy.mockReset().mockResolvedValue(undefined);

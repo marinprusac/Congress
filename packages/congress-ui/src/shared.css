@@ -322,7 +322,7 @@
   .chamber-shell,
   .capitol-shell,
   .chamber-host-unavailable {
-    padding-left: calc(var(--chamber-picker-width) + env(safe-area-inset-left));
+    padding-left: calc(var(--chamber-picker-width, 16rem) + env(safe-area-inset-left));
   }
 
   /* Pins Settings to the bottom of the sidebar without a divider line -
@@ -1339,7 +1339,9 @@
 
 @media (min-width: 641px) {
   .list-search-row {
-    left: calc(var(--chamber-picker-width, 0px) + 1.5rem);
+    /* Fallback matches .nav-panel-desktop's own (line ~287) - if the var is
+       ever unset, both need to agree or this row renders under the sidebar. */
+    left: calc(var(--chamber-picker-width, 16rem) + 1.5rem);
     right: 1.5rem;
     bottom: 1.5rem;
     max-width: 26rem;

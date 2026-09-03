@@ -1,7 +1,7 @@
 import { and, eq, isNotNull } from "drizzle-orm";
 import { createPublishEvent } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
-import { tasks } from "./db/schema.js";
+import { tasks, dueNotifications } from "./db/schema.js";
 import { env } from "./env.js";
 
 // Publishes to Congress's push relay rather than pushing a notification
@@ -18,25 +18,13 @@ export const publishEvent = createPublishEvent({
 // A task surfaces once its due date is within a day out, and stays surfaced
 // until it's completed or its due date moves back out of range - but the
 // due_soon/overdue event itself only fires once per state transition (see
-// lastNotifiedState below), not every time this Chamber re-checks. A
+// dueNotifications below), not every time this Chamber re-checks. A
 // publish is a push-relayed switch, not a durable record (CLAUDE.md's
 // Events section) - re-publishing an unchanged state on every check would
 // flood Logs Chamber's append-only event_history with one row per task per
 // check, and would fire an Automation Chamber automation repeatedly with no
-// dedup of its own (unlike a log rule's notify action, which at least
-// collapses onto one push via its dedupe key).
+// dedup of its own.
 const LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
-
-// Tracks which state ("due_soon" or "overdue") this process last published
-// an event for, per task - both so a task that's completed (or its due date
-// pushed back) between checks gets an explicit tasks.due_cleared event
-// instead of just silently going stale, and so a still-true state doesn't
-// re-publish on every check (only the due_soon -> overdue transition does,
-// since that's a genuine change worth surfacing again). In-memory and reset
-// on restart - same accepted gap as before this Chamber moved to events (see
-// git history): on restart, every currently-due task looks "new" again and
-// re-publishes once, rather than being missed entirely.
-const lastNotifiedState = new Map<number, "due_soon" | "overdue">();
 
 export async function checkDueTasks(): Promise<void> {
   const now = Date.now();
@@ -45,6 +33,11 @@ export async function checkDueTasks(): Promise<void> {
     .from(tasks)
     .where(and(eq(tasks.completed, false), isNotNull(tasks.dueDate)))
     .all();
+  // Persisted (see dueNotifications' own schema comment on why this isn't
+  // just an in-memory Map) - which state this Chamber last published an
+  // event for, per task, so a redeploy's restart doesn't make every
+  // still-due task look "new" again and re-fire its notification.
+  const priorState = new Map(db.select().from(dueNotifications).all().map((row) => [row.taskId, row.state]));
 
   const currentlyDue = new Map<number, "due_soon" | "overdue">();
   // Collected and awaited together rather than one at a time in the loop -
@@ -58,7 +51,7 @@ export async function checkDueTasks(): Promise<void> {
     if (!row.dueDate || row.dueDate.getTime() - now > LOOKAHEAD_MS) continue;
     const state = row.dueDate.getTime() < now ? "overdue" : "due_soon";
     currentlyDue.set(row.id, state);
-    if (lastNotifiedState.get(row.id) !== state) {
+    if (priorState.get(row.id) !== state) {
       publishes.push(
         publishEvent({
           type: state === "overdue" ? "tasks.overdue" : "tasks.due_soon",
@@ -68,7 +61,7 @@ export async function checkDueTasks(): Promise<void> {
     }
   }
 
-  for (const id of lastNotifiedState.keys()) {
+  for (const id of priorState.keys()) {
     if (!currentlyDue.has(id)) {
       publishes.push(publishEvent({ type: "tasks.due_cleared", payload: { taskId: id } }));
     }
@@ -76,8 +69,12 @@ export async function checkDueTasks(): Promise<void> {
 
   await Promise.all(publishes);
 
-  lastNotifiedState.clear();
-  for (const [id, state] of currentlyDue) lastNotifiedState.set(id, state);
+  db.delete(dueNotifications).run();
+  if (currentlyDue.size > 0) {
+    db.insert(dueNotifications)
+      .values([...currentlyDue].map(([taskId, state]) => ({ taskId, state })))
+      .run();
+  }
 }
 
 // setTimeout overflows past this (2^31-1 ms, ~24.8 days) rather than firing
