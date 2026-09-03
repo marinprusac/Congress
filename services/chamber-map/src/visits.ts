@@ -260,8 +260,6 @@ function toTrip(row: {
     durationMinutes: Math.round((trip.arrivedAt.getTime() - trip.departedAt.getTime()) / 60000),
     distanceKm: trip.distanceKm,
     mode: trip.mode,
-    label: trip.label,
-    needsLabel: fromVisit.placeId !== null && fromVisit.placeId === toVisit.placeId && trip.label === null,
     path: parseTripPath(trip.path),
   };
 }
@@ -325,8 +323,7 @@ export async function createTrip(
   // acc has no fixes at all (a silent gap, e.g. a flight, otherwise leaves
   // path null and nothing renders on the map).
   fromLatLng: { latitude: number; longitude: number } | null,
-  toLatLng: { latitude: number; longitude: number } | null,
-  label: string | null = null
+  toLatLng: { latitude: number; longitude: number } | null
 ): Promise<Trip> {
   const endpointDistanceKm = fromLatLng && toLatLng ? haversineMeters(fromLatLng, toLatLng) / 1000 : 0;
   const mode = guessTripMode(acc, endpointDistanceKm);
@@ -340,7 +337,7 @@ export async function createTrip(
 
   const inserted = db
     .insert(trips)
-    .values({ fromVisitId, toVisitId, departedAt, arrivedAt, distanceKm, mode, label, path, createdAt: new Date() })
+    .values({ fromVisitId, toVisitId, departedAt, arrivedAt, distanceKm, mode, path, createdAt: new Date() })
     .returning()
     .get();
 

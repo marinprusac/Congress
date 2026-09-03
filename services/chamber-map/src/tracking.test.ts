@@ -102,10 +102,6 @@ describe("a drive between two known places", () => {
     expect(await listVisits({})).toHaveLength(1);
   });
 
-  it("names a commute between two different places automatically", async () => {
-    await run([fix(HOME_LAT, 0), fix(45.02, 1), fix(WORK_LAT, 2)]);
-    expect((await listTrips({}))[0]?.label).toBe("commute to Work");
-  });
 });
 
 describe("a brief stop mid-route", () => {

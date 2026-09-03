@@ -167,56 +167,6 @@ describe("createTrip", () => {
   });
 });
 
-describe("needsLabel", () => {
-  async function roundTrip(samePlace: boolean, label: string | null = null) {
-    const a = makePlace("Home", 45, 9);
-    const b = samePlace ? a : makePlace("Work", 45.1, 9);
-    const v1 = openConfirmedVisit(a.id, new Date("2026-01-01T08:00:00Z"));
-    closeVisit(v1.id, new Date("2026-01-01T08:30:00Z"));
-    const v2 = openConfirmedVisit(b.id, new Date("2026-01-01T09:00:00Z"));
-    return createTrip(
-      v1.id,
-      v2.id,
-      new Date("2026-01-01T08:30:00Z"),
-      new Date("2026-01-01T09:00:00Z"),
-      createTripFixAccumulator(),
-      null,
-      null,
-      label
-    );
-  }
-
-  it("asks about an unlabelled round trip to the same place, which explains nothing on its own", async () => {
-    expect((await roundTrip(true)).needsLabel).toBe(true);
-  });
-
-  it("does not ask about a trip between two different places", async () => {
-    expect((await roundTrip(false)).needsLabel).toBe(false);
-  });
-
-  it("stops asking once a label is given", async () => {
-    const trip = await roundTrip(true, "school run");
-    expect(trip.label).toBe("school run");
-    expect(trip.needsLabel).toBe(false);
-  });
-
-  it("does not ask about a trip between two unclassified dwells, which have no place to be the same", async () => {
-    const v1 = openPendingVisit(45, 9, new Date("2026-01-01T08:00:00Z"));
-    closeVisit(v1.id, new Date("2026-01-01T08:30:00Z"));
-    const v2 = openPendingVisit(45.1, 9, new Date("2026-01-01T09:00:00Z"));
-    const trip = await createTrip(
-      v1.id,
-      v2.id,
-      new Date("2026-01-01T08:30:00Z"),
-      new Date("2026-01-01T09:00:00Z"),
-      createTripFixAccumulator(),
-      null,
-      null
-    );
-    expect(trip.needsLabel).toBe(false);
-  });
-});
-
 describe("getVisitActiveAt", () => {
   // The day view's own window only returns visits that *arrived* inside it,
   // which says nothing about a day spent entirely at a stay that began

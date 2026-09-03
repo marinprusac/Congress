@@ -73,11 +73,6 @@ export type ClassifyVisitRequest = z.infer<typeof classifyVisitRequestSchema>;
 export const tripModeSchema = z.enum(["walk", "bike", "transit", "unknown"]);
 export type TripMode = z.infer<typeof tripModeSchema>;
 
-// needsLabel is derived at read time (fromPlaceId === toPlaceId, both
-// non-null, label still unset) rather than stored - a same-place round trip
-// with no dot recorded in between is otherwise invisible ("Home -> Home"
-// says nothing about why). fromPlaceId/toPlaceId are exposed only to compute
-// this on the frontend too; prefer needsLabel over comparing them directly.
 export const tripSchema = z.object({
   id: z.number().int(),
   fromVisitId: z.number().int(),
@@ -91,8 +86,6 @@ export const tripSchema = z.object({
   durationMinutes: z.number(),
   distanceKm: z.number(),
   mode: tripModeSchema,
-  label: z.string().nullable(),
-  needsLabel: z.boolean(),
   // The actual GPS fixes recorded in transit, ascending by time - what the
   // frontend draws as the trip's line on the map. Null only for a trip whose
   // in-memory accumulator was lost to a Chamber restart mid-trip.

@@ -138,6 +138,17 @@ app.post("/congress/events/publish", requireInternalToken, async (c) => {
   return c.json({ ok: true });
 });
 
+// The browser itself is the publisher here, not another Chamber - the PWA
+// shell's own service-worker controllerchange handler (main.tsx) calls this
+// right before it force-reloads onto a newly-activated version. Session-
+// gated rather than internal-token-gated for that reason (see
+// requireSessionOrInternalToken's own comment on the same distinction for
+// /congress/registry).
+app.post("/congress/events/app-updated", requireSession, async (c) => {
+  publishEvent({ chamber: "congress", type: "congress.app_updated", payload: {} });
+  return c.json({ ok: true });
+});
+
 // An empty query is meaningful here - it asks each Chamber for its most
 // recent Exhibits, which is what the "[[" picker shows before anything has
 // been typed.

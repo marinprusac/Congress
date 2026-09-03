@@ -72,12 +72,6 @@ export const manifest: Manifest = {
       },
     },
     {
-      type: "map.trip_needs_label",
-      label: "Trip needs a label",
-      description: "A round trip to the same known place with no stop recorded in between needs a purpose label.",
-      payloadFields: { tripId: { type: "number" }, placeName: { type: "string" }, durationMinutes: { type: "number" } },
-    },
-    {
       type: "map.traccar_poll_failing",
       label: "Traccar poll failing",
       description: "Polling the Traccar server has failed several times in a row.",

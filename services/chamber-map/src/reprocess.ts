@@ -19,8 +19,7 @@ import type { ReprocessResult } from "./types.js";
 // adhoc labels and "ignored" dwells are snapshotted before the delete and
 // re-applied to whatever the replay produced in their place (see
 // restoreVisitAnnotations). Everything else - confirmed visits, pending
-// dwells, trips (including their auto-derived labels, which regenerate
-// identically) - is fully derivable and simply regenerated.
+// dwells, trips - is fully derivable and simply regenerated.
 
 // How far back adding or moving a place is willing to rewrite history. A
 // place never visited reprocesses nothing at all (reprocessForPlace returns

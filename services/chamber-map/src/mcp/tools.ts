@@ -29,7 +29,6 @@ async function summarizeTrips(from?: string, to?: string) {
   return trips.map((t) => ({
     from: t.fromLabel,
     to: t.toLabel,
-    label: t.label,
     departedAt: t.departedAt,
     arrivedAt: t.arrivedAt,
     durationMinutes: t.durationMinutes,

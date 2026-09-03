@@ -92,6 +92,11 @@ export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
     description: "A previously-offline Chamber registered or heartbeated again.",
     payloadFields: { chamberName: { type: "string" } },
   },
+  {
+    type: "congress.app_updated",
+    label: "App updated",
+    description: "The PWA's service worker activated a newly deployed version and the shell reloaded onto it.",
+  },
 ];
 
 export const manifestSchema = z.object({

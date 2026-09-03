@@ -108,7 +108,6 @@ async function snapshot() {
     departedAt: t.departedAt,
     arrivedAt: t.arrivedAt,
     mode: t.mode,
-    label: t.label,
     distanceKm: Number(t.distanceKm.toFixed(6)),
   }));
   return { visits, trips };
@@ -227,17 +226,6 @@ describe("annotations across a rebuild", () => {
     expect((await listVisits({})).some((v) => v.status === "ignored")).toBe(true);
   });
 
-  it("does not double-count a label the replay reproduced on its own", async () => {
-    // A commute names itself during the replay, so its auto label is already
-    // current - it is neither restored nor lost.
-    place("Home", HOME_LAT);
-    place("Work", WORK_LAT);
-    await processPositions(COMMUTE(), { publishEvents: false });
-
-    const result = await reprocessRange(new Date(T0));
-    expect(result.annotationsRestored).toBe(0);
-    expect(result.annotationsLost).toBe(0);
-  });
 });
 
 describe("healTrackingStateOnBoot", () => {

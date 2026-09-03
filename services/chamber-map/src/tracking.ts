@@ -167,13 +167,6 @@ async function handleTransition(
     // reported dwell duration by however long the following trip took).
     const departedAt = previous.departedAt ?? atFixTime;
     if (previous.departedAt === null) closeVisit(previous.id, atFixTime);
-    // A commute between two different known places names itself - only
-    // a same-place round trip (previous.placeId === next.placeId, handled
-    // below via needsLabel) is genuinely ambiguous enough to ask about.
-    const autoLabel =
-      previous.placeId !== null && next.placeId !== null && previous.placeId !== next.placeId
-        ? `commute to ${placeById.get(next.placeId)?.name ?? "destination"}`
-        : null;
     // The two visits' own locations - see createTrip's own comment for what
     // these back (the flight heuristic's distance signal, a distanceKm
     // fallback, and the path's anchors). Null when a location can't be
@@ -181,7 +174,7 @@ async function handleTransition(
     // shouldn't crash tracking over a cosmetic distance/path figure).
     const fromLatLng = visitLatLng(previous, placeById);
     const toLatLng = visitLatLng(next, placeById);
-    const trip = await createTrip(previous.id, next.id, departedAt, atFixTime, inTransitAcc, fromLatLng, toLatLng, autoLabel);
+    const trip = await createTrip(previous.id, next.id, departedAt, atFixTime, inTransitAcc, fromLatLng, toLatLng);
     await emit({
       type: "map.trip_completed",
       payload: {
@@ -193,15 +186,6 @@ async function handleTransition(
         durationMinutes: trip.durationMinutes,
       },
     });
-    // A round trip to the same known place with no dot recorded in between
-    // (see visits.ts's toTrip needsLabel) - "Home -> Home" alone says
-    // nothing about why, so ask the owner rather than leave it unexplained.
-    if (trip.needsLabel) {
-      await emit({
-        type: "map.trip_needs_label",
-        payload: { tripId: trip.id, placeName: trip.fromLabel, durationMinutes: trip.durationMinutes },
-      });
-    }
     if (previous.placeId) {
       const place = placeById.get(previous.placeId);
       await emit({
@@ -344,8 +328,8 @@ export async function processPositions(
     // it swallow whatever real stop comes next; and a known place needs its
     // own accurate departure time so a same-place round trip that never
     // dwells anywhere else in between (drive-thru, quick errand) still
-    // produces two visits and a real trip - see visits.ts's needsLabel -
-    // instead of one visit silently spanning the whole outing.
+    // produces two visits and a real trip, instead of one visit silently
+    // spanning the whole outing.
     // (openVisitRow and candidateStop are never both non-null at once - the
     // moment either one is set, the other has already been cleared - so
     // this is genuinely either/or, not two independent checks.)

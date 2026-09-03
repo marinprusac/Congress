@@ -57,6 +57,13 @@
       "when": 1788401779729,
       "tag": "0007_mature_ink",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788472951009,
+      "tag": "0008_demonic_chimera",
+      "breakpoints": true
     }
   ]
 }

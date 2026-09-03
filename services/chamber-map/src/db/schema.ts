@@ -113,13 +113,6 @@ export const trips = sqliteTable(
     arrivedAt: integer("arrived_at", { mode: "timestamp_ms" }).notNull(),
     distanceKm: real("distance_km").notNull(),
     mode: text("mode", { enum: ["walk", "bike", "transit", "unknown"] }).notNull(),
-    // Owner-authored purpose ("walking the dog", "getting lunch"), only ever
-    // meaningful for a trip whose endpoints are the same known place (see
-    // visits.ts's needsLabel) - a same-place round trip with no dot recorded
-    // in between is otherwise invisible: fromLabel/toLabel alone would just
-    // say "Home -> Home". Left null for every other trip; no UI prompts for
-    // one there.
-    label: text("label"),
     // The actual GPS fixes seen in transit (JSON array of [lat, lon] pairs,
     // ascending by time) - what the frontend map draws as the trip's line.
     // A denormalized copy for fast rendering without a `positions` range

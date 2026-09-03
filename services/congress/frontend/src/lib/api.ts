@@ -18,3 +18,11 @@ export async function login(password: string): Promise<{ ok: true } | { ok: fals
 export async function logout(): Promise<void> {
   await fetch("/auth/logout", { method: "POST" });
 }
+
+// `keepalive` so the request survives the page reload that follows it right
+// away (see main.tsx's controllerchange handler) - without it, a normal
+// fetch racing a navigation can be aborted mid-flight before it reaches the
+// server.
+export async function notifyAppUpdated(): Promise<void> {
+  await fetch("/congress/events/app-updated", { method: "POST", keepalive: true }).catch(() => {});
+}

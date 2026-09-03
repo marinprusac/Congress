@@ -95,16 +95,11 @@ function FitToDay({ markers, paths }: { markers: Visit[]; paths: [number, number
   return null;
 }
 
-// A commute between two different known places auto-labels itself
-// ("commute to Work" - see tracking.ts's handleTransition); a same-place
-// round trip (t.needsLabel - see visits.ts's toTrip) stays genuinely
-// unlabeled - there's no owner-facing way to name one.
 function TripEntry({ trip }: { trip: Trip }) {
   return (
     <li className="py-1 pl-6 text-xs text-dust">
       <span className="italic">
         {trip.mode} · {formatDuration(trip.durationMinutes)} · {trip.distanceKm.toFixed(1)} km
-        {trip.label ? ` · "${trip.label}"` : ""}
       </span>
     </li>
   );

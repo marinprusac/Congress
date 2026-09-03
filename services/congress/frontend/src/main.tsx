@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { markShellHosted, preventPinchZoom, PersistedQueryProvider, ToastHost } from "@congress/congress-ui";
 import { queryClient } from "@/lib/queryClient";
+import { notifyAppUpdated } from "@/lib/api";
 import { App } from "@/App";
 import "./index.css";
 
@@ -23,11 +24,17 @@ preventPinchZoom();
 // force-quit/reopen, since each relaunch races the update check rather
 // than waiting on it. `registerSW.js`'s injected registration is the bare
 // vite-plugin-pwa default with no reload-on-update logic of its own.
+//
+// Also logs a congress.app_updated event for this - a Logs Chamber rule can
+// turn "the app updated" into a push notification/history entry the same
+// way any other Chamber's own event does, and this is the one place in the
+// system that actually observes a new version taking over.
 if ("serviceWorker" in navigator) {
   let reloaded = false;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (reloaded) return;
     reloaded = true;
+    void notifyAppUpdated();
     window.location.reload();
   });
 }
