@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 // A plain global flag, deliberately not React Context: congress-ui is a
 // source-only workspace package, recompiled independently into Capitol's
 // own bundle *and* every Chamber's remote entry (see chamber-kit's build
@@ -26,8 +28,30 @@ export function markShellHosted(): void {
 // boot, under its own `BrowserRouter basename="/<chamber>"` - a <Link> to
 // another Chamber's absolute path would resolve *within* that basename
 // instead of escaping it, e.g. "/documents" becoming "/notes/documents").
-export function useShellHosted(): boolean {
+function readShellFlag(): boolean {
   return Boolean((window as unknown as Record<string, boolean>)[SHELL_FLAG]);
+}
+
+// A widget mounted directly onto Capitol's canvas (via a dynamically
+// imported remote-entry.js, resolved and rendered behind its own Suspense
+// boundary independently of Congress's own top-level render) can complete
+// its first render in a narrow window before markShellHosted() has taken
+// effect for it - confirmed by observation, not just theory: a widget's
+// link can render pointing at the current page itself (the raw, unresolved
+// addHref) even though the exact same flag/function correctly resolves a
+// moment later for a full Chamber page reached via ChamberHost. Since the
+// flag itself only ever flips false -> true, never back, a plain `useState`
+// initializer plus one re-check in an effect (which always runs after the
+// commit that might have raced the flag) is enough to self-correct: a
+// widget that raced and lost gets exactly one extra render with the correct
+// value, and one that didn't race pays for an effect that's a same-value
+// no-op.
+export function useShellHosted(): boolean {
+  const [hosted, setHosted] = useState(readShellFlag);
+  useEffect(() => {
+    if (!hosted && readShellFlag()) setHosted(true);
+  }, [hosted]);
+  return hosted;
 }
 
 // A Chamber's own components (ChamberHeader's titleHref, ChamberPicker's
