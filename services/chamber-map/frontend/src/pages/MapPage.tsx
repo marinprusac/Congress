@@ -211,24 +211,33 @@ export function MapPage() {
 
   return (
     <section>
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <button className="tap-target text-accent hover:underline" onClick={() => setDate((d) => shiftDate(d, -1))}>
-            ← Prev
-          </button>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="border border-dust bg-parchment px-2 py-1 font-mono text-sm text-ink"
-          />
-          <button className="tap-target text-accent hover:underline" onClick={() => setDate((d) => shiftDate(d, 1))}>
-            Next →
-          </button>
-        </div>
-        <Link to={resolveChamberPath("/places", "map", shellHosted)} className="text-sm text-accent hover:underline">
-          Manage places
-        </Link>
+      <div className="mb-4 flex items-center gap-2">
+        <button
+          type="button"
+          className="tap-target flex items-center justify-center text-accent"
+          onClick={() => setDate((d) => shiftDate(d, -1))}
+          aria-label="Previous day"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+            <path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+          </svg>
+        </button>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="bg-transparent px-2 py-1 font-mono text-sm text-accent"
+        />
+        <button
+          type="button"
+          className="tap-target flex items-center justify-center text-accent"
+          onClick={() => setDate((d) => shiftDate(d, 1))}
+          aria-label="Next day"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+            <path d="M8.59 16.59 10 18l6-6-6-6-1.41 1.41L13.17 12z" />
+          </svg>
+        </button>
       </div>
 
       <div
