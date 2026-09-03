@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CalendarEvent } from "../../../src/types";
-import { buildAgendaTimeline } from "./datetime";
+import { buildAgendaTimeline, formatGapDuration } from "./datetime";
 import type { AgendaClusterEntry, AgendaDateEntry, AgendaGapEntry } from "./datetime";
 
 let nextId = 0;
@@ -35,7 +35,7 @@ describe("buildAgendaTimeline - day visibility", () => {
   const windowEndMs = new Date("2030-01-04T00:00:00").getTime(); // Jan 1, 2, 3
   const window = { nowMs: windowStartMs - 1, windowStartMs, windowEndMs };
 
-  it("shows a weekday-labeled header for every day, including one with no events, with the true gap around it never compressed", () => {
+  it("merges the idle span across an empty day into one gap, with each day's header riding inside it at its own midnight point", () => {
     const events = [
       makeEvent({ start: "2030-01-01T09:00:00", end: "2030-01-01T10:00:00" }),
       // Jan 2 has no events at all.
@@ -44,22 +44,62 @@ describe("buildAgendaTimeline - day visibility", () => {
 
     const timeline = buildAgendaTimeline(events, window);
 
+    // Only the very first day (Jan 1, with no preceding gap to embed into)
+    // gets a standalone header - Jan 2 and Jan 3's headers both ride inside
+    // the one merged gap below instead.
     const dateEntries = timeline.filter((e): e is AgendaDateEntry => e.kind === "date");
-    expect(dateEntries.map((e) => e.key)).toEqual(["date-2030-01-01", "date-2030-01-02", "date-2030-01-03"]);
-    for (const entry of dateEntries) {
-      expect(entry.label).toMatch(/Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday/);
-    }
+    expect(dateEntries.map((e) => e.key)).toEqual(["date-2030-01-01"]);
 
-    // The full span from the first event's end to the second event's start -
-    // which includes the entirety of the empty Jan 2 - is accounted for by
-    // real "gap" entries, not silently dropped into a collapsed marker.
-    const totalGapMinutes = timeline
-      .filter((e): e is AgendaGapEntry => e.kind === "gap")
-      .reduce((sum, e) => sum + e.minutes, 0);
+    // The merged gap between the two events, plus one trailing gap for the
+    // rest of Jan 3 after its last event, up to the window's own end (no
+    // day-breaks on that one - it doesn't cross into another day).
+    const gapEntries = timeline.filter((e): e is AgendaGapEntry => e.kind === "gap");
+    expect(gapEntries).toHaveLength(2);
+    const gap = gapEntries[0]!;
+    expect(gapEntries[1]!.dayBreaks).toEqual([]);
+
+    // One single duration for the whole span - not one number per day
+    // crossed - covering everything from the first event's end to the
+    // second event's start, including the entirety of the empty Jan 2.
     const expectedMinutes = Math.round(
       (new Date("2030-01-03T09:00:00").getTime() - new Date("2030-01-01T10:00:00").getTime()) / 60000
     );
-    expect(totalGapMinutes).toBe(expectedMinutes);
+    expect(gap.minutes).toBe(expectedMinutes);
+
+    // Both Jan 2 and Jan 3's headers land inside it, each at its own true
+    // midnight offset from the gap's start (10:00 Jan 1).
+    expect(gap.dayBreaks.map((b) => b.key)).toEqual(["2030-01-02", "2030-01-03"]);
+    expect(gap.dayBreaks[0]!.offsetMinutes).toBe(14 * 60); // 10:00 Jan 1 -> 00:00 Jan 2
+    expect(gap.dayBreaks[1]!.offsetMinutes).toBe(38 * 60); // 10:00 Jan 1 -> 00:00 Jan 3
+    for (const brk of gap.dayBreaks) {
+      expect(brk.label).toMatch(/Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday/);
+    }
+  });
+
+  it("still merges into one gap when only a single midnight is crossed, with no empty day in between", () => {
+    const events = [
+      makeEvent({ start: "2030-01-01T18:00:00", end: "2030-01-01T20:00:00" }),
+      makeEvent({ start: "2030-01-02T10:00:00", end: "2030-01-02T11:00:00" }),
+    ];
+
+    const timeline = buildAgendaTimeline(events, {
+      nowMs: windowStartMs - 1,
+      windowStartMs,
+      windowEndMs: new Date("2030-01-03T00:00:00").getTime(),
+    });
+
+    const dateEntries = timeline.filter((e): e is AgendaDateEntry => e.kind === "date");
+    expect(dateEntries.map((e) => e.key)).toEqual(["date-2030-01-01"]);
+
+    // The merged gap crossing the one midnight, plus a trailing gap for the
+    // rest of Jan 2 after its event, up to the window's own end.
+    const gapEntries = timeline.filter((e): e is AgendaGapEntry => e.kind === "gap");
+    expect(gapEntries).toHaveLength(2);
+    const gap = gapEntries[0]!;
+    expect(gap.minutes).toBe(14 * 60); // 20:00 Jan 1 -> 10:00 Jan 2
+    expect(gap.dayBreaks).toHaveLength(1);
+    expect(gap.dayBreaks[0]!.key).toBe("2030-01-02");
+    expect(gap.dayBreaks[0]!.offsetMinutes).toBe(4 * 60); // 20:00 Jan 1 -> 00:00 Jan 2
   });
 
   it("carries a weekday name even for a day far beyond the old 7-day cutoff", () => {
@@ -119,5 +159,19 @@ describe("buildAgendaTimeline - overlap column assignment", () => {
     for (const block of cluster.blocks) {
       expect(block.columnCount).toBe(2);
     }
+  });
+});
+
+describe("formatGapDuration", () => {
+  it("formats sub-hour and sub-day durations as before", () => {
+    expect(formatGapDuration(45)).toBe("45 min");
+    expect(formatGapDuration(90)).toBe("1h 30m");
+    expect(formatGapDuration(120)).toBe("2h");
+  });
+
+  it("switches to day-hour format at 24h and beyond, still a single duration", () => {
+    expect(formatGapDuration(24 * 60)).toBe("1d");
+    expect(formatGapDuration(26 * 60)).toBe("1d 2h");
+    expect(formatGapDuration(29 * 24 * 60)).toBe("29d");
   });
 });

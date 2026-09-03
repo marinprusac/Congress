@@ -86,10 +86,26 @@ export interface AgendaClusterEntry {
   blocks: AgendaEventBlock[];
 }
 
-// Idle time between two consecutive timed events on the same day, or
-// between one day's last timed event and the next day's first, that's
-// short enough (or, for the same-day case, always) to just render as its
-// true proportional whitespace.
+// One calendar day's own header, landing at some point inside a gap that
+// spans across it - see AgendaGapEntry.dayBreaks.
+export interface AgendaGapDayBreak {
+  key: string;
+  // Minutes from the *start* of the gap this break sits inside - the
+  // component turns this into a proportional (linear, not independently
+  // sqrt-scaled) position within the gap's own already-compressed height,
+  // the same way a block's nowOffsetMinutes places the now-indicator inside
+  // an event.
+  offsetMinutes: number;
+  label: string;
+}
+
+// Idle time between two consecutive timed events on the same day, between
+// one day's last content and the next day's first, or - if one or more
+// entirely empty days sit in between - a single span covering all of it at
+// once. A gap always carries exactly one duration, however many calendar
+// days it crosses: dayBreaks is where each of those days' own headers gets
+// placed, as a point inside this one span, rather than splitting the
+// duration itself into one number per day.
 export interface AgendaGapEntry {
   kind: "gap";
   key: string;
@@ -100,6 +116,7 @@ export interface AgendaGapEntry {
   // information, so the gap still renders its true proportional blank space
   // but without the "45 min" caption a future gap gets.
   past: boolean;
+  dayBreaks: AgendaGapDayBreak[];
 }
 
 // The current-time indicator, placed at most once wherever "now" actually
@@ -155,13 +172,20 @@ function formatAgendaDayLabel(dateKey: string): string {
     : AGENDA_WEEKDAY_DATE_FORMAT.format(date);
 }
 
-// Compact label for a plain gap row, e.g. "45 min", "2h", "2h 15m" - short
-// enough to sit as fine print in the gap's own blank space.
+// Compact label for a plain gap row, e.g. "45 min", "2h", "2h 15m", or -
+// once a gap runs a full day or longer (routine now that a gap can span
+// several entirely empty calendar days at once) - "1d", "1d 2h". Always
+// exactly one duration, however long the span.
 export function formatGapDuration(minutes: number): string {
   if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+  if (minutes < 24 * 60) {
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+  }
+  const days = Math.floor(minutes / (24 * 60));
+  const hours = Math.floor((minutes % (24 * 60)) / 60);
+  return hours === 0 ? `${days}d` : `${days}d ${hours}h`;
 }
 
 interface DayGroup {
@@ -337,14 +361,18 @@ function buildDayItems(day: DayGroup, nowMs: number | null): DayItem[] {
 
 // Builds the single continuous timeline the Agenda page renders: every
 // calendar day in the window gets its own header, whether or not it has any
-// events - "no events" is never a reason to skip a day or compress the gap
-// around it, so a fully empty week reads as seven headers each with real,
-// sqrt-scaled blank space around it rather than a collapsed marker. A slow
-// stretch *within* a day is likewise always shown at its true (if
-// sqrt-compressed) proportional size. Today, specifically, is never
-// considered to have "no events" while the current time itself is inside
-// the rendered window, since the now-marker always gives it at least one
-// item to anchor to.
+// events - "no events" is never a reason to skip a day, and idle time is
+// never compressed into a collapsed marker. A day with no content of its
+// own (no timed events, no all-day events, and it isn't today) contributes
+// no flow entries of its own at all - its header instead becomes a
+// dayBreak riding inside whichever single gap ends up spanning it, so a run
+// of several empty days, or just one ordinary overnight gap, still reads as
+// one proportionally-sized span with one duration, with each day's own
+// header landing at its own true (midnight) position inside it - never
+// split into a separate number per day crossed. Today, specifically, is
+// never considered to have "no events" while the current time itself is
+// inside the rendered window, since the now-marker always gives it at
+// least one item to anchor to.
 export function buildAgendaTimeline(events: CalendarEvent[], window: AgendaNowContext): AgendaFlowEntry[] {
   const nowMs = window.nowMs >= window.windowStartMs && window.nowMs < window.windowEndMs ? window.nowMs : null;
   const todayKey = nowMs !== null ? localDateOnly(new Date(nowMs)) : null;
@@ -356,27 +384,80 @@ export function buildAgendaTimeline(events: CalendarEvent[], window: AgendaNowCo
 
   const timeline: AgendaFlowEntry[] = [];
 
-  // The idle span between startMs and endMs, rendered as a plain
-  // proportional (sqrt-scaled) gap - covers everything from a few minutes
-  // between two events to an entire run of empty days, always at its true
-  // size, never condensed.
-  function pushGap(keyBase: string, startMs: number, endMs: number) {
+  // A simple, single-day gap between two items in the same day's own
+  // sequence - never crosses a day boundary, so it never carries dayBreaks.
+  function pushItemGap(keyBase: string, startMs: number, endMs: number) {
     const minutes = Math.max(0, Math.round((endMs - startMs) / 60000));
     if (minutes <= 0) return;
-    timeline.push({ kind: "gap", key: `gap-${keyBase}`, minutes, past: nowMs !== null && endMs <= nowMs });
+    timeline.push({ kind: "gap", key: `gap-${keyBase}`, minutes, past: nowMs !== null && endMs <= nowMs, dayBreaks: [] });
   }
 
-  let previousAnchorEndMs: number | null = null;
+  // previousContentEndMs is the end of the last day that actually had
+  // content (or null before the very first one); pendingBreaks accumulates
+  // the headers of every day crossed since then - empty days that produced
+  // no content of their own, plus (once known) the next content-bearing
+  // day's own header - until there's an endpoint to flush a single merged
+  // gap against.
+  let previousContentEndMs: number | null = null;
+  let pendingBreaks: AgendaGapDayBreak[] = [];
+
+  function flushPending(endMs: number) {
+    if (previousContentEndMs === null) return;
+    const startMs = previousContentEndMs;
+    const minutes = Math.max(0, Math.round((endMs - startMs) / 60000));
+    if (minutes > 0) {
+      timeline.push({
+        kind: "gap",
+        key: `gap-day-${startMs}`,
+        minutes,
+        past: nowMs !== null && endMs <= nowMs,
+        dayBreaks: pendingBreaks,
+      });
+    } else {
+      // No real span to hang the breaks on (e.g. back-to-back events either
+      // side of a midnight with no idle time at all) - fall back to a bare
+      // header per day so none of them silently disappear.
+      for (const brk of pendingBreaks) {
+        timeline.push({ kind: "date", key: `date-${brk.key}`, label: brk.label });
+      }
+    }
+    pendingBreaks = [];
+  }
+
   for (const day of days) {
     const items = buildDayItems(day, day.dateKey === todayKey ? nowMs : null);
-    const anchorStartMs = items.length > 0 ? itemStart(items[0]!) : new Date(`${day.dateKey}T00:00:00`).getTime();
-    const anchorEndMs = items.length > 0 ? itemEnd(items[items.length - 1]!) : anchorStartMs;
+    const dayMidnightMs = new Date(`${day.dateKey}T00:00:00`).getTime();
+    const hasContent = items.length > 0 || day.allDay.length > 0;
+    const headerLabel = formatAgendaDayLabel(day.dateKey);
 
-    if (previousAnchorEndMs !== null) {
-      pushGap(`day-${day.dateKey}`, previousAnchorEndMs, anchorStartMs);
+    if (!hasContent) {
+      if (previousContentEndMs === null) {
+        // Unreachable today (the now-marker always gives it content), kept
+        // as a safe fallback for the very first day in the window.
+        timeline.push({ kind: "date", key: `date-${day.dateKey}`, label: headerLabel });
+      } else {
+        pendingBreaks.push({
+          key: day.dateKey,
+          offsetMinutes: Math.max(0, Math.round((dayMidnightMs - previousContentEndMs) / 60000)),
+          label: headerLabel,
+        });
+      }
+      continue;
     }
 
-    timeline.push({ kind: "date", key: `date-${day.dateKey}`, label: formatAgendaDayLabel(day.dateKey) });
+    const anchorStartMs = items.length > 0 ? itemStart(items[0]!) : dayMidnightMs;
+    const anchorEndMs = items.length > 0 ? itemEnd(items[items.length - 1]!) : anchorStartMs;
+
+    if (previousContentEndMs === null) {
+      timeline.push({ kind: "date", key: `date-${day.dateKey}`, label: headerLabel });
+    } else {
+      pendingBreaks.push({
+        key: day.dateKey,
+        offsetMinutes: Math.max(0, Math.round((dayMidnightMs - previousContentEndMs) / 60000)),
+        label: headerLabel,
+      });
+      flushPending(anchorStartMs);
+    }
 
     if (day.allDay.length > 0) {
       timeline.push({ kind: "allday", key: `allday-${day.dateKey}`, events: day.allDay });
@@ -386,7 +467,7 @@ export function buildAgendaTimeline(events: CalendarEvent[], window: AgendaNowCo
     for (const item of items) {
       const startMs = itemStart(item);
       if (previousItemEndMs !== null) {
-        pushGap(`item-${item.kind === "now" ? "now" : item.blocks[0]!.event.id}`, previousItemEndMs, startMs);
+        pushItemGap(`item-${item.kind === "now" ? "now" : item.blocks[0]!.event.id}`, previousItemEndMs, startMs);
       }
 
       if (item.kind === "now") {
@@ -410,8 +491,13 @@ export function buildAgendaTimeline(events: CalendarEvent[], window: AgendaNowCo
       previousItemEndMs = itemEnd(item);
     }
 
-    previousAnchorEndMs = anchorEndMs;
+    previousContentEndMs = anchorEndMs;
   }
+
+  // Trailing empty days at the tail of the window (no further content to
+  // flush against) still need their headers shown - one final merged gap
+  // running to the window's own end.
+  flushPending(window.windowEndMs);
 
   return timeline;
 }

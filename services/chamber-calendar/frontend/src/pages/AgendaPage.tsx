@@ -241,9 +241,10 @@ export function AgendaPage() {
                 </div>
               );
 
-            case "gap":
+            case "gap": {
+              const heightPx = Math.max(4, durationPx(entry.minutes));
               return (
-                <div key={entry.key} className="flex gap-3 px-1" style={{ height: Math.max(4, durationPx(entry.minutes)) }}>
+                <div key={entry.key} className="relative flex gap-3 px-1" style={{ height: heightPx }}>
                   <div className="w-16 shrink-0" aria-hidden="true" />
                   <div className="relative flex-1">
                     <span className="absolute inset-y-0 left-0 border-l-2 border-dust/30" aria-hidden="true" />
@@ -253,8 +254,23 @@ export function AgendaPage() {
                       </span>
                     )}
                   </div>
+                  {/* Every calendar day this gap spans gets its own header,
+                      positioned at its true (midnight) point inside this one
+                      continuous, single-duration span - not as a separate
+                      flow row, and never splitting the duration above into
+                      one number per day crossed. */}
+                  {entry.dayBreaks.map((brk) => (
+                    <div
+                      key={brk.key}
+                      className="absolute left-1 w-16 -translate-y-1/2 text-right font-mono text-[10px] leading-tight uppercase tracking-wide text-dust"
+                      style={{ top: `${Math.min(100, Math.max(0, (brk.offsetMinutes / entry.minutes) * 100))}%` }}
+                    >
+                      {brk.label}
+                    </div>
+                  ))}
                 </div>
               );
+            }
 
             case "now":
               return (
