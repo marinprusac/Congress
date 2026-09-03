@@ -128,7 +128,21 @@ export function EventViewPage() {
   if (!exhibitId) return <p className="font-mono text-sm text-alert">Invalid event id.</p>;
 
   return (
-    <section>
+    <article>
+      <div className="mb-6 border-b border-dust pb-4">
+        <input
+          value={values.title}
+          onChange={(e) => setValues({ ...values, title: e.target.value })}
+          placeholder="Untitled"
+          readOnly={readOnly}
+          className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+        />
+      </div>
+
+      {updateMutation.isError && (
+        <p className="mb-4 font-mono text-sm text-alert">{(updateMutation.error as Error).message}</p>
+      )}
+
       <ExhibitLinksLayout
         exhibitId={exhibitId}
         renderIcon={(chamber) => getChamberIcon(chamber)}
@@ -147,15 +161,9 @@ export function EventViewPage() {
           </ExhibitActionBar>
         }
       >
-        <EventForm
-          values={values}
-          onChange={setValues}
-          calendarLocked
-          readOnly={readOnly}
-          error={updateMutation.error instanceof Error ? updateMutation.error.message : null}
-        />
+        <EventForm values={values} onChange={setValues} calendarLocked readOnly={readOnly} />
 
-        <div className="mt-6 border-t border-dust pt-4">
+        <div className="mt-6">
           <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">
             {event.attendance.isInvitation ? "Invitation" : "Attendance"}
           </label>
@@ -208,6 +216,6 @@ export function EventViewPage() {
           </a>
         )}
       </ExhibitLinksLayout>
-    </section>
+    </article>
   );
 }

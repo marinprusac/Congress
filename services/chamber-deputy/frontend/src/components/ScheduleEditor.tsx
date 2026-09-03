@@ -23,10 +23,18 @@ export const EMPTY_SCHEDULE: ScheduleDraft = {
 
 const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-const selectClass =
-  "border border-dust bg-parchment px-2 py-1 text-ink normal-case tracking-normal focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
-const numberInputClass = `${selectClass} w-24`;
-const timeInputClass = `${selectClass} w-32`;
+// `.field-plain` itself is `width: 100%` (the common case: a labeled field
+// stacked in its own block) - these three sit inline instead, alongside
+// their own label text, so each pins its own width via `style` (the only
+// thing guaranteed to beat a stylesheet class's width without relying on
+// cascade-layer ordering between this package's plain CSS and Tailwind's
+// generated utilities).
+const selectClass = "field-plain normal-case tracking-normal";
+const numberInputClass = "field-plain normal-case tracking-normal";
+const timeInputClass = "field-plain normal-case tracking-normal";
+const inlineSelectStyle = { width: "auto" };
+const inlineNumberStyle = { width: "3.5rem" };
+const inlineTimeStyle = { width: "6rem" };
 
 function timeInputValue(hour: number | null, minute: number | null): string {
   if (hour == null || minute == null) return "";
@@ -89,6 +97,7 @@ export function ScheduleEditor({ value, onChange, eventCatalog, eventCatalogLoad
           value={value.scheduleType ?? ""}
           onChange={(e) => setType((e.target.value || null) as DirectiveScheduleType | null)}
           className={selectClass}
+          style={inlineSelectStyle}
         >
           <option value="">manual / chat only</option>
           <option value="interval">every —</option>
@@ -108,6 +117,7 @@ export function ScheduleEditor({ value, onChange, eventCatalog, eventCatalogLoad
             onChange={(e) => onChange({ ...value, intervalMs: e.target.value.trim() ? Number(e.target.value) * 60_000 : null })}
             placeholder="minutes"
             className={numberInputClass}
+            style={inlineNumberStyle}
           />
           minutes
         </label>
@@ -122,6 +132,7 @@ export function ScheduleEditor({ value, onChange, eventCatalog, eventCatalogLoad
                 value={value.scheduleDayOfWeek ?? ""}
                 onChange={(e) => onChange({ ...value, scheduleDayOfWeek: Number(e.target.value) })}
                 className={selectClass}
+                style={inlineSelectStyle}
               >
                 {DAY_LABELS.map((label, index) => (
                   <option key={label} value={index}>
@@ -132,7 +143,13 @@ export function ScheduleEditor({ value, onChange, eventCatalog, eventCatalogLoad
             </>
           )}
           At
-          <input type="time" value={timeInputValue(value.scheduleHour, value.scheduleMinute)} onChange={(e) => setTime(e.target.value)} className={timeInputClass} />
+          <input
+            type="time"
+            value={timeInputValue(value.scheduleHour, value.scheduleMinute)}
+            onChange={(e) => setTime(e.target.value)}
+            className={timeInputClass}
+            style={inlineTimeStyle}
+          />
           <span className="normal-case tracking-normal text-dust">({value.scheduleTimeZone ?? browserTimeZone()})</span>
         </div>
       )}

@@ -482,6 +482,40 @@
   margin: -0.6em -0.4em;
 }
 
+/* An editable metadata field (a <select>, a text/date/number/time <input>)
+   with no visible box - the same "reads as content, not a form" contract
+   as an exhibit's own title input (NoteViewPage etc: no border, ever - a
+   focus-visible outline is the only affordance). Every call site still
+   supplies its own font/size utility class alongside this one; a <select>
+   keeps its native chevron/appearance since that's the only cue it has
+   left that it's a picker rather than plain text. */
+.field-plain {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--color-ink);
+}
+
+.field-plain::placeholder {
+  color: var(--color-dust);
+}
+
+.field-plain:focus {
+  outline: none;
+}
+
+.field-plain:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.field-plain:disabled,
+.field-plain[readonly] {
+  color: var(--color-dust);
+}
+
 /* ExhibitTextarea's auto-resize, done natively where the browser supports
    it instead of a per-keystroke JS scrollHeight measurement (see that
    component's own comment - it skips its JS fallback entirely when this is

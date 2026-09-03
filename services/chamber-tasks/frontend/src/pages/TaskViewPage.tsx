@@ -119,7 +119,7 @@ export function TaskViewPage() {
             type="date"
             value={draftDueDate}
             onChange={(e) => setDraftDueDate(e.target.value)}
-            className="border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+            className="field-plain font-mono text-base"
           />
         </div>
       </div>

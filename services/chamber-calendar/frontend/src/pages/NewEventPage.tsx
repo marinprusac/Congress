@@ -4,11 +4,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   useShellHosted,
   resolveChamberPath,
-  PageHeader,
+  ExhibitActionBar,
   ExhibitLinksLayout,
   navigateToExhibit,
   getChamberIcon,
   flushDraftConnections,
+  FormErrorMessage,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
@@ -72,8 +73,19 @@ export function NewEventPage() {
   });
 
   return (
-    <section>
-      <PageHeader title="New Event" />
+    <article>
+      <div className="mb-6 border-b border-dust pb-4">
+        <input
+          autoFocus
+          value={values.title}
+          onChange={(e) => setValues({ ...values, title: e.target.value })}
+          placeholder="Title"
+          className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+        />
+      </div>
+
+      {mutation.isError && <FormErrorMessage>{(mutation.error as Error).message}</FormErrorMessage>}
+
       <ExhibitLinksLayout
         exhibitId={null}
         renderIcon={(chamber) => getChamberIcon(chamber)}
@@ -81,16 +93,26 @@ export function NewEventPage() {
         editable
         draftConnections={draftConnections}
         onDraftConnectionsChange={setDraftConnections}
+        actions={
+          <ExhibitActionBar>
+            <button
+              onClick={() => values.title.trim() && values.calendarKey && mutation.mutate()}
+              disabled={!values.title.trim() || !values.calendarKey || mutation.isPending}
+              className="tap-target text-accent hover:underline disabled:opacity-50"
+            >
+              {mutation.isPending ? "Creating —" : "Create"}
+            </button>
+            <button
+              onClick={() => navigate(resolveChamberPath("/", "calendar", shellHosted))}
+              className="tap-target text-slate hover:underline"
+            >
+              Cancel
+            </button>
+          </ExhibitActionBar>
+        }
       >
-        <EventForm
-          values={values}
-          onChange={setValues}
-          onSubmit={() => mutation.mutate()}
-          submitting={mutation.isPending}
-          submitLabel="Create Event"
-          error={mutation.error instanceof Error ? mutation.error.message : null}
-        />
+        <EventForm values={values} onChange={setValues} />
       </ExhibitLinksLayout>
-    </section>
+    </article>
   );
 }

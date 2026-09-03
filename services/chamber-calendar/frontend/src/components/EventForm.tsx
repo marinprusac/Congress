@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExhibitFieldEditor, ExhibitInlineField, getChamberIcon } from "@congress/congress-ui";
+import { ExhibitFieldEditor, ExhibitInlineField, FormLabel, getChamberIcon } from "@congress/congress-ui";
 import { fetchSelectedCalendars } from "@/lib/api";
 
 export interface EventFormValues {
@@ -17,32 +17,20 @@ interface EventFormProps {
   values: EventFormValues;
   onChange: (values: EventFormValues) => void;
   calendarLocked?: boolean;
-  // Omit entirely for an autosaving caller (editing an existing event) -
-  // the form then has no submit button at all, since every field change is
-  // already persisted by the caller's own autosave. Pass it only for a
-  // creation flow, where the record doesn't exist yet and one explicit
-  // action is still what instantiates it.
-  onSubmit?: () => void;
-  submitting?: boolean;
-  submitLabel?: string;
-  error?: string | null;
   // Set for an event this account can't modify (e.g. an auto-added Gmail
   // reservation whose organizer is a Google service) - every field becomes
-  // read-only and the save action disappears; deleting it is handled by the
-  // caller's own action bar, outside this form, and stays available either way.
+  // read-only; deleting it is handled by the caller's own action bar,
+  // outside this form, and stays available either way.
   readOnly?: boolean;
 }
 
-export function EventForm({
-  values,
-  onChange,
-  calendarLocked,
-  onSubmit,
-  submitting,
-  submitLabel,
-  error,
-  readOnly,
-}: EventFormProps) {
+// The metadata fields shared by an event's view and create flows - not the
+// title (its caller renders that the same way every other exhibit's view
+// page does: a plain, borderless heading input) and not a submit button
+// (a view page autosaves, a create page fires its own mutation from its own
+// action bar) - just calendar/time/location/description, styled to read as
+// an exhibit's own fields rather than a form waiting to be filled in.
+export function EventForm({ values, onChange, calendarLocked, readOnly }: EventFormProps) {
   const { data: calendars } = useQuery({
     queryKey: ["calendars", "selected"],
     queryFn: fetchSelectedCalendars,
@@ -64,129 +52,97 @@ export function EventForm({
   }
 
   return (
-    <form
-      className="space-y-5"
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit?.();
-      }}
-    >
-      {error && <div className="border border-alert px-3 py-2 font-mono text-sm text-alert">{error}</div>}
-
+    <div className="space-y-6">
       {readOnly && (
-        <div className="border border-dust px-3 py-2 font-mono text-sm text-slate">
+        <p className="font-mono text-sm text-dust">
           This event is managed by its organizer, not this account, so it can't be edited here — it can still be
           removed from the calendar.
-        </div>
+        </p>
       )}
 
-      <div>
-        <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Calendar</label>
-        <select
-          value={values.calendarKey}
-          onChange={(e) => set("calendarKey", e.target.value)}
-          disabled={calendarLocked || readOnly}
-          required
-          className="w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink disabled:text-dust"
-        >
-          <option value="" disabled>
-            Select a calendar —
-          </option>
-          {grouped.map(([accountLabel, cals]) => (
-            <optgroup key={accountLabel} label={accountLabel}>
-              {cals.map((cal) => (
-                <option key={cal.id} value={`${cal.accountId}::${cal.googleCalendarId}`}>
-                  {cal.summary}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-      </div>
+      <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+        <div>
+          <FormLabel>Calendar</FormLabel>
+          <select
+            value={values.calendarKey}
+            onChange={(e) => set("calendarKey", e.target.value)}
+            disabled={calendarLocked || readOnly}
+            required
+            className="field-plain font-mono text-base disabled:text-dust"
+          >
+            <option value="" disabled>
+              Select a calendar —
+            </option>
+            {grouped.map(([accountLabel, cals]) => (
+              <optgroup key={accountLabel} label={accountLabel}>
+                {cals.map((cal) => (
+                  <option key={cal.id} value={`${cal.accountId}::${cal.googleCalendarId}`}>
+                    {cal.summary}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
 
-      <div>
-        <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Title</label>
-        <input
-          type="text"
-          value={values.title}
-          onChange={(e) => set("title", e.target.value)}
-          required
-          readOnly={readOnly}
-          className="w-full border border-dust bg-parchment px-3 py-2 font-display text-lg text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-        />
-      </div>
+        <label className="flex items-center gap-2 self-end pb-1 font-mono text-xs uppercase tracking-wide text-slate">
+          <input
+            type="checkbox"
+            checked={values.allDay}
+            onChange={(e) => set("allDay", e.target.checked)}
+            disabled={readOnly}
+          />
+          All day
+        </label>
 
-      <label className="flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-slate">
-        <input
-          type="checkbox"
-          checked={values.allDay}
-          onChange={(e) => set("allDay", e.target.checked)}
-          disabled={readOnly}
-        />
-        All day
-      </label>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="min-w-0">
-          <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Start</label>
+          <FormLabel>Start</FormLabel>
           <input
             type={values.allDay ? "date" : "datetime-local"}
             value={values.start}
             onChange={(e) => set("start", e.target.value)}
             required
             readOnly={readOnly}
-            className="w-full min-w-0 border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
+            className="field-plain font-mono text-base"
           />
         </div>
         <div className="min-w-0">
-          <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">End</label>
+          <FormLabel>End</FormLabel>
           <input
             type={values.allDay ? "date" : "datetime-local"}
             value={values.end}
             onChange={(e) => set("end", e.target.value)}
             required
             readOnly={readOnly}
-            className="w-full min-w-0 border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink"
+            className="field-plain font-mono text-base"
+          />
+        </div>
+
+        <div className="sm:col-span-2">
+          <FormLabel>Location</FormLabel>
+          <ExhibitInlineField
+            value={values.location}
+            onChange={(newValue) => set("location", newValue)}
+            readOnly={readOnly}
+            placeholder="Location (optional)"
+            className="field-plain font-body text-base focus-within:outline-none"
+            renderIcon={(chamber) => getChamberIcon(chamber)}
           />
         </div>
       </div>
 
       <div>
-        <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Location</label>
-        <ExhibitInlineField
-          value={values.location}
-          onChange={(newValue) => set("location", newValue)}
-          readOnly={readOnly}
-          placeholder="Location (optional)"
-          className="w-full border border-dust bg-parchment px-3 py-2 font-body text-base text-ink focus-within:outline-none"
-          renderIcon={(chamber) => getChamberIcon(chamber)}
-        />
-      </div>
-
-      <div>
-        <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">Description</label>
+        <FormLabel>Description</FormLabel>
         <ExhibitFieldEditor
           value={values.description}
           onChange={(newValue) => set("description", newValue)}
           readOnly={readOnly}
           minRows={4}
           placeholder="Description (optional), @ to reference an Exhibit"
-          className="w-full bg-parchment px-3 py-2 font-body text-base text-ink focus-within:outline-none"
+          className="w-full bg-parchment py-1 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
         />
       </div>
-
-      {!readOnly && onSubmit && (
-        <div className="border-t border-dust pt-4">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="border border-ink px-4 py-2 font-mono text-xs uppercase tracking-wide text-ink hover:bg-ink hover:text-parchment disabled:opacity-50"
-          >
-            {submitting ? "Saving —" : submitLabel}
-          </button>
-        </div>
-      )}
-    </form>
+    </div>
   );
 }

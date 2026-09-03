@@ -1,19 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getChamberIcon, showToast, PayloadFieldPicker, useAutosave } from "@congress/congress-ui";
+import { getChamberIcon, showToast, PayloadFieldPicker, useAutosave, FormLabel } from "@congress/congress-ui";
 import { fetchEventSettings, updateEventSettings, fetchHistory } from "@/lib/api";
 import { PayloadView, summarizePayload } from "@/components/PayloadView";
 import type { EventHistoryEntry, UpdateEventSettingsRequest } from "../../../src/types";
 
-const inputClass =
-  "w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
+const inputClass = "field-plain font-mono text-sm";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-function fieldLabel(children: React.ReactNode) {
-  return <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">{children}</label>;
-}
 
 // A settings row per known event type - no delete, no title/body/condition,
 // nothing to create. `label`/`description` are a read-only cache of that
@@ -111,7 +106,7 @@ export function EventSettingsDetailPage() {
           {draft.recordToHistory && (
             <div className="mt-3 grid grid-cols-1 gap-4 pl-6 sm:grid-cols-2">
               <div>
-                {fieldLabel("Retention (days, optional)")}
+                <FormLabel>Retention (days, optional)</FormLabel>
                 <input
                   type="number"
                   min={1}
@@ -134,7 +129,7 @@ export function EventSettingsDetailPage() {
             <div className="mt-3 flex flex-col gap-4 pl-6">
               <div>
                 <div className="mb-1 flex items-baseline justify-between gap-2">
-                  {fieldLabel(`Title (optional — defaults to "${row.label}")`)}
+                  <FormLabel>{`Title (optional — defaults to "${row.label}")`}</FormLabel>
                   <PayloadFieldPicker
                     fields={row.payloadFields}
                     targetRef={titleRef}
@@ -153,7 +148,7 @@ export function EventSettingsDetailPage() {
               </div>
               <div>
                 <div className="mb-1 flex items-baseline justify-between gap-2">
-                  {fieldLabel("Body (optional)")}
+                  <FormLabel>Body (optional)</FormLabel>
                   <PayloadFieldPicker
                     fields={row.payloadFields}
                     targetRef={bodyRef}
@@ -173,7 +168,7 @@ export function EventSettingsDetailPage() {
               </div>
               <div>
                 <div className="mb-1 flex items-baseline justify-between gap-2">
-                  {fieldLabel("Link (optional)")}
+                  <FormLabel>Link (optional)</FormLabel>
                   <PayloadFieldPicker
                     fields={row.payloadFields}
                     targetRef={urlRef}
@@ -192,7 +187,7 @@ export function EventSettingsDetailPage() {
               </div>
               <div>
                 <div className="mb-1 flex items-baseline justify-between gap-2">
-                  {fieldLabel("Dedupe key (optional — defaults to one notification per event type)")}
+                  <FormLabel>Dedupe key (optional — defaults to one notification per event type)</FormLabel>
                   <PayloadFieldPicker
                     fields={row.payloadFields}
                     targetRef={dedupeRef}
@@ -214,7 +209,7 @@ export function EventSettingsDetailPage() {
         </div>
       </div>
 
-      <div className="mt-10 border-t border-dust pt-6">
+      <div className="mt-10">
         <p className="mb-3 font-mono text-xs uppercase tracking-wide text-dust">Recent history</p>
         {historyQuery.data && historyQuery.data.length === 0 && <p className="font-mono text-sm text-dust">— Never fired —</p>}
         {historyQuery.data && historyQuery.data.length > 0 && (

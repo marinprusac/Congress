@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -12,17 +12,11 @@ import {
   ConfirmSheet,
   showToast,
   useAutosave,
+  FormLabel,
 } from "@congress/congress-ui";
 import { fetchPlace, updatePlace, deletePlace, quickCreatePlaceExhibit } from "@/lib/api";
 import { PlacePicker } from "@/components/PlacePicker";
 import type { UpdatePlaceRequest } from "../../../src/types";
-
-const inputClass =
-  "w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
-
-function fieldLabel(children: ReactNode) {
-  return <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">{children}</label>;
-}
 
 export function PlaceViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -108,18 +102,18 @@ export function PlaceViewPage() {
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          {fieldLabel("Geofence radius (meters)")}
+          <FormLabel>Geofence radius (meters)</FormLabel>
           <input
             type="number"
             min={10}
             value={draft.radiusMeters ?? place.radiusMeters}
             onChange={(e) => setDraft((d) => ({ ...d, radiusMeters: Number(e.target.value) }))}
-            className={inputClass}
+            className="field-plain font-mono text-sm"
           />
         </div>
 
         <div className="sm:col-span-2">
-          {fieldLabel("Location")}
+          <FormLabel>Location</FormLabel>
           <PlacePicker
             latitude={draft.latitude ?? place.latitude}
             longitude={draft.longitude ?? place.longitude}

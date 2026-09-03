@@ -14,18 +14,14 @@ import {
   fetchEventCatalog,
   TriggerEventPicker,
   useAutosave,
+  FormLabel,
 } from "@congress/congress-ui";
 import { fetchAutomation, updateAutomation, deleteAutomation, fetchAutomationRuns, fetchChamberTools } from "@/lib/api";
 import { ChamberToolPicker } from "@/components/ChamberToolPicker";
 import { ArgsEditor } from "@/components/ArgsEditor";
 import type { UpdateAutomationRequest } from "../../../src/types";
 
-const inputClass =
-  "w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
-
-function fieldLabel(children: React.ReactNode) {
-  return <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">{children}</label>;
-}
+const inputClass = "field-plain font-mono text-sm";
 
 export function AutomationViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -138,7 +134,7 @@ export function AutomationViewPage() {
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          {fieldLabel("Trigger event")}
+          <FormLabel>Trigger event</FormLabel>
           <TriggerEventPicker
             value={draft.triggerEventType ?? ""}
             onChange={(triggerEventType) => setDraft((d) => ({ ...d, triggerEventType }))}
@@ -149,7 +145,7 @@ export function AutomationViewPage() {
         </div>
 
         <div>
-          {fieldLabel("Condition (optional)")}
+          <FormLabel>Condition (optional)</FormLabel>
           <div className="flex gap-2">
             <input
               placeholder="payload field"
@@ -167,7 +163,7 @@ export function AutomationViewPage() {
         </div>
 
         <div className="sm:col-span-2">
-          {fieldLabel("Action - call a Chamber's tool")}
+          <FormLabel>Action - call a Chamber's tool</FormLabel>
           <ChamberToolPicker
             targetChamber={draft.targetChamber ?? ""}
             toolName={draft.toolName ?? ""}
@@ -215,7 +211,7 @@ export function AutomationViewPage() {
         />
       </ExhibitLinksLayout>
 
-      <div className="mt-10 border-t border-dust pt-6">
+      <div className="mt-10">
         <p className="mb-3 font-mono text-xs uppercase tracking-wide text-dust">
           Recent activity {automation.lastFiredAt ? `— last fired ${new Date(automation.lastFiredAt).toLocaleString()}` : ""}
         </p>
