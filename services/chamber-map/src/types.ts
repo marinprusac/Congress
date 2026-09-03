@@ -112,6 +112,7 @@ export const settingsSchema = z.object({
   minDwellMs: z.number().int(),
   stoppedSpeedKmh: z.number(),
   pollIntervalMs: z.number().int(),
+  staleThresholdMs: z.number().int(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -120,6 +121,7 @@ export const updateSettingsRequestSchema = z.object({
   minDwellMs: z.number().int().positive().optional(),
   stoppedSpeedKmh: z.number().positive().optional(),
   pollIntervalMs: z.number().int().positive().optional(),
+  staleThresholdMs: z.number().int().positive().optional(),
 });
 export type UpdateSettingsRequest = z.infer<typeof updateSettingsRequestSchema>;
 

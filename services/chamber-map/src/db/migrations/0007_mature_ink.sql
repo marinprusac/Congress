@@ -1,0 +1,1 @@
+ALTER TABLE `settings` ADD `stale_threshold_ms` integer DEFAULT 43200000 NOT NULL;

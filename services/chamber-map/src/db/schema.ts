@@ -163,6 +163,16 @@ export const settings = sqliteTable("settings", {
   // this every tick instead of only at boot, so a change here takes effect
   // on the very next tick without a restart.
   pollIntervalMs: integer("poll_interval_ms").notNull().default(2 * 60 * 1000),
+  // How long lastProcessedAt can lag behind wall-clock time before poller.ts
+  // publishes map.tracking_stale - a poll can keep succeeding (200 OK) with
+  // no error at all while the device itself has simply stopped sending real
+  // fixes (e.g. the phone's tracker app lost background location permission
+  // after an update), which map.traccar_poll_failing above never catches -
+  // that only fires on actual HTTP failures. Defaulted generously (12h) so a
+  // normal overnight reporting gap doesn't cry wolf - see tracking.ts's own
+  // notes on sparse overnight fixes being an accepted phone-side quirk, not a
+  // bug.
+  staleThresholdMs: integer("stale_threshold_ms").notNull().default(12 * 60 * 60 * 1000),
   lastProcessedAt: integer("last_processed_at", { mode: "timestamp_ms" }),
   lastPollSucceededAt: integer("last_poll_succeeded_at", { mode: "timestamp_ms" }),
   lastPollError: text("last_poll_error"),

@@ -83,5 +83,20 @@ export const manifest: Manifest = {
       description: "Polling the Traccar server has failed several times in a row.",
       payloadFields: { consecutiveFailures: { type: "number" }, lastError: { type: "string" } },
     },
+    {
+      type: "map.tracking_stale",
+      label: "Tracking data is stale",
+      description: "Polling Traccar keeps succeeding, but the device hasn't sent a real position in longer than the configured threshold - a phone-side issue (permissions, background refresh, the tracker app being closed), not a poll failure.",
+      payloadFields: {
+        lastFixAt: { type: "string", description: "ISO datetime of the last real position received" },
+        staleMinutes: { type: "number" },
+      },
+    },
+    {
+      type: "map.tracking_resumed",
+      label: "Tracking data resumed",
+      description: "The device started sending real positions again after a map.tracking_stale alert.",
+      payloadFields: { lastFixAt: { type: "string", description: "ISO datetime of the first fresh position received" } },
+    },
   ],
 };

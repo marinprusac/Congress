@@ -11,11 +11,13 @@ export const { getSettings, updateSettings } = createSingleRowSettings<typeof se
     minDwellMs: row.minDwellMs,
     stoppedSpeedKmh: row.stoppedSpeedKmh,
     pollIntervalMs: row.pollIntervalMs,
+    staleThresholdMs: row.staleThresholdMs,
   }),
   defaults: {
     unknownClusterRadiusMeters: 150,
     minDwellMs: 15 * 60 * 1000,
     stoppedSpeedKmh: 3,
     pollIntervalMs: 2 * 60 * 1000,
+    staleThresholdMs: 12 * 60 * 60 * 1000,
   },
 });

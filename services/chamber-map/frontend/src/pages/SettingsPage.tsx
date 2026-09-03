@@ -12,6 +12,7 @@ export function SettingsPage() {
   const [minDwellMinutes, setMinDwellMinutes] = useState(15);
   const [stoppedSpeedKmh, setStoppedSpeedKmh] = useState(3);
   const [pollIntervalSeconds, setPollIntervalSeconds] = useState(120);
+  const [staleThresholdHours, setStaleThresholdHours] = useState(12);
 
   useEffect(() => {
     if (settingsQuery.data) {
@@ -19,6 +20,7 @@ export function SettingsPage() {
       setMinDwellMinutes(Math.round(settingsQuery.data.minDwellMs / 60000));
       setStoppedSpeedKmh(settingsQuery.data.stoppedSpeedKmh);
       setPollIntervalSeconds(Math.round(settingsQuery.data.pollIntervalMs / 1000));
+      setStaleThresholdHours(settingsQuery.data.staleThresholdMs / 3600000);
     }
   }, [settingsQuery.data]);
 
@@ -29,6 +31,7 @@ export function SettingsPage() {
         minDwellMs: minDwellMinutes * 60000,
         stoppedSpeedKmh,
         pollIntervalMs: pollIntervalSeconds * 1000,
+        staleThresholdMs: staleThresholdHours * 3600000,
       }),
     onSuccess: (updated) => {
       queryClient.setQueryData(["settings"], updated);
@@ -102,6 +105,20 @@ export function SettingsPage() {
         <p className="-mt-3 mb-4 font-mono text-xs text-dust">
           How often this Chamber asks Traccar for new fixes. Only helps if your device is actually reporting more often than
           this - it can't recover location the device itself never sent.
+        </p>
+
+        <FormLabel>Stale-tracking alert (hours)</FormLabel>
+        <FormTextInput
+          type="number"
+          min={1}
+          step={1}
+          value={staleThresholdHours}
+          onChange={(e) => setStaleThresholdHours(Number(e.target.value))}
+        />
+        <p className="-mt-3 mb-4 font-mono text-xs text-dust">
+          If the device hasn't sent a real position in this long, a Traccar poll can still succeed with nothing new to show
+          for it - a phone-side issue (permissions, background refresh, the tracker app closed), not something this Chamber
+          can recover from. Fires a notification via the Logs Chamber instead of leaving it to be noticed as missing visits.
         </p>
 
         <FormSubmitButton disabled={mutation.isPending}>{mutation.isPending ? "Saving —" : "Save Settings"}</FormSubmitButton>
