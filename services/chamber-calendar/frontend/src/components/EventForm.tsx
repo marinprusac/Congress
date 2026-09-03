@@ -25,14 +25,11 @@ interface EventFormProps {
   onSubmit?: () => void;
   submitting?: boolean;
   submitLabel?: string;
-  onDelete?: () => void;
-  deleting?: boolean;
   error?: string | null;
   // Set for an event this account can't modify (e.g. an auto-added Gmail
   // reservation whose organizer is a Google service) - every field becomes
-  // read-only and the save action disappears, but onDelete still works:
-  // removing such an event from the calendar is always allowed even when
-  // editing its content isn't.
+  // read-only and the save action disappears; deleting it is handled by the
+  // caller's own action bar, outside this form, and stays available either way.
   readOnly?: boolean;
 }
 
@@ -43,8 +40,6 @@ export function EventForm({
   onSubmit,
   submitting,
   submitLabel,
-  onDelete,
-  deleting,
   error,
   readOnly,
 }: EventFormProps) {
@@ -181,8 +176,8 @@ export function EventForm({
         />
       </div>
 
-      <div className="flex items-center justify-between border-t border-dust pt-4">
-        {!readOnly && onSubmit ? (
+      {!readOnly && onSubmit && (
+        <div className="border-t border-dust pt-4">
           <button
             type="submit"
             disabled={submitting}
@@ -190,20 +185,8 @@ export function EventForm({
           >
             {submitting ? "Saving —" : submitLabel}
           </button>
-        ) : (
-          <span />
-        )}
-        {onDelete && (
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={deleting}
-            className="tap-target font-mono text-xs uppercase tracking-wide text-alert hover:underline disabled:opacity-50"
-          >
-            {deleting ? "Deleting —" : "Delete"}
-          </button>
-        )}
-      </div>
+        </div>
+      )}
     </form>
   );
 }
