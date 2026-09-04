@@ -519,14 +519,7 @@
 .note-link,
 .exhibit-chip[data-exhibit-state="resolved"] {
   color: var(--color-accent);
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
-  text-underline-offset: 2px;
-}
-
-.note-link:hover,
-.exhibit-chip[data-exhibit-state="resolved"]:hover {
-  text-decoration-color: var(--color-accent);
+  text-decoration: none;
 }
 
 /* ExhibitMarkdown's react-markdown output styling - used by Notes' own
