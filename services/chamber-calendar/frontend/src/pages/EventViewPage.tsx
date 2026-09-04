@@ -12,7 +12,7 @@ import {
 } from "@congress/congress-ui";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { fetchEvent, updateEvent, deleteEvent, setEventAttendance } from "@/lib/api";
-import { getBrowserTimeZone, toDatetimeLocalInput } from "@/lib/datetime";
+import { addMinutesToLocalInput, getBrowserTimeZone, minutesBetween, toDatetimeLocalInput } from "@/lib/datetime";
 import { toExhibitId } from "@/lib/exhibits";
 import type { AttendanceStatus, CalendarEvent } from "../../../src/types";
 
@@ -43,7 +43,8 @@ function toFormValues(event: CalendarEvent): EventFormValues {
     location: event.locationRich ?? event.location ?? "",
     allDay: event.allDay,
     start: event.allDay ? event.start : toDatetimeLocalInput(event.start),
-    end: event.allDay ? event.end : toDatetimeLocalInput(event.end),
+    end: event.allDay ? event.end : toDatetimeLocalInput(event.start), // unused while !allDay; see durationMinutes
+    durationMinutes: event.allDay ? 0 : minutesBetween(event.start, event.end),
   };
 }
 
@@ -72,7 +73,7 @@ export function EventViewPage() {
         locationRich: v.location || undefined,
         allDay: v.allDay,
         start: v.start,
-        end: v.end,
+        end: v.allDay ? v.end : addMinutesToLocalInput(v.start, v.durationMinutes),
         timeZone: getBrowserTimeZone(),
       }),
     onSuccess: (updated) => {

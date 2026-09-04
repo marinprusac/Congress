@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExhibitFieldEditor, ExhibitInlineField, FormLabel, getChamberIcon } from "@congress/congress-ui";
 import { fetchSelectedCalendars } from "@/lib/api";
+import { formatGapDuration } from "@/lib/datetime";
 
 export interface EventFormValues {
   calendarKey: string; // `${accountId}::${googleCalendarId}`
@@ -10,8 +11,16 @@ export interface EventFormValues {
   location: string;
   allDay: boolean;
   start: string;
+  // Multi-day all-day end date - only used while allDay is set. A timed
+  // event's end is never stored directly; it's start + durationMinutes.
   end: string;
+  durationMinutes: number;
 }
+
+// Common meeting lengths offered as <datalist> suggestions - the field
+// itself stays a plain minutes number, so any other value is just as valid
+// to type, only less discoverable.
+const DURATION_PRESET_MINUTES = [15, 30, 45, 60, 90, 120, 180, 240];
 
 interface EventFormProps {
   values: EventFormValues;
@@ -101,22 +110,47 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
             type={values.allDay ? "date" : "datetime-local"}
             value={values.start}
             onChange={(e) => set("start", e.target.value)}
+            step={values.allDay ? undefined : 900}
             required
             readOnly={readOnly}
             className="field-plain font-mono text-base"
           />
         </div>
-        <div className="min-w-0">
-          <FormLabel>End</FormLabel>
-          <input
-            type={values.allDay ? "date" : "datetime-local"}
-            value={values.end}
-            onChange={(e) => set("end", e.target.value)}
-            required
-            readOnly={readOnly}
-            className="field-plain font-mono text-base"
-          />
-        </div>
+        {values.allDay ? (
+          <div className="min-w-0">
+            <FormLabel>End</FormLabel>
+            <input
+              type="date"
+              value={values.end}
+              onChange={(e) => set("end", e.target.value)}
+              required
+              readOnly={readOnly}
+              className="field-plain font-mono text-base"
+            />
+          </div>
+        ) : (
+          <div className="min-w-0">
+            <FormLabel>Duration</FormLabel>
+            <input
+              type="number"
+              min={5}
+              step={15}
+              list="duration-presets"
+              value={values.durationMinutes}
+              onChange={(e) => set("durationMinutes", Number(e.target.value))}
+              required
+              readOnly={readOnly}
+              className="field-plain font-mono text-base"
+            />
+            <datalist id="duration-presets">
+              {DURATION_PRESET_MINUTES.map((m) => (
+                <option key={m} value={m}>
+                  {formatGapDuration(m)}
+                </option>
+              ))}
+            </datalist>
+          </div>
+        )}
 
         <div className="sm:col-span-2">
           <FormLabel>Location</FormLabel>

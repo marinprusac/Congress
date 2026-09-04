@@ -13,6 +13,53 @@ export function toDatetimeLocalInput(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// Rounds up to the next 30-minute wall-clock boundary (15:03 -> 15:30,
+// 15:30:00.000 exactly -> unchanged) - the default start time offered when
+// creating a new event. 30-minute boundaries land the same in local time as
+// in UTC, so plain epoch-ms rounding is safe here.
+export function nextHalfHourSlot(from: Date): Date {
+  const halfHourMs = 30 * 60 * 1000;
+  return new Date(Math.ceil(from.getTime() / halfHourMs) * halfHourMs);
+}
+
+// Shifts a <input type="datetime-local"> value by a number of minutes,
+// staying in the same offset-less local-time shape - used to derive an
+// event's end from its start + duration, both directions (EventForm's
+// duration field never touches `end` directly).
+export function addMinutesToLocalInput(datetimeLocal: string, minutes: number): string {
+  const d = new Date(datetimeLocal);
+  d.setMinutes(d.getMinutes() + minutes);
+  return toDatetimeLocalInput(d.toISOString());
+}
+
+// Whole-minute span between two ISO instants - used to derive a loaded
+// event's duration for the form's Duration field from its raw start/end.
+export function minutesBetween(startIso: string, endIso: string): number {
+  return Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000);
+}
+
+// Rounds an absolute instant to the nearest 15-minute wall-clock boundary -
+// the live snapping used while hovering/dragging over the agenda's blank gap
+// space to pick a new event's start (and, on desktop, its end).
+export function snapToQuarterHour(ms: number): number {
+  const quarterHourMs = 15 * 60 * 1000;
+  return Math.round(ms / quarterHourMs) * quarterHourMs;
+}
+
+// This is a rough visualization, not a precise clock - so a block or gap's
+// real duration maps to pixels via sqrt(hours) rather than 1:1 with
+// wall-clock time: 1 hour renders as 1 "unit" (PX_PER_HOUR), 4 hours as 2
+// units, 15 minutes as half a unit. A 4-hour meeting still visibly takes
+// more room than a 1-hour one, just not a literal 4x more - and a 15-minute
+// meeting or a slow afternoon both get real, legible space instead of being
+// crushed or blown out by strict linear scaling. Applies uniformly to every
+// duration the Agenda page turns into a height: gaps, cut-eligible spans
+// before they're evaluated against the threshold, and event blocks alike.
+const PX_PER_HOUR = 48;
+export function durationPx(minutes: number): number {
+  return Math.sqrt(Math.max(0, minutes) / 60) * PX_PER_HOUR;
+}
+
 function dayKey(event: CalendarEvent): string {
   return event.allDay ? event.start : event.start.slice(0, 10);
 }
@@ -109,6 +156,11 @@ export interface AgendaGapDayBreak {
 export interface AgendaGapEntry {
   kind: "gap";
   key: string;
+  // Absolute start of the gap's span - lets the agenda place a "create event
+  // here" line/range at a real clock time from a pointer's fractional
+  // position inside the gap's own (sqrt-compressed) rendered height, the
+  // same linear offsetMinutes/minutes fraction dayBreaks already uses below.
+  startMs: number;
   minutes: number;
   // True when this gap is entirely behind "now" (including the one gap that
   // runs right up to it, between the last past event and the current time) -
@@ -389,7 +441,7 @@ export function buildAgendaTimeline(events: CalendarEvent[], window: AgendaNowCo
   function pushItemGap(keyBase: string, startMs: number, endMs: number) {
     const minutes = Math.max(0, Math.round((endMs - startMs) / 60000));
     if (minutes <= 0) return;
-    timeline.push({ kind: "gap", key: `gap-${keyBase}`, minutes, past: nowMs !== null && endMs <= nowMs, dayBreaks: [] });
+    timeline.push({ kind: "gap", key: `gap-${keyBase}`, startMs, minutes, past: nowMs !== null && endMs <= nowMs, dayBreaks: [] });
   }
 
   // previousContentEndMs is the end of the last day that actually had
@@ -409,6 +461,7 @@ export function buildAgendaTimeline(events: CalendarEvent[], window: AgendaNowCo
       timeline.push({
         kind: "gap",
         key: `gap-day-${startMs}`,
+        startMs,
         minutes,
         past: nowMs !== null && endMs <= nowMs,
         dayBreaks: pendingBreaks,

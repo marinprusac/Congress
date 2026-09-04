@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { CalendarEvent } from "../../../src/types";
-import { buildAgendaTimeline, formatGapDuration } from "./datetime";
+import {
+  addMinutesToLocalInput,
+  buildAgendaTimeline,
+  durationPx,
+  formatGapDuration,
+  minutesBetween,
+  nextHalfHourSlot,
+  snapToQuarterHour,
+} from "./datetime";
 import type { AgendaClusterEntry, AgendaDateEntry, AgendaGapEntry } from "./datetime";
 
 let nextId = 0;
@@ -159,6 +167,81 @@ describe("buildAgendaTimeline - overlap column assignment", () => {
     for (const block of cluster.blocks) {
       expect(block.columnCount).toBe(2);
     }
+  });
+});
+
+describe("nextHalfHourSlot", () => {
+  it("rounds up to the next 30-minute boundary", () => {
+    expect(nextHalfHourSlot(new Date("2030-01-01T15:03:00"))).toEqual(new Date("2030-01-01T15:30:00"));
+  });
+
+  it("rounds a time in the second half-hour up to the following hour", () => {
+    expect(nextHalfHourSlot(new Date("2030-01-01T15:31:00"))).toEqual(new Date("2030-01-01T16:00:00"));
+  });
+
+  it("leaves a time already exactly on a boundary unchanged", () => {
+    expect(nextHalfHourSlot(new Date("2030-01-01T15:30:00"))).toEqual(new Date("2030-01-01T15:30:00"));
+  });
+});
+
+describe("addMinutesToLocalInput", () => {
+  it("shifts a datetime-local value forward by the given minutes", () => {
+    expect(addMinutesToLocalInput("2030-01-01T15:30", 60)).toBe("2030-01-01T16:30");
+  });
+
+  it("carries across a day boundary", () => {
+    expect(addMinutesToLocalInput("2030-01-01T23:45", 30)).toBe("2030-01-02T00:15");
+  });
+});
+
+describe("minutesBetween", () => {
+  it("returns the whole-minute span between two ISO instants", () => {
+    expect(minutesBetween("2030-01-01T09:00:00", "2030-01-01T10:30:00")).toBe(90);
+  });
+});
+
+describe("snapToQuarterHour", () => {
+  it("rounds down when closer to the boundary below", () => {
+    expect(snapToQuarterHour(new Date("2030-01-01T15:06:00").getTime())).toBe(new Date("2030-01-01T15:00:00").getTime());
+  });
+
+  it("rounds up when closer to the boundary above", () => {
+    expect(snapToQuarterHour(new Date("2030-01-01T15:09:00").getTime())).toBe(new Date("2030-01-01T15:15:00").getTime());
+  });
+
+  it("leaves a time already on a quarter-hour boundary unchanged", () => {
+    expect(snapToQuarterHour(new Date("2030-01-01T15:15:00").getTime())).toBe(new Date("2030-01-01T15:15:00").getTime());
+  });
+});
+
+describe("durationPx", () => {
+  it("maps 1 hour to exactly PX_PER_HOUR", () => {
+    expect(durationPx(60)).toBe(48);
+  });
+
+  it("compresses longer spans sublinearly (sqrt), not 1:1", () => {
+    expect(durationPx(240)).toBeCloseTo(96, 5); // 4h -> 2 units, not 4
+    expect(durationPx(15)).toBeCloseTo(24, 5); // 15m -> half a unit
+  });
+
+  it("never returns a negative height for a zero/negative span", () => {
+    expect(durationPx(0)).toBe(0);
+    expect(durationPx(-30)).toBe(0);
+  });
+});
+
+describe("buildAgendaTimeline - gap startMs", () => {
+  it("carries each gap's own absolute start instant, matching the end of the preceding event", () => {
+    const windowStartMs = new Date("2030-03-01T00:00:00").getTime();
+    const windowEndMs = new Date("2030-03-02T00:00:00").getTime();
+    const events = [makeEvent({ start: "2030-03-01T09:00:00", end: "2030-03-01T10:00:00" })];
+
+    const timeline = buildAgendaTimeline(events, { nowMs: windowStartMs - 1, windowStartMs, windowEndMs });
+    const gaps = timeline.filter((e): e is AgendaGapEntry => e.kind === "gap");
+
+    // Trailing gap after the one event, running to the window's own end.
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0]!.startMs).toBe(new Date("2030-03-01T10:00:00").getTime());
   });
 });
 

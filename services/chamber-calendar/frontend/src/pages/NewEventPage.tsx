@@ -14,23 +14,37 @@ import {
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { createEvent } from "@/lib/api";
-import { getBrowserTimeZone } from "@/lib/datetime";
+import { addMinutesToLocalInput, getBrowserTimeZone, nextHalfHourSlot, toDatetimeLocalInput } from "@/lib/datetime";
 import { toExhibitId } from "@/lib/exhibits";
 
-function defaultValues(): EventFormValues {
-  const now = new Date();
-  now.setMinutes(0, 0, 0);
-  now.setHours(now.getHours() + 1);
-  const end = new Date(now.getTime() + 60 * 60 * 1000);
-  const toLocalInput = (d: Date) => d.toISOString().slice(0, 16);
+const DEFAULT_DURATION_MINUTES = 60;
+
+// The exact <input type="datetime-local"> shape a `start` query param has to
+// match to be trusted - a malformed or hand-edited one falls back to the
+// ordinary rounded-to-now default instead of reaching an invalid Date into
+// the form.
+const DATETIME_LOCAL_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+// `start` (and, only from a desktop click-drag on the Agenda's own timeline -
+// see AgendaGapRow - `duration`, in minutes) let the Agenda hand off a
+// picked time straight into a prefilled create form, instead of always
+// landing here at defaultValues()'s own rounded-to-now guess.
+function defaultValues(searchParams: URLSearchParams): EventFormValues {
+  const startParam = searchParams.get("start");
+  const start =
+    startParam && DATETIME_LOCAL_PATTERN.test(startParam)
+      ? startParam
+      : toDatetimeLocalInput(nextHalfHourSlot(new Date()).toISOString());
+  const durationParam = Number(searchParams.get("duration"));
   return {
     calendarKey: "",
     title: "",
     description: "",
     location: "",
     allDay: false,
-    start: toLocalInput(now),
-    end: toLocalInput(end),
+    start,
+    end: start.slice(0, 10),
+    durationMinutes: durationParam > 0 ? durationParam : DEFAULT_DURATION_MINUTES,
   };
 }
 
@@ -40,7 +54,7 @@ export function NewEventPage() {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [values, setValues] = useState<EventFormValues>(() => ({
-    ...defaultValues(),
+    ...defaultValues(searchParams),
     title: searchParams.get("title") ?? "",
   }));
   // Staged locally (ExhibitLinksLayout's `exhibitId={null}` mode) since a new
@@ -60,7 +74,7 @@ export function NewEventPage() {
         locationRich: values.location || undefined,
         allDay: values.allDay,
         start: values.start,
-        end: values.end,
+        end: values.allDay ? values.end : addMinutesToLocalInput(values.start, values.durationMinutes),
         timeZone: getBrowserTimeZone(),
       });
       await flushDraftConnections(toExhibitId(created.accountId, created.calendarId, created.id), draftConnections);

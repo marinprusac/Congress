@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useShellHosted, resolveChamberPath, ListSearchInput, ListLoadingState, ListErrorState, ListEmptyState } from "@congress/congress-ui";
 import { fetchEvents, fetchEvent, searchEvents } from "@/lib/api";
@@ -8,14 +8,11 @@ import {
   formatEventStartTime,
   formatEventEndTime,
   formatWidgetEventTime,
-  formatGapDuration,
   formatClockTime,
+  durationPx,
+  toDatetimeLocalInput,
 } from "@/lib/datetime";
-
-// Below this, a gap's blank space stays unlabeled - long enough to be worth
-// naming, but a 5-minute breather between back-to-back meetings doesn't
-// need its own caption.
-const GAP_LABEL_THRESHOLD_MINUTES = 20;
+import { AgendaGapRow } from "@/components/AgendaGapRow";
 
 // How often the now-indicator's position is recomputed while the page sits
 // open - fine-grained enough that it visibly moves over a session, without
@@ -25,20 +22,6 @@ const NOW_REFRESH_MS = 60_000;
 // The agenda is always anchored to today with no way to page it forward or
 // back - just a long enough forward window to be genuinely useful.
 const WINDOW_DAYS = 30;
-
-// This is a rough visualization, not a precise clock - so a block or gap's
-// real duration maps to pixels via sqrt(hours) rather than 1:1 with
-// wall-clock time: 1 hour renders as 1 "unit" (PX_PER_HOUR), 4 hours as 2
-// units, 15 minutes as half a unit. A 4-hour meeting still visibly takes
-// more room than a 1-hour one, just not a literal 4x more - and a 15-minute
-// meeting or a slow afternoon both get real, legible space instead of
-// being crushed or blown out by strict linear scaling. Applies uniformly to
-// every duration this page turns into a height: gaps, cut-eligible spans
-// before they're evaluated against the threshold, and event blocks alike.
-const PX_PER_HOUR = 48;
-function durationPx(minutes: number): number {
-  return Math.sqrt(Math.max(0, minutes) / 60) * PX_PER_HOUR;
-}
 
 // A block never renders shorter than this, regardless of the event's own
 // duration - short meetings still need room for a title and calendar name.
@@ -72,6 +55,19 @@ export function AgendaPage() {
   const [query, setQuery] = useState("");
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  // Long-pressing/dragging (mobile) or hovering/click-dragging (desktop) a
+  // blank stretch of the timeline (see AgendaGapRow) picks a start time -
+  // and, only from a desktop drag, a duration - for a brand new event,
+  // straight from the timeline instead of via the New Event page's own
+  // defaults.
+  function handleGapPick(startMs: number, durationMinutes?: number) {
+    const start = toDatetimeLocalInput(new Date(startMs).toISOString());
+    const params = new URLSearchParams({ start });
+    if (durationMinutes) params.set("duration", String(durationMinutes));
+    navigate(resolveChamberPath(`/new?${params.toString()}`, "calendar", shellHosted));
+  }
 
   const windowEnd = addDays(anchor, WINDOW_DAYS);
   const from = anchor.toISOString();
@@ -241,36 +237,8 @@ export function AgendaPage() {
                 </div>
               );
 
-            case "gap": {
-              const heightPx = Math.max(4, durationPx(entry.minutes));
-              return (
-                <div key={entry.key} className="relative flex gap-3 px-1" style={{ height: heightPx }}>
-                  <div className="w-16 shrink-0" aria-hidden="true" />
-                  <div className="relative flex-1">
-                    <span className="absolute inset-y-0 left-0 border-l-2 border-dust/30" aria-hidden="true" />
-                    {!entry.past && entry.minutes >= GAP_LABEL_THRESHOLD_MINUTES && (
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-dust/50">
-                        {formatGapDuration(entry.minutes)}
-                      </span>
-                    )}
-                  </div>
-                  {/* Every calendar day this gap spans gets its own header,
-                      positioned at its true (midnight) point inside this one
-                      continuous, single-duration span - not as a separate
-                      flow row, and never splitting the duration above into
-                      one number per day crossed. */}
-                  {entry.dayBreaks.map((brk) => (
-                    <div
-                      key={brk.key}
-                      className="absolute left-1 w-16 -translate-y-1/2 text-right font-mono text-[10px] leading-tight uppercase tracking-wide text-dust"
-                      style={{ top: `${Math.min(100, Math.max(0, (brk.offsetMinutes / entry.minutes) * 100))}%` }}
-                    >
-                      {brk.label}
-                    </div>
-                  ))}
-                </div>
-              );
-            }
+            case "gap":
+              return <AgendaGapRow key={entry.key} entry={entry} onPick={handleGapPick} />;
 
             case "now":
               return (
