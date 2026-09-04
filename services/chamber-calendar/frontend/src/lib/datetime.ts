@@ -80,18 +80,25 @@ export function durationPx(minutes: number): number {
   return Math.sqrt(Math.max(0, minutes) / 60) * PX_PER_HOUR;
 }
 
-// Never give a day inside a merged idle gap less room to hover/tap a create-
-// event time into than it would get as a single isolated idle day (durationPx
-// already handles that case well - about 235px, ~6 min/px). Merging several
-// idle days into one gap (buildAgendaTimeline's cross-day merging) otherwise
-// compresses the *whole* span via sqrt(totalMinutes), and since sqrt(N) grows
-// far slower than N, each individual day's own share of the row shrinks
-// toward nothing as more idle days pile up - exactly backwards for this row's
-// interactive job (AgendaGapRow), where absolute pointer position is what
-// picks a coarse time in the first place.
+// Never give a day inside a merged *multi-day* idle gap less room to
+// hover/tap a create-event time into than it would get as a single isolated
+// idle day (durationPx already handles that case well - about 235px, ~6
+// min/px). Merging several idle days into one gap (buildAgendaTimeline's
+// cross-day merging) otherwise compresses the *whole* span via
+// sqrt(totalMinutes), and since sqrt(N) grows far slower than N, each
+// individual day's own share of the row shrinks toward nothing as more idle
+// days pile up - exactly backwards for this row's interactive job
+// (AgendaGapRow), where absolute pointer position is what picks a coarse
+// time in the first place. This floor only kicks in once a gap actually
+// spans more than one calendar day (daysSpanned > 1, i.e. it carries at
+// least one dayBreak) - an ordinary same-day gap between two events (a
+// 30-minute breather between meetings, say) is not a merged idle day and
+// must keep scaling by its own real duration, not balloon to a full day's
+// height just because it "spans" the one day it's already on.
 const MIN_PX_PER_DAY = durationPx(24 * 60);
 
 export function gapHeightPx(minutes: number, daysSpanned: number): number {
+  if (daysSpanned <= 1) return durationPx(minutes);
   return Math.max(durationPx(minutes), daysSpanned * MIN_PX_PER_DAY);
 }
 

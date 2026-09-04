@@ -261,8 +261,14 @@ describe("gapHeightPx", () => {
     expect(floored).toBeCloseTo(daysSpanned * durationPx(24 * 60), 5);
   });
 
-  it("still floors a near-zero-duration single-day gap to one full day's worth of room", () => {
-    expect(gapHeightPx(0, 1)).toBeCloseTo(durationPx(24 * 60), 5);
+  it("does not floor a near-zero-duration single-day gap - the multi-day floor only applies once a gap actually spans more than one calendar day", () => {
+    expect(gapHeightPx(0, 1)).toBeCloseTo(durationPx(0), 5);
+  });
+
+  it("scales an ordinary same-day gap (e.g. a 30-minute breather between meetings) by its own duration, not a full day's height", () => {
+    const heightPx = gapHeightPx(30, 1);
+    expect(heightPx).toBeCloseTo(durationPx(30), 5);
+    expect(heightPx).toBeLessThan(durationPx(24 * 60));
   });
 });
 
