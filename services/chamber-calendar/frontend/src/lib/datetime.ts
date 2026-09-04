@@ -80,6 +80,21 @@ export function durationPx(minutes: number): number {
   return Math.sqrt(Math.max(0, minutes) / 60) * PX_PER_HOUR;
 }
 
+// Never give a day inside a merged idle gap less room to hover/tap a create-
+// event time into than it would get as a single isolated idle day (durationPx
+// already handles that case well - about 235px, ~6 min/px). Merging several
+// idle days into one gap (buildAgendaTimeline's cross-day merging) otherwise
+// compresses the *whole* span via sqrt(totalMinutes), and since sqrt(N) grows
+// far slower than N, each individual day's own share of the row shrinks
+// toward nothing as more idle days pile up - exactly backwards for this row's
+// interactive job (AgendaGapRow), where absolute pointer position is what
+// picks a coarse time in the first place.
+const MIN_PX_PER_DAY = durationPx(24 * 60);
+
+export function gapHeightPx(minutes: number, daysSpanned: number): number {
+  return Math.max(durationPx(minutes), daysSpanned * MIN_PX_PER_DAY);
+}
+
 function dayKey(event: CalendarEvent): string {
   return event.allDay ? event.start : event.start.slice(0, 10);
 }

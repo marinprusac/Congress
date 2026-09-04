@@ -6,6 +6,7 @@ import {
   durationPx,
   fineTimeFromDelta,
   formatGapDuration,
+  gapHeightPx,
   minutesBetween,
   nextHalfHourSlot,
   snapToQuarterHour,
@@ -243,6 +244,25 @@ describe("fineTimeFromDelta", () => {
     const anchor = new Date("2030-01-01T09:00:00").getTime();
     const result = fineTimeFromDelta(anchor, -1_000_000, 12, gapStartMs, gapMinutes);
     expect(result).toBe(gapStartMs);
+  });
+});
+
+describe("gapHeightPx", () => {
+  it("leaves a single-day gap unaffected - durationPx alone already gives a lone idle day its full floor", () => {
+    expect(gapHeightPx(24 * 60, 1)).toBeCloseTo(durationPx(24 * 60), 5);
+  });
+
+  it("floors a merged multi-day gap that durationPx alone would compress below one full day per day spanned", () => {
+    const minutes = 10 * 24 * 60; // 10 idle days merged into one gap
+    const daysSpanned = 10;
+    const compressed = durationPx(minutes);
+    const floored = gapHeightPx(minutes, daysSpanned);
+    expect(compressed).toBeLessThan(floored); // sqrt(10) days is far less than 10 whole days
+    expect(floored).toBeCloseTo(daysSpanned * durationPx(24 * 60), 5);
+  });
+
+  it("still floors a near-zero-duration single-day gap to one full day's worth of room", () => {
+    expect(gapHeightPx(0, 1)).toBeCloseTo(durationPx(24 * 60), 5);
   });
 });
 

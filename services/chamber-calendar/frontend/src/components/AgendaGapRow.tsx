@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { durationPx, fineTimeFromDelta, formatClockTime, formatGapDuration, snapToQuarterHour } from "@/lib/datetime";
+import { fineTimeFromDelta, formatClockTime, formatGapDuration, gapHeightPx, snapToQuarterHour } from "@/lib/datetime";
 import type { AgendaGapEntry } from "@/lib/datetime";
 
 // Below this, a gap's blank space stays unlabeled - long enough to be worth
@@ -49,7 +49,7 @@ interface AgendaGapRowProps {
 // preview state (rather than lifting it to AgendaPage) so a mousemove over
 // one row's idle time never re-renders the whole timeline.
 export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
-  const heightPx = Math.max(4, durationPx(entry.minutes));
+  const heightPx = gapHeightPx(entry.minutes, entry.dayBreaks.length + 1);
   const rootRef = useRef<HTMLDivElement>(null);
   const [preview, setPreview] = useState<Preview>(null);
   const [dragging, setDragging] = useState(false);
@@ -197,13 +197,29 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
       setPreview(null);
       anchorMsRef.current = null;
     }
+    // Right-click (its contextmenu, not the button-2 pointerdown itself,
+    // which handlePointerDown already ignores) and Escape both abandon an
+    // in-progress pick without creating anything - the contextmenu is
+    // prevented so a right-click reads purely as "cancel", not also popping
+    // the browser's own menu on top of it.
+    function onContextMenu(e: MouseEvent) {
+      e.preventDefault();
+      onCancel();
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancel();
+    }
     window.addEventListener("pointermove", onMove, { passive: false });
     window.addEventListener("pointerup", finish);
     window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("contextmenu", onContextMenu);
+    window.addEventListener("keydown", onKeyDown);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", finish);
       window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("contextmenu", onContextMenu);
+      window.removeEventListener("keydown", onKeyDown);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragging]);

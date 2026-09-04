@@ -60,6 +60,22 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
     onChange({ ...values, [key]: value });
   }
 
+  // Start's own stored string switches shape along with its input's type
+  // (date vs. datetime-local, just above) - toggling allDay without also
+  // converting it left the old shape sitting in a field that no longer
+  // accepts it, which a browser silently renders as blank rather than
+  // rejecting. The date portion is a valid prefix of either shape, so a
+  // plain slice converts cleanly in both directions; going back to timed
+  // just needs *some* time of day, since a bare date never carried one.
+  function handleAllDayToggle(checked: boolean) {
+    const date = values.start.slice(0, 10);
+    if (checked) {
+      onChange({ ...values, allDay: true, start: date, end: date });
+    } else {
+      onChange({ ...values, allDay: false, start: `${date}T09:00` });
+    }
+  }
+
   return (
     <div className="space-y-6">
       {readOnly && (
@@ -98,7 +114,7 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
           <input
             type="checkbox"
             checked={values.allDay}
-            onChange={(e) => set("allDay", e.target.checked)}
+            onChange={(e) => handleAllDayToggle(e.target.checked)}
             disabled={readOnly}
           />
           All day
