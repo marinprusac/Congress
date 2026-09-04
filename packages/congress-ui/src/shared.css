@@ -633,6 +633,14 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3em;
+  /* The surrounding prose's own line-height (inherited by default) pads
+     more space above/below this chip's text than the text itself needs,
+     which vertical-align: text-bottom then anchors to the *bottom of that
+     inherited leading* - not to the text's own baseline - visibly
+     floating the label above the rest of the line. line-height: normal
+     shrinks the chip's box to exactly its content, so text-bottom instead
+     lands on the label's own descent line, flush with its neighbors. */
+  line-height: normal;
   vertical-align: text-bottom;
 }
 
