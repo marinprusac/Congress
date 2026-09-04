@@ -25,6 +25,10 @@ export const workoutSummarySchema = z.object({
   id: z.number().int(),
   hevyId: z.string(),
   title: z.string(),
+  // The composed, unique-per-workout "<title> · <date> (n)" Exhibit name
+  // (see workoutTitle.ts) - what the frontend displays. `title` above is
+  // the raw Hevy name, kept for filtering and Hevy round-tripping.
+  exhibitTitle: z.string(),
   startTime: z.string(),
   endTime: z.string(),
   exerciseCount: z.number().int(),

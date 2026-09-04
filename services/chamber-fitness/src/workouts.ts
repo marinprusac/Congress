@@ -11,6 +11,7 @@ function toSummary(row: typeof workouts.$inferSelect): WorkoutSummary {
     id: row.id,
     hevyId: row.hevyId,
     title: row.title,
+    exhibitTitle: composeExhibitTitle(row.id, row.title, row.startTime),
     startTime: row.startTime.toISOString(),
     endTime: row.endTime.toISOString(),
     exerciseCount: row.exerciseCount,

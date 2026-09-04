@@ -31,7 +31,7 @@ export function WorkoutViewPage() {
   return (
     <article>
       <div className="mb-6 border-b border-dust pb-4">
-        <h2 className="font-display text-3xl text-ink">{workout.title}</h2>
+        <h2 className="font-display text-3xl text-ink">{workout.exhibitTitle}</h2>
         <p className="mt-1 font-mono text-sm text-dust">
           {new Date(workout.startTime).toLocaleString()} · {formatDuration(workout.startTime, workout.endTime)}
           {workout.totalVolumeKg != null && ` · ${Math.round(workout.totalVolumeKg).toLocaleString()} kg volume`}

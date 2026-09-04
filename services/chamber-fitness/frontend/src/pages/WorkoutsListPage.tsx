@@ -12,10 +12,6 @@ import {
 } from "@congress/congress-ui";
 import { fetchWorkouts, fetchWorkout } from "@/lib/api";
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
 export function WorkoutsListPage() {
   const [query, setQuery] = useState("");
   const shellHosted = useShellHosted();
@@ -24,7 +20,7 @@ export function WorkoutsListPage() {
     queryKeyBase: "workouts",
     query,
     fetchAll: fetchWorkouts,
-    filterClient: (workout, q) => workout.title.toLowerCase().includes(q),
+    filterClient: (workout, q) => workout.exhibitTitle.toLowerCase().includes(q),
   });
 
   const prefetchWorkout = useListRowPrefetch((id: number) => ["workout", id], fetchWorkout);
@@ -49,9 +45,9 @@ export function WorkoutsListPage() {
               onFocus={() => prefetchWorkout(workout.id)}
               className="block border-b border-dust px-1 py-3 hover:bg-ink/[0.03]"
             >
-              <span className="font-display text-lg text-ink">{workout.title}</span>
+              <span className="font-display text-lg text-ink">{workout.exhibitTitle}</span>
               <p className="mt-1 text-sm text-slate">
-                {formatDate(workout.startTime)} · {workout.exerciseCount} exercise{workout.exerciseCount === 1 ? "" : "s"}
+                {workout.exerciseCount} exercise{workout.exerciseCount === 1 ? "" : "s"}
                 {workout.totalVolumeKg != null && ` · ${Math.round(workout.totalVolumeKg).toLocaleString()} kg`}
               </p>
             </Link>
