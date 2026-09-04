@@ -4,6 +4,7 @@ import { db } from "./db/client.js";
 import { workouts } from "./db/schema.js";
 import { toExhibitId, parseWorkoutId, pushExhibitSync } from "./exhibits.js";
 import { listManualRefs, deleteManualRefsForWorkout } from "./refs.js";
+import { composeExhibitTitle, dayKeyUTC, workoutsInDayTitleBucket } from "./workoutTitle.js";
 
 function toSummary(row: typeof workouts.$inferSelect): WorkoutSummary {
   return {
@@ -79,7 +80,7 @@ function computeExerciseStats(exercises: WorkoutExercise[]): {
   return { exerciseCount, totalVolumeKg, exerciseNames };
 }
 
-async function syncWorkoutExhibit(id: number, title: string): Promise<void> {
+async function syncWorkoutExhibit(id: number, title: string, startTime: Date): Promise<void> {
   // Workouts have no body text of their own to parse "[[" tokens out of -
   // unlike items.ts's syncItemExhibit, outgoingRefs is exactly the manual
   // References-panel set, not a union with anything parsed.
@@ -87,11 +88,19 @@ async function syncWorkoutExhibit(id: number, title: string): Promise<void> {
   await pushExhibitSync({
     id: toExhibitId(id),
     type: "workout",
-    name: title,
+    name: composeExhibitTitle(id, title, startTime),
     url: `/fitness/workouts/${id}`,
     outgoingRefs: manual,
     manualRefs: manual,
   });
+}
+
+// Re-syncs every exhibit in a title+day bucket - needed whenever a workout
+// enters or leaves one, since every sibling's (2)/(3)/... rank can shift.
+async function resyncDayTitleBucket(title: string, startTime: Date): Promise<void> {
+  for (const row of workoutsInDayTitleBucket(title, startTime)) {
+    await syncWorkoutExhibit(row.id, title, row.startTime);
+  }
 }
 
 // Re-syncs a workout whose manual refs changed (see the
@@ -99,7 +108,7 @@ async function syncWorkoutExhibit(id: number, title: string): Promise<void> {
 export async function resyncWorkoutExhibit(id: number): Promise<void> {
   const row = db.select().from(workouts).where(eq(workouts.id, id)).get();
   if (!row) return;
-  await syncWorkoutExhibit(id, row.title);
+  await syncWorkoutExhibit(id, row.title, row.startTime);
 }
 
 export async function resyncWorkoutExhibitByExhibitId(exhibitId: string): Promise<void> {
@@ -140,7 +149,13 @@ export async function upsertWorkoutFromHevy(
       })
       .where(eq(workouts.id, existing.id))
       .run();
-    await syncWorkoutExhibit(existing.id, title);
+    // Resyncs the bucket this workout is now in (itself plus any siblings
+    // its arrival/edit shifted), then - only if it actually changed title or
+    // day - the bucket it left, whose remaining siblings shift back down.
+    await resyncDayTitleBucket(title, startTime);
+    if (existing.title !== title || dayKeyUTC(existing.startTime) !== dayKeyUTC(startTime)) {
+      await resyncDayTitleBucket(existing.title, existing.startTime);
+    }
     return { id: existing.id, created: false };
   }
 
@@ -160,7 +175,7 @@ export async function upsertWorkoutFromHevy(
     })
     .returning()
     .get();
-  await syncWorkoutExhibit(inserted.id, title);
+  await resyncDayTitleBucket(title, startTime);
   return { id: inserted.id, created: true };
 }
 
@@ -179,5 +194,8 @@ export async function deleteWorkoutByHevyId(hevyId: string): Promise<boolean> {
     outgoingRefs: [],
     deleted: true,
   });
+  // Remaining siblings in this workout's old title+day bucket move up a
+  // rank now that it's gone.
+  await resyncDayTitleBucket(existing.title, existing.startTime);
   return true;
 }
