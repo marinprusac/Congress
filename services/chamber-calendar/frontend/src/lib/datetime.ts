@@ -46,6 +46,26 @@ export function snapToQuarterHour(ms: number): number {
   return Math.round(ms / quarterHourMs) * quarterHourMs;
 }
 
+// Once picking is actively dragging, AgendaGapRow moves the anchor by whole
+// 15-minute steps at a fixed screen-space rate (pxPerQuarterHour) rather
+// than re-deriving an absolute position from deltaPx - so precision never
+// depends on how compressed this particular gap's own (sqrt-scaled, see
+// durationPx) rendered height happens to be: a day with nothing on it can
+// render just a few dozen px tall, where every pixel of *absolute* position
+// would otherwise cover tens of real minutes. Clamped to the gap's own
+// bounds so a long drag can't pick a time outside what's actually idle here.
+export function fineTimeFromDelta(
+  anchorMs: number,
+  deltaPx: number,
+  pxPerQuarterHour: number,
+  gapStartMs: number,
+  gapMinutes: number
+): number {
+  const steps = Math.round(deltaPx / pxPerQuarterHour);
+  const ms = anchorMs + steps * 15 * 60_000;
+  return Math.min(gapStartMs + gapMinutes * 60_000, Math.max(gapStartMs, ms));
+}
+
 // This is a rough visualization, not a precise clock - so a block or gap's
 // real duration maps to pixels via sqrt(hours) rather than 1:1 with
 // wall-clock time: 1 hour renders as 1 "unit" (PX_PER_HOUR), 4 hours as 2

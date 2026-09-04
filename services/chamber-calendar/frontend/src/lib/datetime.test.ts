@@ -4,6 +4,7 @@ import {
   addMinutesToLocalInput,
   buildAgendaTimeline,
   durationPx,
+  fineTimeFromDelta,
   formatGapDuration,
   minutesBetween,
   nextHalfHourSlot,
@@ -211,6 +212,37 @@ describe("snapToQuarterHour", () => {
 
   it("leaves a time already on a quarter-hour boundary unchanged", () => {
     expect(snapToQuarterHour(new Date("2030-01-01T15:15:00").getTime())).toBe(new Date("2030-01-01T15:15:00").getTime());
+  });
+});
+
+describe("fineTimeFromDelta", () => {
+  const gapStartMs = new Date("2030-01-01T09:00:00").getTime();
+  const gapMinutes = 60 * 24 * 30; // a whole idle month, like a gap-compressed empty calendar
+
+  it("moves by whole 15-minute steps at the given screen-space rate, regardless of how large the gap is", () => {
+    const anchor = new Date("2030-01-01T09:00:00").getTime();
+    // 60px at 12px/quarter-hour = 5 steps = 75 minutes - the exact case that
+    // used to jump ~33 hours before this fix, when position was absolute.
+    const result = fineTimeFromDelta(anchor, 60, 12, gapStartMs, gapMinutes);
+    expect(result).toBe(anchor + 75 * 60_000);
+  });
+
+  it("moves backward for a negative delta", () => {
+    const anchor = new Date("2030-01-01T12:00:00").getTime();
+    const result = fineTimeFromDelta(anchor, -24, 12, gapStartMs, gapMinutes);
+    expect(result).toBe(anchor - 30 * 60_000);
+  });
+
+  it("clamps to the gap's own end when the drag would push past it", () => {
+    const anchor = new Date("2030-01-01T09:00:00").getTime();
+    const result = fineTimeFromDelta(anchor, 1_000_000, 12, gapStartMs, gapMinutes);
+    expect(result).toBe(gapStartMs + gapMinutes * 60_000);
+  });
+
+  it("clamps to the gap's own start when the drag would push before it", () => {
+    const anchor = new Date("2030-01-01T09:00:00").getTime();
+    const result = fineTimeFromDelta(anchor, -1_000_000, 12, gapStartMs, gapMinutes);
+    expect(result).toBe(gapStartMs);
   });
 });
 

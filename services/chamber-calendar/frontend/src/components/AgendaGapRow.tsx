@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { durationPx, formatClockTime, formatGapDuration, snapToQuarterHour } from "@/lib/datetime";
+import { durationPx, fineTimeFromDelta, formatClockTime, formatGapDuration, snapToQuarterHour } from "@/lib/datetime";
 import type { AgendaGapEntry } from "@/lib/datetime";
 
 // Below this, a gap's blank space stays unlabeled - long enough to be worth
@@ -17,6 +17,18 @@ const LONG_PRESS_MS = 400;
 // cancelling it - past this while still waiting reads as a scroll, not a
 // held finger, so the timer is dropped and the page scrolls normally.
 const MOVE_CANCEL_PX = 10;
+
+// Once picking is active, every this-many px of drag nudges the time by one
+// 15-minute step - a fixed screen-space rate, deliberately independent of
+// how many real minutes this particular gap's own (sqrt-compressed, see
+// durationPx) height happens to represent. Mapping the pointer's absolute
+// position straight to a time - what the initial anchor below still does,
+// deliberately coarsely - makes fine picking on a mostly-idle stretch nearly
+// impossible: a day with nothing on it can render just a few dozen px tall,
+// so every pixel would cover tens of real minutes. Scrubbing by relative
+// motion instead keeps one drag gesture equally fine everywhere, whether the
+// gap under it is 20 minutes or three empty weeks.
+const PX_PER_QUARTER_HOUR = 12;
 
 type Preview = { kind: "point"; ms: number } | { kind: "range"; startMs: number; endMs: number } | null;
 
@@ -43,6 +55,11 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
   const [dragging, setDragging] = useState(false);
 
   const anchorMsRef = useRef<number | null>(null);
+  // The clientY the anchor above was actually computed from - not
+  // necessarily the original pointerdown position, since a touch's anchor is
+  // set later, once the long press fires. Every subsequent fine-drag delta
+  // is measured from here, not from wherever the gesture first began.
+  const anchorClientYRef = useRef(0);
   const pointerTypeRef = useRef<string | null>(null);
   const timerRef = useRef<number | null>(null);
   const startClientRef = useRef<{ x: number; y: number } | null>(null);
@@ -65,6 +82,10 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
     const offsetPx = Math.min(rect.height, Math.max(0, clientY - rect.top));
     const fraction = offsetPx / rect.height;
     return snapToQuarterHour(entry.startMs + fraction * entry.minutes * 60_000);
+  }
+
+  function fineMsFromDelta(anchorMs: number, deltaPx: number): number {
+    return fineTimeFromDelta(anchorMs, deltaPx, PX_PER_QUARTER_HOUR, entry.startMs, entry.minutes);
   }
 
   function topPercent(ms: number): number {
@@ -95,6 +116,7 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
     if (e.pointerType === "mouse") {
       const ms = msAtClientY(e.clientY);
       anchorMsRef.current = ms;
+      anchorClientYRef.current = e.clientY;
       setPreview({ kind: "point", ms });
       setDragging(true);
     } else {
@@ -104,6 +126,7 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
       timerRef.current = window.setTimeout(() => {
         const ms = msAtClientY(lastClientYRef.current);
         anchorMsRef.current = ms;
+        anchorClientYRef.current = lastClientYRef.current;
         setPreview({ kind: "point", ms });
         setDragging(true);
         navigator.vibrate?.(10);
@@ -140,12 +163,15 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
     // Actively picking: a mouse drag previews (and eventually picks) a
     // start+duration range; a touch drag only ever fine-tunes the single
     // start point, per the mobile spec this followed - the user explicitly
-    // called out that only a desktop drag also determines an end time.
+    // called out that only a desktop drag also determines an end time. Both
+    // read the pointer's position only as a delta from the anchor (see
+    // fineMsFromDelta) rather than re-deriving an absolute time from it.
     function onMove(e: PointerEvent) {
       e.preventDefault();
-      const ms = msAtClientY(e.clientY);
       const anchor = anchorMsRef.current;
-      if (pointerTypeRef.current === "mouse" && anchor !== null) {
+      if (anchor === null) return;
+      const ms = fineMsFromDelta(anchor, e.clientY - anchorClientYRef.current);
+      if (pointerTypeRef.current === "mouse") {
         setPreview(ms === anchor ? { kind: "point", ms } : { kind: "range", startMs: Math.min(anchor, ms), endMs: Math.max(anchor, ms) });
       } else {
         setPreview({ kind: "point", ms });
@@ -153,7 +179,7 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
     }
     function finish(e: PointerEvent) {
       const anchor = anchorMsRef.current;
-      const finalMs = msAtClientY(e.clientY);
+      const finalMs = anchor === null ? entry.startMs : fineMsFromDelta(anchor, e.clientY - anchorClientYRef.current);
       setDragging(false);
       setPreview(null);
       anchorMsRef.current = null;
