@@ -15,7 +15,14 @@ const GAP_LABEL_THRESHOLD_MINUTES = 20;
 const LONG_PRESS_MS = 400;
 // How far a touch can move before the long-press timer fires without
 // cancelling it - past this while still waiting reads as a scroll, not a
-// held finger, so the timer is dropped and the page scrolls normally.
+// held finger, so the timer is dropped. The row's own touch-action: none
+// (below) means the browser never starts a native scroll on its own here -
+// without it, a native scroll beginning mid-hold fires pointercancel and
+// silently kills the long-press timer before it ever gets a chance to fire,
+// which is exactly what made long-press-and-drag flaky on a phone. Once
+// dropped, onMove below drives window.scrollBy itself for the rest of this
+// touch so an ordinary swipe still scrolls the page, just without native
+// momentum on release.
 const MOVE_CANCEL_PX = 10;
 
 // Once picking is active, every this-many px of drag nudges the time by one
@@ -65,6 +72,12 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
   const timerRef = useRef<number | null>(null);
   const startClientRef = useRef<{ x: number; y: number } | null>(null);
   const lastClientYRef = useRef<number>(0);
+  // Every AgendaGapRow keeps its own window-level listeners live at once, so
+  // without this a touch that started on some *other* row's blank space
+  // would still hit this row's own pointermove handler below - this is what
+  // scopes the manual-scroll takeover (and the long-press machinery
+  // generally) to only the one pointer that actually went down on this row.
+  const activePointerIdRef = useRef<number | null>(null);
 
   function clearTimer() {
     if (timerRef.current !== null) {
@@ -111,6 +124,7 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
   function handlePointerDown(e: React.PointerEvent) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     pointerTypeRef.current = e.pointerType;
+    activePointerIdRef.current = e.pointerId;
     startClientRef.current = { x: e.clientX, y: e.clientY };
     lastClientYRef.current = e.clientY;
     clearTimer();
@@ -141,17 +155,28 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
       // watching for enough movement to cancel it and fall back to ordinary
       // scrolling, or an early release that abandons it entirely.
       function onMove(e: PointerEvent) {
+        if (e.pointerId !== activePointerIdRef.current) return;
+        const prevClientY = lastClientYRef.current;
         lastClientYRef.current = e.clientY;
+        // touch-action: none below means the browser leaves scrolling
+        // entirely to us here - replicate it by hand (1:1, no momentum) so
+        // a swipe that starts on a gap row still moves the page.
+        if (pointerTypeRef.current !== "mouse") {
+          e.preventDefault();
+          window.scrollBy(0, prevClientY - e.clientY);
+        }
         if (!startClientRef.current || timerRef.current === null) return;
         const dx = e.clientX - startClientRef.current.x;
         const dy = e.clientY - startClientRef.current.y;
         if (Math.hypot(dx, dy) > MOVE_CANCEL_PX) clearTimer();
       }
-      function onUp() {
+      function onUp(e: PointerEvent) {
+        if (e.pointerId !== activePointerIdRef.current) return;
         clearTimer();
         startClientRef.current = null;
+        activePointerIdRef.current = null;
       }
-      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointermove", onMove, { passive: false });
       window.addEventListener("pointerup", onUp);
       window.addEventListener("pointercancel", onUp);
       return () => {
@@ -184,6 +209,7 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
       setDragging(false);
       setPreview(null);
       anchorMsRef.current = null;
+      activePointerIdRef.current = null;
       if (anchor === null) return;
       if (pointerTypeRef.current === "mouse") {
         const startMs = Math.min(anchor, finalMs);
@@ -197,6 +223,7 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
       setDragging(false);
       setPreview(null);
       anchorMsRef.current = null;
+      activePointerIdRef.current = null;
     }
     // Right-click (its contextmenu, not the button-2 pointerdown itself,
     // which handlePointerDown already ignores) and Escape both abandon an
@@ -231,7 +258,7 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
     <div
       ref={rootRef}
       className="relative flex select-none gap-3 px-1"
-      style={{ height: heightPx }}
+      style={{ height: heightPx, touchAction: "none" }}
       onPointerEnter={handlePointerEnter}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
