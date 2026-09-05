@@ -1,8 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExhibitFieldEditor, ExhibitInlineField, FormLabel, getChamberIcon } from "@congress/congress-ui";
 import { fetchSelectedCalendars } from "@/lib/api";
-import { formatGapDuration } from "@/lib/datetime";
 
 export interface EventFormValues {
   calendarKey: string; // `${accountId}::${googleCalendarId}`
@@ -17,10 +16,10 @@ export interface EventFormValues {
   durationMinutes: number;
 }
 
-// Common meeting lengths offered as <datalist> suggestions - the field
-// itself stays a plain minutes number, so any other value is just as valid
-// to type, only less discoverable.
-const DURATION_PRESET_MINUTES = [15, 30, 45, 60, 90, 120, 180, 240];
+// Common meeting lengths, offered as an inline row of picks - "Custom" opens
+// a plain number field for anything else, so no duration is actually
+// unreachable, just less discoverable than these.
+const DURATION_PRESET_MINUTES = [30, 45, 60, 90, 120, 240];
 
 interface EventFormProps {
   values: EventFormValues;
@@ -44,6 +43,12 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
     queryKey: ["calendars", "selected"],
     queryFn: fetchSelectedCalendars,
   });
+
+  // Whether the Duration row is showing its free-entry number field instead
+  // of the preset row - starts open if the value we were handed isn't one of
+  // the presets in the first place (an existing event with an odd length),
+  // so that duration is never silently hidden behind "Custom" unselected.
+  const [customOpen, setCustomOpen] = useState(() => !DURATION_PRESET_MINUTES.includes(values.durationMinutes));
 
   const grouped = useMemo(() => {
     if (!calendars) return [];
@@ -148,24 +153,49 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
         ) : (
           <div className="min-w-0 col-span-2">
             <FormLabel>Duration</FormLabel>
-            <input
-              type="number"
-              min={5}
-              step={15}
-              list="duration-presets"
-              value={values.durationMinutes}
-              onChange={(e) => set("durationMinutes", Number(e.target.value))}
-              required
-              readOnly={readOnly}
-              className="field-plain font-mono text-base"
-            />
-            <datalist id="duration-presets">
-              {DURATION_PRESET_MINUTES.map((m) => (
-                <option key={m} value={m}>
-                  {formatGapDuration(m)}
-                </option>
-              ))}
-            </datalist>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {DURATION_PRESET_MINUTES.map((m) => {
+                const active = !customOpen && values.durationMinutes === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => {
+                      setCustomOpen(false);
+                      set("durationMinutes", m);
+                    }}
+                    className={`font-mono text-base disabled:pointer-events-none ${
+                      active ? "font-semibold text-accent" : "text-ink/70 hover:text-accent"
+                    }`}
+                  >
+                    {m}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                disabled={readOnly}
+                onClick={() => setCustomOpen(true)}
+                className={`font-mono text-base disabled:pointer-events-none ${
+                  customOpen ? "font-semibold text-accent" : "text-ink/70 hover:text-accent"
+                }`}
+              >
+                Custom
+              </button>
+              {customOpen && (
+                <input
+                  type="number"
+                  min={1}
+                  autoFocus
+                  value={values.durationMinutes}
+                  onChange={(e) => set("durationMinutes", Number(e.target.value))}
+                  required
+                  readOnly={readOnly}
+                  className="field-plain w-16 font-mono text-base"
+                />
+              )}
+            </div>
           </div>
         )}
 
