@@ -20,9 +20,10 @@ const LONG_PRESS_MS = 400;
 // without it, a native scroll beginning mid-hold fires pointercancel and
 // silently kills the long-press timer before it ever gets a chance to fire,
 // which is exactly what made long-press-and-drag flaky on a phone. Once
-// dropped, onMove below drives window.scrollBy itself for the rest of this
-// touch so an ordinary swipe still scrolls the page, just without native
-// momentum on release.
+// dropped, onMove below drives window.scrollBy itself (batched to once per
+// animation frame - see queueScrollBy) for the rest of this touch so an
+// ordinary swipe still scrolls the page, just without native momentum on
+// release.
 const MOVE_CANCEL_PX = 10;
 
 // Once picking is active, every this-many px of drag nudges the time by one
@@ -78,6 +79,33 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
   // scopes the manual-scroll takeover (and the long-press machinery
   // generally) to only the one pointer that actually went down on this row.
   const activePointerIdRef = useRef<number | null>(null);
+  // Manual-scroll replication (see MOVE_CANCEL_PX) is batched into one
+  // window.scrollBy per animation frame rather than called straight from
+  // every pointermove - iOS Safari's own scroll/rubber-band bookkeeping
+  // reads as genuinely corrupted (scrolling elsewhere on the page turns
+  // erratic and stays that way) when a touch-action: none element drives
+  // scrollBy synchronously many times within a single frame.
+  const scrollDeltaRef = useRef(0);
+  const scrollRafRef = useRef<number | null>(null);
+
+  function cancelPendingScroll() {
+    if (scrollRafRef.current !== null) {
+      cancelAnimationFrame(scrollRafRef.current);
+      scrollRafRef.current = null;
+    }
+    scrollDeltaRef.current = 0;
+  }
+
+  function queueScrollBy(deltaY: number) {
+    scrollDeltaRef.current += deltaY;
+    if (scrollRafRef.current !== null) return;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      const delta = scrollDeltaRef.current;
+      scrollDeltaRef.current = 0;
+      if (delta !== 0) window.scrollBy(0, delta);
+    });
+  }
 
   function clearTimer() {
     if (timerRef.current !== null) {
@@ -158,13 +186,12 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
         if (e.pointerId !== activePointerIdRef.current) return;
         const prevClientY = lastClientYRef.current;
         lastClientYRef.current = e.clientY;
-        // touch-action: none below means the browser leaves scrolling
-        // entirely to us here - replicate it by hand (1:1, no momentum) so
-        // a swipe that starts on a gap row still moves the page.
-        if (pointerTypeRef.current !== "mouse") {
-          e.preventDefault();
-          window.scrollBy(0, prevClientY - e.clientY);
-        }
+        // touch-action: none below means the default action is already
+        // suppressed - no need for our own preventDefault on top of it,
+        // which is one less thing fighting iOS's own touch bookkeeping.
+        // Replicate the scroll by hand (1:1, no momentum) so a swipe that
+        // starts on a gap row still moves the page.
+        if (pointerTypeRef.current !== "mouse") queueScrollBy(prevClientY - e.clientY);
         if (!startClientRef.current || timerRef.current === null) return;
         const dx = e.clientX - startClientRef.current.x;
         const dy = e.clientY - startClientRef.current.y;
@@ -175,14 +202,16 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
         clearTimer();
         startClientRef.current = null;
         activePointerIdRef.current = null;
+        cancelPendingScroll();
       }
-      window.addEventListener("pointermove", onMove, { passive: false });
+      window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
       window.addEventListener("pointercancel", onUp);
       return () => {
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
         window.removeEventListener("pointercancel", onUp);
+        cancelPendingScroll();
       };
     }
 
@@ -252,7 +281,13 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragging]);
 
-  useEffect(() => clearTimer, []);
+  useEffect(
+    () => () => {
+      clearTimer();
+      cancelPendingScroll();
+    },
+    []
+  );
 
   return (
     <div
