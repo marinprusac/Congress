@@ -61,15 +61,24 @@ export function TasksListPage() {
       {!isLoading && !isError && tasks?.length === 0 && <ListEmptyState label="tasks" hasQuery={!!query} />}
       {!isLoading &&
         !isError &&
-        tasks?.map((task) => (
-          <div key={task.id} className="flex items-baseline gap-3 border-b border-dust px-1 py-3">
-            <button
-              type="button"
-              onClick={() => completeMutation.mutate({ id: task.id, completed: !task.completed })}
-              className="tap-target shrink-0 font-mono text-xs uppercase tracking-wide text-dust hover:text-accent"
-            >
-              {task.completed ? "Reopen" : "Done"}
-            </button>
+        tasks?.map((task, index) => (
+          <div
+            key={task.id}
+            className={
+              task.completed && index > 0 && !tasks[index - 1]?.completed
+                ? "flex items-center gap-3 px-1 py-3 mt-8"
+                : "flex items-center gap-3 px-1 py-3"
+            }
+          >
+            <label className="tap-target shrink-0">
+              <input
+                type="checkbox"
+                checked={task.completed}
+                onChange={(e) => completeMutation.mutate({ id: task.id, completed: e.target.checked })}
+                aria-label={task.completed ? "Reopen task" : "Mark task done"}
+                className="checkbox"
+              />
+            </label>
             <Link
               to={resolveChamberPath(`/t/${task.id}`, "tasks", shellHosted)}
               onMouseEnter={() => prefetchTask(task.id)}
