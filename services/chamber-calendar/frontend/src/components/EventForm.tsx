@@ -175,7 +175,7 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
             value={values.location}
             onChange={(newValue) => set("location", newValue)}
             readOnly={readOnly}
-            placeholder="Location (optional)"
+            placeholder="—"
             className="field-plain font-body text-base focus-within:outline-none"
             renderIcon={(chamber) => getChamberIcon(chamber)}
           />
@@ -189,7 +189,7 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
           onChange={(newValue) => set("description", newValue)}
           readOnly={readOnly}
           minRows={3}
-          placeholder="Description (optional), @ to reference an Exhibit"
+          placeholder="—"
           className="w-full bg-parchment py-1 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
         />
