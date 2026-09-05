@@ -38,16 +38,19 @@ export function minutesBetween(startIso: string, endIso: string): number {
   return Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000);
 }
 
-// Rounds an absolute instant to the nearest 15-minute wall-clock boundary -
+// Rounds an absolute instant to the nearest 30-minute wall-clock boundary -
 // the live snapping used while hovering/dragging over the agenda's blank gap
-// space to pick a new event's start (and, on desktop, its end).
-export function snapToQuarterHour(ms: number): number {
-  const quarterHourMs = 15 * 60 * 1000;
-  return Math.round(ms / quarterHourMs) * quarterHourMs;
+// space to pick a new event's start (and, on desktop, its end). The
+// creation form's own duration/time fields keep finer 15-minute steps
+// (DURATION_PRESET_MINUTES / step={15} in EventForm) - only this Agenda
+// picking surface was coarsened to 30 minutes.
+export function snapToHalfHour(ms: number): number {
+  const halfHourMs = 30 * 60 * 1000;
+  return Math.round(ms / halfHourMs) * halfHourMs;
 }
 
 // Once picking is actively dragging, AgendaGapRow moves the anchor by whole
-// 15-minute steps at a fixed screen-space rate (pxPerQuarterHour) rather
+// 30-minute steps at a fixed screen-space rate (pxPerHalfHour) rather
 // than re-deriving an absolute position from deltaPx - so precision never
 // depends on how compressed this particular gap's own (sqrt-scaled, see
 // durationPx) rendered height happens to be: a day with nothing on it can
@@ -57,12 +60,12 @@ export function snapToQuarterHour(ms: number): number {
 export function fineTimeFromDelta(
   anchorMs: number,
   deltaPx: number,
-  pxPerQuarterHour: number,
+  pxPerHalfHour: number,
   gapStartMs: number,
   gapMinutes: number
 ): number {
-  const steps = Math.round(deltaPx / pxPerQuarterHour);
-  const ms = anchorMs + steps * 15 * 60_000;
+  const steps = Math.round(deltaPx / pxPerHalfHour);
+  const ms = anchorMs + steps * 30 * 60_000;
   return Math.min(gapStartMs + gapMinutes * 60_000, Math.max(gapStartMs, ms));
 }
 

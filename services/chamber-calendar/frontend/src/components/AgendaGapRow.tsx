@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { fineTimeFromDelta, formatClockTime, formatGapDuration, gapHeightPx, snapToQuarterHour } from "@/lib/datetime";
+import { fineTimeFromDelta, formatClockTime, formatGapDuration, gapHeightPx, snapToHalfHour } from "@/lib/datetime";
 import type { AgendaGapEntry } from "@/lib/datetime";
 
 // Below this, a gap's blank space stays unlabeled - long enough to be worth
@@ -19,7 +19,7 @@ const LONG_PRESS_MS = 400;
 const MOVE_CANCEL_PX = 10;
 
 // Once picking is active, every this-many px of drag nudges the time by one
-// 15-minute step - a fixed screen-space rate, deliberately independent of
+// 30-minute step - a fixed screen-space rate, deliberately independent of
 // how many real minutes this particular gap's own (sqrt-compressed, see
 // durationPx) height happens to represent. Mapping the pointer's absolute
 // position straight to a time - what the initial anchor below still does,
@@ -27,8 +27,9 @@ const MOVE_CANCEL_PX = 10;
 // impossible: a day with nothing on it can render just a few dozen px tall,
 // so every pixel would cover tens of real minutes. Scrubbing by relative
 // motion instead keeps one drag gesture equally fine everywhere, whether the
-// gap under it is 20 minutes or three empty weeks.
-const PX_PER_QUARTER_HOUR = 12;
+// gap under it is 20 minutes or three empty weeks. Doubled from the old
+// 15-minute step's 12px so the px-per-real-minute drag feel is unchanged.
+const PX_PER_HALF_HOUR = 24;
 
 type Preview = { kind: "point"; ms: number } | { kind: "range"; startMs: number; endMs: number } | null;
 
@@ -44,7 +45,7 @@ interface AgendaGapRowProps {
 // One row of the Agenda's blank idle-time span, reworked from a purely
 // static spacer into the surface "create an event here" is picked from:
 // hovering (mouse) or a long-press-then-drag (touch) previews a line/range
-// snapped to the nearest 15 minutes, and releasing hands the picked
+// snapped to the nearest 30 minutes, and releasing hands the picked
 // time(s) back to the caller to open the New Event page with. Owns its own
 // preview state (rather than lifting it to AgendaPage) so a mousemove over
 // one row's idle time never re-renders the whole timeline.
@@ -72,7 +73,7 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
     }
   }
 
-  // Converts a viewport Y coordinate into an absolute, 15-minute-snapped
+  // Converts a viewport Y coordinate into an absolute, 30-minute-snapped
   // instant within this gap's own span - clamped to the gap's own bounds so
   // a drag that strays above/below the row (or past its edges on a short
   // gap) never picks a time outside what's actually idle here.
@@ -81,11 +82,11 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
     if (!rect || rect.height <= 0) return entry.startMs;
     const offsetPx = Math.min(rect.height, Math.max(0, clientY - rect.top));
     const fraction = offsetPx / rect.height;
-    return snapToQuarterHour(entry.startMs + fraction * entry.minutes * 60_000);
+    return snapToHalfHour(entry.startMs + fraction * entry.minutes * 60_000);
   }
 
   function fineMsFromDelta(anchorMs: number, deltaPx: number): number {
-    return fineTimeFromDelta(anchorMs, deltaPx, PX_PER_QUARTER_HOUR, entry.startMs, entry.minutes);
+    return fineTimeFromDelta(anchorMs, deltaPx, PX_PER_HALF_HOUR, entry.startMs, entry.minutes);
   }
 
   function topPercent(ms: number): number {

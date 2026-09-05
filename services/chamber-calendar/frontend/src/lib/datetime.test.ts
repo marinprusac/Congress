@@ -9,7 +9,7 @@ import {
   gapHeightPx,
   minutesBetween,
   nextHalfHourSlot,
-  snapToQuarterHour,
+  snapToHalfHour,
 } from "./datetime";
 import type { AgendaClusterEntry, AgendaDateEntry, AgendaGapEntry } from "./datetime";
 
@@ -202,17 +202,17 @@ describe("minutesBetween", () => {
   });
 });
 
-describe("snapToQuarterHour", () => {
+describe("snapToHalfHour", () => {
   it("rounds down when closer to the boundary below", () => {
-    expect(snapToQuarterHour(new Date("2030-01-01T15:06:00").getTime())).toBe(new Date("2030-01-01T15:00:00").getTime());
+    expect(snapToHalfHour(new Date("2030-01-01T15:06:00").getTime())).toBe(new Date("2030-01-01T15:00:00").getTime());
   });
 
   it("rounds up when closer to the boundary above", () => {
-    expect(snapToQuarterHour(new Date("2030-01-01T15:09:00").getTime())).toBe(new Date("2030-01-01T15:15:00").getTime());
+    expect(snapToHalfHour(new Date("2030-01-01T15:24:00").getTime())).toBe(new Date("2030-01-01T15:30:00").getTime());
   });
 
-  it("leaves a time already on a quarter-hour boundary unchanged", () => {
-    expect(snapToQuarterHour(new Date("2030-01-01T15:15:00").getTime())).toBe(new Date("2030-01-01T15:15:00").getTime());
+  it("leaves a time already on a half-hour boundary unchanged", () => {
+    expect(snapToHalfHour(new Date("2030-01-01T15:30:00").getTime())).toBe(new Date("2030-01-01T15:30:00").getTime());
   });
 });
 
@@ -220,18 +220,18 @@ describe("fineTimeFromDelta", () => {
   const gapStartMs = new Date("2030-01-01T09:00:00").getTime();
   const gapMinutes = 60 * 24 * 30; // a whole idle month, like a gap-compressed empty calendar
 
-  it("moves by whole 15-minute steps at the given screen-space rate, regardless of how large the gap is", () => {
+  it("moves by whole 30-minute steps at the given screen-space rate, regardless of how large the gap is", () => {
     const anchor = new Date("2030-01-01T09:00:00").getTime();
-    // 60px at 12px/quarter-hour = 5 steps = 75 minutes - the exact case that
-    // used to jump ~33 hours before this fix, when position was absolute.
+    // 60px at 12px/half-hour = 5 steps = 150 minutes - the exact case that
+    // used to jump ~33 hours before the original fix, when position was absolute.
     const result = fineTimeFromDelta(anchor, 60, 12, gapStartMs, gapMinutes);
-    expect(result).toBe(anchor + 75 * 60_000);
+    expect(result).toBe(anchor + 150 * 60_000);
   });
 
   it("moves backward for a negative delta", () => {
     const anchor = new Date("2030-01-01T12:00:00").getTime();
     const result = fineTimeFromDelta(anchor, -24, 12, gapStartMs, gapMinutes);
-    expect(result).toBe(anchor - 30 * 60_000);
+    expect(result).toBe(anchor - 60 * 60_000);
   });
 
   it("clamps to the gap's own end when the drag would push past it", () => {
