@@ -91,7 +91,7 @@ export function NewNotePage() {
         <ExhibitFieldEditor
           value={content}
           onChange={setContent}
-          minRows={20}
+          minRows={3}
           placeholder={"---\ntags: []\n---\nStart writing. Type @ to reference a note, event, or other Exhibit."}
           className="w-full bg-parchment p-3 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}

@@ -85,7 +85,7 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-4">
         <div>
           <FormLabel>Calendar</FormLabel>
           <select
@@ -96,7 +96,7 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
             className="field-plain font-mono text-base disabled:text-dust"
           >
             <option value="" disabled>
-              Select a calendar —
+              Select —
             </option>
             {grouped.map(([accountLabel, cals]) => (
               <optgroup key={accountLabel} label={accountLabel}>
@@ -116,6 +116,7 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
             checked={values.allDay}
             onChange={(e) => handleAllDayToggle(e.target.checked)}
             disabled={readOnly}
+            className="checkbox"
           />
           All day
         </label>
@@ -168,7 +169,7 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
           </div>
         )}
 
-        <div className="sm:col-span-2">
+        <div className="col-span-2">
           <FormLabel>Location</FormLabel>
           <ExhibitInlineField
             value={values.location}
@@ -187,7 +188,7 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
           value={values.description}
           onChange={(newValue) => set("description", newValue)}
           readOnly={readOnly}
-          minRows={4}
+          minRows={3}
           placeholder="Description (optional), @ to reference an Exhibit"
           className="w-full bg-parchment py-1 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}

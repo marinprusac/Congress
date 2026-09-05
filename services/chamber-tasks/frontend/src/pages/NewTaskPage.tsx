@@ -103,7 +103,7 @@ export function NewTaskPage() {
         <ExhibitFieldEditor
           value={description}
           onChange={setDescription}
-          minRows={12}
+          minRows={3}
           placeholder="Description (optional), @ to reference an Exhibit"
           className="w-full bg-parchment p-3 font-body text-base text-ink focus-within:outline-none"
           renderIcon={(chamber) => getChamberIcon(chamber)}
