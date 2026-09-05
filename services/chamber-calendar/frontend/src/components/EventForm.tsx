@@ -121,7 +121,7 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
           All day
         </label>
 
-        <div className="min-w-0">
+        <div className={values.allDay ? "min-w-0" : "min-w-0 col-span-2"}>
           <FormLabel>Start</FormLabel>
           <input
             type={values.allDay ? "date" : "datetime-local"}
@@ -146,7 +146,7 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
             />
           </div>
         ) : (
-          <div className="min-w-0">
+          <div className="min-w-0 col-span-2">
             <FormLabel>Duration</FormLabel>
             <input
               type="number"

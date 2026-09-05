@@ -784,7 +784,6 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 1.25rem;
-  margin-top: 2rem;
   padding-top: 1rem;
   border-top: 1px solid var(--color-dust);
   font-family: var(--font-mono);
