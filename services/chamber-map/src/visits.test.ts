@@ -202,6 +202,20 @@ describe("getVisitActiveAt", () => {
 
     await expect(getVisitActiveAt(new Date("2026-01-01T11:00:00Z"))).resolves.toMatchObject({ id: second.id });
   });
+
+  // Regression: querying a future instant (e.g. the day view's "tomorrow")
+  // used to return the last visit ever recorded even though it had already
+  // ended, making an already-closed stay look like it spans days it never
+  // touched - see production incident notes for the exact scenario (a home
+  // stay that departed hours ago still shown "active" for the next calendar
+  // day).
+  it("returns null once the most recent visit has already ended before the instant", async () => {
+    const a = makePlace("Home", 45, 9);
+    const v = openConfirmedVisit(a.id, new Date("2026-01-01T08:00:00Z"));
+    closeVisit(v.id, new Date("2026-01-01T09:00:00Z"));
+
+    await expect(getVisitActiveAt(new Date("2026-01-02T00:00:00Z"))).resolves.toBeNull();
+  });
 });
 
 describe("listVisits", () => {

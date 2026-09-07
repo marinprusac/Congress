@@ -1,4 +1,4 @@
-import { desc, eq, and, gte, lte, isNull, isNotNull } from "drizzle-orm";
+import { desc, eq, and, or, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import { db } from "./db/client.js";
 import { visits, places, trips } from "./db/schema.js";
@@ -85,11 +85,18 @@ export async function getVisit(id: number): Promise<Visit | null> {
 // says nothing about a day spent entirely at a stay that started earlier (no
 // visit arrives that day at all) or a day that opens mid-trip (the stay it
 // left from arrived on a previous day). Visits never overlap, so the most
-// recent one that had already started by `instant` - whether or not it had
-// departed yet - is that instant's unambiguous answer.
+// recent one that had already started by `instant` is a candidate - but only
+// a real answer if it also still covers `instant`: either still open, or
+// departed at/after it. A visit that had already ended *before* `instant`
+// (the device left and nothing newer has arrived yet, e.g. `instant` lands
+// in an in-progress trip, or - the case this guards against - `instant` is a
+// future date past the last thing actually recorded) means the honest answer
+// is "don't know", not "still there": querying tomorrow while sitting at
+// today's last-known place would otherwise report that stay as spanning a
+// day that hasn't happened yet.
 export async function getVisitActiveAt(instant: Date): Promise<Visit | null> {
   const row = visitSelection()
-    .where(lte(visits.arrivedAt, instant))
+    .where(and(lte(visits.arrivedAt, instant), or(isNull(visits.departedAt), gte(visits.departedAt, instant))))
     .orderBy(desc(visits.arrivedAt))
     .limit(1)
     .get();
