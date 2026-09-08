@@ -23,6 +23,7 @@ import {
   AccountNeedsReconnectError,
 } from "./google/accounts.js";
 import { listGoogleCalendars, listSelectedCalendarsForUI, setCalendarSelection } from "./google/calendars.js";
+import { EventNotEditableError } from "./google/events.js";
 import {
   listEvents,
   searchEvents,
@@ -32,8 +33,9 @@ import {
   deleteEvent,
   setEventAttendance,
   resyncEventExhibit,
-  EventNotEditableError,
-} from "./google/events.js";
+  LocalEventNotFoundError,
+  InvalidEventRequestError,
+} from "./calendar.js";
 import { GoogleApiError } from "./google/client.js";
 import { searchEventExhibits, resolveEventExhibits } from "./exhibits.js";
 import { listManualRefs, addManualRef, removeManualRef } from "./refs.js";
@@ -47,6 +49,12 @@ function mapError(c: Context, err: unknown): Response {
   }
   if (err instanceof EventNotEditableError) {
     return c.json({ error: "event_not_editable", message: err.message }, 403);
+  }
+  if (err instanceof LocalEventNotFoundError) {
+    return c.json({ error: "not_found", message: err.message }, 404);
+  }
+  if (err instanceof InvalidEventRequestError) {
+    return c.json({ error: "invalid_request", message: err.message }, 400);
   }
   if (err instanceof GoogleApiError) {
     return c.json({ error: "google_api_error", status: err.status, message: err.message }, 502);

@@ -20,7 +20,7 @@ import {
   type RichOverride,
 } from "./cache.js";
 import { projectRichToPlain } from "./richTextMirror.js";
-import { toExhibitId, parseExhibitId } from "./eventId.js";
+import { toExhibitId, toRfc3339DateTime } from "./eventId.js";
 import { pushExhibitSync } from "../exhibits.js";
 import { extractOutgoingExhibitRefs, extractExhibitTokensWithLabels } from "@congress/chamber-kit";
 import { listManualRefs, deleteManualRefsForEvent } from "../refs.js";
@@ -101,13 +101,6 @@ function normalizeGoogleEvent(
     editable: isEventEditable(raw),
     attendance: resolveAttendance(computeGoogleAttendance(raw), toExhibitId(accountId, calendarId, raw.id)),
   };
-}
-
-// <input type="datetime-local"> values look like "2026-08-15T02:03" - valid
-// RFC3339 (what Google's API requires) needs seconds too, or Google 400s
-// with an opaque "Bad Request".
-function toRfc3339DateTime(value: string): string {
-  return /T\d{2}:\d{2}$/.test(value) ? `${value}:00` : value;
 }
 
 function toGoogleEventBody(input: {
@@ -300,24 +293,19 @@ export async function syncEventExhibit(result: CalendarEvent): Promise<void> {
   });
 }
 
-// Re-syncs an event whose description didn't change but whose manual refs
-// did (see the /api/exhibits/:id/refs routes in server.ts) - unlike the
-// table-backed Chambers' resync helpers, this has to re-fetch from Google
-// first since there's no local row to read the current name/description
-// back from.
-export async function resyncEventExhibit(exhibitId: string): Promise<void> {
-  const parsed = parseExhibitId(exhibitId);
-  if (!parsed || !getAccountRow(parsed.accountId)) return;
-  try {
-    const event = await getEvent(parsed.accountId, parsed.calendarId, parsed.eventId);
-    await syncEventExhibit(event);
-  } catch {
-    // A transient Google error shouldn't fail the manual-ref add/remove
-    // that triggered this resync.
-  }
-}
+// CreateEventRequest's own accountId/calendarId/timeZone are optional at the
+// wire level (an absent accountId+calendarId means "create this locally
+// instead", see types.ts's own comment) - calendar.ts is what enforces the
+// invariant and only ever calls this Google-specific implementation once
+// all three are confirmed present, so this narrower type is what the actual
+// Google API calls below can rely on without an unchecked `!`.
+export type GoogleCreateEventInput = Omit<CreateEventRequest, "accountId" | "calendarId" | "timeZone"> & {
+  accountId: number;
+  calendarId: string;
+  timeZone: string;
+};
 
-export async function createEvent(input: CreateEventRequest): Promise<CalendarEvent> {
+export async function createEvent(input: GoogleCreateEventInput): Promise<CalendarEvent> {
   const account = requireAccount(input.accountId);
   const { plain, richOverride } = await resolveRichAndPlainFields(input);
   const raw = (await googleCalendarFetch(account, `/calendars/${encodeURIComponent(input.calendarId)}/events`, {

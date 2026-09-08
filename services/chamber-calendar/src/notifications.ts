@@ -1,5 +1,6 @@
 import { createPublishEvent } from "@congress/chamber-kit";
 import { listCachedEvents } from "./google/cache.js";
+import { listLocalEvents } from "./localEvents.js";
 import { eventUrl } from "./google/eventId.js";
 import { env } from "./env.js";
 
@@ -93,10 +94,16 @@ function scheduleFire(key: string, fireAtMs: number, fire: () => void): void {
 
 // A local cache read now, not a live Google call - the calendar cache sync
 // (google/cache.ts) is what actually talks to Google on its own interval;
-// this just re-arms timers off whatever it last synced.
+// this just re-arms timers off whatever it last synced. A local event (see
+// localEvents.ts) has no external source to poll at all, so it's always
+// current - included here too so it gets the exact same "starting soon"
+// treatment as a Google-backed one, not a silent gap in the notification
+// system just because it isn't on Google.
 function pollUpcomingEvents(): void {
   const now = Date.now();
-  const events = listCachedEvents(new Date(now).toISOString(), new Date(now + LOOKAHEAD_MS).toISOString());
+  const fromISO = new Date(now).toISOString();
+  const toISO = new Date(now + LOOKAHEAD_MS).toISOString();
+  const events = [...listCachedEvents(fromISO, toISO), ...listLocalEvents(fromISO, toISO)];
   const seen = new Set<string>();
 
   for (const event of events) {

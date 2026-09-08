@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult as textResult } from "@congress/chamber-kit";
 import { listAccounts } from "../google/accounts.js";
-import { listEvents, searchEvents, createEvent, updateEvent, deleteEvent, setEventAttendance } from "../google/events.js";
+import { listEvents, searchEvents, createEvent, updateEvent, deleteEvent, setEventAttendance } from "../calendar.js";
 
 export function registerTools(server: McpServer) {
   server.registerTool(
@@ -41,17 +41,18 @@ export function registerTools(server: McpServer) {
     "create_event",
     {
       title: "Create Event",
-      description: "Create a new event on a connected account's calendar.",
+      description:
+        "Create a new event. Pass accountId+calendarId+timeZone to create it on a connected Google account's calendar; omit all three to store it only in this Chamber, not synced to Google.",
       inputSchema: {
-        accountId: z.number().int(),
-        calendarId: z.string().min(1),
+        accountId: z.number().int().optional(),
+        calendarId: z.string().min(1).optional(),
         title: z.string().min(1),
         description: z.string().optional(),
         location: z.string().optional(),
         allDay: z.boolean(),
         start: z.string(),
         end: z.string(),
-        timeZone: z.string().min(1),
+        timeZone: z.string().min(1).optional(),
       },
     },
     async (input) => textResult(await createEvent(input))

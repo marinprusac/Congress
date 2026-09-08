@@ -105,6 +105,40 @@ export const cachedEvents = sqliteTable(
   ]
 );
 
+// An event that lives only in this Chamber's own database - never sent to
+// Google at all, unlike cachedEvents above (which mirrors an event Google
+// itself stores). Created when the New Event page's Calendar field is left
+// unselected (see google/eventId.ts's LOCAL_ACCOUNT_ID/LOCAL_CALENDAR_ID,
+// the pseudo account/calendar identity a local row is addressed under so it
+// can reuse the exact same exhibit-id/route shape a Google event has). Kept
+// as its own small table rather than a nullable-accountId row bolted onto
+// cachedEvents - that table is an explicitly disposable, rebuildable poll-
+// sync mirror (see its own comment), and a local event has no such upstream
+// to rebuild from were it ever wiped.
+export const localEvents = sqliteTable(
+  "local_events",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    // Same rich/plain split as cachedEvents' own description/location -
+    // descriptionRich/locationRich carry the chip-bearing text the editor
+    // loads/edits; description/location are the projected plain text (see
+    // google/richTextMirror.ts's projectRichToPlain), kept alongside so
+    // plain-text search (searchLocalEvents) doesn't need to strip tokens
+    // out of the rich value on every query.
+    description: text("description"),
+    location: text("location"),
+    descriptionRich: text("description_rich"),
+    locationRich: text("location_rich"),
+    allDay: integer("all_day", { mode: "boolean" }).notNull(),
+    start: text("start").notNull(),
+    end: text("end").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("local_events_start_idx").on(table.start)]
+);
+
 // A purely local, private "not attending" note for an event with no Google
 // invite to respond to - this account either organizes it or isn't a listed
 // attendee at all (see attendance.ts's resolveAttendance). Keyed by the same

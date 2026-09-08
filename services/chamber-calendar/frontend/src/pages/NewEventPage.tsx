@@ -65,9 +65,16 @@ export function NewEventPage() {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const [accountId, calendarId] = values.calendarKey.split("::") as [string, string];
+      // An empty calendarKey (the field's own default - see EventForm) means
+      // "store this locally": accountId/calendarId are left out of the
+      // request entirely rather than sent as some sentinel, which is what
+      // tells the backend to create a local event instead of a Google one
+      // (see types.ts's createEventRequestSchema).
+      const [accountId, calendarId] = values.calendarKey
+        ? (values.calendarKey.split("::") as [string, string])
+        : [undefined, undefined];
       const created = await createEvent({
-        accountId: Number(accountId),
+        accountId: accountId !== undefined ? Number(accountId) : undefined,
         calendarId,
         title: values.title,
         descriptionRich: values.description || undefined,
@@ -110,8 +117,8 @@ export function NewEventPage() {
         actions={
           <ExhibitActionBar>
             <button
-              onClick={() => values.title.trim() && values.calendarKey && mutation.mutate()}
-              disabled={!values.title.trim() || !values.calendarKey || mutation.isPending}
+              onClick={() => values.title.trim() && mutation.mutate()}
+              disabled={!values.title.trim() || mutation.isPending}
               className="tap-target text-accent hover:underline disabled:opacity-50"
             >
               {mutation.isPending ? "Creating —" : "Create"}

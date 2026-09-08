@@ -1,22 +1,26 @@
 import type { ExhibitSearchResult, ExhibitResolveResult } from "@congress/shared-types";
 import { createPushExhibitSync, scoreExhibitMatch } from "@congress/chamber-kit";
 import { env } from "./env.js";
-import { toExhibitId, parseExhibitId, eventUrl } from "./google/eventId.js";
+import { toExhibitId, parseExhibitId, eventUrl, isLocalEventKey } from "./google/eventId.js";
 import { searchCachedEvents, getCachedEvent, upsertCachedEventFromGoogle, type RawGoogleEvent } from "./google/cache.js";
 import { googleCalendarFetch } from "./google/client.js";
 import { getAccountRow } from "./google/accounts.js";
+import { searchLocalEvents, getLocalEvent } from "./localEvents.js";
+import { combineRankedEventSearch } from "./eventSearch.js";
 
 // Deliberately talks directly to the low-level Google client/account
-// lookups on a cache miss, not to google/events.ts's own getEvent -
-// events.ts already depends on this module (to push a sync on
-// create/update/delete), and having this module call back into events.ts
+// lookups on a cache miss, and to localEvents.ts's own data-layer reads,
+// rather than to google/events.ts's or calendar.ts's own getEvent - both of
+// those already depend on this module (to push a sync on
+// create/update/delete), and having this module call back into either
 // would create a cycle.
 
 export { toExhibitId, parseExhibitId, eventUrl };
 
 export async function searchEventExhibits(query: string, limit = 10): Promise<ExhibitSearchResult[]> {
   const trimmedQuery = query.trim();
-  return searchCachedEvents(query, limit).map((event) => ({
+  const events = combineRankedEventSearch(searchCachedEvents(query, limit), searchLocalEvents(query, limit), query, limit);
+  return events.map((event) => ({
     id: toExhibitId(event.accountId, event.calendarId, event.id),
     type: "event",
     name: event.title,
@@ -38,6 +42,13 @@ export async function resolveEventExhibits(ids: string[]): Promise<ExhibitResolv
     ids.map(async (id): Promise<ExhibitResolveResult> => {
       const parsed = parseExhibitId(id);
       if (!parsed) return { id, deleted: true };
+
+      if (isLocalEventKey(parsed.accountId, parsed.calendarId)) {
+        const event = getLocalEvent(parsed.eventId);
+        return event
+          ? { id, name: event.title, url: eventUrl(parsed.accountId, parsed.calendarId, parsed.eventId) }
+          : { id, deleted: true };
+      }
 
       const cached = getCachedEvent(id);
       if (cached) return { id, name: cached.title, url: eventUrl(parsed.accountId, parsed.calendarId, parsed.eventId) };

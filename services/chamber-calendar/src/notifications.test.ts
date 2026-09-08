@@ -4,6 +4,9 @@ import type { CalendarEvent } from "./types.js";
 vi.mock("./google/cache.js", () => ({
   listCachedEvents: vi.fn(),
 }));
+vi.mock("./localEvents.js", () => ({
+  listLocalEvents: vi.fn(() => []),
+}));
 
 import { listCachedEvents } from "./google/cache.js";
 import { startUpcomingEventNotifications, stopUpcomingEventNotifications } from "./notifications.js";

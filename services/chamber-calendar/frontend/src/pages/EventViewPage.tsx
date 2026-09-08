@@ -13,7 +13,7 @@ import {
 import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { fetchEvent, updateEvent, deleteEvent, setEventAttendance } from "@/lib/api";
 import { addMinutesToLocalInput, getBrowserTimeZone, minutesBetween, toDatetimeLocalInput } from "@/lib/datetime";
-import { toExhibitId } from "@/lib/exhibits";
+import { toExhibitId, isLocalEvent } from "@/lib/exhibits";
 import type { AttendanceStatus, CalendarEvent } from "../../../src/types";
 
 const RESPONSE_STATUS_LABELS: Record<AttendanceStatus, string> = {
@@ -35,7 +35,11 @@ function isUnconfirmedInvitation(attendance: { isInvitation: boolean; responseSt
 
 function toFormValues(event: CalendarEvent): EventFormValues {
   return {
-    calendarKey: `${event.accountId}::${event.calendarId}`,
+    // "" is EventForm's own "Local" value (see its header comment) - a
+    // local event has no real Google account/calendar pair to build a
+    // matching option value from, so it maps back to the same blank key the
+    // New Event page's own default already uses.
+    calendarKey: isLocalEvent(event) ? "" : `${event.accountId}::${event.calendarId}`,
     title: event.title,
     // The rich (chip-bearing) value is what the editor loads - falls back
     // to the plain field for a row from before this split existed.

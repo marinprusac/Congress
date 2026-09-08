@@ -110,19 +110,37 @@ export type ListEventsResponse = z.infer<typeof listEventsResponseSchema>;
 // text, tokens intact); when given, these take priority and the server
 // derives the plain text actually sent to Google by resolving their tokens
 // to current labels (see google/richTextMirror.ts).
-export const createEventRequestSchema = z.object({
-  accountId: z.number().int(),
-  calendarId: z.string().min(1),
-  title: z.string().min(1),
-  description: z.string().optional(),
-  location: z.string().optional(),
-  descriptionRich: z.string().optional(),
-  locationRich: z.string().optional(),
-  allDay: z.boolean(),
-  start: z.string(),
-  end: z.string(),
-  timeZone: z.string().min(1),
-});
+//
+// accountId/calendarId are both optional and travel together: present on
+// both, this creates a real Google event on that account's calendar (and
+// timeZone is then required, since Google needs it to interpret a timed
+// start/end); absent on both, this creates an event stored only in this
+// Chamber's own database instead (see localEvents.ts) - the New Event page's
+// Calendar field simply leaves both out when nothing is selected, which is
+// the default. Exactly one present is never valid (see calendar.ts's own
+// createEvent, which is what actually enforces and dispatches on this).
+export const createEventRequestSchema = z
+  .object({
+    accountId: z.number().int().optional(),
+    calendarId: z.string().min(1).optional(),
+    title: z.string().min(1),
+    description: z.string().optional(),
+    location: z.string().optional(),
+    descriptionRich: z.string().optional(),
+    locationRich: z.string().optional(),
+    allDay: z.boolean(),
+    start: z.string(),
+    end: z.string(),
+    timeZone: z.string().min(1).optional(),
+  })
+  .refine((v) => (v.accountId === undefined) === (v.calendarId === undefined), {
+    message: "accountId and calendarId must both be provided (a Google event), or both left out (a local event).",
+    path: ["calendarId"],
+  })
+  .refine((v) => v.accountId === undefined || v.timeZone !== undefined, {
+    message: "timeZone is required when creating a Google event.",
+    path: ["timeZone"],
+  });
 export type CreateEventRequest = z.infer<typeof createEventRequestSchema>;
 
 export const updateEventRequestSchema = z.object({

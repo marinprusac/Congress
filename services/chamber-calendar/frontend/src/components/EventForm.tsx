@@ -38,6 +38,12 @@ interface EventFormProps {
 // (a view page autosaves, a create page fires its own mutation from its own
 // action bar) - just calendar/time/location/description, styled to read as
 // an exhibit's own fields rather than a form waiting to be filled in.
+//
+// The Calendar field's own blank value ("") is a real, selected-by-default
+// choice - "Local", stored only in this Chamber and never sent to Google
+// (see the backend's calendar.ts/localEvents.ts) - not a disabled
+// placeholder blocking submission the way it used to be. Picking one of the
+// Google calendars listed below it opts back into syncing there instead.
 export function EventForm({ values, onChange, calendarLocked, readOnly }: EventFormProps) {
   const { data: calendars } = useQuery({
     queryKey: ["calendars", "selected"],
@@ -97,12 +103,9 @@ export function EventForm({ values, onChange, calendarLocked, readOnly }: EventF
             value={values.calendarKey}
             onChange={(e) => set("calendarKey", e.target.value)}
             disabled={calendarLocked || readOnly}
-            required
             className="field-plain font-mono text-base disabled:text-dust"
           >
-            <option value="" disabled>
-              Select —
-            </option>
+            <option value="">Local (not synced)</option>
             {grouped.map(([accountLabel, cals]) => (
               <optgroup key={accountLabel} label={accountLabel}>
                 {cals.map((cal) => (
