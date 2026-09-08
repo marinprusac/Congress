@@ -1,4 +1,4 @@
-import type { WorkoutSummary, WorkoutDetail, Settings, HevySyncHealth } from "../../../src/types";
+import type { WorkoutSummary, WorkoutDetail, Settings, HevySyncHealth, HealthMetric, HealthLatest, HealthMetricType } from "../../../src/types";
 import { resolveApiBase, parseJsonResponse as json } from "@congress/congress-ui";
 
 const API_BASE = resolveApiBase("fitness", import.meta.env.PROD);
@@ -42,4 +42,15 @@ export function fetchSyncHealth(): Promise<HevySyncHealth> {
 
 export function triggerSync(): Promise<HevySyncHealth> {
   return fetch(`${API_BASE}/sync`, { method: "POST" }).then((res) => json(res));
+}
+
+export function fetchHealthLatest(): Promise<HealthLatest> {
+  return fetch(`${API_BASE}/health/latest`).then((res) => json(res));
+}
+
+export function fetchHealthMetrics(metricType?: HealthMetricType, limit = 50): Promise<HealthMetric[]> {
+  const params = new URLSearchParams();
+  if (metricType) params.set("type", metricType);
+  params.set("limit", String(limit));
+  return fetch(`${API_BASE}/health/metrics?${params}`).then((res) => json(res));
 }

@@ -17,6 +17,7 @@ export const manifest: Manifest = {
   widgets: [
     { id: "recent-workouts", width: 3, height: 2, label: "Recent Workouts" },
     { id: "week-stats", width: 2, height: 1, label: "This Week" },
+    { id: "health-snapshot", width: 3, height: 2, label: "Health" },
   ],
   events: [
     {
@@ -30,6 +31,12 @@ export const manifest: Manifest = {
       label: "Hevy sync failing",
       description: "The Hevy poll loop has failed several times in a row.",
       payloadFields: { consecutiveFailures: { type: "number" }, lastError: { type: "string" } },
+    },
+    {
+      type: "fitness.health_metric_received",
+      label: "Health metric received",
+      description: "New or changed Apple Health samples were ingested via the Shortcuts automation.",
+      payloadFields: { count: { type: "number" } },
     },
   ],
 };

@@ -8,6 +8,13 @@
       "when": 1787957644629,
       "tag": "0000_brief_princess_powerful",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788882931134,
+      "tag": "0001_kind_puppet_master",
+      "breakpoints": true
     }
   ]
 }

@@ -9,8 +9,8 @@ const { getSettings, updateSettings: updateSettingsRaw } = createSingleRowSettin
 >({
   db,
   table: settings,
-  toSettings: (row) => ({ hevyApiKey: row.hevyApiKey }),
-  defaults: { hevyApiKey: null },
+  toSettings: (row) => ({ hevyApiKey: row.hevyApiKey, healthIngestToken: row.healthIngestToken }),
+  defaults: { hevyApiKey: null, healthIngestToken: null },
 });
 
 export { getSettings };

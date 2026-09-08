@@ -23,7 +23,7 @@ import {
   sweepStaleChambers,
   getChamber,
 } from "./registry.js";
-import { forwardToChamber, forwardToChamberFrontend, proxyToChamberIcon } from "./gateway.js";
+import { forwardToChamber, forwardToChamberFrontend, proxyToChamberIcon, proxyToChamberPath } from "./gateway.js";
 import { hasValidSession } from "./sessionAuth.js";
 import {
   syncExhibit,
@@ -204,6 +204,21 @@ app.delete("/congress/exhibits/:id/connections/:otherExhibitId", requireSession,
   if ("error" in result) return c.json(result, 404);
   return c.json(result);
 });
+
+// Reachable at /api/fitness/health/ingest, forwarded through
+// unauthenticated by Congress itself - unlike every other "/api/:chamber/*"
+// request, this one is called by an iOS Shortcuts automation, which cannot
+// present a session cookie. The secret check happens entirely inside
+// chamber-fitness's own route handler (src/health/ingest.ts), comparing a
+// caller-supplied header against that Chamber's own settings row - safe
+// because chamber-fitness itself is only reachable through this forward
+// (only Congress is publicly exposed; every Chamber binds 127.0.0.1).
+// Registered ahead of the generic "/api/:chamber/*" wildcard below (Hono
+// matches route registration order), exactly like every /congress/* route
+// already is. No dedicated auth middleware here on purpose - Congress
+// asserts nothing about the caller for this one path, so a middleware whose
+// only job would be to call next() is pure ceremony.
+app.post("/api/fitness/health/ingest", (c) => proxyToChamberPath(c, "fitness", "/health/ingest"));
 
 app.all("/api/:chamber/*", requireSession, forwardToChamber);
 

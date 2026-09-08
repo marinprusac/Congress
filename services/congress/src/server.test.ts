@@ -27,6 +27,9 @@ beforeAll(async () => {
   chamber = await startFakeChamber((c) => {
     c.get("/api/notes", (ctx) => ctx.json([{ id: 1, title: "One" }]));
     c.get("/icons/mark.svg", (ctx) => ctx.body("<svg/>", 200, { "content-type": "image/svg+xml" }));
+    c.post("/api/health/ingest", async (ctx) =>
+      ctx.json({ receivedToken: ctx.req.header("x-health-ingest-token") ?? null, body: await ctx.req.json() })
+    );
   });
 });
 
@@ -241,6 +244,44 @@ describe("chamber frontend proxy", () => {
     });
     const res = await app.request("/fronted/anything", {}, bindings());
     expect(res.status).toBe(401);
+  });
+});
+
+describe("POST /api/fitness/health/ingest", () => {
+  // The one deliberate exception to "every /api/:chamber/* request needs a
+  // session" - an iOS Shortcuts automation can't present a session cookie,
+  // so Congress forwards this specific path through unvalidated by design.
+  // The secret check happens entirely inside chamber-fitness's own handler;
+  // Congress's only job is to not 401 it first, and not to touch the
+  // caller's token header on the way through.
+  it("503s if chamber-fitness isn't registered, same as any other proxied path", async () => {
+    const res = await app.request(
+      "/api/fitness/health/ingest",
+      { method: "POST", headers: json, body: "{}" },
+      bindings()
+    );
+    expect(res.status).toBe(503);
+  });
+
+  it("forwards with no session required, passing the caller's token header through unmodified", async () => {
+    await app.request("/congress/register", {
+      method: "POST",
+      headers: { ...internal, ...json },
+      body: JSON.stringify(makeManifest("fitness", chamber.origin)),
+    });
+
+    const res = await app.request(
+      "/api/fitness/health/ingest",
+      {
+        method: "POST",
+        headers: { ...json, "X-Health-Ingest-Token": "owner-secret" },
+        body: JSON.stringify({ samples: [] }),
+      },
+      bindings()
+    );
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ receivedToken: "owner-secret", body: { samples: [] } });
   });
 });
 

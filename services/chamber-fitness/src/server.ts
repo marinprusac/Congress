@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
-import { updateSettingsRequestSchema } from "./types.js";
+import { updateSettingsRequestSchema, healthIngestRequestSchema } from "./types.js";
+import type { HealthMetricType } from "./types.js";
 import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,
@@ -15,6 +16,8 @@ import { getSettings, updateSettings } from "./settings.js";
 import { searchWorkoutExhibits, resolveWorkoutExhibits } from "./exhibits.js";
 import { getSyncState, toSyncHealth } from "./hevy/pollState.js";
 import { syncNow } from "./hevy/poller.js";
+import { isValidIngestToken, ingestSamples } from "./health/ingest.js";
+import { listHealthMetrics, getLatestHealthMetrics } from "./healthMetrics.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -53,6 +56,32 @@ app.get("/api/sync-health", async (c) => {
 app.post("/api/sync", async (c) => {
   await syncNow();
   return c.json(toSyncHealth(getSyncState()));
+});
+
+// Pushed to by an iOS Shortcuts automation, not read by the browser - the
+// only route in this Chamber that authenticates itself rather than relying
+// on Congress's session gate, because a Shortcut can present neither a
+// session cookie nor the shared internal token. See health/ingest.ts.
+app.post("/api/health/ingest", async (c) => {
+  if (!(await isValidIngestToken(c.req.header("X-Health-Ingest-Token")))) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const parsed = healthIngestRequestSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  }
+  return c.json(await ingestSamples(parsed.data));
+});
+
+app.get("/api/health/metrics", async (c) => {
+  const metricType = (c.req.query("type") as HealthMetricType | undefined) ?? undefined;
+  const since = c.req.query("since");
+  const limit = Number(c.req.query("limit")) || undefined;
+  return c.json(await listHealthMetrics({ metricType, since: since ? new Date(since) : undefined, limit }));
+});
+
+app.get("/api/health/latest", async (c) => {
+  return c.json(await getLatestHealthMetrics());
 });
 
 mountExhibitSearchRoutes(app, { search: searchWorkoutExhibits, resolve: resolveWorkoutExhibits });

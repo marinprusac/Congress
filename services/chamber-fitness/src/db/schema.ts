@@ -42,17 +42,56 @@ export const workoutRefs = sqliteTable(
   (table) => [uniqueIndex("workout_refs_workout_target_idx").on(table.workoutId, table.targetExhibitId)]
 );
 
-// Single-row table (id is always 1). hevyApiKey is the one owner-facing
-// field, routed through the public Settings type/PUT /api/settings.
-// hevyLastSyncedAt/hevyConsecutiveFailures/hevyLastPollError are internal
-// poll-loop bookkeeping written directly by hevy/pollState.ts, never through
-// updateSettings - kept on the same row purely to avoid a second single-row
-// table, not because they're user settings. Mirrors the split in
-// chamber-map/src/db/schema.ts's own settings table.
+// Single-row table (id is always 1). hevyApiKey/healthIngestToken are the
+// owner-facing fields, routed through the public Settings type/PUT
+// /api/settings. hevyLastSyncedAt/hevyConsecutiveFailures/hevyLastPollError
+// are internal poll-loop bookkeeping written directly by
+// hevy/pollState.ts, never through updateSettings - kept on the same row
+// purely to avoid a second single-row table, not because they're user
+// settings. Mirrors the split in chamber-map/src/db/schema.ts's own
+// settings table.
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
   hevyApiKey: text("hevy_api_key"),
   hevyLastSyncedAt: integer("hevy_last_synced_at", { mode: "timestamp_ms" }),
   hevyConsecutiveFailures: integer("hevy_consecutive_failures").notNull().default(0),
   hevyLastPollError: text("hevy_last_poll_error"),
+  // Bearer-style credential the owner pastes into their iOS Shortcut's
+  // "Get Contents of URL" action header (X-Health-Ingest-Token) - compared
+  // against that header by src/health/ingest.ts's own auth check, the first
+  // inbound auth check owned by this Chamber rather than Congress. See that
+  // file's comment for why.
+  healthIngestToken: text("health_ingest_token"),
 });
+
+// One row per Apple Health sample, pushed in by an iOS Shortcuts automation
+// (POST /api/health/ingest) rather than pulled - unlike workouts/hevy above,
+// there is no upstream API to poll, so this table's freshness is entirely a
+// function of how often the owner's Shortcut runs. A single generic table
+// covers all five tracked metric types (weight/vo2Max are Apple's own
+// "instantaneous quantity" samples, so startDate == endDate for them;
+// activeEnergy/restingEnergy/sleepAsleep are "interval quantity" samples)
+// rather than one table per metric - they share the same
+// (type, value, unit, start, end) shape and a per-metric table would just be
+// this same shape five times over with no relational benefit.
+export const healthMetrics = sqliteTable(
+  "health_metrics",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    metricType: text("metric_type").notNull(), // "weight" | "vo2Max" | "activeEnergy" | "restingEnergy" | "sleepAsleep"
+    value: real("value").notNull(),
+    unit: text("unit").notNull(),
+    startDate: integer("start_date", { mode: "timestamp_ms" }).notNull(),
+    endDate: integer("end_date", { mode: "timestamp_ms" }).notNull(),
+    sourceName: text("source_name"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    // Shortcuts has no stable per-sample UUID to hand us, and will re-send
+    // overlapping recent history on every run (e.g. "last 2 days" of
+    // sleep/energy) - (metricType, startDate, endDate) is what identifies a
+    // sample of a given type for our purposes, so an upsert on this triple
+    // makes re-ingestion idempotent without needing Apple's own internal id.
+    uniqueIndex("health_metrics_type_range_idx").on(table.metricType, table.startDate, table.endDate),
+  ]
+);
