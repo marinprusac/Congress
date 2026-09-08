@@ -161,10 +161,15 @@ export const settings = sqliteTable("settings", {
   // no error at all while the device itself has simply stopped sending real
   // fixes (e.g. the phone's tracker app lost background location permission
   // after an update), which map.traccar_poll_failing above never catches -
-  // that only fires on actual HTTP failures. Defaulted generously (12h) so a
-  // normal overnight reporting gap doesn't cry wolf - see tracking.ts's own
-  // notes on sparse overnight fixes being an accepted phone-side quirk, not a
-  // bug.
+  // that only fires on actual HTTP failures.
+  //
+  // The 12h default here is a holdover from an assumption that long silences
+  // are just a normal overnight quirk. On a healthy phone-side tracker they
+  // are not: a working setup reports continuously, and a multi-hour daytime
+  // silence means the tracker app has been suspended, not that nothing
+  // happened. A threshold this long turns the one signal that would say so
+  // into a guarantee of silence, so tune it down (roughly 1h) in Settings
+  // once the device side actually reports reliably.
   staleThresholdMs: integer("stale_threshold_ms").notNull().default(12 * 60 * 60 * 1000),
   lastProcessedAt: integer("last_processed_at", { mode: "timestamp_ms" }),
   lastPollSucceededAt: integer("last_poll_succeeded_at", { mode: "timestamp_ms" }),

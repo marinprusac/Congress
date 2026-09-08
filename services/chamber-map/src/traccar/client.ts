@@ -21,12 +21,22 @@ export interface TraccarPosition {
   attributes: Record<string, unknown>;
 }
 
+// Bare fetch() falls back to undici's 300s header timeout, which is more
+// than two orders of magnitude longer than a poll tick - a Traccar that
+// accepts the connection and then never answers (the container wedged, a
+// reverse proxy holding the socket open) would stall the whole poll loop for
+// five minutes per tick rather than failing fast and retrying on the next
+// one. Bounded well under the shortest sensible poll interval instead, so a
+// hung request costs at most one tick.
+const TRACCAR_TIMEOUT_MS = 20_000;
+
 async function traccarFetch(path: string): Promise<unknown> {
   const res = await fetch(`${env.TRACCAR_URL}${path}`, {
     headers: {
       Authorization: `Bearer ${env.TRACCAR_TOKEN}`,
       Accept: "application/json",
     },
+    signal: AbortSignal.timeout(TRACCAR_TIMEOUT_MS),
   });
   if (!res.ok) {
     throw new TraccarApiError(res.status, await res.text());

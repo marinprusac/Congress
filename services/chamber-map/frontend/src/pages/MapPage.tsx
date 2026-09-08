@@ -4,7 +4,8 @@ import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-
 import L from "leaflet";
 import { Link } from "react-router-dom";
 import { useShellHosted, resolveChamberPath } from "@congress/congress-ui";
-import { fetchVisits, fetchTrips, fetchVisit, fetchVisitActiveAt } from "@/lib/api";
+import { fetchVisits, fetchTrips, fetchVisit, fetchVisitActiveAt, fetchPollHealth } from "@/lib/api";
+import { trackingFreshness } from "@/lib/freshness";
 import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
 import { formatDuration } from "@/lib/formatDuration";
 import { placeMarkerIcon } from "@/lib/markerIcon";
@@ -114,6 +115,20 @@ export function MapPage() {
 
   const visitsQuery = useQuery({ queryKey: ["visits", from, to], queryFn: () => fetchVisits({ from, to }) });
   const tripsQuery = useQuery({ queryKey: ["trips", from, to], queryFn: () => fetchTrips({ from, to }) });
+
+  // Only today's view can mislead about "where am I now" - every earlier day
+  // is history, and a lag banner on it would just be noise about a gap that
+  // is already visible as a gap. Refetched on the poll loop's own rough
+  // cadence so the banner clears on its own once fixes resume, without a
+  // reload.
+  const isToday = date === todayLocal();
+  const pollHealthQuery = useQuery({
+    queryKey: ["poll-health"],
+    queryFn: fetchPollHealth,
+    enabled: isToday,
+    refetchInterval: 60_000,
+  });
+  const freshness = isToday ? trackingFreshness(pollHealthQuery.data?.lastProcessedAt ?? null) : null;
 
   const visits = visitsQuery.data ?? [];
   const trips = tripsQuery.data ?? [];
@@ -239,6 +254,21 @@ export function MapPage() {
           </svg>
         </button>
       </div>
+
+      {freshness && (
+        <p
+          className="mb-4 flex items-baseline gap-2 border-l-2 border-alert py-1 pl-3 font-mono text-xs text-alert"
+          role="status"
+        >
+          <span>{freshness.label}</span>
+          <Link
+            to={resolveChamberPath("/settings", "map", shellHosted)}
+            className="underline underline-offset-2 opacity-80 hover:opacity-100"
+          >
+            tracking status
+          </Link>
+        </p>
+      )}
 
       <div
         className="mb-4 h-80 overflow-hidden rounded border border-dust"

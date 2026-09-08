@@ -1,8 +1,27 @@
-import { and, asc, gte, lte } from "drizzle-orm";
+import { and, asc, gte, inArray, lte } from "drizzle-orm";
 import { db } from "./db/client.js";
 import { positions } from "./db/schema.js";
 import { haversineMeters } from "./geo.js";
 import type { TraccarPosition } from "./traccar/client.js";
+
+// Which of these Traccar position ids are already stored. Backs the poller's
+// "don't classify the same fix twice" filter: the poll cursor is the last
+// fix's own fixTime and Traccar's `from` is inclusive, so every tick refetches
+// at least the boundary fix it already handled last time. Harmless for the
+// `positions` table itself (onConflictDoNothing below), but not for
+// tracking.ts, whose trip accumulator would append that same point again on
+// every tick - once every pollIntervalMs for as long as the device stays
+// silent, which on a phone that goes quiet for hours means a trip path padded
+// with hundreds of copies of one coordinate. See poller.ts.
+export function existingPositionIds(traccarIds: number[]): Set<number> {
+  if (traccarIds.length === 0) return new Set();
+  const rows = db
+    .select({ traccarPositionId: positions.traccarPositionId })
+    .from(positions)
+    .where(inArray(positions.traccarPositionId, traccarIds))
+    .all();
+  return new Set(rows.map((r) => r.traccarPositionId));
+}
 
 // Appends one fix to the permanent GPS log - see db/schema.ts's comment on
 // `positions`. Called unconditionally, once per fix, before any of
