@@ -1,5 +1,5 @@
 import type { ExhibitSearchResult, ExhibitResolveResult } from "@congress/shared-types";
-import { createPushExhibitSync } from "@congress/chamber-kit";
+import { createPushExhibitSync, scoreExhibitMatch } from "@congress/chamber-kit";
 import { env } from "./env.js";
 import { toExhibitId, parseExhibitId, eventUrl } from "./google/eventId.js";
 import { searchCachedEvents, getCachedEvent, upsertCachedEventFromGoogle, type RawGoogleEvent } from "./google/cache.js";
@@ -15,11 +15,21 @@ import { getAccountRow } from "./google/accounts.js";
 export { toExhibitId, parseExhibitId, eventUrl };
 
 export async function searchEventExhibits(query: string, limit = 10): Promise<ExhibitSearchResult[]> {
+  const trimmedQuery = query.trim();
   return searchCachedEvents(query, limit).map((event) => ({
     id: toExhibitId(event.accountId, event.calendarId, event.id),
     type: "event",
     name: event.title,
     url: eventUrl(event.accountId, event.calendarId, event.id),
+    ...(trimmedQuery
+      ? {
+          score: scoreExhibitMatch(trimmedQuery, [
+            { text: event.title, isPrimary: true },
+            { text: event.description ?? "", isPrimary: false },
+            { text: event.location ?? "", isPrimary: false },
+          ]),
+        }
+      : {}),
   }));
 }
 

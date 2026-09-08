@@ -101,4 +101,21 @@ describe("searchCachedEvents", () => {
 
     expect(searchCachedEvents("")).toHaveLength(0);
   });
+
+  it("ranks an event titled exactly the query above a temporally-closer event that only matches in its description", async () => {
+    const titleMatch = raw("2026-03-05T10:00:00Z", "2026-03-05T11:00:00Z");
+    titleMatch.summary = "ESN";
+    const descriptionMatch = raw("2026-03-01T10:00:00Z", "2026-03-01T11:00:00Z");
+    descriptionMatch.summary = "Unrelated meeting";
+    descriptionMatch.description = "Discuss the ESN rollout with the team";
+
+    // Chronologically, descriptionMatch (Mar 1) comes before titleMatch
+    // (Mar 5) - without relevance ranking, the old chronological sort would
+    // return descriptionMatch first.
+    await upsertCachedEventFromGoogle(descriptionMatch, 1, "primary");
+    await upsertCachedEventFromGoogle(titleMatch, 1, "primary");
+
+    const results = searchCachedEvents("ESN");
+    expect(results.map((e) => e.title)).toEqual(["ESN", "Unrelated meeting"]);
+  });
 });

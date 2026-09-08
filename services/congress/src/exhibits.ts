@@ -91,7 +91,15 @@ export async function searchExhibits(query: string): Promise<CapitolExhibitSearc
     })
   );
 
-  return perChamberResults.flat();
+  // Stable sort by score (missing -> 0) merges every active Chamber's
+  // results into one relevance-ranked list, rather than the raw
+  // concatenation order above (which is just chamber-registration order).
+  // For an empty query no Chamber attaches a score at all (see
+  // createTableBackedExhibits.search / searchEventExhibits), so every
+  // comparison is 0-vs-0 and this sort is a no-op - the existing
+  // per-chamber-recency, registration-order "browse recent" behavior is
+  // unchanged.
+  return perChamberResults.flat().sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 }
 
 // Resolves every id in one owning Chamber through a single POST

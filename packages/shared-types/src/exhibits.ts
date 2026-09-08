@@ -6,6 +6,11 @@ export const exhibitSearchResultSchema = z.object({
   type: z.string(),
   name: z.string(),
   url: z.string(),
+  // Present only for a non-empty query - a Chamber's own relevance score
+  // (see chamber-kit's scoreExhibitMatch), used by Congress to merge
+  // multiple Chambers' results into one relevance-sorted list. Absent for
+  // an empty ("browse recent") query, where no ranking applies.
+  score: z.number().optional(),
 });
 export type ExhibitSearchResult = z.infer<typeof exhibitSearchResultSchema>;
 

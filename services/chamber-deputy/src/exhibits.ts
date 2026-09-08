@@ -10,13 +10,18 @@ const exhibits = createTableBackedExhibits({
   urlFor: (id: number) => `/d/${id}`,
   searchRows: (pattern, limit) =>
     db
-      .select({ id: directives.id, title: directives.title })
+      .select({ id: directives.id, title: directives.title, body: directives.body })
       .from(directives)
       .where(or(like(directives.title, pattern), like(directives.body, pattern)))
       .orderBy(desc(directives.updatedAt))
       .limit(limit)
       .all(),
-  resolveRows: (ids) => db.select({ id: directives.id, title: directives.title }).from(directives).where(inArray(directives.id, ids)).all(),
+  resolveRows: (ids) =>
+    db
+      .select({ id: directives.id, title: directives.title, body: directives.body })
+      .from(directives)
+      .where(inArray(directives.id, ids))
+      .all(),
 });
 
 export const toExhibitId = exhibits.toExhibitId;

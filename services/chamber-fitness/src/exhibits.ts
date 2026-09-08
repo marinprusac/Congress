@@ -17,20 +17,38 @@ const exhibits = createTableBackedExhibits({
   urlFor: (id: number) => `/fitness/workouts/${id}`,
   searchRows: (pattern, limit) =>
     db
-      .select({ id: workouts.id, title: workouts.title, startTime: workouts.startTime })
+      .select({
+        id: workouts.id,
+        title: workouts.title,
+        startTime: workouts.startTime,
+        exerciseNames: workouts.exerciseNames,
+      })
       .from(workouts)
       .where(or(like(workouts.title, pattern), like(workouts.exerciseNames, pattern)))
       .orderBy(desc(workouts.startTime))
       .limit(limit)
       .all()
-      .map((row) => ({ id: row.id, title: composeExhibitTitle(row.id, row.title, row.startTime) })),
+      .map((row) => ({
+        id: row.id,
+        title: composeExhibitTitle(row.id, row.title, row.startTime),
+        body: row.exerciseNames,
+      })),
   resolveRows: (ids) =>
     db
-      .select({ id: workouts.id, title: workouts.title, startTime: workouts.startTime })
+      .select({
+        id: workouts.id,
+        title: workouts.title,
+        startTime: workouts.startTime,
+        exerciseNames: workouts.exerciseNames,
+      })
       .from(workouts)
       .where(inArray(workouts.id, ids))
       .all()
-      .map((row) => ({ id: row.id, title: composeExhibitTitle(row.id, row.title, row.startTime) })),
+      .map((row) => ({
+        id: row.id,
+        title: composeExhibitTitle(row.id, row.title, row.startTime),
+        body: row.exerciseNames,
+      })),
 });
 
 export const toExhibitId = exhibits.toExhibitId;

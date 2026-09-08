@@ -11,7 +11,7 @@ import { publishEvent } from "../events.js";
 import { computeGoogleAttendance, resolveAttendance } from "../attendance.js";
 import type { AttendanceStatus } from "../types.js";
 import { env } from "../env.js";
-import { resolveExhibitsServerSide, extractExhibitTokensWithLabels } from "@congress/chamber-kit";
+import { resolveExhibitsServerSide, extractExhibitTokensWithLabels, scoreExhibitMatch } from "@congress/chamber-kit";
 import { buildExhibitToken, type CapitolExhibitResolveResult, type ExhibitToken } from "@congress/shared-types";
 import { projectRichToPlain, reconcileRichValue } from "./richTextMirror.js";
 
@@ -272,6 +272,11 @@ export function searchCachedEvents(query: string, limit = 20): CalendarEvent[] {
       .sort((a, b) => startMsOf(a) - startMsOf(b))
       .slice(0, limit);
   }
+  // No LIMIT in the SQL here - the WHERE already bounds this to matching
+  // rows only (never the whole table), so ranking by relevance just needs a
+  // smarter comparator, not a wider candidate fetch the way the table-backed
+  // factory needs. Chronological order is the base sort (kept as the
+  // tie-break via the second sort's stability), then relevance wins.
   return db
     .select()
     .from(cachedEvents)
@@ -279,7 +284,17 @@ export function searchCachedEvents(query: string, limit = 20): CalendarEvent[] {
     .all()
     .map(rowToCalendarEvent)
     .sort((a, b) => startMsOf(a) - startMsOf(b))
-    .slice(0, limit);
+    .map((event) => ({
+      event,
+      score: scoreExhibitMatch(trimmed, [
+        { text: event.title, isPrimary: true },
+        { text: event.description ?? "", isPrimary: false },
+        { text: event.location ?? "", isPrimary: false },
+      ]),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ event }) => event);
 }
 
 // `richOverride` supplied means this is the Chamber's own write-through

@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createPushExhibitSync, createTableBackedExhibits } from "./exhibits.js";
+import { createPushExhibitSync, createTableBackedExhibits, scoreExhibitMatch } from "./exhibits.js";
 
 interface Row {
   id: number;
   title: string;
+  body?: string;
 }
 
 // The factory takes its row queries as callbacks, so the whole contract that
@@ -15,10 +16,12 @@ function build(rows: Row[] = [], overrides: Partial<Parameters<typeof createTabl
     idPrefix: "note-",
     type: "note",
     urlFor: (id) => `/n/${id}`,
-    searchRows: (pattern, limit) =>
-      rows
-        .filter((r) => r.title.toLowerCase().includes(pattern.replaceAll("%", "").toLowerCase()))
-        .slice(0, limit),
+    searchRows: (pattern, limit) => {
+      const needle = pattern.replaceAll("%", "").toLowerCase();
+      return rows
+        .filter((r) => r.title.toLowerCase().includes(needle) || (r.body ?? "").toLowerCase().includes(needle))
+        .slice(0, limit);
+    },
     resolveRows: (ids) => ids.map((id) => byId.get(id)).filter((r): r is Row => r !== undefined),
     ...overrides,
   });
@@ -61,22 +64,120 @@ describe("search", () => {
   it("maps rows to exhibit results with the chamber's id prefix, type and url", async () => {
     const { search } = build([{ id: 3, title: "Weekly review" }]);
     await expect(search("week")).resolves.toEqual([
-      { id: "note-3", type: "note", name: "Weekly review", url: "/n/3" },
+      { id: "note-3", type: "note", name: "Weekly review", url: "/n/3", score: expect.any(Number) },
     ]);
   });
 
-  it("wraps the query in LIKE wildcards and passes the limit through", async () => {
+  it("wraps the query in LIKE wildcards, and for a non-empty query requests a wide candidate window rather than the caller's own limit", async () => {
+    // A non-empty query needs a much wider candidate set than the caller's
+    // final `limit` so scoring has enough rows to find an exact match that
+    // isn't among the most recently touched - see the regression test below
+    // for the actual bug this fixes. The final result is still trimmed to
+    // `limit` after scoring (covered by the regression test), just not at
+    // the SQL layer any more.
     const searchRows = vi.fn<(pattern: string, limit: number) => Row[]>().mockReturnValue([]);
     const { search } = build([], { searchRows });
     await search("week", 5);
-    expect(searchRows).toHaveBeenCalledWith("%week%", 5);
+    expect(searchRows).toHaveBeenCalledWith("%week%", 200);
   });
 
   it("turns an empty query into a match-everything pattern, which is what the picker wants before typing", async () => {
     const searchRows = vi.fn<(pattern: string, limit: number) => Row[]>().mockReturnValue([]);
     const { search } = build([], { searchRows });
     await search("");
+    // Unlike a non-empty query, empty ("browse recent") mode still requests
+    // exactly `limit` rows - no scoring applies, so there's nothing to gain
+    // from widening the candidate window.
     expect(searchRows).toHaveBeenCalledWith("%%", 10);
+  });
+
+  it("ranks an exact title match first even when it sorts last in searchRows' own recency order", async () => {
+    // The exact shape of the reported bug: a note titled exactly "ESN" that
+    // hasn't been touched recently, buried behind 11 other notes that only
+    // match because "esn" appears somewhere in their body text and were
+    // edited more recently.
+    const decoys = Array.from({ length: 11 }, (_, i) => ({
+      id: i + 1,
+      title: `Decoy ${i + 1}`,
+      body: "some text mentioning esn in passing",
+    }));
+    const exactMatch = { id: 99, title: "ESN", body: "" };
+    const { search } = build([...decoys, exactMatch]);
+
+    const results = await search("ESN");
+    expect(results[0]).toMatchObject({ id: "note-99", name: "ESN" });
+  });
+
+  it("still finds a body-only match, ranked below any title match", async () => {
+    const titleMatch = { id: 1, title: "ESN", body: "" };
+    const bodyOnlyMatch = { id: 2, title: "Unrelated", body: "mentions esn once" };
+    const { search } = build([bodyOnlyMatch, titleMatch]);
+
+    const results = await search("ESN");
+    expect(results.map((r) => r.id)).toEqual(["note-1", "note-2"]);
+  });
+
+  it("attaches no score to results for an empty query", async () => {
+    const { search } = build([{ id: 1, title: "One" }]);
+    const results = await search("");
+    expect(results.every((r) => r.score === undefined)).toBe(true);
+  });
+
+  it("attaches a score to results for a non-empty query", async () => {
+    const { search } = build([{ id: 1, title: "One" }]);
+    const results = await search("one");
+    expect(results[0]?.score).toBeGreaterThan(0);
+  });
+});
+
+describe("scoreExhibitMatch", () => {
+  it("ranks an exact primary-field match above every other tier", () => {
+    const exact = scoreExhibitMatch("esn", [{ text: "ESN", isPrimary: true }]);
+    const prefix = scoreExhibitMatch("esn", [{ text: "ESN Kickoff", isPrimary: true }]);
+    expect(exact).toBeGreaterThan(prefix);
+  });
+
+  it("ranks a primary-field prefix match above a word-boundary match", () => {
+    const prefix = scoreExhibitMatch("esn", [{ text: "ESN Kickoff", isPrimary: true }]);
+    const wordBoundary = scoreExhibitMatch("esn", [{ text: "Notes on ESN today", isPrimary: true }]);
+    expect(prefix).toBeGreaterThan(wordBoundary);
+  });
+
+  it("ranks a primary-field word-boundary match above a bare substring match", () => {
+    const wordBoundary = scoreExhibitMatch("esn", [{ text: "Notes on ESN today", isPrimary: true }]);
+    const substring = scoreExhibitMatch("esn", [{ text: "Xesny device", isPrimary: true }]);
+    expect(wordBoundary).toBeGreaterThan(substring);
+  });
+
+  it("ranks any primary-field match above every secondary-field match", () => {
+    const primarySubstring = scoreExhibitMatch("esn", [{ text: "Xesny device", isPrimary: true }]);
+    const secondaryWordBoundary = scoreExhibitMatch("esn", [{ text: "Discuss ESN rollout", isPrimary: false }]);
+    expect(primarySubstring).toBeGreaterThan(secondaryWordBoundary);
+  });
+
+  it("ranks a secondary-field word-boundary match above a secondary-field substring match", () => {
+    const wordBoundary = scoreExhibitMatch("esn", [{ text: "Discuss ESN rollout", isPrimary: false }]);
+    const substring = scoreExhibitMatch("esn", [{ text: "Xesny device", isPrimary: false }]);
+    expect(wordBoundary).toBeGreaterThan(substring);
+  });
+
+  it("is case-insensitive", () => {
+    expect(scoreExhibitMatch("ESN", [{ text: "esn", isPrimary: true }])).toBe(
+      scoreExhibitMatch("esn", [{ text: "ESN", isPrimary: true }])
+    );
+  });
+
+  it("returns 0 when no field matches at all", () => {
+    expect(scoreExhibitMatch("esn", [{ text: "Weekly review", isPrimary: true }])).toBe(0);
+  });
+
+  it("takes the best score across multiple fields", () => {
+    const score = scoreExhibitMatch("esn", [
+      { text: "Unrelated", isPrimary: true },
+      { text: "ESN", isPrimary: false },
+    ]);
+    const bodyOnly = scoreExhibitMatch("esn", [{ text: "ESN", isPrimary: false }]);
+    expect(score).toBe(bodyOnly);
   });
 });
 

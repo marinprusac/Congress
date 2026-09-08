@@ -341,6 +341,61 @@ describe("searchExhibits", () => {
     expect(results.some((r) => r.chamber === "broken")).toBe(false);
     expect(results.length).toBeGreaterThan(0);
   });
+
+  describe("cross-chamber score merge", () => {
+    let low: FakeChamber;
+    let high: FakeChamber;
+
+    beforeAll(async () => {
+      // "low" registers before "high" - a merge that just concatenated
+      // per-chamber results in registration order (the pre-fix behaviour)
+      // would put low's result first regardless of score.
+      // Mirrors a real Chamber's own contract: score is present only for a
+      // non-empty query (see createTableBackedExhibits.search), so the
+      // empty-query test below can assert every result is unscored.
+      low = await startFakeChamber((app) => {
+        app.get("/api/exhibits/search", (c) => {
+          const score = c.req.query("q") ? 1 : undefined;
+          return c.json({ results: [{ id: "low-1", type: "note", name: "Low score match", url: "/l/1", score }] });
+        });
+      });
+      high = await startFakeChamber((app) => {
+        app.get("/api/exhibits/search", (c) => {
+          const score = c.req.query("q") ? 6 : undefined;
+          return c.json({ results: [{ id: "high-1", type: "note", name: "High score match", url: "/h/1", score }] });
+        });
+      });
+      registerChamber(makeManifest("low", low.origin));
+      registerChamber(makeManifest("high", high.origin));
+    });
+
+    afterAll(async () => {
+      deregisterChamber("low");
+      deregisterChamber("high");
+      await Promise.all([low.close(), high.close()]);
+    });
+
+    it("ranks a higher-scoring result first regardless of chamber registration order", async () => {
+      const results = await searchExhibits("query");
+      const ids = results.map((r) => r.id);
+      expect(ids.indexOf("high-1")).toBeLessThan(ids.indexOf("low-1"));
+    });
+
+    it("ranks a chamber that omits score entirely beneath any chamber with a positive score", async () => {
+      // "notes"/"tasks" (registered in the outer beforeAll) never send
+      // `score` at all - a missing score must be treated as 0, not as
+      // "unranked and therefore first".
+      const results = await searchExhibits("query");
+      const ids = results.map((r) => r.id);
+      expect(ids.indexOf("high-1")).toBeLessThan(ids.indexOf("note-1"));
+      expect(ids.indexOf("high-1")).toBeLessThan(ids.indexOf("task-1"));
+    });
+
+    it("leaves an empty query's results without a score and merge-stable", async () => {
+      const results = await searchExhibits("");
+      expect(results.every((r) => r.score === undefined)).toBe(true);
+    });
+  });
 });
 
 describe("getExhibitChip", () => {
