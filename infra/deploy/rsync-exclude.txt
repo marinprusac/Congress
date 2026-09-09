@@ -1,0 +1,10 @@
+# Used by .github/workflows/deploy.yml's rsync push to /srv/congress.
+# Unanchored (no leading slash) so each matches by basename at any depth -
+# these are exactly the paths .gitignore keeps out of the CI checkout in the
+# first place, listed here so rsync --delete doesn't remove the server's own
+# copies of them just because the pushed tree doesn't contain them.
+.git
+node_modules
+.env
+data
+dev-dist

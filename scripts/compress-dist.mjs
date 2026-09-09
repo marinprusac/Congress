@@ -4,9 +4,10 @@
 // precompressed: true) can stream pre-compressed bytes instead of Caddy
 // re-running zstd/gzip over the same file on every single request. Run once
 // after all of a deploy's build:web/build:remote/build:vendor steps finish
-// (see infra/deploy/sync-deploy.sh) - safe to run repeatedly, and safe if
-// never run at all (serveStatic just falls back to the uncompressed file
-// when a sibling doesn't exist).
+// (see infra/deploy/build-artifacts.sh, run in CI, not on the production
+// server) - safe to run repeatedly, and safe if never run at all
+// (serveStatic just falls back to the uncompressed file when a sibling
+// doesn't exist).
 import { readdirSync, statSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, extname } from "node:path";
 import { gzipSync, brotliCompressSync, constants as zlibConstants } from "node:zlib";

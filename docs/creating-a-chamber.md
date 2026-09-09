@@ -386,10 +386,11 @@ pnpm --filter chamber-<name> build:web      # normal production build
 pnpm --filter chamber-<name> build:remote   # shell-hosting artifact, run after build:web
 ```
 
-`infra/deploy/sync-deploy.sh` (which the server's sync timer runs on every
-push to `main`) already discovers and builds every `services/chamber-*/`
-directory this way automatically — a new Chamber needs **zero edits** to
-that script. What's still manual, on the server, one time per Chamber:
+`infra/deploy/build-artifacts.sh` (which the GitHub Actions deploy workflow
+runs on every push to `main`) already discovers and builds every
+`services/chamber-*/` directory this way automatically — a new Chamber
+needs **zero edits** to that script. What's still manual, on the server,
+one time per Chamber:
 
 1. Copy the systemd unit the scaffold already generated for you
    (`infra/systemd/congress-chamber-<name>.service`) to
@@ -399,7 +400,7 @@ that script. What's still manual, on the server, one time per Chamber:
    (the `.env.example` default of `:3000` is the dev value).
 3. `sudo systemctl enable --now congress-chamber-<name>`.
 
-Full detail (including the passwordless-sudo requirement `sync-deploy.sh`
+Full detail (including the passwordless-sudo requirement `remote-apply.sh`
 depends on) is in `infra/README.md`'s "Adding a new Chamber's infra"
 section.
 
@@ -408,7 +409,7 @@ section.
 If you're setting up Congress on a brand-new server rather than adding one
 more Chamber to an existing deployment, `infra/README.md` is the source of
 truth — it covers the full VPS layout, the systemd/Caddy setup, the
-poll-based `git push` → auto-deploy sync mechanism, and the master-password
+push-based GitHub Actions → rsync deploy mechanism, and the master-password
 access-control model (public HTTPS + a signed session cookie, not
 Tailscale/network-level access — see that doc for why). Its "First-time
 server bootstrap" section is a literal, copy-pasteable script.

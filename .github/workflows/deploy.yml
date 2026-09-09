@@ -1,0 +1,62 @@
+name: Deploy
+
+# Push-based deploy: this workflow does everything the server used to do
+# for itself on a 30s poll (see infra/README.md's "Deploy" section for the
+# full story) - it builds and tests in CI, then pushes the finished tree to
+# the VPS over rsync+SSH and tells it to install runtime deps and restart.
+# The server never touches git or a build tool again; it only ever receives
+# files.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.3.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build frontend artifacts
+        run: infra/deploy/build-artifacts.sh "${{ github.sha }}"
+
+      - name: Configure deploy SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Push build to server
+        run: |
+          rsync -az --delete \
+            --exclude-from=infra/deploy/rsync-exclude.txt \
+            -e "ssh -i ~/.ssh/deploy_key -o UserKnownHostsFile=$HOME/.ssh/known_hosts" \
+            ./ "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:/srv/congress/"
+
+      - name: Install runtime deps and restart services
+        run: |
+          ssh -i ~/.ssh/deploy_key -o UserKnownHostsFile=$HOME/.ssh/known_hosts \
+            "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}" \
+            "/srv/congress/infra/deploy/remote-apply.sh"

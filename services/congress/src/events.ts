@@ -4,7 +4,7 @@ import { env } from "./env.js";
 
 // A publish is retried against a briefly-unreachable Chamber with
 // increasing delays rather than given up on immediately - a redeploy
-// restarts every service together (infra/deploy/sync-deploy.sh) and can
+// restarts every service together (infra/deploy/remote-apply.sh) and can
 // leave a Chamber briefly down for well over the first few attempts here.
 // Purely in-memory (a chain of setTimeouts within this one background
 // task) - no durable queue. If Congress itself restarts mid-retry, or the

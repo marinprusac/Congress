@@ -12,10 +12,10 @@ decision. See "Access control" below for what that means in practice.
 
 ## Layout on the server
 
-- Repo lives at `/srv/congress`, owned by `marin`, cloned over SSH using a
-  repo-scoped GitHub deploy key with write access (`~/.ssh/congress_deploy_key`
-  on the server, configured via `core.sshCommand` in that clone's git config —
-  not the user's own key, and not added to the server's default SSH agent).
+- The app lives at `/srv/congress`, owned by `marin`. It is **not** a git
+  clone — deploys are push-based (see "Deploy: GitHub Actions → server"
+  below), so the server only ever receives a tree of files over rsync and
+  never runs `git` itself.
 - Ports: this VPS already runs other services on `3000` and `4000`, so
   Congress's production port differs from its dev default: **Congress
   `8000`**, **Notes Chamber `8011`**, **Calendar Chamber `8012`**, **Documents
@@ -51,12 +51,12 @@ manage one templated unit than N discrete files. Adopting it on an
 already-running server is a manual, one-time migration (stop/disable each
 discrete unit, enable the corresponding `congress-chamber@<name>` instance
 instead) — not something to mix with the discrete units, since
-`infra/deploy/sync-deploy.sh` restarts services by exact unit name.
+`infra/deploy/remote-apply.sh` restarts services by exact unit name.
 
-`sync-deploy.sh`'s restart/build step requires **passwordless `sudo` for
+`remote-apply.sh`'s restart step requires **passwordless `sudo` for
 `systemctl restart` and `systemctl reload`** for the `marin` user (it calls
 `sudo /usr/bin/systemctl restart <service>` non-interactively on every
-sync). This isn't set up by any script here — add it by hand once, e.g. via
+deploy). This isn't set up by any script here — add it by hand once, e.g. via
 `sudo visudo -f /etc/sudoers.d/congress-sync`:
 
 ```
@@ -72,9 +72,10 @@ only genuinely manual, per-Chamber steps are on the infra side, and running
 
 1. **Systemd unit** — generated for you at `infra/systemd/congress-chamber-<name>.service`
    by the scaffold script. On the server: `sudo cp infra/systemd/congress-chamber-<name>.service /etc/systemd/system/ && sudo systemctl daemon-reload`.
-2. **`infra/deploy/sync-deploy.sh`** — nothing to edit. It discovers Chambers
-   by globbing `services/chamber-*/`, so a new Chamber directory is picked
-   up on the very next sync with zero changes to that script.
+2. **`infra/deploy/build-artifacts.sh`/`remote-apply.sh`** — nothing to
+   edit. Both discover Chambers by globbing `services/chamber-*/`, so a new
+   Chamber directory is picked up on the very next deploy with zero changes
+   to either script.
 3. **Caddy** — nothing to edit. Caddy only ever proxies to Congress
    (`127.0.0.1:8000`); Chamber ports are never referenced there, since
    path-based routing to each Chamber happens inside Congress's own gateway.
@@ -130,45 +131,57 @@ serve`, bound to `127.0.0.1:8000`). That's been fully torn down — Tailscale
 is uninstalled from the VPS and the user's other devices — in favor of the
 setup above.
 
-## Sync: laptop → GitHub → server
+## Deploy: GitHub Actions → server
 
-No webhook (would need its own public endpoint and auth story); the server
-polls instead:
+Push-based, not pull-based: nothing on the server ever fetches from GitHub
+or builds anything. A push to `main` triggers `.github/workflows/deploy.yml`
+on a GitHub-hosted runner, which:
 
-- `infra/deploy/sync.sh` — fetches `origin/main`; if it moved, fast-forwards
-  (never rebases/force-merges) then `exec`s into `infra/deploy/sync-deploy.sh`
-  (reinstalls deps with `--frozen-lockfile`, rebuilds every service's
-  frontend, restarts the affected `systemd` services). Split into two files
-  deliberately: `sync.sh` is tracked in git and rewrites itself via the
-  merge above, and bash can keep executing content it already buffered from
-  before that rewrite for the rest of *that* process - `exec`ing into a
-  separate file makes the actual build/restart logic a fresh process that
-  reads its file from disk for the first time, so a change to it always
-  takes effect on the very deploy that introduces it. Keep new build steps
-  in `sync-deploy.sh`, not `sync.sh`.
-- `infra/systemd/congress-sync.service` (oneshot) + `congress-sync.timer`
-  (every 30s) run it on a loop.
+1. Checks out the commit, `pnpm install --frozen-lockfile`, then runs
+   `pnpm typecheck` and `pnpm test` — the same two checks
+   `infra/deploy/pre-push-hook-checks` already ran on the laptop before the
+   push was even allowed, now re-run as a real gate: if either fails here,
+   nothing below happens and production is untouched.
+2. Runs `infra/deploy/build-artifacts.sh <sha>` — builds every service's
+   frontend (`build:web`, Congress's `build:vendor`, every Chamber's
+   `build:remote`) and precompresses the output, exactly what
+   `sync-deploy.sh` used to do, just on the runner instead of on the VPS.
+3. `rsync`s the whole working tree (minus `infra/deploy/rsync-exclude.txt`'s
+   `.git`/`node_modules`/`.env`/`data`/`dev-dist`) to `/srv/congress` over
+   SSH, with `--delete` so removed files actually disappear on the server —
+   safe because everything excluded is either regenerated
+   (`node_modules`) or the server's own state (`.env`, each service's
+   `data/*.sqlite3`), never source.
+4. SSHes in once more to run `infra/deploy/remote-apply.sh`, which is the
+   only thing that still runs *on* the VPS: `pnpm install --frozen-lockfile`
+   (native modules like `better-sqlite3` must be compiled against this
+   machine's own libc/Node ABI — that's the one thing CI genuinely can't do
+   for the server) and `sudo systemctl restart` on every affected unit.
 
-Installed once with:
+The server needs no build toolchain beyond what `remote-apply.sh` itself
+requires (`pnpm`, and whatever `better-sqlite3` needs to compile — see
+"First-time server bootstrap" below) — no git, no repo-scoped deploy key.
+
+### One-time setup (GitHub repo secrets)
+
+The runner authenticates to the server as a dedicated SSH key with no
+access beyond that one account — not the user's own key.
 
 ```
-sudo cp infra/systemd/congress-sync.* /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now congress-sync.timer
+ssh-keygen -t ed25519 -f deploy_key -N "" -C "congress-gh-actions-deploy"
+# append deploy_key.pub to ~/.ssh/authorized_keys for marin@178.105.180.7
+ssh-keyscan -H 178.105.180.7   # -> value for DEPLOY_SSH_KNOWN_HOSTS
 ```
 
-Push to `main` from the laptop as usual — the server picks it up within
-~90 seconds, no manual deploy step.
+Then, in the GitHub repo's Settings → Secrets and variables → Actions, set:
 
-## An AI running on the server
+- `DEPLOY_SSH_KEY` — `deploy_key`'s private key contents.
+- `DEPLOY_SSH_KNOWN_HOSTS` — the `ssh-keyscan` output above.
+- `DEPLOY_SSH_HOST` — `178.105.180.7`.
+- `DEPLOY_SSH_USER` — `marin`.
 
-The server's deploy key has **write** access to this repo (so an on-server
-AI can commit and push its own work), but the server's clone has a
-`pre-push` hook (source at `infra/deploy/pre-push-hook`, installed at
-`.git/hooks/pre-push`) that refuses any push to `main` or `master` from that
-machine. Server-side AI work must go to a `server-ai/*` branch and get
-reviewed/merged from the laptop — `main` is the only branch the sync timer
-trusts, and it should only ever move via a reviewed merge.
+Delete the local `deploy_key`/`deploy_key.pub` files once they're in place —
+the private half only needs to exist as that GitHub secret from then on.
 
 ## First-time server bootstrap
 
@@ -179,54 +192,51 @@ snapshot rather than the current system — since corrected. If you're adding
 a *new* Chamber to an already-running server rather than bootstrapping from
 zero, see "Adding a new Chamber's infra" above instead.)
 
+Nothing here is cloned from git anymore — the server only ever receives
+files pushed by CI (see "Deploy: GitHub Actions → server" above), so
+bootstrap is: get the toolchain and SSH access in place, let one deploy
+populate `/srv/congress`, then do the parts that stay genuinely manual
+(units, Caddy, `.env` files) with real files to point at.
+
 ```
 sudo mkdir -p /srv/congress && sudo chown marin:marin /srv/congress
-ssh-keygen -t ed25519 -f ~/.ssh/congress_deploy_key -N "" -C "congress-vps-deploy"
-# add ~/.ssh/congress_deploy_key.pub as a repo deploy key with write access
-GIT_SSH_COMMAND="ssh -i ~/.ssh/congress_deploy_key -o IdentitiesOnly=yes" \
-  git clone git@github.com:marinprusac/Congress.git /srv/congress
-cd /srv/congress
-git config core.sshCommand "ssh -i ~/.ssh/congress_deploy_key -o IdentitiesOnly=yes"
-cp infra/deploy/pre-push-hook .git/hooks/pre-push && chmod +x .git/hooks/pre-push
 sudo corepack enable && corepack prepare pnpm@11.3.0 --activate
 sudo apt-get install -y build-essential python3   # better-sqlite3 native build
-pnpm install
+sudo apt-get install -y rsync                     # if not already present
 
-# build:web must run before build:vendor/build:remote (shared dist/, see
-# sync-deploy.sh's comment); build:vendor is Congress-only.
-pnpm --filter congress build:web
-pnpm --filter congress build:vendor
-for name in chamber-notes chamber-calendar chamber-documents chamber-tasks chamber-capitol; do
-  pnpm --filter "$name" build:web
-  pnpm --filter "$name" build:remote
-done
+# Set up the GitHub Actions deploy key + secrets exactly as in
+# "One-time setup (GitHub repo secrets)" above, then push to main (or
+# manually re-run the workflow from the Actions tab). This populates
+# /srv/congress via rsync and runs `pnpm install`. The workflow's final
+# step (restarting services) will fail on this very first run - there's
+# nothing to restart yet - that's expected; continue below.
 
-# Create every service's .env by hand (untracked) from its .env.example:
-# services/congress/.env, services/chamber-notes/.env, .../chamber-calendar/.env,
-# .../chamber-documents/.env, .../chamber-tasks/.env, .../chamber-capitol/.env.
-# Set NODE_ENV=production, the real production PORT
-# (8000/8011/8012/8013/8014/8015), one shared CONGRESS_INTERNAL_TOKEN across
-# all six files, and - for every Chamber - CAPITOL_URL=http://127.0.0.1:8000
+# Create every service's .env by hand (untracked) from the .env.example
+# rsync just delivered: services/congress/.env, services/chamber-notes/.env,
+# .../chamber-calendar/.env, .../chamber-documents/.env,
+# .../chamber-tasks/.env, .../chamber-capitol/.env, and so on for every
+# chamber-*/ directory present. Set NODE_ENV=production, the real
+# production PORT (8000/8011/8012/...), one shared CONGRESS_INTERNAL_TOKEN
+# across every file, and - for every Chamber - CAPITOL_URL=http://127.0.0.1:8000
 # (the .env.example default of :3000 is the dev value and is wrong here).
 # Congress's own .env additionally needs CONGRESS_MASTER_PASSWORD_HASH and
 # SESSION_SECRET (see .env.example).
 
+cd /srv/congress
 sudo cp infra/systemd/congress-*.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now congress-core congress-chamber-notes \
-  congress-chamber-calendar congress-chamber-documents congress-chamber-tasks \
-  congress-chamber-capitol
+sudo systemctl enable --now $(for d in services/chamber-*/; do echo "congress-$(basename "$d")"; done) congress-core
 
-# Passwordless sudo for the sync timer's restarts - see "Process management"
-# above for the exact sudoers line; sync-deploy.sh will fail at the restart
-# step without it.
+# Passwordless sudo for the deploy workflow's restarts - see "Process
+# management" above for the exact sudoers line; remote-apply.sh will fail
+# at the restart step without it.
 
-sudo cp infra/systemd/congress-sync.* /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now congress-sync.timer
 # add congress.marinprusac.com A record -> this VPS's public IP in Hetzner DNS
 sudo cp infra/caddy/congress.caddy /etc/caddy/
 echo 'import /etc/caddy/congress.caddy' | sudo tee -a /etc/caddy/Caddyfile
 sudo caddy validate --config /etc/caddy/Caddyfile
 sudo systemctl reload caddy
+
+# Re-run the deploy workflow (or push an empty commit) now that units exist
+# - this time the restart step succeeds too.
 ```

@@ -1,17 +1,15 @@
 #!/bin/sh
 # Runs typecheck + tests before a push is allowed, for the developer machine.
 #
-# Pushing to main IS the deploy here - the VPS polls origin/main every 30s and
-# fast-forwards, rebuilds and restarts (see infra/deploy/sync.sh). There is no
-# CI stage in between, so this hook is the only thing standing between a broken
-# commit and production.
+# Pushing to main IS the deploy here - a push triggers the GitHub Actions
+# workflow (.github/workflows/deploy.yml), which builds, tests, and pushes
+# the result to the VPS over rsync+SSH. That workflow re-runs these same two
+# checks as the actual deploy gate, so this hook is fast local feedback, not
+# the only thing standing between a broken commit and production - but it
+# still catches most breakage before a push even leaves the laptop.
 #
-# This is the laptop counterpart to pre-push-hook, which is the *server* clone's
-# hook and blocks pushes to main entirely. They are separate files because they
-# solve different problems; a machine only ever wants one of them.
-#
-# Like that one, this file is checked in as the source of truth rather than run
-# by git from here. Install with:
+# This file is checked in as the source of truth rather than run by git from
+# here. Install with:
 #   cp infra/deploy/pre-push-hook-checks .git/hooks/pre-push && chmod +x .git/hooks/pre-push
 #
 # To push anyway (a genuinely known-broken WIP branch), use `git push --no-verify`.

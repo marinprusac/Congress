@@ -11,8 +11,8 @@ export default defineConfig({
   root,
   // Baked into both the app bundle and (via vite-plugin-pwa's injectManifest
   // build, which reuses this same `define`) the service worker - see
-  // sw.ts's own comment for why. Set by infra/deploy/sync-deploy.sh from the
-  // deploy's git sha; "dev" outside that pipeline.
+  // sw.ts's own comment for why. Set by infra/deploy/build-artifacts.sh from
+  // the deploy's git sha; "dev" outside that pipeline.
   define: {
     __BUILD_ID__: JSON.stringify(process.env.VITE_BUILD_ID ?? "dev"),
   },
