@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { CalendarEvent, CreateEventRequest, ListEventsResponse, UpdateEventRequest } from "./types.js";
+import type { CalendarEvent, CreateEventRequest, ListEventsResponse, MoveEventRequest, UpdateEventRequest } from "./types.js";
 import {
   listEvents as listGoogleEvents,
   searchEvents as searchGoogleEvents,
@@ -23,8 +23,8 @@ import {
 import { combineRankedEventSearch } from "./eventSearch.js";
 import { publishEvent } from "./events.js";
 import { pushExhibitSync } from "./exhibits.js";
-import { deleteManualRefsForEvent } from "./refs.js";
-import { setLocalNotAttending, deleteLocalAttendance } from "./attendance.js";
+import { deleteManualRefsForEvent, moveManualRefs } from "./refs.js";
+import { setLocalNotAttending, deleteLocalAttendance, moveLocalAttendance } from "./attendance.js";
 
 // The one layer that sits *above* both a Google-backed event
 // (google/events.ts) and a locally-stored one (localEvents.ts), merging
@@ -127,6 +127,64 @@ export async function deleteEvent(accountId: number, calendarId: string, eventId
     return;
   }
   return deleteGoogleEvent(accountId, calendarId, eventId);
+}
+
+// Changes which store is the source of truth for an event - moves it onto a
+// different Google account/calendar, or onto/off of this Chamber's own local
+// storage. Implemented as create-at-target then delete-at-source (via this
+// same module's own createEvent/deleteEvent, so each still gets its usual
+// exhibit-sync/event-publish treatment) rather than Google's own
+// events.move, which only ever covers a same-account calendar change anyway
+// and wouldn't help at all for a local<->Google move - one dispatch that
+// handles every direction uniformly is worth the extra round trip. The
+// event's exhibit id necessarily changes with it (ids are scoped to the
+// calendar/account that stores the event), so this event's own manual refs
+// and any local "not attending" note are re-keyed onto the new id before the
+// old one is torn down; anything *pointing at* this event from elsewhere
+// (a note's own wikilink, say) is not rewritten, the same limitation a
+// delete-and-recreate would have - there is no rename propagation anywhere
+// in the exhibit system.
+export async function moveEvent(
+  accountId: number,
+  calendarId: string,
+  eventId: string,
+  target: MoveEventRequest
+): Promise<CalendarEvent> {
+  const source = await getEvent(accountId, calendarId, eventId);
+  if (!source.editable) {
+    throw new InvalidEventRequestError(`"${source.title}" can't be moved - it's managed by its organizer, not this account.`);
+  }
+
+  const targetIsLocal = target.accountId === undefined;
+  const sourceIsLocal = isLocalEventKey(accountId, calendarId);
+  const sameCalendar = !targetIsLocal && !sourceIsLocal && target.accountId === accountId && target.calendarId === calendarId;
+  if (sameCalendar || (targetIsLocal && sourceIsLocal)) {
+    throw new InvalidEventRequestError("This event is already stored there.");
+  }
+
+  const created = await createEvent({
+    accountId: target.accountId,
+    calendarId: target.calendarId,
+    timeZone: target.timeZone,
+    title: source.title,
+    description: source.description ?? undefined,
+    location: source.location ?? undefined,
+    descriptionRich: source.descriptionRich ?? undefined,
+    locationRich: source.locationRich ?? undefined,
+    allDay: source.allDay,
+    start: source.start,
+    end: source.end,
+  });
+
+  const oldExhibitId = toExhibitId(accountId, calendarId, eventId);
+  const newExhibitId = toExhibitId(created.accountId, created.calendarId, created.id);
+  moveManualRefs(oldExhibitId, newExhibitId);
+  moveLocalAttendance(oldExhibitId, newExhibitId);
+  await resyncEventExhibit(newExhibitId);
+
+  await deleteEvent(accountId, calendarId, eventId);
+
+  return created;
 }
 
 // notAttending on a local event is always just the same private local note

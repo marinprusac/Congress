@@ -11,7 +11,7 @@ import {
   useAutosave,
 } from "@congress/congress-ui";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
-import { fetchEvent, updateEvent, deleteEvent, setEventAttendance } from "@/lib/api";
+import { fetchEvent, updateEvent, moveEvent, deleteEvent, setEventAttendance } from "@/lib/api";
 import { addMinutesToLocalInput, getBrowserTimeZone, minutesBetween, toDatetimeLocalInput } from "@/lib/datetime";
 import { toExhibitId, isLocalEvent } from "@/lib/exhibits";
 import type { AttendanceStatus, CalendarEvent } from "../../../src/types";
@@ -86,6 +86,38 @@ export function EventViewPage() {
     },
   });
 
+  // Changing the Calendar field is a structural move (see calendar.ts's
+  // moveEvent), not an ordinary field edit - fired immediately on selection
+  // rather than folded into the debounced autosave below, and the event's id
+  // changes with it, so the only way to land on the moved event afterward is
+  // a navigate to its new URL. currentCalendarKeyRef tracks the value last
+  // confirmed by the server so a fresh load (including the one after this
+  // mutation's own navigate) is never mistaken for a user-initiated move.
+  const currentCalendarKeyRef = useRef<string | null>(null);
+  const moveMutation = useMutation({
+    mutationFn: (calendarKey: string) => {
+      const [targetAccountId, targetCalendarId] = calendarKey
+        ? (calendarKey.split("::") as [string, string])
+        : [undefined, undefined];
+      return moveEvent(Number(accountId), calendarId!, eventId!, {
+        accountId: targetAccountId !== undefined ? Number(targetAccountId) : undefined,
+        calendarId: targetCalendarId,
+        timeZone: targetAccountId !== undefined ? getBrowserTimeZone() : undefined,
+      });
+    },
+    onSuccess: (moved) => {
+      queryClient.invalidateQueries({ queryKey: ["events"] });
+      navigate(
+        resolveChamberPath(
+          `/e/${moved.accountId}/${encodeURIComponent(moved.calendarId)}/${encodeURIComponent(moved.id)}`,
+          "calendar",
+          shellHosted
+        ),
+        { replace: true }
+      );
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: () => deleteEvent(Number(accountId), calendarId!, eventId!),
     onSuccess: () => {
@@ -121,9 +153,21 @@ export function EventViewPage() {
       const formValues = toFormValues(event);
       setValues(formValues);
       markSaved(formValues);
+      currentCalendarKeyRef.current = formValues.calendarKey;
       initializedEventKeyRef.current = eventKey;
     }
   }, [event, eventKey, markSaved]);
+
+  // Intercepted rather than folded into setValues directly - see
+  // moveMutation above for why a Calendar change needs its own, immediate
+  // path instead of waiting on the debounced autosave.
+  function handleFormChange(next: EventFormValues) {
+    if (next.calendarKey !== currentCalendarKeyRef.current && !moveMutation.isPending) {
+      moveMutation.mutate(next.calendarKey);
+      return;
+    }
+    setValues(next);
+  }
 
   const exhibitId =
     accountId && calendarId && eventId ? toExhibitId(Number(accountId), calendarId, eventId) : null;
@@ -144,8 +188,10 @@ export function EventViewPage() {
         />
       </div>
 
-      {updateMutation.isError && (
-        <p className="mb-4 font-mono text-sm text-alert">{(updateMutation.error as Error).message}</p>
+      {(updateMutation.isError || moveMutation.isError) && (
+        <p className="mb-4 font-mono text-sm text-alert">
+          {((moveMutation.error ?? updateMutation.error) as Error).message}
+        </p>
       )}
 
       <ExhibitLinksLayout
@@ -166,7 +212,7 @@ export function EventViewPage() {
           </ExhibitActionBar>
         }
       >
-        <EventForm values={values} onChange={setValues} calendarLocked readOnly={readOnly} />
+        <EventForm values={values} onChange={handleFormChange} calendarLocked={moveMutation.isPending} readOnly={readOnly} />
 
         <div className="mt-6">
           <label className="mb-1 block font-mono text-xs uppercase tracking-wide text-dust">

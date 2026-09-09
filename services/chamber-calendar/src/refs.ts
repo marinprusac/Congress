@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { createManualRefs } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
 import { eventRefs } from "./db/schema.js";
@@ -34,3 +35,10 @@ export function removeManualRef(exhibitId: string, targetExhibitId: string): boo
 }
 
 export const deleteManualRefsForEvent = manualRefs.deleteManualRefsForOwner;
+
+// Re-keys an event's manual refs onto its new exhibit id after a move (see
+// calendar.ts's moveEvent) - a rename in place rather than list+delete+re-add,
+// since the new id can never already have rows of its own to conflict with.
+export function moveManualRefs(fromExhibitId: string, toExhibitId: string): void {
+  db.update(eventRefs).set({ exhibitId: toExhibitId }).where(eq(eventRefs.exhibitId, fromExhibitId)).run();
+}

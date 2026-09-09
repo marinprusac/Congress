@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult as textResult } from "@congress/chamber-kit";
 import { listAccounts } from "../google/accounts.js";
-import { listEvents, searchEvents, createEvent, updateEvent, deleteEvent, setEventAttendance } from "../calendar.js";
+import { listEvents, searchEvents, createEvent, updateEvent, moveEvent, deleteEvent, setEventAttendance } from "../calendar.js";
 
 export function registerTools(server: McpServer) {
   server.registerTool(
@@ -78,6 +78,31 @@ export function registerTools(server: McpServer) {
     },
     async ({ accountId, calendarId, eventId, ...input }) =>
       textResult(await updateEvent(accountId, calendarId, eventId, input))
+  );
+
+  server.registerTool(
+    "move_event",
+    {
+      title: "Move Event",
+      description:
+        "Change which calendar is the source of truth for an existing event. Pass targetAccountId+targetCalendarId+timeZone to move it onto a connected Google account's calendar, or omit all three to detach it and store it only in this Chamber. The event keeps its content but gets a new id (ids are scoped to the calendar/account storing the event), and can only be moved if it's editable (i.e. this account organizes it).",
+      inputSchema: {
+        accountId: z.number().int(),
+        calendarId: z.string().min(1),
+        eventId: z.string().min(1),
+        targetAccountId: z.number().int().optional(),
+        targetCalendarId: z.string().min(1).optional(),
+        timeZone: z.string().min(1).optional(),
+      },
+    },
+    async ({ accountId, calendarId, eventId, targetAccountId, targetCalendarId, timeZone }) =>
+      textResult(
+        await moveEvent(accountId, calendarId, eventId, {
+          accountId: targetAccountId,
+          calendarId: targetCalendarId,
+          timeZone,
+        })
+      )
   );
 
   server.registerTool(

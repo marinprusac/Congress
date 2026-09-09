@@ -5,6 +5,7 @@ import {
   setCalendarSelectionRequestSchema,
   createEventRequestSchema,
   updateEventRequestSchema,
+  moveEventRequestSchema,
   setEventAttendanceRequestSchema,
 } from "./types.js";
 import {
@@ -30,6 +31,7 @@ import {
   getEvent,
   createEvent,
   updateEvent,
+  moveEvent,
   deleteEvent,
   setEventAttendance,
   resyncEventExhibit,
@@ -184,6 +186,21 @@ app.patch("/api/events/:accountId/:calendarId/:eventId", async (c) => {
   if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   try {
     return c.json(await updateEvent(accountId, calendarId, eventId, parsed.data));
+  } catch (err) {
+    return mapError(c, err);
+  }
+});
+
+app.post("/api/events/:accountId/:calendarId/:eventId/move", async (c) => {
+  const accountId = Number(c.req.param("accountId"));
+  const calendarId = decodeURIComponent(c.req.param("calendarId"));
+  const eventId = decodeURIComponent(c.req.param("eventId"));
+  if (!Number.isInteger(accountId)) return c.json({ error: "invalid_account_id" }, 400);
+  const body = await c.req.json().catch(() => null);
+  const parsed = moveEventRequestSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  try {
+    return c.json(await moveEvent(accountId, calendarId, eventId, parsed.data));
   } catch (err) {
     return mapError(c, err);
   }

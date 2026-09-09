@@ -47,6 +47,15 @@ export function deleteLocalAttendance(exhibitId: string): void {
   db.delete(eventAttendance).where(eq(eventAttendance.exhibitId, exhibitId)).run();
 }
 
+// Carries a "not attending" note over to an event's new exhibit id after a
+// move (see calendar.ts's moveEvent) - a no-op when there was none to begin
+// with, which is the common case for a real Google invitation (its "not
+// attending" comes from responseStatus, not this table - see
+// resolveAttendance above).
+export function moveLocalAttendance(fromExhibitId: string, toExhibitId: string): void {
+  db.update(eventAttendance).set({ exhibitId: toExhibitId }).where(eq(eventAttendance.exhibitId, fromExhibitId)).run();
+}
+
 // Combines Google's own RSVP (when this event is an invitation) with the
 // local-only note (when it isn't) into the one field CalendarEvent exposes.
 export function resolveAttendance(

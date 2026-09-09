@@ -7,6 +7,7 @@ import type {
   ListEventsResponse,
   CreateEventRequest,
   UpdateEventRequest,
+  MoveEventRequest,
   SetEventAttendanceRequest,
 } from "../../../src/types";
 import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
@@ -91,6 +92,22 @@ export function updateEvent(
     `${API_BASE}/events/${accountId}/${encodeURIComponent(calendarId)}/${encodeURIComponent(eventId)}`,
     {
       method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }
+  ).then((res) => json(res));
+}
+
+export function moveEvent(
+  accountId: number,
+  calendarId: string,
+  eventId: string,
+  input: MoveEventRequest
+): Promise<CalendarEvent> {
+  return fetch(
+    `${API_BASE}/events/${accountId}/${encodeURIComponent(calendarId)}/${encodeURIComponent(eventId)}/move`,
+    {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }

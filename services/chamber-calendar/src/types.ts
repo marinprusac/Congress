@@ -156,6 +156,29 @@ export const updateEventRequestSchema = z.object({
 });
 export type UpdateEventRequest = z.infer<typeof updateEventRequestSchema>;
 
+// Changes which store is the source of truth for an existing event - same
+// accountId/calendarId/timeZone shape and "both or neither" rule as
+// createEventRequestSchema, just without the content fields (the event's own
+// title/description/etc. travel with it as-is; see calendar.ts's moveEvent).
+// The event's id necessarily changes - ids are scoped to the calendar/account
+// that stores the event, Google's included - so the caller follows up with
+// the id the response reports rather than reusing the one just moved.
+export const moveEventRequestSchema = z
+  .object({
+    accountId: z.number().int().optional(),
+    calendarId: z.string().min(1).optional(),
+    timeZone: z.string().min(1).optional(),
+  })
+  .refine((v) => (v.accountId === undefined) === (v.calendarId === undefined), {
+    message: "accountId and calendarId must both be provided (a Google calendar), or both left out (local).",
+    path: ["calendarId"],
+  })
+  .refine((v) => v.accountId === undefined || v.timeZone !== undefined, {
+    message: "timeZone is required when moving an event onto a Google calendar.",
+    path: ["timeZone"],
+  });
+export type MoveEventRequest = z.infer<typeof moveEventRequestSchema>;
+
 // notAttending:true on an invitation (see eventAttendanceSchema) declines the
 // real Google invite (visible to the organizer/other guests, exactly like
 // clicking "No" in Google Calendar); on any other event it just sets the
