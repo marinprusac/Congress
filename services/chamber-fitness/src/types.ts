@@ -64,17 +64,21 @@ export type UpdateSettingsRequest = z.infer<typeof updateSettingsRequestSchema>;
 export const healthMetricTypeSchema = z.enum(["weight", "vo2Max", "activeEnergy", "restingEnergy", "sleepAsleep"]);
 export type HealthMetricType = z.infer<typeof healthMetricTypeSchema>;
 
-// The wire format is the Health Auto Export iOS app's own REST API export
-// shape (its "Automations" feature POSTs this directly, on a schedule, with
-// a custom header we use for auth - see health/ingest.ts), not something we
-// designed: `{"data": {"metrics": [{name, units, data: [...]}], ...}}`.
-// Each metric entry's own fields vary by metric (a quantity sample carries
-// `qty`/`date`/`source`; sleep_analysis carries `totalSleep`/`sleepStart`/
-// `sleepEnd`/... instead) and the export always includes whatever the owner
-// has enabled in the app, not just what we track - so entries are validated
-// loosely here and interpreted defensively in health/normalize.ts, the same
-// "tolerant of an external service's own field-name choices" spirit as
-// hevy/normalize.ts.
+// The wire format is the Health Auto Export iOS app's own export shape, not
+// something we designed: `{"metrics": [{name, units, data: [...]}], ...}`,
+// each metric entry's own fields varying by metric (a quantity sample
+// carries `qty`/`date`/`source`; sleep_analysis carries `totalSleep`/
+// `sleepStart`/`sleepEnd`/... instead) - the export always includes
+// whatever the owner has enabled in the app, not just what we track, so
+// entries are validated loosely here and interpreted defensively in
+// health/normalize.ts, the same "tolerant of an external service's own
+// field-name choices" spirit as hevy/normalize.ts. The app's in-app REST
+// Automation (a paid-tier feature) wraps this in an outer `{"data": {...}}`
+// envelope; its Shortcuts export action - the only option on the Basic
+// tier, called from a hand-built Shortcut instead - has been observed
+// sending the same content unwrapped. The preprocess step below accepts
+// either, unwrapping `data` when present rather than requiring one specific
+// envelope.
 const healthAutoExportEntrySchema = z.record(z.string(), z.unknown());
 
 const healthAutoExportMetricSchema = z.object({
@@ -83,16 +87,17 @@ const healthAutoExportMetricSchema = z.object({
   data: z.array(healthAutoExportEntrySchema),
 });
 
-export const healthIngestRequestSchema = z
+const healthAutoExportBodySchema = z
   .object({
-    data: z
-      .object({
-        metrics: z.array(healthAutoExportMetricSchema).default([]),
-      })
-      .passthrough(),
+    metrics: z.array(healthAutoExportMetricSchema).default([]),
   })
   .passthrough();
-export type HealthIngestRequest = z.infer<typeof healthIngestRequestSchema>;
+
+export const healthIngestRequestSchema = z.preprocess((raw) => {
+  if (raw && typeof raw === "object" && "data" in raw) return (raw as { data: unknown }).data;
+  return raw;
+}, healthAutoExportBodySchema);
+export type HealthIngestRequest = z.infer<typeof healthAutoExportBodySchema>;
 
 export const healthIngestResultSchema = z.object({
   accepted: z.number().int(),

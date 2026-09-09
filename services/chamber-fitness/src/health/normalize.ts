@@ -49,7 +49,7 @@ export function normalizeHealthAutoExportPayload(payload: HealthIngestRequest): 
   const samples: NormalizedHealthSample[] = [];
   let skipped = 0;
 
-  for (const metric of payload.data.metrics) {
+  for (const metric of payload.metrics) {
     // Sleep Analysis entries are pre-aggregated per night by the app itself
     // (totalSleep already excludes in-bed-but-awake time, regardless of
     // whether the source device reported sleep stages or just one lump

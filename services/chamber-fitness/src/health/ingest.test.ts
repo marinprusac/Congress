@@ -125,22 +125,44 @@ describe("POST /api/health/ingest route", () => {
     expect(res.status).toBe(401);
   });
 
-  it("400s a schema-invalid body", async () => {
+  it("200s a body with no metrics key at all - not an error, just nothing to ingest", async () => {
     db.insert(settings).values({ id: 1, healthIngestToken: "secret" }).run();
     const res = await app.request("/api/health/ingest", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Health-Ingest-Token": "secret" },
-      body: JSON.stringify({ notData: true }),
+      body: JSON.stringify({ somethingElse: true }),
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ accepted: 0, skipped: 0 });
+  });
+
+  it("400s a body where metrics is genuinely malformed", async () => {
+    db.insert(settings).values({ id: 1, healthIngestToken: "secret" }).run();
+    const res = await app.request("/api/health/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Health-Ingest-Token": "secret" },
+      body: JSON.stringify({ metrics: "not-an-array" }),
     });
     expect(res.status).toBe(400);
   });
 
-  it("200s a valid export with the correct accepted/skipped counts", async () => {
+  it("200s a valid export wrapped in the in-app-automation's {data: {...}} envelope", async () => {
     db.insert(settings).values({ id: 1, healthIngestToken: "secret" }).run();
     const res = await app.request("/api/health/ingest", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Health-Ingest-Token": "secret" },
       body: JSON.stringify(haePayload()),
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ accepted: 1, skipped: 0 });
+  });
+
+  it("200s the same export unwrapped, as the Shortcuts export action (Basic-tier path) sends it", async () => {
+    db.insert(settings).values({ id: 1, healthIngestToken: "secret" }).run();
+    const res = await app.request("/api/health/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Health-Ingest-Token": "secret" },
+      body: JSON.stringify(haePayload().data),
     });
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ accepted: 1, skipped: 0 });
