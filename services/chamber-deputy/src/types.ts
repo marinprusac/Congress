@@ -59,6 +59,11 @@ export const directiveSummarySchema = z.object({
   // pages' schedule display and progress ring; recomputed on every read
   // rather than cached, since it depends on "now" relative to lastRunAt.
   nextRunAt: z.string().nullable(),
+  // Derived (scheduling.ts#previousOccurrence) - one schedule period before
+  // nextRunAt, null except for "daily"/"weekly". The progress ring anchors
+  // its own cycle-start here instead of lastRunAt/createdAt - see
+  // directives.ts#scheduleCycleStart for why.
+  scheduleCycleStart: z.string().nullable(),
   lastRunAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),

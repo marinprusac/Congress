@@ -5,7 +5,7 @@ import { db } from "./db/client.js";
 import { directives } from "./db/schema.js";
 import { toExhibitId, parseDirectiveId, pushExhibitSync } from "./exhibits.js";
 import { listManualRefs, addManualRef, removeManualRef, deleteManualRefsForDirective } from "./refs.js";
-import { nextRunAt as computeNextRunAt } from "./scheduling.js";
+import { nextRunAt as computeNextRunAt, previousOccurrence } from "./scheduling.js";
 
 // The set of Exhibits a directive points at is the union of what's embedded
 // in its body ("[[" tokens) and what was added explicitly via the
@@ -65,8 +65,37 @@ function directiveNextRunAt(row: typeof directives.$inferSelect): number | null 
   );
 }
 
+// The wall-clock instant the directive's *current* daily/weekly cycle began
+// at - one schedule period before `nextRunAtMs` ("yesterday at 9am" for a
+// "daily at 9am" directive) - null for "interval"/"event"/unscheduled,
+// where there's no fixed wall-clock slot to speak of. Deliberately not
+// `lastRunAt`/`createdAt`: a directive's actual run history can lag behind
+// its own schedule (a manual run, a catch-up after downtime, or simply
+// never having fired yet all leave `lastRunAt` short of the ideal slot), but
+// "daily at 9am" cycles run 9am-to-9am regardless - the progress ring should
+// reflect that rhythm, not whichever timestamp `lastRunAt` last happened to
+// land on. See directiveProgress.ts (frontend) for where this anchors the
+// ring instead of lastRunAt/createdAt.
+function scheduleCycleStart(row: typeof directives.$inferSelect, nextRunAtMs: number | null): number | null {
+  if (nextRunAtMs === null) return null;
+  if (row.scheduleType === "daily") {
+    return previousOccurrence(row.scheduleHour as number, row.scheduleMinute as number, row.scheduleTimeZone as string, nextRunAtMs);
+  }
+  if (row.scheduleType === "weekly") {
+    return previousOccurrence(
+      row.scheduleHour as number,
+      row.scheduleMinute as number,
+      row.scheduleTimeZone as string,
+      nextRunAtMs,
+      row.scheduleDayOfWeek as number
+    );
+  }
+  return null;
+}
+
 function toSummary(row: typeof directives.$inferSelect): DirectiveSummary {
   const nextRunAtMs = directiveNextRunAt(row);
+  const cycleStartMs = scheduleCycleStart(row, nextRunAtMs);
   return {
     id: row.id,
     title: row.title,
@@ -80,6 +109,7 @@ function toSummary(row: typeof directives.$inferSelect): DirectiveSummary {
     scheduleTimeZone: row.scheduleTimeZone,
     triggerEventType: row.triggerEventType,
     nextRunAt: nextRunAtMs !== null ? new Date(nextRunAtMs).toISOString() : null,
+    scheduleCycleStart: cycleStartMs !== null ? new Date(cycleStartMs).toISOString() : null,
     lastRunAt: row.lastRunAt ? row.lastRunAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

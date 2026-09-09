@@ -111,7 +111,7 @@ export function DirectivesListPage() {
           !isError &&
           data?.map((directive) => {
             const running = runningDirectiveId === directive.id || (runMutation.isPending && runMutation.variables === directive.id);
-            const fraction = directiveProgressFraction(directive.lastRunAt, directive.nextRunAt, directive.createdAt, now);
+            const fraction = directiveProgressFraction(directive.lastRunAt, directive.nextRunAt, directive.createdAt, directive.scheduleCycleStart, now);
             return (
               <div key={directive.id} className="flex items-stretch gap-1 border-b border-dust">
                 <Link

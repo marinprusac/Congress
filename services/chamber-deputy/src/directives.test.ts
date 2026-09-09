@@ -19,6 +19,7 @@ import {
   listDueScheduledDirectives,
   nextScheduledWakeDelayMs,
   listEventTriggeredDirectives,
+  listDirectives,
 } from "./directives.js";
 
 beforeAll(() => runMigrations(migrationsDir("chamber-deputy")));
@@ -91,6 +92,38 @@ describe("listDueScheduledDirectives / nextScheduledWakeDelayMs", () => {
     // than a fresh 60-minute interval directive's own full hour wait,
     // except in the one-minute window right before midnight - comfortably
     // true for this assertion regardless of when the suite runs.
+  });
+});
+
+describe("scheduleCycleStart", () => {
+  it("is one day before nextRunAt for a never-run daily directive - not createdAt", async () => {
+    // Created well before 09:00 UTC today, so nextRunAt lands later today -
+    // the old createdAt-anchored progress math would've made this cycle
+    // only a few hours long instead of a full day.
+    const createdAt = new Date("2026-01-01T01:00:00.000Z");
+    insertDirective({ scheduleType: "daily", scheduleHour: 9, scheduleMinute: 0, scheduleTimeZone: "UTC", createdAt, updatedAt: createdAt });
+    const [directive] = await listDirectives();
+    expect(directive?.nextRunAt).toBe("2026-01-01T09:00:00.000Z");
+    expect(directive?.scheduleCycleStart).toBe("2025-12-31T09:00:00.000Z");
+  });
+
+  it("stays anchored to the schedule's own slot even after an off-schedule manual run", async () => {
+    // lastRunAt is a manual run at a time unrelated to the 09:00 schedule -
+    // scheduleCycleStart should still reflect the true previous 09:00 slot,
+    // not lastRunAt.
+    const lastRunAt = new Date("2026-01-01T15:00:00.000Z");
+    insertDirective({ scheduleType: "daily", scheduleHour: 9, scheduleMinute: 0, scheduleTimeZone: "UTC", lastRunAt });
+    const [directive] = await listDirectives();
+    expect(directive?.nextRunAt).toBe("2026-01-02T09:00:00.000Z");
+    expect(directive?.scheduleCycleStart).toBe("2026-01-01T09:00:00.000Z");
+  });
+
+  it("is null for interval, event, and unscheduled directives", async () => {
+    insertDirective({ title: "interval", scheduleType: "interval", intervalMs: 60_000 });
+    insertDirective({ title: "event", scheduleType: "event", triggerEventType: "tasks.overdue" });
+    insertDirective({ title: "manual", scheduleType: null });
+    const result = await listDirectives();
+    expect(result.every((d) => d.scheduleCycleStart === null)).toBe(true);
   });
 });
 

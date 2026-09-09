@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextRunAt, type DirectiveScheduleFields } from "./scheduling.js";
+import { nextRunAt, previousOccurrence, type DirectiveScheduleFields } from "./scheduling.js";
 
 const CREATED_AT = new Date("2026-01-01T00:00:00.000Z").getTime();
 
@@ -94,5 +94,35 @@ describe("nextRunAt", () => {
       CREATED_AT
     );
     expect(new Date(due as number).toISOString()).toBe("2026-01-08T09:00:00.000Z");
+  });
+});
+
+describe("previousOccurrence", () => {
+  it("daily: is exactly one day before the given instant's own slot", () => {
+    const due = new Date("2026-01-02T09:00:00.000Z").getTime();
+    const prev = previousOccurrence(9, 0, "UTC", due);
+    expect(new Date(prev).toISOString()).toBe("2026-01-01T09:00:00.000Z");
+  });
+
+  it("daily: strictly before the pivot, so an exact-match instant rolls back a full day", () => {
+    const exactMatch = new Date("2026-01-01T09:00:00.000Z").getTime();
+    const prev = previousOccurrence(9, 0, "UTC", exactMatch);
+    expect(new Date(prev).toISOString()).toBe("2025-12-31T09:00:00.000Z");
+  });
+
+  it("weekly: lands on the requested day-of-week going backward", () => {
+    // 2026-01-08 is a Thursday (weekday 4) - the previous Wednesday (3) is 2026-01-07.
+    const due = new Date("2026-01-08T09:00:00.000Z").getTime();
+    const prev = previousOccurrence(9, 0, "UTC", due, 3);
+    const result = new Date(prev);
+    expect(result.getUTCDay()).toBe(3);
+    expect(result.toISOString()).toBe("2026-01-07T09:00:00.000Z");
+  });
+
+  it("is the exact inverse of nextRunAt's own search - chains back to the original pivot", () => {
+    const pivot = new Date("2026-03-15T09:00:00.000Z").getTime();
+    const forward = nextRunAt(fields({ scheduleType: "daily", scheduleHour: 9, scheduleMinute: 0, scheduleTimeZone: "UTC" }), pivot, CREATED_AT);
+    const back = previousOccurrence(9, 0, "UTC", forward as number);
+    expect(back).toBe(pivot);
   });
 });

@@ -22,6 +22,7 @@ const directive: DirectiveSummary = {
   scheduleTimeZone: null,
   triggerEventType: null,
   nextRunAt: null,
+  scheduleCycleStart: null,
   lastRunAt: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",

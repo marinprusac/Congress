@@ -64,18 +64,24 @@ function calendarDateInZone(afterMs: number, timeZone: string): CalendarDate {
   return { year: parts.year, month: parts.month, day: parts.day };
 }
 
-// Day-by-day search for the next instant, strictly after `afterMs`, whose
-// local wall clock in `timeZone` reads `hour:minute` - and, when
-// `dayOfWeek` is given (0 Sunday - 6 Saturday), additionally falls on that
-// weekday. A calendar date's day-of-week is time-zone independent once its
-// Y/M/D is fixed (day N is the same weekday everywhere), so it's read via
-// plain UTC arithmetic on the candidate date rather than another zoned
-// lookup. Bounded to 8 days - more than enough margin for a weekly search
-// (worst case 7 days) plus one for DST-transition edge cases.
-function nextOccurrence(hour: number, minute: number, timeZone: string, afterMs: number, dayOfWeek?: number): number {
-  const anchor = calendarDateInZone(afterMs, timeZone);
+// Day-by-day search, walking forward or backward from `pivotMs`'s own
+// calendar day, for the nearest instant whose local wall clock in
+// `timeZone` reads `hour:minute` - and, when `dayOfWeek` is given (0 Sunday
+// - 6 Saturday), additionally falls on that weekday - that's strictly after
+// `pivotMs` (`direction: "forward"`) or strictly before it (`"backward"`).
+// A calendar date's day-of-week is time-zone independent once its Y/M/D is
+// fixed (day N is the same weekday everywhere), so it's read via plain UTC
+// arithmetic on the candidate date rather than another zoned lookup.
+// Bounded to 8 days - more than enough margin for a weekly search (worst
+// case 7 days) plus one for DST-transition edge cases. Shared by
+// nextOccurrence (a directive's own due-time) and previousOccurrence (the
+// progress ring's cycle-start anchor, see directives.ts#toSummary) - same
+// math, opposite direction.
+function searchOccurrence(hour: number, minute: number, timeZone: string, pivotMs: number, direction: "forward" | "backward", dayOfWeek?: number): number {
+  const anchor = calendarDateInZone(pivotMs, timeZone);
+  const step = direction === "forward" ? 1 : -1;
   for (let offset = 0; offset <= 8; offset++) {
-    const candidateUtcMidnight = Date.UTC(anchor.year, anchor.month - 1, anchor.day + offset);
+    const candidateUtcMidnight = Date.UTC(anchor.year, anchor.month - 1, anchor.day + offset * step);
     const candidate = new Date(candidateUtcMidnight);
     if (dayOfWeek !== undefined && candidate.getUTCDay() !== dayOfWeek) continue;
     const instant = zonedWallClockToUtc(
@@ -84,9 +90,22 @@ function nextOccurrence(hour: number, minute: number, timeZone: string, afterMs:
       minute,
       timeZone
     );
-    if (instant > afterMs) return instant;
+    if (direction === "forward" ? instant > pivotMs : instant < pivotMs) return instant;
   }
-  throw new Error(`nextOccurrence: no matching day found within search window for ${timeZone} ${hour}:${minute} dayOfWeek=${dayOfWeek}`);
+  throw new Error(`searchOccurrence: no matching day found within search window for ${timeZone} ${hour}:${minute} dayOfWeek=${dayOfWeek}`);
+}
+
+function nextOccurrence(hour: number, minute: number, timeZone: string, afterMs: number, dayOfWeek?: number): number {
+  return searchOccurrence(hour, minute, timeZone, afterMs, "forward", dayOfWeek);
+}
+
+// The occurrence immediately before `beforeMs` - one schedule period back.
+// Used to anchor the progress ring's "current cycle" for daily/weekly
+// directives at the true previous wall-clock slot ("yesterday at 9am")
+// rather than at whatever `lastRunAt`/`createdAt` happen to be - see
+// directives.ts#toSummary for why those two can't be trusted for this.
+export function previousOccurrence(hour: number, minute: number, timeZone: string, beforeMs: number, dayOfWeek?: number): number {
+  return searchOccurrence(hour, minute, timeZone, beforeMs, "backward", dayOfWeek);
 }
 
 // Every timestamp (ms since epoch) this directive's own timer should next
