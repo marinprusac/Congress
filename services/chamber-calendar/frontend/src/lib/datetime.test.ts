@@ -120,6 +120,76 @@ describe("buildAgendaTimeline - day visibility", () => {
   });
 });
 
+describe("buildAgendaTimeline - overnight events", () => {
+  const windowStartMs = new Date("2030-01-01T00:00:00").getTime();
+  const windowEndMs = new Date("2030-01-04T00:00:00").getTime(); // Jan 1, 2, 3
+  const window = { nowMs: windowStartMs - 1, windowStartMs, windowEndMs };
+
+  it("attaches the crossed day's header to the event's own block instead of severing it into a following gap", () => {
+    const events = [
+      // 10pm Jan 1 -> 2am Jan 2 - nothing else on Jan 2 or Jan 3.
+      makeEvent({ start: "2030-01-01T22:00:00", end: "2030-01-02T02:00:00" }),
+    ];
+
+    const timeline = buildAgendaTimeline(events, window);
+
+    // Jan 2's header never appears as its own standalone caption - it's
+    // riding inside the overnight event's own block instead.
+    const dateEntries = timeline.filter((e): e is AgendaDateEntry => e.kind === "date");
+    expect(dateEntries.map((e) => e.key)).toEqual(["date-2030-01-01"]);
+
+    const cluster = timeline.find((e): e is AgendaClusterEntry => e.kind === "cluster")!;
+    expect(cluster.blocks).toHaveLength(1);
+    const dayBreaks = cluster.blocks[0]!.dayBreaks ?? [];
+    expect(dayBreaks).toHaveLength(1);
+    expect(dayBreaks[0]!.key).toBe("2030-01-02");
+    expect(dayBreaks[0]!.offsetMinutes).toBe(2 * 60); // 22:00 Jan 1 -> 00:00 Jan 2, relative to the block's own start
+
+    // No gap anywhere else carries a Jan 2 break - it was never left to
+    // collapse into a zero-offset caption after the event ends.
+    const gapEntries = timeline.filter((e): e is AgendaGapEntry => e.kind === "gap");
+    for (const gap of gapEntries) {
+      expect(gap.dayBreaks.map((b) => b.key)).not.toContain("2030-01-02");
+    }
+    // Jan 3 is genuinely empty and unrelated to the overnight event, so it
+    // still gets its own header, riding in the trailing gap as usual.
+    expect(gapEntries.some((g) => g.dayBreaks.some((b) => b.key === "2030-01-03"))).toBe(true);
+  });
+
+  it("doesn't double-render the crossed day's header when that day also has its own separate event", () => {
+    const events = [
+      makeEvent({ start: "2030-01-01T22:00:00", end: "2030-01-02T02:00:00" }),
+      makeEvent({ start: "2030-01-02T09:00:00", end: "2030-01-02T10:00:00" }),
+    ];
+
+    const timeline = buildAgendaTimeline(events, window);
+
+    // Still only Jan 1's own header stands alone - Jan 2 has real content of
+    // its own here, but its header stays embedded in the overnight block
+    // rather than also getting a second caption of its own.
+    const dateEntries = timeline.filter((e): e is AgendaDateEntry => e.kind === "date");
+    expect(dateEntries.map((e) => e.key)).toEqual(["date-2030-01-01"]);
+
+    const gapEntries = timeline.filter((e): e is AgendaGapEntry => e.kind === "gap");
+    for (const gap of gapEntries) {
+      expect(gap.dayBreaks.map((b) => b.key)).not.toContain("2030-01-02");
+    }
+
+    const clusters = timeline.filter((e): e is AgendaClusterEntry => e.kind === "cluster");
+    expect(clusters).toHaveLength(2);
+    expect(clusters[0]!.blocks[0]!.dayBreaks?.map((b) => b.key)).toEqual(["2030-01-02"]);
+    expect(clusters[1]!.blocks[0]!.dayBreaks ?? []).toEqual([]);
+
+    // The gap between the overnight event ending (2am) and the day's own
+    // 9am event still renders normally, with no day-break of its own since
+    // Jan 2's header was already placed.
+    const dayGap = gapEntries.find((g) => g.startMs === new Date("2030-01-02T02:00:00").getTime())!;
+    expect(dayGap).toBeDefined();
+    expect(dayGap.minutes).toBe(7 * 60);
+    expect(dayGap.dayBreaks).toEqual([]);
+  });
+});
+
 describe("buildAgendaTimeline - overlap column assignment", () => {
   const windowStartMs = new Date("2030-02-01T00:00:00").getTime();
   const windowEndMs = new Date("2030-02-02T00:00:00").getTime();

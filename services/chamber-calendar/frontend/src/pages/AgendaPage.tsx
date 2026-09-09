@@ -273,7 +273,7 @@ export function AgendaPage() {
                     to={eventHref(event)}
                     onMouseEnter={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
                     onFocus={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
-                    className="group flex items-start gap-3 px-1"
+                    className="group relative flex items-start gap-3 px-1"
                   >
                     <div className="w-16 shrink-0 pt-2 text-right font-mono text-[11px] leading-tight text-dust">
                       <div>{formatEventStartTime(event)}</div>
@@ -299,6 +299,31 @@ export function AgendaPage() {
                         </div>
                       )}
                     </div>
+                    {/* An event that itself runs past midnight (10pm-2am) has
+                        no ordinary gap to hang the crossed day's header on -
+                        see AgendaEventBlock.dayBreaks - so it's drawn as a
+                        divider straight through the block instead, at its
+                        true medial position, rather than a caption severed
+                        off to sit right at the block's own edge. */}
+                    {(block.dayBreaks ?? []).map((brk) => {
+                      const brkPercent = Math.min(
+                        100,
+                        Math.max(0, (brk.offsetMinutes / Math.max(1, block.durationMinutes)) * 100)
+                      );
+                      return (
+                        <div
+                          key={brk.key}
+                          className="pointer-events-none absolute inset-x-0 flex items-center gap-3 px-1"
+                          style={{ top: `${brkPercent}%` }}
+                          aria-hidden="true"
+                        >
+                          <span className="w-16 shrink-0 -translate-y-1/2 bg-parchment px-0.5 text-right font-mono text-[10px] uppercase tracking-wide text-dust">
+                            {brk.label}
+                          </span>
+                          <span className="h-px flex-1 -translate-y-1/2 border-t border-dashed border-dust/50" />
+                        </div>
+                      );
+                    })}
                   </Link>
                 );
               }
@@ -336,7 +361,7 @@ export function AgendaPage() {
               const containerHeightPx = Math.max(clusterHeightPx, ...blockLayouts.map((b) => b.top + b.height));
 
               return (
-                <div key={entry.key} className="flex items-start gap-3 px-1">
+                <div key={entry.key} className="relative flex items-start gap-3 px-1">
                   <div className="w-16 shrink-0 pt-2 text-right font-mono text-[11px] leading-tight text-dust">
                     {formatClockTime(Math.min(...entry.blocks.map((b) => new Date(b.event.start).getTime())))}
                   </div>
@@ -414,6 +439,30 @@ export function AgendaPage() {
                       );
                     })}
                   </div>
+                  {/* Same overnight-divider treatment as the single-block
+                      case above, positioned against each spanning block's own
+                      top/height within this cluster's shared container. */}
+                  {blockLayouts.flatMap(({ block, top, height }) =>
+                    (block.dayBreaks ?? []).map((brk) => {
+                      const brkPercent = Math.min(
+                        100,
+                        Math.max(0, (brk.offsetMinutes / Math.max(1, block.durationMinutes)) * 100)
+                      );
+                      return (
+                        <div
+                          key={`${block.event.id}-${brk.key}`}
+                          className="pointer-events-none absolute inset-x-0 flex items-center gap-3 px-1"
+                          style={{ top: top + (brkPercent / 100) * height }}
+                          aria-hidden="true"
+                        >
+                          <span className="w-16 shrink-0 -translate-y-1/2 bg-parchment px-0.5 text-right font-mono text-[10px] uppercase tracking-wide text-dust">
+                            {brk.label}
+                          </span>
+                          <span className="h-px flex-1 -translate-y-1/2 border-t border-dashed border-dust/50" />
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               );
             }

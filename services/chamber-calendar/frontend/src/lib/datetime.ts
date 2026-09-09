@@ -155,7 +155,13 @@ export interface AgendaAllDayEntry {
 // cluster's box without knowing anything about the rest of the day.
 // nowOffsetMinutes is only set on the one block, if any, that the current
 // time falls inside - the component uses it to draw the now-indicator as an
-// overlay instead of as its own flow entry.
+// overlay instead of as its own flow entry. dayBreaks is the same idea for
+// midnight: an event that itself runs past midnight (a 10pm-2am block) has
+// no ordinary gap to hang the crossed day's header on, so each day boundary
+// it actually spans is attached here instead - offsetMinutes relative to
+// *this block's own start* (not a gap's) - and the component draws it as a
+// divider through the block itself, at its true medial position, rather
+// than a header severed off to sit right at the block's edge.
 export interface AgendaEventBlock {
   event: CalendarEvent;
   offsetMinutes: number;
@@ -163,6 +169,7 @@ export interface AgendaEventBlock {
   column: number;
   columnCount: number;
   nowOffsetMinutes?: number;
+  dayBreaks?: AgendaGapDayBreak[];
 }
 
 // One or more events sharing a single contiguous span of overlapping time,
@@ -506,6 +513,11 @@ export function buildAgendaTimeline(events: CalendarEvent[], window: AgendaNowCo
   // gap against.
   let previousContentEndMs: number | null = null;
   let pendingBreaks: AgendaGapDayBreak[] = [];
+  // Calendar days whose own header has already been embedded inside an
+  // earlier day's overnight event block (see the dayBreaks pass in the loop
+  // below) - the normal per-day header logic must skip these entirely
+  // rather than also emitting a second, redundant caption for them.
+  const embeddedDayKeys = new Set<string>();
 
   function flushPending(endMs: number) {
     if (previousContentEndMs === null) return;
@@ -533,11 +545,44 @@ export function buildAgendaTimeline(events: CalendarEvent[], window: AgendaNowCo
 
   for (const day of days) {
     const items = buildDayItems(day, day.dateKey === todayKey ? nowMs : null);
+
+    // Attach an embedded day-break to every block that's still running at a
+    // midnight it crosses (a 10pm-2am event, or rarer still a multi-day
+    // one) - see AgendaEventBlock.dayBreaks. Must run before the header
+    // logic below reads embeddedDayKeys for *this* day, and before later
+    // days in the loop are reached, since it's what tells them their own
+    // header was already handled here.
+    for (const item of items) {
+      if (item.kind !== "cluster") continue;
+      for (const block of item.blocks) {
+        const cursor = new Date(block.startMs);
+        cursor.setHours(24, 0, 0, 0);
+        while (cursor.getTime() < block.endMs) {
+          const midnightMs = cursor.getTime();
+          const dateKey = localDateOnly(cursor);
+          (block.dayBreaks ??= []).push({
+            key: dateKey,
+            offsetMinutes: Math.max(0, Math.round((midnightMs - block.startMs) / 60000)),
+            label: formatAgendaDayLabel(dateKey),
+          });
+          embeddedDayKeys.add(dateKey);
+          cursor.setDate(cursor.getDate() + 1);
+        }
+      }
+    }
+
     const dayMidnightMs = new Date(`${day.dateKey}T00:00:00`).getTime();
     const hasContent = items.length > 0 || day.allDay.length > 0;
     const headerLabel = formatAgendaDayLabel(day.dateKey);
+    const headerEmbedded = embeddedDayKeys.has(day.dateKey);
 
     if (!hasContent) {
+      if (headerEmbedded) {
+        // Already rendered as a divider inside the overnight block that's
+        // still spanning this day - this day itself contributes nothing
+        // further to the flow.
+        continue;
+      }
       if (previousContentEndMs === null) {
         // Unreachable today (the now-marker always gives it content), kept
         // as a safe fallback for the very first day in the window.
@@ -556,13 +601,15 @@ export function buildAgendaTimeline(events: CalendarEvent[], window: AgendaNowCo
     const anchorEndMs = items.length > 0 ? itemEnd(items[items.length - 1]!) : anchorStartMs;
 
     if (previousContentEndMs === null) {
-      timeline.push({ kind: "date", key: `date-${day.dateKey}`, label: headerLabel });
+      if (!headerEmbedded) timeline.push({ kind: "date", key: `date-${day.dateKey}`, label: headerLabel });
     } else {
-      pendingBreaks.push({
-        key: day.dateKey,
-        offsetMinutes: Math.max(0, Math.round((dayMidnightMs - previousContentEndMs) / 60000)),
-        label: headerLabel,
-      });
+      if (!headerEmbedded) {
+        pendingBreaks.push({
+          key: day.dateKey,
+          offsetMinutes: Math.max(0, Math.round((dayMidnightMs - previousContentEndMs) / 60000)),
+          label: headerLabel,
+        });
+      }
       flushPending(anchorStartMs);
     }
 
@@ -592,6 +639,7 @@ export function buildAgendaTimeline(events: CalendarEvent[], window: AgendaNowCo
             column: block.column,
             columnCount: block.columnCount,
             nowOffsetMinutes: block.nowOffsetMinutes,
+            dayBreaks: block.dayBreaks,
           })),
         });
       }
