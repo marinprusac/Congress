@@ -170,6 +170,28 @@ describe("buildAgendaTimeline - overlap column assignment", () => {
       expect(block.columnCount).toBe(2);
     }
   });
+
+  it("doesn't merge two genuinely non-overlapping events into one cluster just because they arrive out of chronological order", () => {
+    // The backend sorts the fetched list by its own Date parsing, which can
+    // disagree with the browser's for a timezone-naive local event (see
+    // localEvents.ts) when server and client run in different zones - the
+    // array buildAgendaTimeline receives isn't guaranteed sorted by the
+    // client's own notion of start time. A later event listed first must
+    // not corrupt an earlier, genuinely non-overlapping one's placement.
+    const events = [
+      makeEvent({ start: "2030-02-01T09:00:00", end: "2030-02-01T11:00:00" }), // listed first, but starts later
+      makeEvent({ start: "2030-02-01T07:00:00", end: "2030-02-01T07:15:00" }), // starts earlier, doesn't overlap the above at all
+    ];
+
+    const timeline = buildAgendaTimeline(events, window);
+    const clusters = timeline.filter((e): e is AgendaClusterEntry => e.kind === "cluster");
+    // Two unrelated events stay two separate clusters - not one cluster
+    // with both blocks pinned on top of each other.
+    expect(clusters).toHaveLength(2);
+    for (const cluster of clusters) {
+      expect(cluster.blocks).toHaveLength(1);
+    }
+  });
 });
 
 describe("nextHalfHourSlot", () => {

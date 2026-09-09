@@ -448,7 +448,16 @@ function buildClusters(timed: CalendarEvent[], nowMs: number | null): { clusters
 // overlay (nowOffsetMinutes) instead of becoming its own item - it's not a
 // boundary in that case, it's a point *inside* an existing block.
 function buildDayItems(day: DayGroup, nowMs: number | null): DayItem[] {
-  const { clusters, nowConsumed } = buildClusters(day.timed, nowMs);
+  // buildClusters requires its input pre-sorted by real start instant (see
+  // its own comment) - the backend already sorts the fetched event list,
+  // but it does so in server time, which disagrees with the browser's own
+  // interpretation of a timezone-naive local event's start (see
+  // localEvents.ts) whenever the two run in different zones (the VPS runs
+  // in UTC; the one user is not). Re-sorting here with the client's own
+  // Date parsing is what actually keeps the invariant buildClusters counts
+  // on, regardless of what order the response arrived in.
+  const timed = [...day.timed].sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+  const { clusters, nowConsumed } = buildClusters(timed, nowMs);
   const items: DayItem[] = [...clusters];
   if (nowMs !== null && !nowConsumed) items.push({ kind: "now", nowMs });
 
