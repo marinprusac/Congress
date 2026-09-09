@@ -14,6 +14,7 @@ import {
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createTask, quickCreateTaskExhibit } from "@/lib/api";
+import { dateInputToIso } from "@/lib/dateInput";
 
 // Mirrors TaskViewPage's editing state exactly (name input, due date,
 // ExhibitTextarea, ExhibitLinksLayout with a live Connections panel) rather
@@ -32,7 +33,7 @@ export function NewTaskPage() {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const created = await createTask({ name, description, dueDate: dueDate || null });
+      const created = await createTask({ name, description, dueDate: dueDate ? dateInputToIso(dueDate) : null });
       await flushDraftConnections(`task-${created.id}`, draftConnections);
       return created;
     },

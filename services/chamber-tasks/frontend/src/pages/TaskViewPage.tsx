@@ -14,9 +14,10 @@ import {
   useAutosave,
 } from "@congress/congress-ui";
 import { fetchTask, updateTask, deleteTask, quickCreateTaskExhibit } from "@/lib/api";
+import { dateInputToIso, isoToDateInput } from "@/lib/dateInput";
 
 function toDateInputValue(iso: string | null): string {
-  return iso ? iso.slice(0, 10) : "";
+  return iso ? isoToDateInput(iso) : "";
 }
 
 export function TaskViewPage() {
@@ -68,7 +69,7 @@ export function TaskViewPage() {
   const { markSaved } = useAutosave({
     value: { name: draftName, description: draftDescription, dueDate: draftDueDate || null },
     enabled: initializedTaskIdRef.current !== null,
-    onSave: (draft) => updateMutation.mutate(draft),
+    onSave: (draft) => updateMutation.mutate({ ...draft, dueDate: draft.dueDate ? dateInputToIso(draft.dueDate) : null }),
   });
   useEffect(() => {
     if (taskQuery.data && initializedTaskIdRef.current !== taskQuery.data.id) {
