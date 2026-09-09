@@ -74,7 +74,7 @@ app.post("/api/health/ingest", async (c) => {
   }
   const { samples, skipped } = normalizeHealthAutoExportPayload(parsed.data);
   const result = await ingestSamples(samples);
-  return c.json({ accepted: result.accepted, skipped });
+  return c.json({ accepted: result.accepted, duplicated: result.duplicated, skipped });
 });
 
 app.get("/api/health/metrics", async (c) => {

@@ -23,13 +23,19 @@ export async function isValidIngestToken(headerValue: string | undefined): Promi
 // Upserts each sample by (metricType, startDate, endDate) - the export has
 // no stable per-sample id to hand us and will re-send overlapping recent
 // history on every run, so a resend must update in place rather than
-// duplicate. Publishes fitness.health_metric_received only if at least one
-// row was actually new or changed, not on a byte-identical resend. Samples
-// are expected already normalized (health/normalize.ts) - this function
-// only knows about this Chamber's own storage shape, not the export's wire
-// format.
-export async function ingestSamples(samples: NormalizedHealthSample[]): Promise<{ accepted: number }> {
+// duplicate. `accepted` counts only genuinely new rows; `duplicated` counts
+// resends that matched an existing row (whether or not the value itself
+// changed - e.g. a still-accumulating daily energy total resent mid-day is
+// a "duplicate" of the same key, even though its value legitimately grew).
+// Publishes fitness.health_metric_received if any row was new or its value
+// actually changed, not on a byte-identical resend. Samples are expected
+// already normalized (health/normalize.ts) - this function only knows
+// about this Chamber's own storage shape, not the export's wire format.
+export async function ingestSamples(
+  samples: NormalizedHealthSample[]
+): Promise<{ accepted: number; duplicated: number }> {
   let accepted = 0;
+  let duplicated = 0;
   let changed = false;
   const now = new Date();
 
@@ -37,6 +43,7 @@ export async function ingestSamples(samples: NormalizedHealthSample[]): Promise<
     const existing = findExistingMetric(sample.metricType, sample.startDate, sample.endDate);
 
     if (existing) {
+      duplicated++;
       if (existing.value !== sample.value || existing.unit !== sample.unit || existing.sourceName !== sample.sourceName) {
         changed = true;
       }
@@ -56,14 +63,14 @@ export async function ingestSamples(samples: NormalizedHealthSample[]): Promise<
           createdAt: now,
         })
         .run();
+      accepted++;
       changed = true;
     }
-    accepted++;
   }
 
   if (changed) {
     void publishEvent({ type: "fitness.health_metric_received", payload: { count: accepted } });
   }
 
-  return { accepted };
+  return { accepted, duplicated };
 }

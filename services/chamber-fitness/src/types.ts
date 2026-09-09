@@ -100,7 +100,15 @@ export const healthIngestRequestSchema = z.preprocess((raw) => {
 export type HealthIngestRequest = z.infer<typeof healthAutoExportBodySchema>;
 
 export const healthIngestResultSchema = z.object({
+  // Genuinely new rows only - see duplicated below for resends.
   accepted: z.number().int(),
+  // A sample whose (metricType, startDate, endDate) already existed -
+  // updated in place (its value can legitimately change, e.g. a
+  // still-accumulating daily energy total), but not a new data point, so
+  // counted separately from accepted rather than folded into it - useful
+  // for sanity-checking a bulk backfill ("how much of this did I already
+  // have?").
+  duplicated: z.number().int(),
   // Entries present in the export but not one of our tracked metric types
   // (e.g. resting_heart_rate), or missing a field normalize.ts needs - not
   // an error, just "not something we track" or "malformed", silently

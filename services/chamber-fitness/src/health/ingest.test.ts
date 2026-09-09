@@ -56,17 +56,24 @@ describe("isValidIngestToken", () => {
 describe("ingestSamples", () => {
   it("inserts a new sample", async () => {
     const result = await ingestSamples([sample()]);
-    expect(result).toEqual({ accepted: 1 });
+    expect(result).toEqual({ accepted: 1, duplicated: 0 });
     expect(db.select().from(healthMetrics).all()).toHaveLength(1);
   });
 
-  it("updates an identical (metricType, startDate, endDate) sample in place rather than duplicating", async () => {
+  it("updates an identical (metricType, startDate, endDate) sample in place, counting it as duplicated not accepted", async () => {
     await ingestSamples([sample({ value: 82.3 })]);
-    await ingestSamples([sample({ value: 82.5 })]);
+    const result = await ingestSamples([sample({ value: 82.5 })]);
 
+    expect(result).toEqual({ accepted: 0, duplicated: 1 });
     const rows = db.select().from(healthMetrics).all();
     expect(rows).toHaveLength(1);
     expect(rows[0]?.value).toBe(82.5);
+  });
+
+  it("counts a byte-identical resend as duplicated too, even though nothing changed", async () => {
+    await ingestSamples([sample()]);
+    const result = await ingestSamples([sample()]);
+    expect(result).toEqual({ accepted: 0, duplicated: 1 });
   });
 
   it("publishes fitness.health_metric_received when a sample is new", async () => {
@@ -133,7 +140,7 @@ describe("POST /api/health/ingest route", () => {
       body: JSON.stringify({ somethingElse: true }),
     });
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ accepted: 0, skipped: 0 });
+    await expect(res.json()).resolves.toEqual({ accepted: 0, duplicated: 0, skipped: 0 });
   });
 
   it("400s a body where metrics is genuinely malformed", async () => {
@@ -154,7 +161,7 @@ describe("POST /api/health/ingest route", () => {
       body: JSON.stringify(haePayload()),
     });
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ accepted: 1, skipped: 0 });
+    await expect(res.json()).resolves.toEqual({ accepted: 1, duplicated: 0, skipped: 0 });
   });
 
   it("200s the same export unwrapped, as the Shortcuts export action (Basic-tier path) sends it", async () => {
@@ -165,6 +172,22 @@ describe("POST /api/health/ingest route", () => {
       body: JSON.stringify(haePayload().data),
     });
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ accepted: 1, skipped: 0 });
+    await expect(res.json()).resolves.toEqual({ accepted: 1, duplicated: 0, skipped: 0 });
+  });
+
+  it("200s a resend of the same export as a duplicate, not a fresh accept", async () => {
+    db.insert(settings).values({ id: 1, healthIngestToken: "secret" }).run();
+    await app.request("/api/health/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Health-Ingest-Token": "secret" },
+      body: JSON.stringify(haePayload()),
+    });
+    const res = await app.request("/api/health/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Health-Ingest-Token": "secret" },
+      body: JSON.stringify(haePayload()),
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ accepted: 0, duplicated: 1, skipped: 0 });
   });
 });
