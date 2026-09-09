@@ -22,9 +22,26 @@ const LONG_PRESS_MS = 400;
 // which is exactly what made long-press-and-drag flaky on a phone. Once
 // dropped, onMove below drives window.scrollBy itself (batched to once per
 // animation frame - see queueScrollBy) for the rest of this touch so an
-// ordinary swipe still scrolls the page, just without native momentum on
-// release.
+// ordinary swipe still scrolls the page; startMomentum below then picks up
+// where the native fling would have on release.
 const MOVE_CANCEL_PX = 10;
+
+// Because touch-action: none (below) keeps the browser from ever seeing this
+// as a scrollable element, an ordinary swipe that starts on a gap row never
+// gets native momentum - onMove above already covers the 1:1 scroll while
+// the finger is down, but release used to just stop dead. These constants
+// reimplement that missing momentum by hand: an exponential-decay fling
+// driven by the touch's own recent velocity, restarted every animation
+// frame until it decays below MOMENTUM_MIN_VELOCITY or gets interrupted.
+// MOMENTUM_FRICTION is expressed per-ms (not per-frame) so the decay rate
+// doesn't depend on the display's refresh rate; ~0.9968 matches the common
+// "0.95 per 16ms frame" convention. MOMENTUM_STALE_MS guards the case where
+// the finger stopped moving and just sat there before lifting - without it,
+// a fast swipe that paused before release would still be read as a flick.
+const MOMENTUM_FRICTION_PER_MS = 0.9968;
+const MOMENTUM_MIN_VELOCITY = 0.02; // px/ms; below this the fling is imperceptible, so stop
+const MOMENTUM_MAX_VELOCITY = 5; // px/ms; clamps a noisy single-sample velocity spike
+const MOMENTUM_STALE_MS = 60;
 
 // Once picking is active, every this-many px of drag nudges the time by one
 // 30-minute step - a fixed screen-space rate, deliberately independent of
@@ -87,6 +104,17 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
   // scrollBy synchronously many times within a single frame.
   const scrollDeltaRef = useRef(0);
   const scrollRafRef = useRef<number | null>(null);
+  // Velocity (px/ms, same sign convention as queueScrollBy's deltaY) of the
+  // touch's own most recent pointermove sample, plus when that sample was
+  // taken - both feed startMomentum on release. wasManualScrollRef marks
+  // that this gesture actually got read as a scroll (long-press timer
+  // cancelled by movement) rather than a tap or a still-pending hold, since
+  // only a real scroll should fling on release.
+  const velocityRef = useRef(0);
+  const lastMoveTimeRef = useRef(0);
+  const wasManualScrollRef = useRef(false);
+  const momentumRafRef = useRef<number | null>(null);
+  const momentumCleanupRef = useRef<(() => void) | null>(null);
 
   function cancelPendingScroll() {
     if (scrollRafRef.current !== null) {
@@ -94,6 +122,57 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
       scrollRafRef.current = null;
     }
     scrollDeltaRef.current = 0;
+  }
+
+  function cancelMomentum() {
+    if (momentumRafRef.current !== null) {
+      cancelAnimationFrame(momentumRafRef.current);
+      momentumRafRef.current = null;
+    }
+    momentumCleanupRef.current?.();
+    momentumCleanupRef.current = null;
+  }
+
+  // Starts the manual fling described above. releaseTimeStamp is the
+  // pointerup event's own timeStamp, used against lastMoveTimeRef to detect
+  // a finger that had already stopped moving before it lifted.
+  function startMomentum(releaseTimeStamp: number) {
+    const stale = releaseTimeStamp - lastMoveTimeRef.current > MOMENTUM_STALE_MS;
+    let velocity = stale ? 0 : velocityRef.current;
+    velocity = Math.max(-MOMENTUM_MAX_VELOCITY, Math.min(MOMENTUM_MAX_VELOCITY, velocity));
+    if (Math.abs(velocity) < MOMENTUM_MIN_VELOCITY) return;
+
+    // A real touch landing anywhere (not just this row) or a wheel spin both
+    // read as "the user grabbed the page again" - same as native momentum
+    // scrolling, either kills the fling immediately rather than fighting it.
+    function stop() {
+      cancelMomentum();
+    }
+    window.addEventListener("pointerdown", stop, { once: true });
+    window.addEventListener("wheel", stop, { once: true });
+    momentumCleanupRef.current = () => {
+      window.removeEventListener("pointerdown", stop);
+      window.removeEventListener("wheel", stop);
+    };
+
+    let lastTs: number | null = null;
+    function step(ts: number) {
+      if (lastTs === null) {
+        lastTs = ts;
+        momentumRafRef.current = requestAnimationFrame(step);
+        return;
+      }
+      const dt = ts - lastTs;
+      lastTs = ts;
+      velocity *= Math.pow(MOMENTUM_FRICTION_PER_MS, dt);
+      window.scrollBy(0, velocity * dt);
+      if (Math.abs(velocity) < MOMENTUM_MIN_VELOCITY) {
+        cancelMomentum();
+        return;
+      }
+      momentumRafRef.current = requestAnimationFrame(step);
+    }
+    momentumRafRef.current = requestAnimationFrame(step);
   }
 
   function queueScrollBy(deltaY: number) {
@@ -151,10 +230,14 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
 
   function handlePointerDown(e: React.PointerEvent) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    cancelMomentum();
     pointerTypeRef.current = e.pointerType;
     activePointerIdRef.current = e.pointerId;
     startClientRef.current = { x: e.clientX, y: e.clientY };
     lastClientYRef.current = e.clientY;
+    lastMoveTimeRef.current = e.timeStamp;
+    velocityRef.current = 0;
+    wasManualScrollRef.current = false;
     clearTimer();
     if (e.pointerType === "mouse") {
       const ms = msAtClientY(e.clientY);
@@ -189,13 +272,22 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
         // touch-action: none below means the default action is already
         // suppressed - no need for our own preventDefault on top of it,
         // which is one less thing fighting iOS's own touch bookkeeping.
-        // Replicate the scroll by hand (1:1, no momentum) so a swipe that
-        // starts on a gap row still moves the page.
-        if (pointerTypeRef.current !== "mouse") queueScrollBy(prevClientY - e.clientY);
+        // Replicate the scroll by hand (1:1 while the finger is down; see
+        // startMomentum for what carries it on after release) so a swipe
+        // that starts on a gap row still moves the page.
+        if (pointerTypeRef.current !== "mouse") {
+          queueScrollBy(prevClientY - e.clientY);
+          const dt = e.timeStamp - lastMoveTimeRef.current;
+          if (dt > 0) velocityRef.current = (prevClientY - e.clientY) / dt;
+          lastMoveTimeRef.current = e.timeStamp;
+        }
         if (!startClientRef.current || timerRef.current === null) return;
         const dx = e.clientX - startClientRef.current.x;
         const dy = e.clientY - startClientRef.current.y;
-        if (Math.hypot(dx, dy) > MOVE_CANCEL_PX) clearTimer();
+        if (Math.hypot(dx, dy) > MOVE_CANCEL_PX) {
+          wasManualScrollRef.current = true;
+          clearTimer();
+        }
       }
       function onUp(e: PointerEvent) {
         if (e.pointerId !== activePointerIdRef.current) return;
@@ -203,6 +295,7 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
         startClientRef.current = null;
         activePointerIdRef.current = null;
         cancelPendingScroll();
+        if (pointerTypeRef.current !== "mouse" && wasManualScrollRef.current) startMomentum(e.timeStamp);
       }
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
@@ -285,6 +378,7 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
     () => () => {
       clearTimer();
       cancelPendingScroll();
+      cancelMomentum();
     },
     []
   );
