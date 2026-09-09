@@ -8,7 +8,7 @@ vi.mock("../events.js", () => ({ publishEvent: vi.fn().mockResolvedValue(undefin
 
 import { publishEvent } from "../events.js";
 import { isValidIngestToken, ingestSamples } from "./ingest.js";
-import type { HealthSample } from "../types.js";
+import type { NormalizedHealthSample } from "./normalize.js";
 import { app } from "../server.js";
 
 beforeAll(() => runMigrations(migrationsDir("chamber-fitness")));
@@ -19,12 +19,15 @@ beforeEach(() => {
   vi.mocked(publishEvent).mockClear();
 });
 
-function sample(overrides: Partial<HealthSample> = {}): HealthSample {
+function sample(overrides: Partial<NormalizedHealthSample> = {}): NormalizedHealthSample {
+  const startDate = new Date("2026-09-08T07:00:00.000Z");
   return {
     metricType: "weight",
     value: 82.3,
     unit: "kg",
-    startDate: "2026-09-08T07:00:00.000Z",
+    startDate,
+    endDate: startDate,
+    sourceName: null,
     ...overrides,
   };
 }
@@ -52,73 +55,62 @@ describe("isValidIngestToken", () => {
 
 describe("ingestSamples", () => {
   it("inserts a new sample", async () => {
-    const result = await ingestSamples({ samples: [sample()] });
-    expect(result).toEqual({ accepted: 1, rejected: 0, errors: [] });
+    const result = await ingestSamples([sample()]);
+    expect(result).toEqual({ accepted: 1 });
     expect(db.select().from(healthMetrics).all()).toHaveLength(1);
   });
 
   it("updates an identical (metricType, startDate, endDate) sample in place rather than duplicating", async () => {
-    await ingestSamples({ samples: [sample({ value: 82.3 })] });
-    await ingestSamples({ samples: [sample({ value: 82.5 })] });
+    await ingestSamples([sample({ value: 82.3 })]);
+    await ingestSamples([sample({ value: 82.5 })]);
 
     const rows = db.select().from(healthMetrics).all();
     expect(rows).toHaveLength(1);
     expect(rows[0]?.value).toBe(82.5);
   });
 
-  it("defaults endDate to startDate for an instantaneous sample", async () => {
-    await ingestSamples({ samples: [sample()] });
-    const row = db.select().from(healthMetrics).all()[0]!;
-    expect(row.endDate.toISOString()).toBe(row.startDate.toISOString());
-  });
-
-  it("partially accepts a batch with one invalid date, reporting its index", async () => {
-    const result = await ingestSamples({
-      samples: [sample(), sample({ startDate: "not-a-date", value: 1 })],
-    });
-    expect(result.accepted).toBe(1);
-    expect(result.rejected).toBe(1);
-    expect(result.errors).toEqual([{ index: 1, message: "invalid_date" }]);
-  });
-
   it("publishes fitness.health_metric_received when a sample is new", async () => {
-    await ingestSamples({ samples: [sample()] });
+    await ingestSamples([sample()]);
     expect(publishEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: "fitness.health_metric_received", payload: { count: 1 } })
     );
   });
 
-  it("derives sleepAsleep's value from (endDate - startDate) server-side, ignoring whatever the client sent", async () => {
-    await ingestSamples({
-      samples: [
-        sample({
-          metricType: "sleepAsleep",
-          value: 0, // a Shortcut need not compute this - the server derives it
-          unit: "min",
-          startDate: "2026-09-08T00:00:00.000Z",
-          endDate: "2026-09-08T03:00:00.000Z",
-        }),
-      ],
-    });
-    const row = db.select().from(healthMetrics).all()[0]!;
-    expect(row.value).toBe(3 * 3600);
-    expect(row.unit).toBe("s");
+  it("does not publish on a byte-identical resend", async () => {
+    await ingestSamples([sample()]);
+    vi.mocked(publishEvent).mockClear();
+    await ingestSamples([sample()]);
+    expect(publishEvent).not.toHaveBeenCalled();
   });
 
-  it("does not publish on a byte-identical resend", async () => {
-    await ingestSamples({ samples: [sample()] });
+  it("publishes when a resend actually changes the value", async () => {
+    await ingestSamples([sample({ value: 82.3 })]);
     vi.mocked(publishEvent).mockClear();
-    await ingestSamples({ samples: [sample()] });
-    expect(publishEvent).not.toHaveBeenCalled();
+    await ingestSamples([sample({ value: 82.5 })]);
+    expect(publishEvent).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("POST /api/health/ingest route", () => {
+  function haePayload() {
+    return {
+      data: {
+        metrics: [
+          {
+            name: "vo2_max",
+            units: "ml/(kg·min)",
+            data: [{ date: "2026-08-16 00:00:00 +0200", qty: 37.75, source: "Marin’s Apple Watch" }],
+          },
+        ],
+      },
+    };
+  }
+
   it("401s with no token set in settings at all", async () => {
     const res = await app.request("/api/health/ingest", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Health-Ingest-Token": "anything" },
-      body: JSON.stringify({ samples: [sample()] }),
+      body: JSON.stringify(haePayload()),
     });
     expect(res.status).toBe(401);
   });
@@ -128,7 +120,7 @@ describe("POST /api/health/ingest route", () => {
     const res = await app.request("/api/health/ingest", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Health-Ingest-Token": "wrong" },
-      body: JSON.stringify({ samples: [sample()] }),
+      body: JSON.stringify(haePayload()),
     });
     expect(res.status).toBe(401);
   });
@@ -138,19 +130,19 @@ describe("POST /api/health/ingest route", () => {
     const res = await app.request("/api/health/ingest", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Health-Ingest-Token": "secret" },
-      body: JSON.stringify({ samples: [] }),
+      body: JSON.stringify({ notData: true }),
     });
     expect(res.status).toBe(400);
   });
 
-  it("200s a valid batch with the correct accepted/rejected counts", async () => {
+  it("200s a valid export with the correct accepted/skipped counts", async () => {
     db.insert(settings).values({ id: 1, healthIngestToken: "secret" }).run();
     const res = await app.request("/api/health/ingest", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Health-Ingest-Token": "secret" },
-      body: JSON.stringify({ samples: [sample()] }),
+      body: JSON.stringify(haePayload()),
     });
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ accepted: 1, rejected: 0, errors: [] });
+    await expect(res.json()).resolves.toEqual({ accepted: 1, skipped: 0 });
   });
 });

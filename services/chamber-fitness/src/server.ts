@@ -17,6 +17,7 @@ import { searchWorkoutExhibits, resolveWorkoutExhibits } from "./exhibits.js";
 import { getSyncState, toSyncHealth } from "./hevy/pollState.js";
 import { syncNow } from "./hevy/poller.js";
 import { isValidIngestToken, ingestSamples } from "./health/ingest.js";
+import { normalizeHealthAutoExportPayload } from "./health/normalize.js";
 import { listHealthMetrics, getLatestHealthMetrics } from "./healthMetrics.js";
 import { mcpApp } from "./mcp/server.js";
 
@@ -58,10 +59,11 @@ app.post("/api/sync", async (c) => {
   return c.json(toSyncHealth(getSyncState()));
 });
 
-// Pushed to by an iOS Shortcuts automation, not read by the browser - the
-// only route in this Chamber that authenticates itself rather than relying
-// on Congress's session gate, because a Shortcut can present neither a
-// session cookie nor the shared internal token. See health/ingest.ts.
+// Pushed to by an iOS Shortcut (relaying a Health Auto Export "export"
+// action's own JSON output), not read by the browser - the only route in
+// this Chamber that authenticates itself rather than relying on Congress's
+// session gate, because a Shortcut can present neither a session cookie nor
+// the shared internal token. See health/ingest.ts and health/normalize.ts.
 app.post("/api/health/ingest", async (c) => {
   if (!(await isValidIngestToken(c.req.header("X-Health-Ingest-Token")))) {
     return c.json({ error: "unauthorized" }, 401);
@@ -70,7 +72,9 @@ app.post("/api/health/ingest", async (c) => {
   if (!parsed.success) {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
-  return c.json(await ingestSamples(parsed.data));
+  const { samples, skipped } = normalizeHealthAutoExportPayload(parsed.data);
+  const result = await ingestSamples(samples);
+  return c.json({ accepted: result.accepted, skipped });
 });
 
 app.get("/api/health/metrics", async (c) => {

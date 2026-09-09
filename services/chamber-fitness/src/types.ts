@@ -64,37 +64,44 @@ export type UpdateSettingsRequest = z.infer<typeof updateSettingsRequestSchema>;
 export const healthMetricTypeSchema = z.enum(["weight", "vo2Max", "activeEnergy", "restingEnergy", "sleepAsleep"]);
 export type HealthMetricType = z.infer<typeof healthMetricTypeSchema>;
 
-// One Apple Health sample, shaped so a real, non-technical iOS Shortcut can
-// assemble it with native actions only ("Find Health Samples" -> "Repeat
-// with Each" -> append a dictionary built from Shortcuts' own
-// Quantity/Start Date/End Date/Source magic variables to a list) - no
-// scripting step required. `endDate` is optional on the wire purely so a
-// Shortcut built against an instantaneous sample (weight/vo2Max) doesn't
-// have to wire up a second dictionary key that would just repeat Start Date;
-// it defaults to startDate server-side.
-export const healthSampleSchema = z.object({
-  metricType: healthMetricTypeSchema,
-  value: z.number(),
-  unit: z.string().min(1),
-  startDate: z.string().datetime({ offset: true }),
-  endDate: z.string().datetime({ offset: true }).optional(),
-  sourceName: z.string().optional(),
-});
-export type HealthSample = z.infer<typeof healthSampleSchema>;
+// The wire format is the Health Auto Export iOS app's own REST API export
+// shape (its "Automations" feature POSTs this directly, on a schedule, with
+// a custom header we use for auth - see health/ingest.ts), not something we
+// designed: `{"data": {"metrics": [{name, units, data: [...]}], ...}}`.
+// Each metric entry's own fields vary by metric (a quantity sample carries
+// `qty`/`date`/`source`; sleep_analysis carries `totalSleep`/`sleepStart`/
+// `sleepEnd`/... instead) and the export always includes whatever the owner
+// has enabled in the app, not just what we track - so entries are validated
+// loosely here and interpreted defensively in health/normalize.ts, the same
+// "tolerant of an external service's own field-name choices" spirit as
+// hevy/normalize.ts.
+const healthAutoExportEntrySchema = z.record(z.string(), z.unknown());
 
-// The whole POST body - one request per Shortcut run, one array of samples.
-// Shortcuts' "Get Contents of URL" JSON body is a single list-of-dictionaries
-// variable built by "Repeat with Each" appending to it, not one request per
-// sample (which would mean scripting a loop of network calls in the Shortcut).
-export const healthIngestRequestSchema = z.object({
-  samples: z.array(healthSampleSchema).min(1).max(2000),
+const healthAutoExportMetricSchema = z.object({
+  name: z.string(),
+  units: z.string().optional(),
+  data: z.array(healthAutoExportEntrySchema),
 });
+
+export const healthIngestRequestSchema = z
+  .object({
+    data: z
+      .object({
+        metrics: z.array(healthAutoExportMetricSchema).default([]),
+      })
+      .passthrough(),
+  })
+  .passthrough();
 export type HealthIngestRequest = z.infer<typeof healthIngestRequestSchema>;
 
 export const healthIngestResultSchema = z.object({
   accepted: z.number().int(),
-  rejected: z.number().int(),
-  errors: z.array(z.object({ index: z.number().int(), message: z.string() })),
+  // Entries present in the export but not one of our tracked metric types
+  // (e.g. resting_heart_rate), or missing a field normalize.ts needs - not
+  // an error, just "not something we track" or "malformed", silently
+  // dropped rather than 400ing the whole batch over one export's worth of
+  // metrics we don't care about.
+  skipped: z.number().int(),
 });
 export type HealthIngestResult = z.infer<typeof healthIngestResultSchema>;
 
