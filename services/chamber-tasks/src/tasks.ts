@@ -55,6 +55,7 @@ function toSummary(row: typeof tasks.$inferSelect): TaskSummary {
     description: row.description,
     dueDate: row.dueDate ? row.dueDate.toISOString() : null,
     completed: row.completed,
+    completedAt: row.completedAt ? row.completedAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -123,11 +124,13 @@ export async function updateTask(id: number, input: UpdateTaskRequest): Promise<
   const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
   if (!existing) return null;
 
+  const completed = input.completed ?? existing.completed;
   const next = {
     name: input.name ?? existing.name,
     description: input.description ?? existing.description,
     dueDate: input.dueDate === undefined ? existing.dueDate : input.dueDate ? new Date(input.dueDate) : null,
-    completed: input.completed ?? existing.completed,
+    completed,
+    completedAt: completed === existing.completed ? existing.completedAt : completed ? new Date() : null,
     updatedAt: new Date(),
   };
 

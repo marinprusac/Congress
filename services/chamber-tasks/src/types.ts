@@ -6,6 +6,7 @@ export const taskSummarySchema = z.object({
   description: z.string(),
   dueDate: z.string().nullable(),
   completed: z.boolean(),
+  completedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

@@ -1,4 +1,4 @@
-import { eq, and, desc, isNull, count } from "drizzle-orm";
+import { eq, and, desc, isNull } from "drizzle-orm";
 import type { Notification, NotificationPushRequest } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { notifications } from "./db/schema.js";
@@ -69,14 +69,20 @@ function notifyDevices(title: string, body: string | null, chamber: string, cham
   });
 }
 
+// A read notification is dropped from the inbox rather than merely
+// grayed out - once the owner has seen it, it has nothing left to show
+// them. The row itself is kept (not deleted) so pushNotification's own
+// upsert/change-detection above still has something to compare a re-push
+// against; only this listing hides it.
 export function listNotifications(): { notifications: Notification[]; unreadCount: number } {
-  const rows = db.select().from(notifications).orderBy(desc(notifications.createdAt)).limit(LIST_LIMIT).all();
-  const unreadCount = db
-    .select({ n: count() })
+  const rows = db
+    .select()
     .from(notifications)
     .where(isNull(notifications.readAt))
-    .get()!.n;
-  return { notifications: rows.map(toNotification), unreadCount };
+    .orderBy(desc(notifications.createdAt))
+    .limit(LIST_LIMIT)
+    .all();
+  return { notifications: rows.map(toNotification), unreadCount: rows.length };
 }
 
 export function markNotificationRead(id: number): boolean {

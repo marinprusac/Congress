@@ -9,6 +9,7 @@ function task(overrides: Partial<TaskSummary>): TaskSummary {
     description: "",
     dueDate: null,
     completed: false,
+    completedAt: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
@@ -72,6 +73,30 @@ describe("sortTasks", () => {
     const doneEarly = task({ id: 1, completed: true, dueDate: "2026-09-01T00:00:00.000Z" });
     const openLate = task({ id: 2, completed: false, dueDate: "2026-12-01T00:00:00.000Z" });
     expect(sortTasks([doneEarly, openLate]).map((t) => t.id)).toEqual([2, 1]);
+  });
+
+  it("orders completed tasks by completion date descending, ignoring due/creation date", () => {
+    const completedFirst = task({
+      id: 1,
+      completed: true,
+      completedAt: "2026-09-01T00:00:00.000Z",
+      dueDate: "2026-12-01T00:00:00.000Z",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    const completedLast = task({
+      id: 2,
+      completed: true,
+      completedAt: "2026-09-05T00:00:00.000Z",
+      dueDate: "2026-01-01T00:00:00.000Z",
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+    expect(sortTasks([completedFirst, completedLast]).map((t) => t.id)).toEqual([2, 1]);
+  });
+
+  it("puts completed tasks with no completion date (pre-migration rows) last among completed", () => {
+    const withDate = task({ id: 1, completed: true, completedAt: "2026-09-01T00:00:00.000Z" });
+    const withoutDate = task({ id: 2, completed: true, completedAt: null });
+    expect(sortTasks([withoutDate, withDate]).map((t) => t.id)).toEqual([1, 2]);
   });
 });
 

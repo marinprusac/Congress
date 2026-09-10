@@ -22,11 +22,20 @@ export function categorizeDueDate(task: Pick<TaskSummary, "dueDate" | "completed
   return null;
 }
 
-// Open tasks before completed ones, then by due date ascending with
-// no-due-date tasks last, then by creation date ascending.
+// Open tasks before completed ones. Completed tasks sort by completion
+// date descending (most recently finished first) - due date and creation
+// date no longer mean anything once a task is done. Open tasks sort by
+// due date ascending with no-due-date tasks last, then by creation date
+// ascending.
 export function compareTasks(a: TaskSummary, b: TaskSummary): number {
   const completedDiff = Number(a.completed) - Number(b.completed);
   if (completedDiff !== 0) return completedDiff;
+
+  if (a.completed && b.completed) {
+    if (!a.completedAt) return 1;
+    if (!b.completedAt) return -1;
+    return new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime();
+  }
 
   if (a.dueDate !== b.dueDate) {
     if (!a.dueDate) return 1;

@@ -90,7 +90,7 @@ export function NotificationBell({ ownChamber, navigate }: NotificationBellProps
   }
 
   function openNotification(n: Notification) {
-    if (!n.readAt) void markRead(n.id);
+    void markRead(n.id);
     if (n.chamberUrl) {
       navigateToExhibit(ownChamber, { id: String(n.id), chamber: n.chamber, name: n.title, url: n.chamberUrl }, navigate, shellHosted);
     }
@@ -123,11 +123,7 @@ export function NotificationBell({ ownChamber, navigate }: NotificationBellProps
         </div>
         {notifications.length === 0 && <div className="notification-empty">Nothing here</div>}
         {notifications.map((n) => (
-          <div
-            key={n.id}
-            className={n.readAt ? "notification-item" : "notification-item unread"}
-            onClick={() => openNotification(n)}
-          >
+          <div key={n.id} className="notification-item" onClick={() => openNotification(n)}>
             <span className="notification-item-icon">{getChamberIcon(n.chamber)}</span>
             <div className="notification-item-body">
               <div className="notification-item-title">{n.title}</div>

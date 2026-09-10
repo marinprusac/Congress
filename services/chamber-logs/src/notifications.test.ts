@@ -150,6 +150,24 @@ describe("reading and dismissing", () => {
     expect(listNotifications().unreadCount).toBe(1);
   });
 
+  it("removes a read notification from the list, not just its unread count", () => {
+    push({ dedupeKey: "a" });
+    push({ dedupeKey: "b" });
+    const [first, second] = listNotifications().notifications;
+    markNotificationRead(first!.id);
+
+    const { notifications: remaining, unreadCount } = listNotifications();
+    expect(remaining.map((n) => n.id)).toEqual([second!.id]);
+    expect(unreadCount).toBe(1);
+  });
+
+  it("marking all read empties the list", () => {
+    push({ dedupeKey: "a" });
+    push({ dedupeKey: "b" });
+    markAllNotificationsRead();
+    expect(listNotifications().notifications).toHaveLength(0);
+  });
+
   it("lists newest first", () => {
     push({ dedupeKey: "older", title: "Older" });
     db.update(notifications).set({ createdAt: new Date(0) }).where(eq(notifications.dedupeKey, "older")).run();

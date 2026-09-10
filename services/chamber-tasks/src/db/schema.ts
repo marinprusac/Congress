@@ -8,6 +8,11 @@ export const tasks = sqliteTable(
     description: text("description").notNull().default(""),
     dueDate: integer("due_date", { mode: "timestamp_ms" }),
     completed: integer("completed", { mode: "boolean" }).notNull().default(false),
+    // Set when `completed` flips true, cleared when it flips back - lets
+    // the done list order by when a task was actually finished rather than
+    // its due date or creation date, which no longer mean anything once a
+    // task is done.
+    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
