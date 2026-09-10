@@ -29,7 +29,8 @@ export function registerTools(server: McpServer) {
     "get_note",
     {
       title: "Get Note",
-      description: "Get a single note's full content and frontmatter. Use Capitol's resolve_exhibits/search_exhibits for outgoing references and connections.",
+      description:
+        "Get a single note's full content and frontmatter. Use Congress's own resolve_exhibits/search_exhibits/get_exhibit_connections for outgoing references and connections, and get_exhibit_chip/create_exhibit_connection to link this note to another Exhibit.",
       inputSchema: { id: z.number().int() },
     },
     async ({ id }) => {
