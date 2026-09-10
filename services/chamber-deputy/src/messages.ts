@@ -24,10 +24,6 @@ export async function listRecentMessages(limit = MESSAGES_LIST_LIMIT): Promise<M
   return rows.map(toMessage).reverse();
 }
 
-// Inserted together, after the run completes - see chat.ts. The assistant
-// row's timestamp is nudged 1ms later than the user row's so chronological
-// ordering (by createdAt) is unambiguous even though both are written in the
-// same call.
 // The owner's "start fresh" action (ChatPage's Clear button) - Deputy keeps
 // no history beyond the current thread, so clearing means actually deleting
 // every stored message, not starting a new session id alongside old ones.
@@ -35,17 +31,31 @@ export function deleteAllMessages(): void {
   db.delete(messages).run();
 }
 
-export function insertMessagePair(sessionId: string, userText: string, assistantText: string): { userMessage: Message; assistantMessage: Message } {
-  const now = new Date();
-  const userRow = db
+// Written the moment the message is sent, not held in memory until the run
+// completes - see chat.ts. The queued headless run this message triggers can
+// take a while (concurrency-1 job queue, plus the run itself), and
+// ChatPage's optimistic cache write only lives in the browser's own
+// React-Query cache: a refresh mid-run used to lose the just-sent message
+// entirely until the assistant row landed alongside it, because both were
+// inserted together only once the run finished.
+export function insertUserMessage(sessionId: string, text: string): Message {
+  const row = db
     .insert(messages)
-    .values({ sessionId, role: "user", text: userText, createdAt: now })
+    .values({ sessionId, role: "user", text, createdAt: new Date() })
     .returning()
     .get();
-  const assistantRow = db
+  return toMessage(row);
+}
+
+// Written once the run finishes, pairing with the user row insertUserMessage
+// already wrote. `after` is that user row's own createdAt - the assistant
+// row's timestamp is nudged 1ms later so chronological ordering (by
+// createdAt) is unambiguous even on a fast reply.
+export function insertAssistantMessage(sessionId: string, text: string, after: Date): Message {
+  const row = db
     .insert(messages)
-    .values({ sessionId, role: "assistant", text: assistantText, createdAt: new Date(now.getTime() + 1) })
+    .values({ sessionId, role: "assistant", text, createdAt: new Date(after.getTime() + 1) })
     .returning()
     .get();
-  return { userMessage: toMessage(userRow), assistantMessage: toMessage(assistantRow) };
+  return toMessage(row);
 }

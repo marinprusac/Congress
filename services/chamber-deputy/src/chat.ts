@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { getLatestMessage, insertMessagePair, listRecentMessages, deleteAllMessages } from "./messages.js";
+import { getLatestMessage, insertUserMessage, insertAssistantMessage, listRecentMessages, deleteAllMessages } from "./messages.js";
 import { getSettings } from "./settings.js";
 import { enqueue } from "./jobQueue.js";
 import { runDeputy } from "./engine.js";
@@ -34,15 +34,25 @@ export async function postChatMessage(input: PostChatMessageRequest): Promise<{ 
   const settings = await getSettings();
   const resumeSessionId = resolveSessionToResume(settings.chatIdleWindowMs);
 
+  // Persisted immediately, before the queued run even starts, so the
+  // message survives a page refresh while Deputy is still working on a
+  // reply - see messages.ts's insertUserMessage. Its sessionId is only a
+  // best guess (the run below may mint a genuinely new one, e.g. when
+  // resumeSessionId is null); that's fine, since the assistant row inserted
+  // after it - and thus the *latest* row - always carries the real session
+  // id, which is all resolveSessionToResume ever reads.
+  const userMessage = insertUserMessage(resumeSessionId ?? randomUUID(), input.text);
+
   const result = await enqueue(() => runDeputy({ trigger: "chat", chatMessage: input.text, resumeSessionId }));
 
   // A paused/budget-capped run never reaches the CLI, so it never produces a
-  // session id - fall back to the session we tried to resume, or mint one so
-  // this exchange still has somewhere to live. That synthetic id simply
-  // won't --resume successfully later, which is fine: the next real message
-  // starts fresh either way.
-  const sessionId = result.sessionId ?? resumeSessionId ?? randomUUID();
+  // session id - fall back to the session we tried to resume, or the one we
+  // already minted for the user row above, so this exchange still has
+  // somewhere to live. That synthetic id simply won't --resume successfully
+  // later, which is fine: the next real message starts fresh either way.
+  const sessionId = result.sessionId ?? resumeSessionId ?? userMessage.sessionId;
   const replyText = result.ok ? (result.response ?? "(no response)") : (result.errorMessage ?? "Deputy failed to respond.");
 
-  return insertMessagePair(sessionId, input.text, replyText);
+  const assistantMessage = insertAssistantMessage(sessionId, replyText, new Date(userMessage.createdAt));
+  return { userMessage, assistantMessage };
 }

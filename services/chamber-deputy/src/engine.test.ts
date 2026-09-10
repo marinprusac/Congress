@@ -1,3 +1,5 @@
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 
 // Publishing is a network call (createPublishEvent -> Congress's event
@@ -6,7 +8,32 @@ import { describe, expect, it, vi } from "vitest";
 const publishEvent = vi.fn();
 vi.mock("./events.js", () => ({ publishEvent: (...args: unknown[]) => publishEvent(...args) }));
 
-import { reportRun, type SpawnResult } from "./engine.js";
+// A fake `claude` child process good enough to exercise spawnClaude's own
+// stdout-parsing/exit-code logic without actually shelling out - it feeds
+// the given stream-json lines through a real stdout PassThrough (spawnClaude
+// reads it via node:readline, so it has to behave like a real stream) and
+// then emits "close" with the given exit code, mirroring how the real CLI
+// process ends.
+let fakeChild: EventEmitter & { stdout: PassThrough; stderr: PassThrough };
+vi.mock("node:child_process", () => ({
+  spawn: vi.fn(() => fakeChild),
+}));
+
+function queueFakeChild(opts: { lines: string[]; exitCode: number; stderr?: string }): void {
+  const child = new EventEmitter() as EventEmitter & { stdout: PassThrough; stderr: PassThrough };
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  fakeChild = child;
+  queueMicrotask(() => {
+    for (const line of opts.lines) child.stdout.write(`${line}\n`);
+    child.stdout.end();
+    if (opts.stderr) child.stderr.write(opts.stderr);
+    child.stderr.end();
+    child.emit("close", opts.exitCode);
+  });
+}
+
+import { reportRun, spawnClaude, type SpawnResult } from "./engine.js";
 import type { DirectiveSummary } from "./types.js";
 
 const directive: DirectiveSummary = {
@@ -102,5 +129,64 @@ describe("a bundled chat run (no single directive)", () => {
     expect(event.payload.directiveId).toBeNull();
     expect(event.payload.directiveTitle).toBeNull();
     expect(event.payload.actionTaken).toBe(true);
+  });
+});
+
+describe("spawnClaude", () => {
+  const opts = { prompt: "do the thing", mcpConfigPath: "/tmp/mcp.json", model: "sonnet" };
+
+  it("trusts a successful result event over a nonzero exit code", async () => {
+    // Regression: a run that already streamed a successful "result" event
+    // (is_error: false, with the real response) used to get overridden into
+    // a reported failure if the CLI process happened to exit nonzero
+    // afterwards (e.g. shutdown/cleanup noise) - the actions it already took
+    // had genuinely succeeded, so the owner would see an error for a
+    // directive that, a moment later, turned out to have worked.
+    queueFakeChild({
+      lines: [
+        JSON.stringify({ session_id: "sess-1", type: "result", is_error: false, result: "Watered the plants.", total_cost_usd: 0.02 }),
+      ],
+      exitCode: 1,
+      stderr: "some unrelated shutdown warning",
+    });
+
+    const result = await spawnClaude(opts);
+
+    expect(result.ok).toBe(true);
+    expect(result.response).toBe("Watered the plants.");
+    expect(result.errorMessage).toBeNull();
+  });
+
+  it("still trusts a failed result event over a nonzero exit code", async () => {
+    queueFakeChild({
+      lines: [JSON.stringify({ session_id: "sess-1", type: "result", is_error: true, result: "Could not reach chamber-notes." })],
+      exitCode: 1,
+    });
+
+    const result = await spawnClaude(opts);
+
+    expect(result.ok).toBe(false);
+    expect(result.errorMessage).toBe("Could not reach chamber-notes.");
+  });
+
+  it("falls back to the exit code/stderr when no result event ever arrives", async () => {
+    queueFakeChild({ lines: [], exitCode: 1, stderr: "claude: command failed to start" });
+
+    const result = await spawnClaude(opts);
+
+    expect(result.ok).toBe(false);
+    expect(result.errorMessage).toBe("claude: command failed to start");
+  });
+
+  it("reports ok on a clean exit with a successful result", async () => {
+    queueFakeChild({
+      lines: [JSON.stringify({ session_id: "sess-1", type: "result", is_error: false, result: "Done." })],
+      exitCode: 0,
+    });
+
+    const result = await spawnClaude(opts);
+
+    expect(result.ok).toBe(true);
+    expect(result.response).toBe("Done.");
   });
 });

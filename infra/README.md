@@ -19,9 +19,11 @@ decision. See "Access control" below for what that means in practice.
 - Ports: this VPS already runs other services on `3000` and `4000`, so
   Congress's production port differs from its dev default: **Congress
   `8000`**, **Notes Chamber `8011`**, **Calendar Chamber `8012`**, **Documents
-  Chamber `8013`**, **Tasks Chamber `8014`**, **Capitol Chamber `8015`** (each
-  Chamber matches its dev default). All bind `127.0.0.1` only — the only
-  thing reachable from outside the box at all is Caddy, on 80/443.
+  Chamber `8013`**, **Tasks Chamber `8014`**, **Capitol Chamber `8015`**,
+  **Logs Chamber `8016`**, **Automation Chamber `8017`**, **Deputy Chamber
+  `8018`**, **Map Chamber `8019`**, **Fitness Chamber `8020`** (each Chamber
+  matches its dev default). All bind `127.0.0.1` only — the only thing
+  reachable from outside the box at all is Caddy, on 80/443.
 - Each service's `.env` (untracked, created by hand on the server) sets
   `NODE_ENV=production` and a shared `CONGRESS_INTERNAL_TOKEN`. Congress's
   `.env` additionally sets `CONGRESS_MASTER_PASSWORD_HASH` and
@@ -32,9 +34,11 @@ decision. See "Access control" below for what that means in practice.
 
 Every service (`congress-core`, `congress-chamber-notes`,
 `congress-chamber-calendar`, `congress-chamber-documents`,
-`congress-chamber-tasks`, `congress-chamber-capitol`) has its own discrete
-unit under `infra/systemd/`, installed at `/etc/systemd/system/` and enabled
-(`systemctl enable --now`). All six share the same body: `User=marin`,
+`congress-chamber-tasks`, `congress-chamber-capitol`, `congress-chamber-logs`,
+`congress-chamber-automation`, `congress-chamber-deputy`,
+`congress-chamber-map`, `congress-chamber-fitness`) has its own discrete unit
+under `infra/systemd/`, installed at `/etc/systemd/system/` and enabled
+(`systemctl enable --now`). All share the same body: `User=marin`,
 `WorkingDirectory=` the service dir, `ExecStart=/usr/bin/pnpm run start`,
 `Restart=on-failure`.
 
@@ -185,12 +189,13 @@ the private half only needs to exist as that GitHub secret from then on.
 
 ## First-time server bootstrap
 
-This is what setting up a fresh VPS from scratch looks like today, for all
-five current services. (The very first VPS setup only had Capitol + Notes
-live at this stage and the reference block here used to reflect that
-snapshot rather than the current system — since corrected. If you're adding
-a *new* Chamber to an already-running server rather than bootstrapping from
-zero, see "Adding a new Chamber's infra" above instead.)
+This is what setting up a fresh VPS from scratch looks like today, for the
+full current set of services (Congress plus every `chamber-*` service in
+`services/`). (The very first VPS setup only had Capitol + Notes live at this
+stage and the reference block here used to reflect that snapshot rather than
+the current system — since corrected. If you're adding a *new* Chamber to an
+already-running server rather than bootstrapping from zero, see "Adding a new
+Chamber's infra" above instead.)
 
 Nothing here is cloned from git anymore — the server only ever receives
 files pushed by CI (see "Deploy: GitHub Actions → server" above), so

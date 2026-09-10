@@ -57,7 +57,7 @@ function stringifyToolContent(content: unknown): string {
 // ensures the only MCP servers Deputy ever sees are the ones this run's own
 // mcpConfig.ts generated from the live Chamber registry - never whatever
 // else might be configured in this environment.
-async function spawnClaude(opts: { prompt: string; mcpConfigPath: string; model: string; resumeSessionId?: string | null }): Promise<SpawnResult> {
+export async function spawnClaude(opts: { prompt: string; mcpConfigPath: string; model: string; resumeSessionId?: string | null }): Promise<SpawnResult> {
   const args = [
     "-p",
     opts.prompt,
@@ -99,6 +99,14 @@ async function spawnClaude(opts: { prompt: string; mcpConfigPath: string; model:
   let outputTokens: number | null = null;
   let ok = false;
   let errorMessage: string | null = null;
+  // Whether a terminal "result" event was ever parsed off stdout - once one
+  // arrives it's the authoritative verdict for this run (it's what actually
+  // carries is_error/response from the CLI itself), so a nonzero exit code
+  // after that point must never override it. The CLI can still exit nonzero
+  // on a run that already reported success (e.g. cleanup/shutdown noise
+  // after streaming the result) - without this guard that flipped an
+  // already-successful, already-actioned run into a reported failure.
+  let gotResult = false;
 
   const rl = createInterface({ input: child.stdout });
   rl.on("line", (line) => {
@@ -133,6 +141,7 @@ async function spawnClaude(opts: { prompt: string; mcpConfigPath: string; model:
         }
       }
     } else if (evt.type === "result") {
+      gotResult = true;
       ok = evt.is_error !== true;
       response = typeof evt.result === "string" ? evt.result : null;
       costUsd = typeof evt.total_cost_usd === "number" ? evt.total_cost_usd : null;
@@ -153,7 +162,12 @@ async function spawnClaude(opts: { prompt: string; mcpConfigPath: string; model:
     child.on("close", (code) => resolve(code ?? -1));
   });
 
-  if (exitCode !== 0 && !errorMessage) {
+  // Only a fallback for a run that never got far enough to stream its own
+  // verdict (crashed/killed before a "result" line) - once gotResult is
+  // true, ok/errorMessage already reflect the CLI's own is_error, and a
+  // nonzero exit after that point (cleanup/shutdown noise, an MCP client
+  // still tearing down) must not override it.
+  if (!gotResult && exitCode !== 0) {
     ok = false;
     errorMessage = stderrOutput.trim() || `claude exited with code ${exitCode}`;
   }
