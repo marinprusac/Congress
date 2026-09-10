@@ -14,6 +14,7 @@ import {
 } from "@/lib/datetime";
 import { AgendaGapRow } from "@/components/AgendaGapRow";
 import { DraggableEventBlock } from "@/components/DraggableEventBlock";
+import { OverlapEventBlock } from "@/components/OverlapEventBlock";
 
 // How often the now-indicator's position is recomputed while the page sits
 // open - fine-grained enough that it visibly moves over a session, without
@@ -367,12 +368,22 @@ export function AgendaPage() {
                     {formatClockTime(Math.min(...entry.blocks.map((b) => new Date(b.event.start).getTime())))}
                   </div>
                   <div className="relative min-w-0 flex-1" style={{ height: containerHeightPx }}>
-                    {/* Paint layer: the full-width, alpha-blended bars described
-                        above. Purely visual (pointer-events-none) - stacking
-                        order comes from each block's chronological position in
-                        the cluster (stackIndex), not its column, since most
-                        blocks now share column 0 (see the hit layer's own note
-                        below) and would otherwise tie. */}
+                    {/* Each block renders its own full-width, alpha-blended
+                        paint bar (stacked by stackIndex, its chronological
+                        position in the cluster - most blocks share column 0,
+                        see below, and would otherwise tie) plus its own hit/
+                        drag target - full width unless it substantially
+                        overlaps another block in the cluster, in which case
+                        it gets an exclusive column-width slice instead (two
+                        blocks that only brush each other in time both stay
+                        fully tappable across their own true span; two that
+                        substantially, or exactly, coincide split the width so
+                        each stays independently reachable and draggable).
+                        The hit target's own stacking is always above every
+                        paint bar, so in a genuinely ambiguous full-width
+                        overlap the later-starting block wins the tap. See
+                        OverlapEventBlock for why both layers move together
+                        during a drag. */}
                     {blockLayouts.map(({ block, stackIndex, unconfirmed, top, height }) => {
                       const event = block.event;
                       const textIndent = `calc(${(block.column / block.columnCount) * 100}% + 8px)`;
@@ -380,62 +391,22 @@ export function AgendaPage() {
                         block.nowOffsetMinutes !== undefined
                           ? Math.min(100, Math.max(0, (block.nowOffsetMinutes / Math.max(1, block.durationMinutes)) * 100))
                           : null;
-                      return (
-                        <div
-                          key={event.id}
-                          aria-hidden="true"
-                          className={`pointer-events-none absolute inset-x-0 overflow-hidden border-l-2 py-1 ${
-                            unconfirmed ? "border-dashed border-accent/50 bg-accent/[0.03]" : "border-accent bg-accent/[0.08]"
-                          }`}
-                          style={{ top, height, zIndex: stackIndex + 1 }}
-                        >
-                          <div
-                            className={`truncate font-display text-xs leading-snug ${unconfirmed ? "text-ink/70" : "text-ink"}`}
-                            style={{ paddingLeft: textIndent, paddingRight: 8 }}
-                          >
-                            {event.title}
-                          </div>
-                          {height > 30 && (
-                            <div
-                              className="truncate font-mono text-[10px] text-dust"
-                              style={{ paddingLeft: textIndent, paddingRight: 8 }}
-                            >
-                              {formatEventStartTime(event)}
-                            </div>
-                          )}
-                          {nowPercent !== null && (
-                            <div
-                              className="pointer-events-none absolute inset-x-0 h-px bg-alert"
-                              style={{ top: `${nowPercent}%` }}
-                              aria-hidden="true"
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
-                    {/* Hit layer: full-width unless this block substantially
-                        overlaps another in the cluster, in which case it gets
-                        an exclusive column-width slice instead - two blocks
-                        that only brush each other in time both stay fully
-                        tappable across their own true span; two that
-                        substantially (or exactly) coincide split the width so
-                        each stays independently reachable. Stacking again
-                        comes from stackIndex (always above the paint layer),
-                        so in a genuinely ambiguous full-width overlap the
-                        later-starting block wins the tap. */}
-                    {blockLayouts.map(({ block, stackIndex, top, height }) => {
-                      const event = block.event;
                       const leftPercent = (block.column / block.columnCount) * 100;
                       const widthPercent = 100 / block.columnCount;
                       return (
-                        <Link
-                          key={`${event.id}-hit`}
-                          to={eventHref(event)}
-                          onMouseEnter={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
-                          onFocus={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
-                          aria-label={`${event.title}, ${formatEventStartTime(event)}–${formatEventEndTime(event)}`}
-                          className="absolute rounded-sm hover:bg-accent/20 focus-visible:bg-accent/20"
-                          style={{ top, height, left: `${leftPercent}%`, width: `${widthPercent}%`, zIndex: 100 + stackIndex }}
+                        <OverlapEventBlock
+                          key={event.id}
+                          block={block}
+                          stackIndex={stackIndex}
+                          unconfirmed={unconfirmed}
+                          top={top}
+                          height={height}
+                          leftPercent={leftPercent}
+                          widthPercent={widthPercent}
+                          textIndent={textIndent}
+                          nowPercent={nowPercent}
+                          href={eventHref(event)}
+                          onPrefetch={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
                         />
                       );
                     })}
