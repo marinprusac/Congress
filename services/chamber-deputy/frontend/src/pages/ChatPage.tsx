@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormSubmitButton, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
-import { useNavigate } from "react-router-dom";
-import { fetchMessages, postChatMessage, clearChatThread } from "@/lib/api";
+import { Link, useNavigate } from "react-router-dom";
+import { fetchMessages, postChatMessage, clearChatThread, fetchSettings } from "@/lib/api";
 import { useDeputyRunStream } from "@/lib/useDeputyRunStream";
 import type { Message } from "../../../src/types";
 
@@ -47,6 +47,12 @@ export function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const messagesQuery = useQuery({ queryKey: ["messages"], queryFn: fetchMessages });
+  // See DirectivesListPage's own comment on this same query - a paused
+  // Deputy still replies (chat.ts surfaces the pause reason as its own
+  // reply text), but that's easy to read as a broken/unhelpful response
+  // rather than Deputy having declined to actually do anything.
+  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
+  const paused = settingsQuery.data?.paused ?? false;
 
   const mutation = useMutation({
     mutationFn: (input: { text: string }) => postChatMessage(input),
@@ -99,6 +105,15 @@ export function ChatPage() {
       <div className="flex shrink-0 items-center justify-center px-4 pt-3 pb-2 sm:px-6 sm:pt-5">
         <h2 className="font-display text-2xl text-ink sm:text-3xl">Chat</h2>
       </div>
+
+      {paused && (
+        <div className="mx-4 mb-2 shrink-0 border border-alert px-3 py-2 font-mono text-sm text-alert sm:mx-6">
+          Deputy is paused{settingsQuery.data?.pausedReason ? ` — ${settingsQuery.data.pausedReason}` : "."}{" "}
+          <Link to="/settings?from=deputy" className="underline">
+            Resume in Settings
+          </Link>
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 sm:px-6">
         {messagesQuery.isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}

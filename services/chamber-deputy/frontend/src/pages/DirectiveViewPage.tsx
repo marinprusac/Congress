@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ExhibitFieldEditor,
@@ -14,7 +14,7 @@ import {
   fetchEventCatalog,
   useAutosave,
 } from "@congress/congress-ui";
-import { fetchDirective, updateDirective, deleteDirective, runDirective } from "@/lib/api";
+import { fetchDirective, updateDirective, deleteDirective, runDirective, fetchSettings } from "@/lib/api";
 import { useDeputyRunStream } from "@/lib/useDeputyRunStream";
 import type { UpdateDirectiveRequest } from "../../../src/types";
 import { ScheduleEditor, EMPTY_SCHEDULE, type ScheduleDraft } from "@/components/ScheduleEditor";
@@ -29,6 +29,12 @@ export function DirectiveViewPage() {
   const [draft, setDraft] = useState<UpdateDirectiveRequest>({});
   const [schedule, setSchedule] = useState<ScheduleDraft>(EMPTY_SCHEDULE);
   const runStream = useDeputyRunStream();
+  // See DirectivesListPage's own comment on this same query - a paused
+  // Deputy (budget cap or owner-paused) makes "Run now" return instantly
+  // with ok:false, which without this reads as the button just doing
+  // nothing rather than Deputy having declined to run.
+  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
+  const paused = settingsQuery.data?.paused ?? false;
 
   const directiveQuery = useQuery({
     queryKey: ["directive", directiveId],
@@ -126,6 +132,15 @@ export function DirectiveViewPage() {
 
       {updateMutation.isError && <p className="mb-4 font-mono text-sm text-alert">{(updateMutation.error as Error).message}</p>}
 
+      {paused && (
+        <div className="mb-4 border border-alert px-3 py-2 font-mono text-sm text-alert">
+          Deputy is paused{settingsQuery.data?.pausedReason ? ` — ${settingsQuery.data.pausedReason}` : "."}{" "}
+          <Link to="/settings?from=deputy" className="underline">
+            Resume in Settings
+          </Link>
+        </div>
+      )}
+
       {isThisRunning && (
         <div className="mb-4 border border-accent/40 bg-accent/[0.06] p-3">
           <p className="mb-1 font-mono text-xs uppercase tracking-wide text-accent">Running now</p>
@@ -150,7 +165,12 @@ export function DirectiveViewPage() {
         editable
         actions={
           <ExhibitActionBar>
-            <button onClick={() => runMutation.mutate()} disabled={runMutation.isPending} className="tap-target text-accent hover:underline disabled:opacity-50">
+            <button
+              onClick={() => runMutation.mutate()}
+              disabled={runMutation.isPending || paused}
+              title={paused ? "Deputy is paused" : undefined}
+              className="tap-target text-accent hover:underline disabled:opacity-50"
+            >
               {runMutation.isPending ? "Running —" : "Run now"}
             </button>
             <button onClick={toggleEnabled} className="tap-target text-accent hover:underline">

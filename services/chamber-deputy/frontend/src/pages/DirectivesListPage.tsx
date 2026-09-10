@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useShellHosted,
   resolveChamberPath,
@@ -12,7 +12,7 @@ import {
   ListEmptyState,
   showToast,
 } from "@congress/congress-ui";
-import { fetchDirectives, fetchDirective, searchDirectives, runDirective } from "@/lib/api";
+import { fetchDirectives, fetchDirective, searchDirectives, runDirective, fetchSettings } from "@/lib/api";
 import { useDeputyRunStream } from "@/lib/useDeputyRunStream";
 import { DirectiveProgressRing } from "@/components/DirectiveProgressRing";
 import { directiveProgressFraction } from "@/lib/directiveProgress";
@@ -73,6 +73,17 @@ export function DirectivesListPage() {
   const runStream = useDeputyRunStream();
   const runningDirectiveId = runStream.active && runStream.kind === "directive" ? runStream.directiveId : null;
 
+  // A paused Deputy (the daily budget cap auto-pauses it, or the owner
+  // paused it by hand in Settings) returns instantly, without ever spawning
+  // a run - the Play button's own mutation still fires and still succeeds
+  // (ok:false, with the reason), but that's easy to miss as a passing toast:
+  // the ring just flashes into its spinning state and back out within a
+  // fraction of a second, reading as "the button did nothing" rather than
+  // "Deputy declined to run". Surfaced here as a standing banner instead so
+  // it isn't a one-shot toast the owner has to catch mid-tap.
+  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
+  const paused = settingsQuery.data?.paused ?? false;
+
   const now = useNowTick(TICK_MS);
 
   const prefetchDirective = useListRowPrefetch((id: number) => ["directive", id], fetchDirective);
@@ -100,6 +111,15 @@ export function DirectivesListPage() {
           </Link>
         }
       />
+
+      {paused && (
+        <div className="mb-4 border border-alert px-3 py-2 font-mono text-sm text-alert">
+          Deputy is paused{settingsQuery.data?.pausedReason ? ` — ${settingsQuery.data.pausedReason}` : "."}{" "}
+          <Link to="/settings?from=deputy" className="underline">
+            Resume in Settings
+          </Link>
+        </div>
+      )}
 
       <div className="border-t border-dust">
         {isLoading && <ListLoadingState />}
@@ -135,9 +155,9 @@ export function DirectivesListPage() {
                 <button
                   type="button"
                   onClick={() => runMutation.mutate(directive.id)}
-                  disabled={running}
+                  disabled={running || paused}
                   aria-label={`Run "${directive.title}" now`}
-                  title="Run now"
+                  title={paused ? "Deputy is paused" : "Run now"}
                   className="tap-target flex shrink-0 items-center px-3 text-slate hover:text-accent disabled:opacity-50"
                 >
                   <span className="directive-progress-ring-wrap">

@@ -14,13 +14,15 @@ vi.mock("./events.js", () => ({ publishEvent: (...args: unknown[]) => publishEve
 // reads it via node:readline, so it has to behave like a real stream) and
 // then emits "close" with the given exit code, mirroring how the real CLI
 // process ends.
-let fakeChild: EventEmitter & { stdout: PassThrough; stderr: PassThrough };
+let fakeChild: EventEmitter & { stdin: PassThrough; stdout: PassThrough; stderr: PassThrough };
+const spawnMock = vi.fn((..._args: unknown[]) => fakeChild);
 vi.mock("node:child_process", () => ({
-  spawn: vi.fn(() => fakeChild),
+  spawn: (...args: unknown[]) => spawnMock(...args),
 }));
 
 function queueFakeChild(opts: { lines: string[]; exitCode: number; stderr?: string }): void {
-  const child = new EventEmitter() as EventEmitter & { stdout: PassThrough; stderr: PassThrough };
+  const child = new EventEmitter() as EventEmitter & { stdin: PassThrough; stdout: PassThrough; stderr: PassThrough };
+  child.stdin = new PassThrough();
   child.stdout = new PassThrough();
   child.stderr = new PassThrough();
   fakeChild = child;
@@ -176,6 +178,31 @@ describe("spawnClaude", () => {
 
     expect(result.ok).toBe(false);
     expect(result.errorMessage).toBe("claude: command failed to start");
+  });
+
+  it("writes the prompt to the child's stdin rather than passing it as a CLI argument", async () => {
+    // Regression: the prompt used to travel as a positional CLI argument
+    // ("-p", opts.prompt, ...) - a scheduled/event run's own prompt embeds
+    // every event received since that directive last ran (an unbounded
+    // backlog), and a long enough one blew straight through the OS's argv
+    // size limit, failing every subsequent run for that directive with
+    // "spawn E2BIG" before the process ever started. Piped over stdin
+    // instead, there's no such limit.
+    queueFakeChild({
+      lines: [JSON.stringify({ session_id: "sess-1", type: "result", is_error: false, result: "Done." })],
+      exitCode: 0,
+    });
+
+    let written = "";
+    fakeChild.stdin.on("data", (chunk: Buffer) => {
+      written += chunk.toString();
+    });
+
+    await spawnClaude(opts);
+
+    expect(written).toBe(opts.prompt);
+    const [, args] = spawnMock.mock.calls[0]!;
+    expect(args as string[]).not.toContain(opts.prompt);
   });
 
   it("reports ok on a clean exit with a successful result", async () => {

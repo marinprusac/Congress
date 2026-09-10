@@ -69,13 +69,22 @@ function stringifyToolContent(content: unknown): string {
 // ensures the only MCP servers Deputy ever sees are the ones this run's own
 // mcpConfig.ts generated from the live Chamber registry - never whatever
 // else might be configured in this environment.
+//
+// The prompt itself travels over stdin, not as a positional CLI argument -
+// a scheduled/event run's own prompt embeds every event received since this
+// directive last ran (promptAssembly.ts's formatEvents), which has no fixed
+// upper bound. A long enough backlog blew straight through the OS's argv
+// size limit (a directive whose own timer had gone unfired for a while,
+// piling up a large event backlog, started failing every subsequent run
+// with "spawn E2BIG" - the process never even started, so this failed
+// identically whether the run was scheduled, event-triggered, or a manual
+// "Run now" click). Piped over stdin instead, the prompt has no such limit.
 export async function spawnClaude(
   opts: { prompt: string; mcpConfigPath: string; model: string; resumeSessionId?: string | null },
   onEvent?: (event: SpawnProgressEvent) => void
 ): Promise<SpawnResult> {
   const args = [
     "-p",
-    opts.prompt,
     "--mcp-config",
     opts.mcpConfigPath,
     "--strict-mcp-config",
@@ -102,8 +111,10 @@ export async function spawnClaude(
   const startedAt = Date.now();
   const child = spawn("claude", args, {
     env: childEnv,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["pipe", "pipe", "pipe"],
   });
+  child.stdin.write(opts.prompt);
+  child.stdin.end();
 
   const transcript: DeputyTranscriptEntry[] = [];
   const pendingToolUses = new Map<string, { name: string; input: unknown }>();
