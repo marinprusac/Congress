@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormSubmitButton, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { useNavigate } from "react-router-dom";
 import { fetchMessages, postChatMessage, clearChatThread } from "@/lib/api";
+import { useDeputyRunStream } from "@/lib/useDeputyRunStream";
 import type { Message } from "../../../src/types";
 
 // Mirrors DirectivesListPage's own chat-toggle icon, in the same leading
@@ -23,13 +24,16 @@ function DirectivesIcon() {
   );
 }
 
-// Deliberately a plain request/response exchange, not a live-streaming
-// interface - the POST blocks on the queued headless run itself (see
-// chat.ts/jobQueue.ts), which matches the "terse, transactional, not a chat
-// companion" framing (docs/deputy-chamber-plan.md §1) better than a
-// typing-indicator UI would. The sent message still shows up right away
-// though, via an optimistic cache write in onMutate below - the user
-// shouldn't stare at an unchanged transcript for however long the run takes.
+// The POST still blocks on the queued headless run itself (see
+// chat.ts/jobQueue.ts) - the message/reply exchange itself stays a plain
+// request/response, matching the "terse, transactional, not a chat
+// companion" framing (docs/deputy-chamber-plan.md §1) rather than a
+// streamed-reply UI. While that request is in flight, though, useDeputyRunStream
+// (GET /api/runs/stream) surfaces live tool-call progress below the
+// transcript, so the wait isn't just a static "working" caption. The sent
+// message still shows up right away too, via an optimistic cache write in
+// onMutate below - the user shouldn't stare at an unchanged transcript for
+// however long the run takes.
 //
 // Deputy keeps no history beyond the current thread (see chat.ts's
 // clearThread) - there's never more than one session's worth of messages to
@@ -37,6 +41,7 @@ function DirectivesIcon() {
 export function ChatPage() {
   const navigate = useNavigate();
   const shellHosted = useShellHosted();
+  const runStream = useDeputyRunStream();
   const queryClient = useQueryClient();
   const [text, setText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -106,7 +111,21 @@ export function ChatPage() {
             <p className="whitespace-pre-wrap font-mono text-sm text-ink">{message.text}</p>
           </div>
         ))}
-        {mutation.isPending && <p className="font-mono text-xs text-dust">Deputy is working —</p>}
+        {mutation.isPending && (
+          <div className="font-mono text-xs text-dust">
+            {runStream.kind === "chat" && runStream.toolCalls.length > 0 ? (
+              <ul className="space-y-0.5">
+                {runStream.toolCalls.map((call, index) => (
+                  <li key={index}>
+                    {call.done ? (call.error ? "✗" : "✓") : "…"} {call.toolName}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              "Deputy is working —"
+            )}
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 

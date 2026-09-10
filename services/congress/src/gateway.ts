@@ -13,6 +13,13 @@ const FORWARD_TIMEOUT_MS = 10_000;
 // gets persisted - the reload-and-it's-there symptom this constant fixes.
 const DEPUTY_CHAT_TIMEOUT_MS = 5 * 60 * 1000;
 
+// Deputy's own run-progress SSE stream (see chamber-deputy/src/server.ts's
+// GET /api/runs/stream) is meant to stay open indefinitely, not just longer
+// than the default - AbortSignal.timeout(Infinity) itself throws, so
+// timeoutFor returns Infinity here and proxyRequest below skips
+// constructing a timeout signal at all for it.
+const DEPUTY_STREAM_NO_TIMEOUT = Infinity;
+
 // A Chamber's registered apiBase is its origin plus "/api"; its frontend and
 // its public assets are served from the origin itself. Named rather than
 // inlined at each call site both because it is the same rule twice over and
@@ -36,9 +43,10 @@ export function rewriteChamberPath(path: string, prefix: string, base: string, s
 // responding; every other Chamber route answers in milliseconds. See
 // DEPUTY_CHAT_TIMEOUT_MS above.
 export function timeoutFor(chamberName: string, method: string, remainder: string): number {
-  return chamberName === "deputy" && method === "POST" && remainder === "/chat/messages"
-    ? DEPUTY_CHAT_TIMEOUT_MS
-    : FORWARD_TIMEOUT_MS;
+  if (chamberName !== "deputy") return FORWARD_TIMEOUT_MS;
+  if (method === "POST" && remainder === "/chat/messages") return DEPUTY_CHAT_TIMEOUT_MS;
+  if (method === "GET" && remainder === "/runs/stream") return DEPUTY_STREAM_NO_TIMEOUT;
+  return FORWARD_TIMEOUT_MS;
 }
 
 const HOP_BY_HOP_HEADERS = new Set([
@@ -73,7 +81,10 @@ async function proxyRequest(c: Context, targetUrl: string, timeoutMs: number = F
     // fetch() would otherwise silently resolve the redirect target itself
     // and hand back that page's body under this request's original status.
     redirect: "manual",
-    signal: AbortSignal.timeout(timeoutMs),
+    // AbortSignal.timeout(Infinity) itself throws - a stream meant to stay
+    // open indefinitely (see DEPUTY_STREAM_NO_TIMEOUT above) passes no
+    // signal at all rather than an unreachable one.
+    signal: Number.isFinite(timeoutMs) ? AbortSignal.timeout(timeoutMs) : undefined,
   });
 
   const responseHeaders = new Headers();

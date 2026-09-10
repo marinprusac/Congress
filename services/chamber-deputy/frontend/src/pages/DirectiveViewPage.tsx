@@ -15,6 +15,7 @@ import {
   useAutosave,
 } from "@congress/congress-ui";
 import { fetchDirective, updateDirective, deleteDirective, runDirective } from "@/lib/api";
+import { useDeputyRunStream } from "@/lib/useDeputyRunStream";
 import type { UpdateDirectiveRequest } from "../../../src/types";
 import { ScheduleEditor, EMPTY_SCHEDULE, type ScheduleDraft } from "@/components/ScheduleEditor";
 
@@ -27,6 +28,7 @@ export function DirectiveViewPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [draft, setDraft] = useState<UpdateDirectiveRequest>({});
   const [schedule, setSchedule] = useState<ScheduleDraft>(EMPTY_SCHEDULE);
+  const runStream = useDeputyRunStream();
 
   const directiveQuery = useQuery({
     queryKey: ["directive", directiveId],
@@ -96,6 +98,7 @@ export function DirectiveViewPage() {
   if (directiveQuery.isError || !directiveQuery.data) return <p className="font-mono text-sm text-alert">Directive not found.</p>;
 
   const directive = directiveQuery.data;
+  const isThisRunning = runStream.active && runStream.kind === "directive" && runStream.directiveId === directiveId;
 
   // Bypasses the debounce for an instant flip (the button's label/strike-
   // through reads from `directive.enabled`, not `draft.enabled`, so a
@@ -122,6 +125,23 @@ export function DirectiveViewPage() {
       </div>
 
       {updateMutation.isError && <p className="mb-4 font-mono text-sm text-alert">{(updateMutation.error as Error).message}</p>}
+
+      {isThisRunning && (
+        <div className="mb-4 border border-accent/40 bg-accent/[0.06] p-3">
+          <p className="mb-1 font-mono text-xs uppercase tracking-wide text-accent">Running now</p>
+          {runStream.toolCalls.length === 0 ? (
+            <p className="font-mono text-xs text-ink">Starting —</p>
+          ) : (
+            <ul className="space-y-0.5 font-mono text-xs text-ink">
+              {runStream.toolCalls.map((call, index) => (
+                <li key={index}>
+                  {call.done ? (call.error ? "✗" : "✓") : "…"} {call.toolName}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <ExhibitLinksLayout
         exhibitId={`directive-${directiveId}`}

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   useShellHosted,
   resolveChamberPath,
@@ -12,16 +12,17 @@ import {
   ListEmptyState,
   showToast,
 } from "@congress/congress-ui";
-import { fetchDirectives, fetchDirective, searchDirectives, runDirective, fetchRunningDirective } from "@/lib/api";
+import { fetchDirectives, fetchDirective, searchDirectives, runDirective } from "@/lib/api";
+import { useDeputyRunStream } from "@/lib/useDeputyRunStream";
 import { DirectiveProgressRing } from "@/components/DirectiveProgressRing";
 import { directiveProgressFraction } from "@/lib/directiveProgress";
 import { formatSchedule } from "@/lib/formatSchedule";
 
-// Drives both the progress rings' live fill and how fresh the list itself
-// (lastRunAt/intervalMs) needs to be - short enough that a scheduled run
-// firing elsewhere shows up promptly, cheap enough for a personal system's
-// own SQLite to not think twice about.
-const RUNNING_POLL_MS = 2_000;
+// Drives how fresh the list itself (lastRunAt/intervalMs) needs to be -
+// short enough that a scheduled run firing elsewhere shows up promptly,
+// cheap enough for a personal system's own SQLite to not think twice about.
+// The rings' own "is this one running" state comes from useDeputyRunStream
+// (live, pushed) instead of a poll now - see runningDirectiveId below.
 const LIST_POLL_MS = 5_000;
 const TICK_MS = 1_000;
 
@@ -67,13 +68,10 @@ export function DirectivesListPage() {
 
   // Which directive (if any) currently has a run actually in flight -
   // covers a run kicked off anywhere (this tab's own play button, another
-  // tab, or checkup.ts's own scheduler on the backend), not just this one.
-  const runningQuery = useQuery({
-    queryKey: ["directives", "running"],
-    queryFn: fetchRunningDirective,
-    refetchInterval: RUNNING_POLL_MS,
-  });
-  const runningDirectiveId = runningQuery.data?.directiveId ?? null;
+  // tab, or checkup.ts's own scheduler on the backend), not just this one,
+  // pushed live over SSE rather than polled.
+  const runStream = useDeputyRunStream();
+  const runningDirectiveId = runStream.active && runStream.kind === "directive" ? runStream.directiveId : null;
 
   const now = useNowTick(TICK_MS);
 
@@ -112,6 +110,7 @@ export function DirectivesListPage() {
           data?.map((directive) => {
             const running = runningDirectiveId === directive.id || (runMutation.isPending && runMutation.variables === directive.id);
             const fraction = directiveProgressFraction(directive.lastRunAt, directive.nextRunAt, directive.createdAt, directive.scheduleCycleStart, now);
+            const liveToolName = running && runningDirectiveId === directive.id ? runStream.toolCalls.at(-1)?.toolName : null;
             return (
               <div key={directive.id} className="flex items-stretch gap-1 border-b border-dust">
                 <Link
@@ -127,7 +126,11 @@ export function DirectivesListPage() {
                       {!directive.enabled && "disabled"}
                     </span>
                   </div>
-                  {directive.body && <p className="mt-1 truncate text-sm text-slate">{directive.body}</p>}
+                  {liveToolName ? (
+                    <p className="mt-1 truncate font-mono text-xs text-accent">Calling {liveToolName} —</p>
+                  ) : (
+                    directive.body && <p className="mt-1 truncate text-sm text-slate">{directive.body}</p>
+                  )}
                 </Link>
                 <button
                   type="button"

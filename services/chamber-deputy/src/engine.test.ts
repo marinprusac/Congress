@@ -189,4 +189,50 @@ describe("spawnClaude", () => {
     expect(result.ok).toBe(true);
     expect(result.response).toBe("Done.");
   });
+
+  it("streams tool_start/tool_result/assistant_text onEvent callbacks in order as it parses", async () => {
+    queueFakeChild({
+      lines: [
+        JSON.stringify({
+          type: "assistant",
+          message: { content: [{ type: "tool_use", id: "call-1", name: "notes.search_notes", input: { query: "plants" } }] },
+        }),
+        JSON.stringify({
+          type: "user",
+          message: { content: [{ type: "tool_result", tool_use_id: "call-1", content: [{ type: "text", text: "found 2 notes" }], is_error: false }] },
+        }),
+        JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "Here's what I found." }] } }),
+        JSON.stringify({ session_id: "sess-1", type: "result", is_error: false, result: "Here's what I found.", total_cost_usd: 0.01 }),
+      ],
+      exitCode: 0,
+    });
+
+    const events: unknown[] = [];
+    await spawnClaude(opts, (event) => events.push(event));
+
+    expect(events).toEqual([
+      { type: "tool_start", toolName: "notes.search_notes", input: { query: "plants" } },
+      { type: "tool_result", toolName: "notes.search_notes", output: [{ type: "text", text: "found 2 notes" }], error: null },
+      { type: "assistant_text", text: "Here's what I found." },
+    ]);
+  });
+
+  it("reports a tool error on the tool_result onEvent callback", async () => {
+    queueFakeChild({
+      lines: [
+        JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", id: "call-1", name: "notes.create_note", input: {} }] } }),
+        JSON.stringify({
+          type: "user",
+          message: { content: [{ type: "tool_result", tool_use_id: "call-1", content: "permission denied", is_error: true }] },
+        }),
+        JSON.stringify({ session_id: "sess-1", type: "result", is_error: true, result: "Could not create the note." }),
+      ],
+      exitCode: 0,
+    });
+
+    const events: unknown[] = [];
+    await spawnClaude(opts, (event) => events.push(event));
+
+    expect(events).toContainEqual({ type: "tool_result", toolName: "notes.create_note", output: "permission denied", error: "permission denied" });
+  });
 });

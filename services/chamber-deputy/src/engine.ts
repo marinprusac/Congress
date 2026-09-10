@@ -6,7 +6,19 @@ import { recordSpend, todaySpendUsd } from "./spend.js";
 import { writeMcpConfigFile } from "./mcpConfig.js";
 import { buildPrompt, type PromptContext } from "./promptAssembly.js";
 import { publishEvent } from "./events.js";
+import { startRun, emitProgress, finishRun, type RunKind } from "./runStream.js";
 import type { DeputyRunTrigger, DeputyTranscriptEntry, DirectiveSummary } from "./types.js";
+
+// What spawnClaude reports as a run progresses, before it's known which
+// runId this run will be assigned in runStream.ts - runDeputy tags each one
+// with that runId on the way to emitProgress. Deliberately mirrors (a
+// subset of) RunProgressEvent's own shape rather than importing it directly,
+// since spawnClaude has no business knowing about runs/runIds at all - only
+// about what it just parsed off the CLI's stdout.
+export type SpawnProgressEvent =
+  | { type: "tool_start"; toolName: string; input: unknown }
+  | { type: "tool_result"; toolName: string; output: unknown; error: string | null }
+  | { type: "assistant_text"; text: string };
 
 export interface RunContext extends PromptContext {
   trigger: DeputyRunTrigger;
@@ -57,7 +69,10 @@ function stringifyToolContent(content: unknown): string {
 // ensures the only MCP servers Deputy ever sees are the ones this run's own
 // mcpConfig.ts generated from the live Chamber registry - never whatever
 // else might be configured in this environment.
-export async function spawnClaude(opts: { prompt: string; mcpConfigPath: string; model: string; resumeSessionId?: string | null }): Promise<SpawnResult> {
+export async function spawnClaude(
+  opts: { prompt: string; mcpConfigPath: string; model: string; resumeSessionId?: string | null },
+  onEvent?: (event: SpawnProgressEvent) => void
+): Promise<SpawnResult> {
   const args = [
     "-p",
     opts.prompt,
@@ -122,8 +137,13 @@ export async function spawnClaude(opts: { prompt: string; mcpConfigPath: string;
     if (evt.type === "assistant") {
       const content = (evt.message as { content?: unknown[] } | undefined)?.content ?? [];
       for (const block of content) {
-        const b = block as { type?: string; id?: string; name?: string; input?: unknown };
-        if (b.type === "tool_use" && b.id && b.name) pendingToolUses.set(b.id, { name: b.name, input: b.input });
+        const b = block as { type?: string; id?: string; name?: string; input?: unknown; text?: string };
+        if (b.type === "tool_use" && b.id && b.name) {
+          pendingToolUses.set(b.id, { name: b.name, input: b.input });
+          onEvent?.({ type: "tool_start", toolName: b.name, input: b.input });
+        } else if (b.type === "text" && b.text) {
+          onEvent?.({ type: "assistant_text", text: b.text });
+        }
       }
     } else if (evt.type === "user") {
       const content = (evt.message as { content?: unknown[] } | undefined)?.content ?? [];
@@ -131,12 +151,14 @@ export async function spawnClaude(opts: { prompt: string; mcpConfigPath: string;
         const b = block as { type?: string; tool_use_id?: string; content?: unknown; is_error?: boolean };
         if (b.type === "tool_result" && b.tool_use_id) {
           const pending = pendingToolUses.get(b.tool_use_id);
+          const error = b.is_error ? stringifyToolContent(b.content) : null;
           transcript.push({
             toolName: pending?.name ?? "unknown",
             input: pending?.input ?? null,
             output: b.content ?? null,
-            error: b.is_error ? stringifyToolContent(b.content) : null,
+            error,
           });
+          onEvent?.({ type: "tool_result", toolName: pending?.name ?? "unknown", output: b.content ?? null, error });
           pendingToolUses.delete(b.tool_use_id);
         }
       }
@@ -259,13 +281,25 @@ export async function runDeputy(ctx: RunContext): Promise<RunResult> {
   const prompt = await buildPrompt(ctx);
   const mcpConfig = await writeMcpConfigFile();
 
+  // Only ever a "chat" or a directive-tied run - a directive-triggered run
+  // (manual/scheduled/event) always carries ctx.directive, and chat never
+  // does (see RunContext/PromptContext). Started here, not at any of
+  // runDeputy's own call sites, so every trigger is covered uniformly
+  // without each one remembering to wrap its own call - see runStream.ts.
+  const kind: RunKind = ctx.trigger === "chat" ? "chat" : "directive";
+  const directiveId = ctx.directive?.id ?? null;
+  const runId = startRun(kind, directiveId);
+
   try {
-    const result = await spawnClaude({
-      prompt,
-      mcpConfigPath: mcpConfig.path,
-      model: settings.model,
-      resumeSessionId: ctx.resumeSessionId,
-    });
+    const result = await spawnClaude(
+      {
+        prompt,
+        mcpConfigPath: mcpConfig.path,
+        model: settings.model,
+        resumeSessionId: ctx.resumeSessionId,
+      },
+      (event) => emitProgress({ ...event, runId })
+    );
 
     recordSpend(result.costUsd);
 
@@ -276,7 +310,11 @@ export async function runDeputy(ctx: RunContext): Promise<RunResult> {
       await updateSettings({ paused: true, pausedReason: `Daily budget cap reached ($${settings.budgetCapUsd.toFixed(2)}).` });
     }
 
+    finishRun({ type: "run_finished", runId, ok: result.ok, response: result.response, errorMessage: result.errorMessage });
     return { ok: result.ok, response: result.response, sessionId: result.sessionId, errorMessage: result.errorMessage, costUsd: result.costUsd };
+  } catch (err) {
+    finishRun({ type: "run_finished", runId, ok: false, response: null, errorMessage: (err as Error).message });
+    throw err;
   } finally {
     await mcpConfig.cleanup();
   }

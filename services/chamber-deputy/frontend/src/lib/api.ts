@@ -8,11 +8,10 @@ import type {
   PostChatMessageResponse,
   Settings,
   UpdateSettingsRequest,
-  RunningDirectiveResponse,
 } from "../../../src/types";
 import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
-const API_BASE = resolveApiBase("deputy", import.meta.env.PROD);
+export const API_BASE = resolveApiBase("deputy", import.meta.env.PROD);
 
 export function fetchDirectives(): Promise<DirectiveSummary[]> {
   return fetch(`${API_BASE}/directives`).then((res) => json(res));
@@ -53,12 +52,6 @@ export async function deleteDirective(id: number): Promise<void> {
 
 export function runDirective(id: number): Promise<{ ok: boolean; response: string | null; errorMessage: string | null }> {
   return fetch(`${API_BASE}/directives/${id}/run`, { method: "POST" }).then((res) => json(res));
-}
-
-// Polled by the directives list to drive its play-button progress ring's
-// "running" state - see the backend's runningState.ts.
-export function fetchRunningDirective(): Promise<RunningDirectiveResponse> {
-  return fetch(`${API_BASE}/directives/running`).then((res) => json(res));
 }
 
 export function fetchMessages(): Promise<Message[]> {

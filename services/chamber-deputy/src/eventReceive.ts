@@ -4,7 +4,6 @@ import { bufferEvent } from "./pendingEvents.js";
 import { listEventTriggeredDirectives, markDirectiveRunNow } from "./directives.js";
 import { enqueue } from "./jobQueue.js";
 import { runDeputy } from "./engine.js";
-import { withRunningDirective } from "./runningState.js";
 
 // Handed to mountEventReceiveRoute (@congress/chamber-kit). This Chamber
 // subscribes to every event type (subscriptions.ts). Every delivery is
@@ -31,7 +30,7 @@ export async function handleReceivedEvent(event: EventDelivery): Promise<void> {
     // checkup.ts's own tick() - a slow `claude` invocation can't cause a
     // second matching event to re-fire the same directive concurrently.
     await markDirectiveRunNow(directive.id);
-    void enqueue(() => withRunningDirective(directive.id, () => runDeputy({ trigger: "event", events: [logEntry], directive }))).catch((err) =>
+    void enqueue(() => runDeputy({ trigger: "event", events: [logEntry], directive })).catch((err) =>
       console.warn(`Deputy event-triggered run for directive ${directive.id} failed: ${(err as Error).message}`)
     );
   }

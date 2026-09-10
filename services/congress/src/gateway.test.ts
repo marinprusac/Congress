@@ -64,6 +64,14 @@ describe("timeoutFor", () => {
   it("gives another chamber's identically-named route the ordinary timeout", () => {
     expect(timeoutFor("notes", "POST", "/chat/messages")).toBe(10_000);
   });
+
+  it("never times out Deputy's run-progress SSE stream, since it's meant to stay open indefinitely", () => {
+    expect(timeoutFor("deputy", "GET", "/runs/stream")).toBe(Infinity);
+  });
+
+  it("gives another chamber's identically-named route the ordinary timeout, not the no-timeout exemption", () => {
+    expect(timeoutFor("notes", "GET", "/runs/stream")).toBe(10_000);
+  });
 });
 
 describe("proxying", () => {

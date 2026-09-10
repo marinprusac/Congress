@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import type { HttpBindings } from "@hono/node-server";
 import { createDirectiveRequestSchema, updateDirectiveRequestSchema, updateSettingsRequestSchema, postChatMessageRequestSchema } from "./types.js";
 import {
@@ -33,7 +34,7 @@ import { todaySpendUsd } from "./spend.js";
 import { enqueue } from "./jobQueue.js";
 import { runDeputy } from "./engine.js";
 import { rearmScheduler } from "./checkup.js";
-import { getRunningDirectiveId, withRunningDirective } from "./runningState.js";
+import { getSnapshot, onProgress, type RunProgressEvent } from "./runStream.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -49,12 +50,6 @@ app.get("/api/directives/search", async (c) => {
   const query = c.req.query("q") ?? "";
   if (!query.trim()) return c.json([]);
   return c.json(await searchDirectives(query));
-});
-
-// Polled by the directives list (not the single-directive page) to drive
-// its play-button progress ring's "running" state - see runningState.ts.
-app.get("/api/directives/running", async (c) => {
-  return c.json({ directiveId: getRunningDirectiveId() });
 });
 
 app.get("/api/directives/:id", async (c) => {
@@ -117,7 +112,7 @@ app.post("/api/directives/:id/run", async (c) => {
   await markDirectiveRunNow(id);
   rearmScheduler();
   try {
-    const result = await enqueue(() => withRunningDirective(id, () => runDeputy({ trigger: "manual", directive })));
+    const result = await enqueue(() => runDeputy({ trigger: "manual", directive }));
     return c.json({ ok: result.ok, response: result.response, errorMessage: result.errorMessage });
   } catch (err) {
     // runDeputy can throw before ever reaching the CLI (e.g. it couldn't
@@ -166,6 +161,40 @@ app.post("/api/chat/messages", async (c) => {
 app.delete("/api/chat/messages", async (c) => {
   clearThread();
   return c.body(null, 204);
+});
+
+// Live progress for whichever run (chat or directive) is currently in
+// flight - see runStream.ts. jobQueue.ts is concurrency-1, so there's at
+// most one run to report on at a time; a client connecting mid-run (or
+// right after one finishes) is replayed its full event log first via
+// getSnapshot() rather than only seeing events from here on. Congress's own
+// gateway.ts special-cases this route to skip its usual forwarding timeout,
+// since this connection is meant to stay open indefinitely.
+app.get("/api/runs/stream", (c) => {
+  return streamSSE(c, async (stream) => {
+    async function send(event: RunProgressEvent) {
+      await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
+    }
+
+    const snapshot = getSnapshot();
+    if (snapshot) {
+      for (const event of snapshot.events) await send(event);
+    } else {
+      await stream.writeSSE({ event: "idle", data: "{}" });
+    }
+
+    const unsubscribe = onProgress((event) => void send(event));
+    stream.onAbort(unsubscribe);
+
+    // Keeps the connection alive through any idle-timeout proxy/middleware
+    // sitting in front of it - stream.aborted flips once the client
+    // disconnects (see StreamingApi's own readable.cancel -> abort wiring),
+    // which is also what ends this loop.
+    while (!stream.aborted) {
+      await stream.sleep(25_000);
+      if (!stream.aborted) await stream.writeSSE({ event: "ping", data: "" });
+    }
+  });
 });
 
 app.route("/mcp", mcpApp);
