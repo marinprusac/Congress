@@ -4,14 +4,22 @@ import { getChamber } from "./registry.js";
 
 const FORWARD_TIMEOUT_MS = 10_000;
 
-// Deputy's chat POST blocks on a full headless `claude` run (chat.ts) before
-// responding - unlike every other Chamber route, which answers in
-// milliseconds, this one can legitimately take minutes (multiple cross-
-// Chamber MCP tool calls). The default FORWARD_TIMEOUT_MS would abort the
-// proxy well before that run finishes, surfacing a false "chamber
-// unreachable" to the owner even though the run itself completes fine and
-// gets persisted - the reload-and-it's-there symptom this constant fixes.
-const DEPUTY_CHAT_TIMEOUT_MS = 5 * 60 * 1000;
+// Both Deputy's chat POST (chat.ts) and its "Run now" directive POST
+// (server.ts's POST /api/directives/:id/run) block on a full headless
+// `claude` run before responding - unlike every other Chamber route, which
+// answers in milliseconds, either of these can legitimately take minutes
+// (multiple cross-Chamber MCP tool calls). The default FORWARD_TIMEOUT_MS
+// would abort the proxy well before that run finishes, surfacing a false
+// "chamber unreachable" (or, for the directive route, silently eating the
+// response so the Play button's mutation just errors out) to the owner even
+// though the run itself completes fine and gets persisted - the
+// reload-and-it's-there symptom this constant fixes.
+const DEPUTY_BLOCKING_RUN_TIMEOUT_MS = 5 * 60 * 1000;
+
+// Matches "/directives/<id>/run" - the one dynamic-segment route among
+// Deputy's blocking routes, so it needs a pattern rather than the other two's
+// plain string equality.
+const DEPUTY_DIRECTIVE_RUN_PATH = /^\/directives\/\d+\/run$/;
 
 // Deputy's own run-progress SSE stream (see chamber-deputy/src/server.ts's
 // GET /api/runs/stream) is meant to stay open indefinitely, not just longer
@@ -39,12 +47,13 @@ export function rewriteChamberPath(path: string, prefix: string, base: string, s
   return `${base}${remainder}${search}`;
 }
 
-// Deputy's chat POST blocks on a full headless `claude` run before
-// responding; every other Chamber route answers in milliseconds. See
-// DEPUTY_CHAT_TIMEOUT_MS above.
+// Deputy's chat and "Run now" POSTs both block on a full headless `claude`
+// run before responding; every other Chamber route answers in milliseconds.
+// See DEPUTY_BLOCKING_RUN_TIMEOUT_MS above.
 export function timeoutFor(chamberName: string, method: string, remainder: string): number {
   if (chamberName !== "deputy") return FORWARD_TIMEOUT_MS;
-  if (method === "POST" && remainder === "/chat/messages") return DEPUTY_CHAT_TIMEOUT_MS;
+  if (method === "POST" && remainder === "/chat/messages") return DEPUTY_BLOCKING_RUN_TIMEOUT_MS;
+  if (method === "POST" && DEPUTY_DIRECTIVE_RUN_PATH.test(remainder)) return DEPUTY_BLOCKING_RUN_TIMEOUT_MS;
   if (method === "GET" && remainder === "/runs/stream") return DEPUTY_STREAM_NO_TIMEOUT;
   return FORWARD_TIMEOUT_MS;
 }
