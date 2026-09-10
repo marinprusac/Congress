@@ -14,6 +14,30 @@
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 
+/* Congress-wide: almost every link in this app is client-side SPA routing
+   (react-router's Link, never a real page load), so iOS Safari's own
+   long-press affordances on an <a> - a link-preview popup
+   (-webkit-touch-callout) and a "drag this link out" ghost
+   (-webkit-user-drag) - never make sense here and only get in the way of a
+   Chamber's own long-press gesture (useLongPressDrag; see its own inline
+   style for the belt-and-suspenders per-element version of this same fix).
+   A genuine external link - one that opens a real separate page, marked
+   target="_blank" the same way every one of those in this codebase already
+   is (e.g. EventViewPage's "Open in Google Calendar"), or a same-origin
+   file download (the `download` attribute) - is exempted: there's no
+   competing in-app gesture on those, so the browser's native long-press
+   preview/drag-out is the normal, useful behavior, not something to
+   suppress. */
+a {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+a[target="_blank"],
+a[download] {
+  -webkit-touch-callout: default;
+  -webkit-user-drag: auto;
+}
+
 /* Chamber shell (ChamberLayout) - header, primary nav, and a bottom nav bar
    that only appears on narrow viewports, since the top nav's small text
    links aren't a comfortable phone target. */
