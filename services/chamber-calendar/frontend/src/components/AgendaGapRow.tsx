@@ -74,7 +74,7 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
     return Math.min(100, Math.max(0, ((ms - entry.startMs) / (entry.minutes * 60_000)) * 100));
   }
 
-  const { dragging, onPointerDown: longPressPointerDown, touchAction } = useLongPressDrag({
+  const { dragging, onPointerDown: longPressPointerDown, style: longPressStyle } = useLongPressDrag({
     onActivate: (clientY) => {
       const ms = msAtClientY(clientY);
       anchorMsRef.current = ms;
@@ -134,7 +134,7 @@ export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
     <div
       ref={rootRef}
       className="relative flex select-none gap-3 px-1"
-      style={{ height: heightPx, touchAction }}
+      style={{ height: heightPx, ...longPressStyle }}
       onPointerEnter={handlePointerEnter}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}

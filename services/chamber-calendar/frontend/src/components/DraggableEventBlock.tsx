@@ -62,7 +62,7 @@ export function DraggableEventBlock({ event, href, onPrefetch, className, childr
     },
   });
 
-  const { onPointerDown, touchAction } = useLongPressDrag({
+  const { onPointerDown, style: longPressStyle } = useLongPressDrag({
     disabled: !event.editable,
     onActivate: () => {
       draggedRef.current = false;
@@ -106,8 +106,10 @@ export function DraggableEventBlock({ event, href, onPrefetch, className, childr
       onFocus={onPrefetch}
       onPointerDown={onPointerDown}
       onClickCapture={onClickCapture}
+      draggable={false}
+      onDragStart={(e) => e.preventDefault()}
       className={className}
-      style={{ touchAction, transform: dragOffsetPx ? `translateY(${dragOffsetPx}px)` : undefined }}
+      style={{ ...longPressStyle, transform: dragOffsetPx ? `translateY(${dragOffsetPx}px)` : undefined }}
     >
       {children}
       {pendingMs !== 0 && (

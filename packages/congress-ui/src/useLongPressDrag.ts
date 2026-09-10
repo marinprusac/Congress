@@ -64,9 +64,16 @@ export interface UseLongPressDragOptions {
 export interface UseLongPressDragResult {
   dragging: boolean;
   onPointerDown: (e: React.PointerEvent) => void;
-  // The caller's pressed element must set this as its own touchAction style
-  // - see MOVE_CANCEL_PX above for why.
-  touchAction: "none";
+  // The caller's pressed element must spread this into its own style prop.
+  // touchAction: "none" is MOVE_CANCEL_PX's own requirement (see above); the
+  // rest neutralizes the browser's own native touch/drag gestures on a
+  // pressed <a> (or any element) that would otherwise fire on the same
+  // long-press this hook is trying to claim - iOS Safari's link-preview
+  // popup (-webkit-touch-callout), the browser's native "drag this link out"
+  // ghost/affordance (-webkit-user-drag), and incidental text selection
+  // (userSelect) - same fix already proven for NavPanel's own draggable
+  // links, see shared.css's .nav-panel-link.
+  style: React.CSSProperties;
 }
 
 // Long-press-and-drag for touch (with a short vibration on activation),
@@ -292,5 +299,15 @@ export function useLongPressDrag(options: UseLongPressDragOptions): UseLongPress
     []
   );
 
-  return { dragging, onPointerDown, touchAction: "none" };
+  return {
+    dragging,
+    onPointerDown,
+    style: {
+      touchAction: "none",
+      userSelect: "none",
+      WebkitUserSelect: "none",
+      WebkitUserDrag: "none",
+      WebkitTouchCallout: "none",
+    } as React.CSSProperties,
+  };
 }
