@@ -10,6 +10,7 @@ import {
   minutesBetween,
   nextHalfHourSlot,
   snappedDeltaMs,
+  snappedPxFromDeltaMs,
   snapToHalfHour,
 } from "./datetime";
 import type { AgendaClusterEntry, AgendaDateEntry, AgendaGapEntry } from "./datetime";
@@ -357,6 +358,27 @@ describe("snappedDeltaMs", () => {
 
   it("returns zero for a delta smaller than half a step", () => {
     expect(snappedDeltaMs(5, 16, 15)).toBe(0);
+  });
+});
+
+describe("snappedPxFromDeltaMs", () => {
+  it("inverts snappedDeltaMs for a forward, whole-step delta", () => {
+    expect(snappedPxFromDeltaMs(30 * 60_000, 16, 15)).toBe(32);
+  });
+
+  it("inverts snappedDeltaMs for a backward delta", () => {
+    expect(snappedPxFromDeltaMs(-15 * 60_000, 16, 15)).toBe(-16);
+  });
+
+  it("returns zero for a zero delta", () => {
+    expect(snappedPxFromDeltaMs(0, 16, 15)).toBe(0);
+  });
+
+  it("round-trips through snappedDeltaMs to the snapped pixel position, not the original raw one", () => {
+    // 20px snaps to 1 step (15 minutes, see the snappedDeltaMs test above) -
+    // converting that snapped delta back to pixels should land on the step's
+    // own exact position (16px), not the original unsnapped 20px.
+    expect(snappedPxFromDeltaMs(snappedDeltaMs(20, 16, 15), 16, 15)).toBe(16);
   });
 });
 

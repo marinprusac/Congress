@@ -3,7 +3,14 @@ import { useRef, useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLongPressDrag, showToast } from "@congress/congress-ui";
 import { updateEvent } from "@/lib/api";
-import { formatClockTime, getBrowserTimeZone, PX_PER_QUARTER_HOUR, snappedDeltaMs, toDatetimeLocalInput } from "@/lib/datetime";
+import {
+  formatClockTime,
+  getBrowserTimeZone,
+  PX_PER_QUARTER_HOUR,
+  snappedDeltaMs,
+  snappedPxFromDeltaMs,
+  toDatetimeLocalInput,
+} from "@/lib/datetime";
 import type { CalendarEvent } from "../../../src/types";
 
 // Minimum raw pixel movement before a press reads as "actually dragging"
@@ -54,11 +61,29 @@ export function DraggableEventBlock({ event, href, onPrefetch, className, childr
       });
     },
     onSuccess: (updated) => {
+      // Patch every cached events list synchronously (not just this one
+      // event's own solo cache entry) so the Agenda's list re-sorts around
+      // the new time in the same render that clears dragOffsetPx below -
+      // invalidateQueries alone only marks those lists stale and refetches
+      // in the background, which left the block visually snapping back to
+      // its pre-drag spot for the length of that round trip before jumping
+      // to its real new position once the refetch finally landed.
+      queryClient.setQueriesData<{ events: CalendarEvent[] }>({ queryKey: ["events"], exact: false }, (old) => {
+        if (!old || !Array.isArray(old.events)) return old;
+        return {
+          ...old,
+          events: old.events.map((e) =>
+            e.accountId === updated.accountId && e.calendarId === updated.calendarId && e.id === updated.id ? updated : e
+          ),
+        };
+      });
       queryClient.setQueryData(["events", String(event.accountId), event.calendarId, event.id], updated);
       queryClient.invalidateQueries({ queryKey: ["events"] });
+      setDragOffsetPx(0);
     },
     onError: () => {
       showToast("Failed to reschedule event.", "error");
+      setDragOffsetPx(0);
     },
   });
 
@@ -74,10 +99,23 @@ export function DraggableEventBlock({ event, href, onPrefetch, className, childr
       setDragOffsetPx(deltaPx);
     },
     onDragEnd: (deltaPx) => {
-      setDragOffsetPx(0);
-      if (!draggedRef.current) return;
+      if (!draggedRef.current) {
+        setDragOffsetPx(0);
+        return;
+      }
       const deltaMs = snappedDeltaMs(deltaPx, PX_PER_QUARTER_HOUR, 15);
-      if (deltaMs !== 0) moveMutation.mutate(deltaMs);
+      if (deltaMs === 0) {
+        setDragOffsetPx(0);
+        return;
+      }
+      // Hold the block at its snapped drop position - not zero, and not the
+      // raw unsnapped deltaPx - until the pending mutation settles (see
+      // moveMutation's onSuccess/onError above, the only other places that
+      // reset this). Resetting to zero here immediately used to make the
+      // block visibly snap back to its pre-drag spot for the length of the
+      // PATCH round trip before jumping to its real new position.
+      setDragOffsetPx(snappedPxFromDeltaMs(deltaMs, PX_PER_QUARTER_HOUR, 15));
+      moveMutation.mutate(deltaMs);
     },
     onDragCancel: () => {
       setDragOffsetPx(0);

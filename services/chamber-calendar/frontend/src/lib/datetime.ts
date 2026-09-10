@@ -89,6 +89,21 @@ export function snappedDeltaMs(deltaPx: number, pxPerStep: number, minutesPerSte
   return steps * minutesPerStep * 60_000;
 }
 
+// The inverse of snappedDeltaMs - turns an already-snapped millisecond delta
+// (one snappedDeltaMs itself returned) back into the exact pixel offset that
+// produced it. Used to hold a dragged block visually at its committed,
+// snapped drop position (see DraggableEventBlock) instead of resetting the
+// drag offset to zero the instant the pointer lifts - snapping back to zero
+// immediately, before the pending PATCH resolves and the Agenda's own list
+// re-sorts around the new time, reads as the block glitching back to its old
+// spot before jumping to its new one a moment later. deltaMs is assumed to
+// already be a whole multiple of minutesPerStep, exactly as snappedDeltaMs
+// produces, so this never needs its own rounding.
+export function snappedPxFromDeltaMs(deltaMs: number, pxPerStep: number, minutesPerStep: number): number {
+  const steps = deltaMs / (minutesPerStep * 60_000);
+  return steps * pxPerStep;
+}
+
 // This is a rough visualization, not a precise clock - so a block or gap's
 // real duration maps to pixels via sqrt(hours) rather than 1:1 with
 // wall-clock time: 1 hour renders as 1 "unit" (PX_PER_HOUR), 4 hours as 2
