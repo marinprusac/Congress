@@ -69,6 +69,26 @@ export function fineTimeFromDelta(
   return Math.min(gapStartMs + gapMinutes * 60_000, Math.max(gapStartMs, ms));
 }
 
+// Once an existing event is actively being dragged to a new time (Agenda's
+// event blocks), every this-many px of drag nudges it by one 15-minute step
+// - matching the event form's own 15-minute step={900} granularity, finer
+// than the gap-picker's 30-minute PX_PER_HALF_HOUR above since this is
+// adjusting an *existing*, precisely-timed event rather than coarsely
+// placing a brand-new one.
+export const PX_PER_QUARTER_HOUR = 16;
+
+// Rounds a raw pixel drag delta to the nearest whole step of `minutesPerStep`
+// real minutes, at a fixed screen-space rate (pxPerStep) - same "fixed
+// screen-space rate independent of the sqrt-compressed layout" reasoning as
+// fineTimeFromDelta above, but returning a plain millisecond delta with no
+// anchor/clamp: the caller adds it to whatever absolute instant it's
+// adjusting (an existing event's own start/end, not a gap's bounds), and an
+// existing event has no natural span to clamp the result against.
+export function snappedDeltaMs(deltaPx: number, pxPerStep: number, minutesPerStep: number): number {
+  const steps = Math.round(deltaPx / pxPerStep);
+  return steps * minutesPerStep * 60_000;
+}
+
 // This is a rough visualization, not a precise clock - so a block or gap's
 // real duration maps to pixels via sqrt(hours) rather than 1:1 with
 // wall-clock time: 1 hour renders as 1 "unit" (PX_PER_HOUR), 4 hours as 2

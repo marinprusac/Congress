@@ -13,6 +13,7 @@ import {
   toDatetimeLocalInput,
 } from "@/lib/datetime";
 import { AgendaGapRow } from "@/components/AgendaGapRow";
+import { DraggableEventBlock } from "@/components/DraggableEventBlock";
 
 // How often the now-indicator's position is recomputed while the page sits
 // open - fine-grained enough that it visibly moves over a session, without
@@ -268,11 +269,11 @@ export function AgendaPage() {
                     ? Math.min(100, Math.max(0, (block.nowOffsetMinutes / Math.max(1, block.durationMinutes)) * 100))
                     : null;
                 return (
-                  <Link
+                  <DraggableEventBlock
                     key={entry.key}
-                    to={eventHref(event)}
-                    onMouseEnter={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
-                    onFocus={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
+                    event={event}
+                    href={eventHref(event)}
+                    onPrefetch={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
                     className="group relative flex items-start gap-3 px-1"
                   >
                     <div className="w-16 shrink-0 pt-2 text-right font-mono text-[11px] leading-tight text-dust">
@@ -324,7 +325,7 @@ export function AgendaPage() {
                         </div>
                       );
                     })}
-                  </Link>
+                  </DraggableEventBlock>
                 );
               }
 

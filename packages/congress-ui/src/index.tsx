@@ -49,3 +49,5 @@ export { ToastHost } from "./ToastHost.js";
 export { showToast } from "./toast.js";
 export { useAutosave } from "./useAutosave.js";
 export type { ToastDetail } from "./toast.js";
+export { useLongPressDrag } from "./useLongPressDrag.js";
+export type { UseLongPressDragOptions, UseLongPressDragResult } from "./useLongPressDrag.js";

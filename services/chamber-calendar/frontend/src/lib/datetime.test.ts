@@ -9,6 +9,7 @@ import {
   gapHeightPx,
   minutesBetween,
   nextHalfHourSlot,
+  snappedDeltaMs,
   snapToHalfHour,
 } from "./datetime";
 import type { AgendaClusterEntry, AgendaDateEntry, AgendaGapEntry } from "./datetime";
@@ -336,6 +337,26 @@ describe("fineTimeFromDelta", () => {
     const anchor = new Date("2030-01-01T09:00:00").getTime();
     const result = fineTimeFromDelta(anchor, -1_000_000, 12, gapStartMs, gapMinutes);
     expect(result).toBe(gapStartMs);
+  });
+});
+
+describe("snappedDeltaMs", () => {
+  it("moves by whole 15-minute steps at the given screen-space rate", () => {
+    // 32px at 16px/step = 2 steps = 30 minutes.
+    expect(snappedDeltaMs(32, 16, 15)).toBe(30 * 60_000);
+  });
+
+  it("moves backward for a negative delta", () => {
+    expect(snappedDeltaMs(-16, 16, 15)).toBe(-15 * 60_000);
+  });
+
+  it("rounds a partial step to the nearest whole one", () => {
+    // 20px is closer to 1 step (16px) than 2 steps (32px).
+    expect(snappedDeltaMs(20, 16, 15)).toBe(15 * 60_000);
+  });
+
+  it("returns zero for a delta smaller than half a step", () => {
+    expect(snappedDeltaMs(5, 16, 15)).toBe(0);
   });
 });
 
