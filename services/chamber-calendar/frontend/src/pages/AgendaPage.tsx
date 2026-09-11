@@ -277,55 +277,59 @@ export function AgendaPage() {
                     onPrefetch={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
                     className="group relative flex items-start gap-3 px-1"
                   >
-                    <div className="w-16 shrink-0 pt-2 text-right font-mono text-[11px] leading-tight text-dust">
-                      <div>{formatEventStartTime(event)}</div>
-                      <div className="text-dust/60">{formatEventEndTime(event)}</div>
-                    </div>
-                    <div
-                      className={`relative min-w-0 flex-1 border-l-2 px-3 py-2 group-hover:bg-accent/[0.12] ${
-                        unconfirmed ? "border-dashed border-accent/50 bg-accent/[0.02]" : "border-accent bg-accent/[0.06]"
-                      }`}
-                      style={{ minHeight: clusterHeightPx }}
-                    >
-                      <div className={`font-display text-base leading-snug ${unconfirmed ? "text-ink/70" : "text-ink"}`}>
-                        {event.title}
-                      </div>
-                      <div className="font-mono text-[11px] text-dust">{event.calendarSummary}</div>
-                      {nowPercent !== null && (
-                        <div
-                          className="pointer-events-none absolute inset-x-0 h-px bg-alert"
-                          style={{ top: `${nowPercent}%` }}
-                          aria-hidden="true"
-                        >
-                          <span className="absolute -left-[5px] top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-alert" />
+                    {(resizeOffsetPx) => (
+                      <>
+                        <div className="w-16 shrink-0 pt-2 text-right font-mono text-[11px] leading-tight text-dust">
+                          <div>{formatEventStartTime(event)}</div>
+                          <div className="text-dust/60">{formatEventEndTime(event)}</div>
                         </div>
-                      )}
-                    </div>
-                    {/* An event that itself runs past midnight (10pm-2am) has
-                        no ordinary gap to hang the crossed day's header on -
-                        see AgendaEventBlock.dayBreaks - so it's drawn as a
-                        divider straight through the block instead, at its
-                        true medial position, rather than a caption severed
-                        off to sit right at the block's own edge. */}
-                    {(block.dayBreaks ?? []).map((brk) => {
-                      const brkPercent = Math.min(
-                        100,
-                        Math.max(0, (brk.offsetMinutes / Math.max(1, block.durationMinutes)) * 100)
-                      );
-                      return (
                         <div
-                          key={brk.key}
-                          className="pointer-events-none absolute inset-x-0 flex items-center gap-3 px-1"
-                          style={{ top: `${brkPercent}%` }}
-                          aria-hidden="true"
+                          className={`relative min-w-0 flex-1 border-l-2 px-3 py-2 group-hover:bg-accent/[0.12] ${
+                            unconfirmed ? "border-dashed border-accent/50 bg-accent/[0.02]" : "border-accent bg-accent/[0.06]"
+                          }`}
+                          style={{ minHeight: Math.max(MIN_BLOCK_HEIGHT_PX, clusterHeightPx + resizeOffsetPx) }}
                         >
-                          <span className="w-16 shrink-0 -translate-y-1/2 bg-parchment px-0.5 text-right font-mono text-[10px] uppercase tracking-wide text-dust">
-                            {brk.label}
-                          </span>
-                          <span className="h-px flex-1 -translate-y-1/2 border-t border-dashed border-dust/50" />
+                          <div className={`font-display text-base leading-snug ${unconfirmed ? "text-ink/70" : "text-ink"}`}>
+                            {event.title}
+                          </div>
+                          <div className="font-mono text-[11px] text-dust">{event.calendarSummary}</div>
+                          {nowPercent !== null && (
+                            <div
+                              className="pointer-events-none absolute inset-x-0 h-px bg-alert"
+                              style={{ top: `${nowPercent}%` }}
+                              aria-hidden="true"
+                            >
+                              <span className="absolute -left-[5px] top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-alert" />
+                            </div>
+                          )}
                         </div>
-                      );
-                    })}
+                        {/* An event that itself runs past midnight (10pm-2am) has
+                            no ordinary gap to hang the crossed day's header on -
+                            see AgendaEventBlock.dayBreaks - so it's drawn as a
+                            divider straight through the block instead, at its
+                            true medial position, rather than a caption severed
+                            off to sit right at the block's own edge. */}
+                        {(block.dayBreaks ?? []).map((brk) => {
+                          const brkPercent = Math.min(
+                            100,
+                            Math.max(0, (brk.offsetMinutes / Math.max(1, block.durationMinutes)) * 100)
+                          );
+                          return (
+                            <div
+                              key={brk.key}
+                              className="pointer-events-none absolute inset-x-0 flex items-center gap-3 px-1"
+                              style={{ top: `${brkPercent}%` }}
+                              aria-hidden="true"
+                            >
+                              <span className="w-16 shrink-0 -translate-y-1/2 bg-parchment px-0.5 text-right font-mono text-[10px] uppercase tracking-wide text-dust">
+                                {brk.label}
+                              </span>
+                              <span className="h-px flex-1 -translate-y-1/2 border-t border-dashed border-dust/50" />
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
                   </DraggableEventBlock>
                 );
               }

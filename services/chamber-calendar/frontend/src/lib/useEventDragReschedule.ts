@@ -2,14 +2,27 @@ import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLongPressDrag, showToast } from "@congress/congress-ui";
 import { updateEvent } from "@/lib/api";
-import {
-  getBrowserTimeZone,
-  PX_PER_QUARTER_HOUR,
-  snappedDeltaMs,
-  snappedPxFromDeltaMs,
-  toDatetimeLocalInput,
-} from "@/lib/datetime";
+import { getBrowserTimeZone, PX_PER_QUARTER_HOUR, snappedDeltaMs, toDatetimeLocalInput } from "@/lib/datetime";
 import type { CalendarEvent } from "../../../src/types";
+
+// Patches every cached events list/solo entry the Agenda's own timeline
+// (buildAgendaTimeline) reads from - shared between the optimistic write at
+// drag-end and the mutation's own onSuccess/onError below, so a move and a
+// rollback both go through the identical cache shape. Exported for
+// useEventResizeDuration, which needs the identical patch against the same
+// cache shape for its own start-fixed/end-only edit.
+export function patchEventCache(queryClient: ReturnType<typeof useQueryClient>, updated: CalendarEvent) {
+  queryClient.setQueriesData<{ events: CalendarEvent[] }>({ queryKey: ["events"], exact: false }, (old) => {
+    if (!old || !Array.isArray(old.events)) return old;
+    return {
+      ...old,
+      events: old.events.map((e) =>
+        e.accountId === updated.accountId && e.calendarId === updated.calendarId && e.id === updated.id ? updated : e
+      ),
+    };
+  });
+  queryClient.setQueryData(["events", String(updated.accountId), updated.calendarId, updated.id], updated);
+}
 
 // Minimum raw pixel movement before a press reads as "actually dragging"
 // rather than a still long-press or a plain click/tap - below this, the
@@ -35,7 +48,12 @@ export interface EventDragRescheduleResult {
 // snappedDeltaMs), committed on release via the same updateEvent PATCH
 // EventViewPage's own autosave already uses - not moveEvent, which is for
 // reassigning calendar/account and would needlessly change the event's
-// exhibit id, unrelated to a plain time shift.
+// exhibit id, unrelated to a plain time shift. Always `immediate` (see
+// useLongPressDrag) - the only touch/pen entry point left is the block's own
+// right-edge move nudge (a small dedicated handle), never the block body
+// itself, so there's nothing left to disambiguate from an ordinary scroll by
+// waiting out a long-press first; the body's own long-press is a different,
+// unrelated gesture now (see useEventContextMenuGesture).
 //
 // Extracted from DraggableEventBlock (the lone, non-overlapping case) so
 // OverlapEventBlock - one block inside a genuinely overlapping cluster,
@@ -49,11 +67,14 @@ export function useEventDragReschedule(event: CalendarEvent): EventDragReschedul
   // Whether the current gesture ever moved past DRAG_ACTIVATE_PX - decides
   // both whether release commits a move and whether the resulting click
   // needs swallowing. Checked at click time via onClickCapture below rather
-  // than relying on useLongPressDrag's own `dragging` flag, since mouse
-  // activates that immediately on mousedown (see the hook's own doc) and
-  // would otherwise swallow every ordinary click before it ever moves.
+  // than relying on useLongPressDrag's own `dragging` flag, since this hook
+  // is `immediate` (see above) and would otherwise swallow every ordinary
+  // click/tap before it ever moves.
   const draggedRef = useRef(false);
   const durationMsRef = useRef(0);
+  // The pre-drag event, captured on activation - lets onError roll the
+  // optimistically-patched cache back to exactly what it displaced.
+  const previousEventRef = useRef(event);
 
   const moveMutation = useMutation({
     mutationFn: (deltaMs: number) => {
@@ -66,37 +87,26 @@ export function useEventDragReschedule(event: CalendarEvent): EventDragReschedul
         timeZone: getBrowserTimeZone(),
       });
     },
+    // Re-patches with the server's own canonical response - idempotent
+    // against the optimistic patch onDragEnd already made below, just here
+    // to catch any server-side normalization. invalidateQueries then
+    // refetches in the background to fully reconcile the fetched window.
     onSuccess: (updated) => {
-      // Patch every cached events list synchronously (not just this one
-      // event's own solo cache entry) so the Agenda's list re-sorts around
-      // the new time in the same render that clears dragOffsetPx below -
-      // invalidateQueries alone only marks those lists stale and refetches
-      // in the background, which reads as the block snapping back to its
-      // pre-drag spot for the length of that round trip before jumping to
-      // its real new position once the refetch finally lands.
-      queryClient.setQueriesData<{ events: CalendarEvent[] }>({ queryKey: ["events"], exact: false }, (old) => {
-        if (!old || !Array.isArray(old.events)) return old;
-        return {
-          ...old,
-          events: old.events.map((e) =>
-            e.accountId === updated.accountId && e.calendarId === updated.calendarId && e.id === updated.id ? updated : e
-          ),
-        };
-      });
-      queryClient.setQueryData(["events", String(event.accountId), event.calendarId, event.id], updated);
+      patchEventCache(queryClient, updated);
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      setDragOffsetPx(0);
     },
     onError: () => {
+      patchEventCache(queryClient, previousEventRef.current);
       showToast("Failed to reschedule event.", "error");
-      setDragOffsetPx(0);
     },
   });
 
   const { onPointerDown, style: longPressStyle } = useLongPressDrag({
+    immediate: true,
     disabled: !event.editable,
     onActivate: () => {
       draggedRef.current = false;
+      previousEventRef.current = event;
       durationMsRef.current = new Date(event.end).getTime() - new Date(event.start).getTime();
       setDragOffsetPx(0);
     },
@@ -114,13 +124,22 @@ export function useEventDragReschedule(event: CalendarEvent): EventDragReschedul
         setDragOffsetPx(0);
         return;
       }
-      // Hold the block at its snapped drop position - not zero, and not the
-      // raw unsnapped deltaPx - until the pending mutation settles (see
-      // moveMutation's onSuccess/onError above, the only other places that
-      // reset this). Resetting to zero here immediately used to make the
-      // block visibly snap back to its pre-drag spot for the length of the
-      // PATCH round trip before jumping to its real new position.
-      setDragOffsetPx(snappedPxFromDeltaMs(deltaMs, PX_PER_QUARTER_HOUR, 15));
+      // Patch the query cache with the real, snapped new start/end
+      // synchronously, in the same tick dragOffsetPx resets to zero - the
+      // Agenda's own timeline (buildAgendaTimeline, and its sqrt-scaled
+      // durationPx/gapHeightPx) recomputes from that same render, so the
+      // block is already at its true post-drop position (correct gap
+      // heights, correct sort order) the instant the pointer lifts, rather
+      // than sitting at a guessed pixel offset until moveMutation's network
+      // round trip resolves and only then reflowing.
+      const newStart = new Date(new Date(event.start).getTime() + deltaMs);
+      const newEnd = new Date(newStart.getTime() + durationMsRef.current);
+      patchEventCache(queryClient, {
+        ...event,
+        start: newStart.toISOString(),
+        end: newEnd.toISOString(),
+      });
+      setDragOffsetPx(0);
       moveMutation.mutate(deltaMs);
     },
     onDragCancel: () => {

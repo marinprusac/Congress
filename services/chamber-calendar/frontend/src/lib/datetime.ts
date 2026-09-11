@@ -104,6 +104,24 @@ export function snappedPxFromDeltaMs(deltaMs: number, pxPerStep: number, minutes
   return steps * pxPerStep;
 }
 
+// Clamps a live resize drag's raw pixel delta (dragging an event's own
+// bottom edge to change its duration) so the implied new duration never
+// drops below minDurationMinutes - only the shrinking direction is bounded,
+// growing is left open. Reuses snappedPxFromDeltaMs's own px-per-real-minute
+// rate (not durationMinutes' own sqrt-compressed rendered height) to convert
+// the floor into a pixel bound, same "fixed screen-space rate" reasoning as
+// everywhere else a drag delta is resolved in this file.
+export function clampResizeDeltaPx(
+  deltaPx: number,
+  durationMinutes: number,
+  pxPerStep: number,
+  minutesPerStep: number,
+  minDurationMinutes: number
+): number {
+  const minDeltaPx = snappedPxFromDeltaMs((minDurationMinutes - durationMinutes) * 60_000, pxPerStep, minutesPerStep);
+  return Math.max(deltaPx, minDeltaPx);
+}
+
 // This is a rough visualization, not a precise clock - so a block or gap's
 // real duration maps to pixels via sqrt(hours) rather than 1:1 with
 // wall-clock time: 1 hour renders as 1 "unit" (PX_PER_HOUR), 4 hours as 2

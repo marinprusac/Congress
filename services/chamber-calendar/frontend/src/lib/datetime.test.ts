@@ -3,6 +3,7 @@ import type { CalendarEvent } from "../../../src/types";
 import {
   addMinutesToLocalInput,
   buildAgendaTimeline,
+  clampResizeDeltaPx,
   durationPx,
   fineTimeFromDelta,
   formatGapDuration,
@@ -379,6 +380,27 @@ describe("snappedPxFromDeltaMs", () => {
     // converting that snapped delta back to pixels should land on the step's
     // own exact position (16px), not the original unsnapped 20px.
     expect(snappedPxFromDeltaMs(snappedDeltaMs(20, 16, 15), 16, 15)).toBe(16);
+  });
+});
+
+describe("clampResizeDeltaPx", () => {
+  it("leaves a shrinking delta alone when the resulting duration still clears the floor", () => {
+    // 60min event, dragging -15min (one step) still leaves 45min, well above a 15min floor.
+    expect(clampResizeDeltaPx(-16, 60, 16, 15, 15)).toBe(-16);
+  });
+
+  it("clamps a shrinking delta that would take the duration below the floor", () => {
+    // 30min event, a -32px (2-step, 30min) drag would zero it out - clamped to the
+    // exact px bound that leaves exactly the 15min floor.
+    expect(clampResizeDeltaPx(-32, 30, 16, 15, 15)).toBe(-16);
+  });
+
+  it("leaves a growing delta unclamped - only the shrinking direction has a floor", () => {
+    expect(clampResizeDeltaPx(48, 30, 16, 15, 15)).toBe(48);
+  });
+
+  it("clamps to zero movement when the event is already sitting exactly at the floor", () => {
+    expect(clampResizeDeltaPx(-16, 15, 16, 15, 15)).toBe(0);
   });
 });
 

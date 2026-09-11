@@ -59,6 +59,14 @@ export interface UseLongPressDragOptions {
   // the pointerdown handler becomes a no-op rather than the caller needing
   // to conditionally attach it.
   disabled?: boolean;
+  // Treats touch/pen exactly like mouse - activate synchronously on
+  // pointerdown, no long-press timer, no vibration. For a small dedicated
+  // handle (a resize/move grip, not a scrollable list row) there's nothing
+  // to disambiguate from a scroll gesture: the finger was deliberately
+  // placed on the handle, so waiting out LONG_PRESS_MS before responding
+  // would just read as lag, the same way a native app's own drag handles
+  // never make you hold still first.
+  immediate?: boolean;
 }
 
 export interface UseLongPressDragResult {
@@ -99,6 +107,8 @@ export function useLongPressDrag(options: UseLongPressDragOptions): UseLongPress
   onDragCancelRef.current = options.onDragCancel;
   const disabledRef = useRef(options.disabled ?? false);
   disabledRef.current = options.disabled ?? false;
+  const immediateRef = useRef(options.immediate ?? false);
+  immediateRef.current = options.immediate ?? false;
 
   const anchorClientYRef = useRef(0);
   const pointerTypeRef = useRef<string | null>(null);
@@ -200,7 +210,7 @@ export function useLongPressDrag(options: UseLongPressDragOptions): UseLongPress
     velocityRef.current = 0;
     wasManualScrollRef.current = false;
     clearTimer();
-    if (e.pointerType === "mouse") {
+    if (e.pointerType === "mouse" || immediateRef.current) {
       anchorClientYRef.current = e.clientY;
       setDragging(true);
       onActivateRef.current?.(e.clientY);

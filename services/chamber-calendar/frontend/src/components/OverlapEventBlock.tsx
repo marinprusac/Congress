@@ -1,6 +1,9 @@
 import { Link } from "react-router-dom";
 import { useEventDragReschedule } from "@/lib/useEventDragReschedule";
+import { useEventResizeDuration } from "@/lib/useEventResizeDuration";
+import { useEventContextMenuGesture } from "@/lib/useEventContextMenuGesture";
 import { formatClockTime, formatEventStartTime, formatEventEndTime } from "@/lib/datetime";
+import { EventMoveHandle, EventResizeHandle } from "@/components/EventDragHandles";
 import type { AgendaEventBlock } from "@/lib/datetime";
 
 interface OverlapEventBlockProps {
@@ -19,9 +22,10 @@ interface OverlapEventBlockProps {
 
 // One block inside a genuinely-overlapping Agenda cluster (AgendaPage's
 // other cluster branch, where a lone non-overlapping block instead uses
-// DraggableEventBlock) - same drag-to-reschedule gesture (see
-// useEventDragReschedule), just applied to this layout's own two-layer
-// markup instead of a single flow <Link>:
+// DraggableEventBlock) - same three gestures (useEventDragReschedule,
+// useEventResizeDuration, useEventContextMenuGesture; see DraggableEventBlock
+// for the full rundown), just applied to this layout's own two-layer markup
+// instead of a single flow <Link>:
 //
 // - The "paint" div is the always-full-width, alpha-blended visual bar
 //   (unchanged from before this block was draggable) - two overlapping
@@ -30,13 +34,14 @@ interface OverlapEventBlockProps {
 // - The "hit" <Link> is the actual tap/press target, narrowed to this
 //   block's own column only when it substantially overlaps another block in
 //   the cluster (so both stay independently reachable), full width
-//   otherwise.
+//   otherwise. The move/resize nudges live inside it, so their own hit
+//   testing lines up with the visible bar.
 //
-// Both receive the identical live drag transform from the one hook instance
-// below, so the block the user is actually holding visibly moves as a whole
-// - not just its (otherwise invisible) hit target - while the other blocks
-// in the same cluster stay put until this one's own move actually commits
-// and the whole timeline reflows around it.
+// All three receive the identical live drag/resize state from the one hook
+// instances below, so the block the user is actually holding visibly
+// moves/resizes as a whole - not just its (otherwise invisible) hit target -
+// while the other blocks in the same cluster stay put until this one's own
+// change actually commits and the whole timeline reflows around it.
 export function OverlapEventBlock({
   block,
   stackIndex,
@@ -51,8 +56,24 @@ export function OverlapEventBlock({
   onPrefetch,
 }: OverlapEventBlockProps) {
   const event = block.event;
-  const { dragOffsetPx, pendingMs, onPointerDown, longPressStyle, onClickCapture } = useEventDragReschedule(event);
+  const { dragOffsetPx, pendingMs, onPointerDown: onMovePointerDown, longPressStyle: moveStyle, onClickCapture: onMoveClickCapture } =
+    useEventDragReschedule(event);
+  const { resizeOffsetPx, onPointerDown: onResizePointerDown, longPressStyle: resizeStyle, onClickCapture: onResizeClickCapture } =
+    useEventResizeDuration(event);
+  const { onPointerDown: onMenuPointerDown, longPressStyle: menuStyle, onContextMenu } = useEventContextMenuGesture(event);
+
   const transform = dragOffsetPx ? `translateY(${dragOffsetPx}px)` : undefined;
+  const liveHeight = Math.max(0, height + resizeOffsetPx);
+
+  function onBodyPointerDown(e: React.PointerEvent) {
+    if (e.pointerType === "mouse") onMovePointerDown(e);
+    else onMenuPointerDown(e);
+  }
+
+  function onClickCapture(e: React.MouseEvent) {
+    onMoveClickCapture(e);
+    onResizeClickCapture(e);
+  }
 
   return (
     <>
@@ -61,7 +82,7 @@ export function OverlapEventBlock({
         className={`pointer-events-none absolute inset-x-0 overflow-hidden border-l-2 py-1 ${
           unconfirmed ? "border-dashed border-accent/50 bg-accent/[0.03]" : "border-accent bg-accent/[0.08]"
         }`}
-        style={{ top, height, zIndex: stackIndex + 1, transform }}
+        style={{ top, height: liveHeight, zIndex: stackIndex + 1, transform }}
       >
         <div
           className={`truncate font-display text-xs leading-snug ${unconfirmed ? "text-ink/70" : "text-ink"}`}
@@ -69,7 +90,7 @@ export function OverlapEventBlock({
         >
           {event.title}
         </div>
-        {height > 30 && (
+        {liveHeight > 30 && (
           <div className="truncate font-mono text-[10px] text-dust" style={{ paddingLeft: textIndent, paddingRight: 8 }}>
             {formatEventStartTime(event)}
           </div>
@@ -90,14 +111,27 @@ export function OverlapEventBlock({
         to={href}
         onMouseEnter={onPrefetch}
         onFocus={onPrefetch}
-        onPointerDown={onPointerDown}
+        onPointerDown={onBodyPointerDown}
+        onContextMenu={onContextMenu}
         onClickCapture={onClickCapture}
         draggable={false}
         onDragStart={(e) => e.preventDefault()}
         aria-label={`${event.title}, ${formatEventStartTime(event)}–${formatEventEndTime(event)}`}
         className="absolute rounded-sm hover:bg-accent/20 focus-visible:bg-accent/20"
-        style={{ ...longPressStyle, top, height, left: `${leftPercent}%`, width: `${widthPercent}%`, zIndex: 100 + stackIndex, transform }}
-      />
+        style={{
+          ...moveStyle,
+          ...menuStyle,
+          top,
+          height: liveHeight,
+          left: `${leftPercent}%`,
+          width: `${widthPercent}%`,
+          zIndex: 100 + stackIndex,
+          transform,
+        }}
+      >
+        {event.editable && <EventMoveHandle onPointerDown={onMovePointerDown} style={moveStyle} />}
+        {event.editable && <EventResizeHandle onPointerDown={onResizePointerDown} style={resizeStyle} />}
+      </Link>
     </>
   );
 }
