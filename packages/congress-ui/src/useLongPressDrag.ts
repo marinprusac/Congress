@@ -7,10 +7,36 @@ import { useEffect, useRef, useState } from "react";
 // gesture on a trackpad/mouse to disambiguate from and no vibration to gate.
 const LONG_PRESS_MS = 400;
 // How far a touch can move before the long-press timer fires without
-// cancelling it - a supplementary same-thread check for movement too small
-// to make the browser itself commit to a native scroll (see `touchAction`
-// below) but still too much to read as a held-still finger.
+// cancelling it - past this while still waiting reads as a scroll, not a
+// held finger, so the timer is dropped. touchAction: "none" on the pressed
+// element (the caller's responsibility - see the returned `touchAction`
+// value) means the browser never starts a native scroll on its own here -
+// without it, a native scroll beginning mid-hold fires pointercancel and
+// silently kills the long-press timer before it ever gets a chance to fire,
+// which is exactly what made long-press-and-drag flaky on a phone. Once
+// dropped, onMove below drives window.scrollBy itself (batched to once per
+// animation frame - see queueScrollBy) for the rest of this touch so an
+// ordinary swipe still scrolls the page; startMomentum then picks up where
+// the native fling would have on release.
 const MOVE_CANCEL_PX = 10;
+
+// Because touch-action: none keeps the browser from ever seeing the pressed
+// element as scrollable, an ordinary swipe that starts on it never gets
+// native momentum - the pending-phase onMove above already covers the 1:1
+// scroll while the finger is down, but release used to just stop dead.
+// These constants reimplement that missing momentum by hand: an
+// exponential-decay fling driven by the touch's own recent velocity,
+// restarted every animation frame until it decays below
+// MOMENTUM_MIN_VELOCITY or gets interrupted. MOMENTUM_FRICTION is expressed
+// per-ms (not per-frame) so the decay rate doesn't depend on the display's
+// refresh rate; ~0.9968 matches the common "0.95 per 16ms frame"
+// convention. MOMENTUM_STALE_MS guards the case where the finger stopped
+// moving and just sat there before lifting - without it, a fast swipe that
+// paused before release would still be read as a flick.
+const MOMENTUM_FRICTION_PER_MS = 0.9968;
+const MOMENTUM_MIN_VELOCITY = 0.02; // px/ms; below this the fling is imperceptible, so stop
+const MOMENTUM_MAX_VELOCITY = 5; // px/ms; clamps a noisy single-sample velocity spike
+const MOMENTUM_STALE_MS = 60;
 
 export interface UseLongPressDragOptions {
   // Fires once a drag actually begins - immediately on mousedown, or after
@@ -39,20 +65,11 @@ export interface UseLongPressDragResult {
   dragging: boolean;
   onPointerDown: (e: React.PointerEvent) => void;
   // The caller's pressed element must spread this into its own style prop.
-  // touchAction is "pan-y" (not "none") while merely pending - so a genuine
-  // scroll starting on a draggable element is still the browser's own
-  // native, compositor-driven scroll, not something this hook has to
-  // reimplement by hand. The browser fires pointercancel the moment it
-  // commits to that native pan, which the pending-phase listener below
-  // already treats as "cancel the long-press timer" - exactly the right
-  // outcome, since a touch that actually moved enough to scroll was never a
-  // held-still long-press to begin with. Only once a drag has actually
-  // activated does this switch to "none", so the browser can't then steal a
-  // mid-drag pointermove out from under onDragMove. The rest neutralizes the
-  // browser's own native touch/drag gestures on a pressed <a> (or any
-  // element) that would otherwise fire on the same long-press this hook is
-  // trying to claim - iOS Safari's link-preview popup
-  // (-webkit-touch-callout), the browser's native "drag this link out"
+  // touchAction: "none" is MOVE_CANCEL_PX's own requirement (see above); the
+  // rest neutralizes the browser's own native touch/drag gestures on a
+  // pressed <a> (or any element) that would otherwise fire on the same
+  // long-press this hook is trying to claim - iOS Safari's link-preview
+  // popup (-webkit-touch-callout), the browser's native "drag this link out"
   // ghost/affordance (-webkit-user-drag), and incidental text selection
   // (userSelect) - same fix already proven for NavPanel's own draggable
   // links, see shared.css's .nav-panel-link.
@@ -92,6 +109,77 @@ export function useLongPressDrag(options: UseLongPressDragOptions): UseLongPress
   // actually went down on this element - without it, a touch that started
   // on some *other* draggable element would still hit these handlers.
   const activePointerIdRef = useRef<number | null>(null);
+  const scrollDeltaRef = useRef(0);
+  const scrollRafRef = useRef<number | null>(null);
+  const velocityRef = useRef(0);
+  const lastMoveTimeRef = useRef(0);
+  const wasManualScrollRef = useRef(false);
+  const momentumRafRef = useRef<number | null>(null);
+  const momentumCleanupRef = useRef<(() => void) | null>(null);
+
+  function cancelPendingScroll() {
+    if (scrollRafRef.current !== null) {
+      cancelAnimationFrame(scrollRafRef.current);
+      scrollRafRef.current = null;
+    }
+    scrollDeltaRef.current = 0;
+  }
+
+  function cancelMomentum() {
+    if (momentumRafRef.current !== null) {
+      cancelAnimationFrame(momentumRafRef.current);
+      momentumRafRef.current = null;
+    }
+    momentumCleanupRef.current?.();
+    momentumCleanupRef.current = null;
+  }
+
+  function startMomentum(releaseTimeStamp: number) {
+    const stale = releaseTimeStamp - lastMoveTimeRef.current > MOMENTUM_STALE_MS;
+    let velocity = stale ? 0 : velocityRef.current;
+    velocity = Math.max(-MOMENTUM_MAX_VELOCITY, Math.min(MOMENTUM_MAX_VELOCITY, velocity));
+    if (Math.abs(velocity) < MOMENTUM_MIN_VELOCITY) return;
+
+    function stop() {
+      cancelMomentum();
+    }
+    window.addEventListener("pointerdown", stop, { once: true });
+    window.addEventListener("wheel", stop, { once: true });
+    momentumCleanupRef.current = () => {
+      window.removeEventListener("pointerdown", stop);
+      window.removeEventListener("wheel", stop);
+    };
+
+    let lastTs: number | null = null;
+    function step(ts: number) {
+      if (lastTs === null) {
+        lastTs = ts;
+        momentumRafRef.current = requestAnimationFrame(step);
+        return;
+      }
+      const dt = ts - lastTs;
+      lastTs = ts;
+      velocity *= Math.pow(MOMENTUM_FRICTION_PER_MS, dt);
+      window.scrollBy(0, velocity * dt);
+      if (Math.abs(velocity) < MOMENTUM_MIN_VELOCITY) {
+        cancelMomentum();
+        return;
+      }
+      momentumRafRef.current = requestAnimationFrame(step);
+    }
+    momentumRafRef.current = requestAnimationFrame(step);
+  }
+
+  function queueScrollBy(deltaY: number) {
+    scrollDeltaRef.current += deltaY;
+    if (scrollRafRef.current !== null) return;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      const delta = scrollDeltaRef.current;
+      scrollDeltaRef.current = 0;
+      if (delta !== 0) window.scrollBy(0, delta);
+    });
+  }
 
   function clearTimer() {
     if (timerRef.current !== null) {
@@ -103,10 +191,14 @@ export function useLongPressDrag(options: UseLongPressDragOptions): UseLongPress
   function onPointerDown(e: React.PointerEvent) {
     if (disabledRef.current) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    cancelMomentum();
     pointerTypeRef.current = e.pointerType;
     activePointerIdRef.current = e.pointerId;
     startClientRef.current = { x: e.clientX, y: e.clientY };
     lastClientYRef.current = e.clientY;
+    lastMoveTimeRef.current = e.timeStamp;
+    velocityRef.current = 0;
+    wasManualScrollRef.current = false;
     clearTimer();
     if (e.pointerType === "mouse") {
       anchorClientYRef.current = e.clientY;
@@ -126,17 +218,29 @@ export function useLongPressDrag(options: UseLongPressDragOptions): UseLongPress
     if (!dragging) {
       function onMove(e: PointerEvent) {
         if (e.pointerId !== activePointerIdRef.current) return;
+        const prevClientY = lastClientYRef.current;
         lastClientYRef.current = e.clientY;
+        if (pointerTypeRef.current !== "mouse") {
+          queueScrollBy(prevClientY - e.clientY);
+          const dt = e.timeStamp - lastMoveTimeRef.current;
+          if (dt > 0) velocityRef.current = (prevClientY - e.clientY) / dt;
+          lastMoveTimeRef.current = e.timeStamp;
+        }
         if (!startClientRef.current || timerRef.current === null) return;
         const dx = e.clientX - startClientRef.current.x;
         const dy = e.clientY - startClientRef.current.y;
-        if (Math.hypot(dx, dy) > MOVE_CANCEL_PX) clearTimer();
+        if (Math.hypot(dx, dy) > MOVE_CANCEL_PX) {
+          wasManualScrollRef.current = true;
+          clearTimer();
+        }
       }
       function onUp(e: PointerEvent) {
         if (e.pointerId !== activePointerIdRef.current) return;
         clearTimer();
         startClientRef.current = null;
         activePointerIdRef.current = null;
+        cancelPendingScroll();
+        if (pointerTypeRef.current !== "mouse" && wasManualScrollRef.current) startMomentum(e.timeStamp);
       }
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
@@ -145,6 +249,7 @@ export function useLongPressDrag(options: UseLongPressDragOptions): UseLongPress
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
         window.removeEventListener("pointercancel", onUp);
+        cancelPendingScroll();
       };
     }
 
@@ -185,13 +290,20 @@ export function useLongPressDrag(options: UseLongPressDragOptions): UseLongPress
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragging]);
 
-  useEffect(() => clearTimer, []);
+  useEffect(
+    () => () => {
+      clearTimer();
+      cancelPendingScroll();
+      cancelMomentum();
+    },
+    []
+  );
 
   return {
     dragging,
     onPointerDown,
     style: {
-      touchAction: dragging ? "none" : "pan-y",
+      touchAction: "none",
       userSelect: "none",
       WebkitUserSelect: "none",
       WebkitUserDrag: "none",
