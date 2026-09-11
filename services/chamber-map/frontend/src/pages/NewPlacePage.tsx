@@ -11,6 +11,7 @@ import {
   resolveChamberPath,
   flushDraftConnections,
   FormErrorMessage,
+  useAutosave,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createPlace, quickCreatePlaceExhibit } from "@/lib/api";
@@ -62,6 +63,15 @@ export function NewPlacePage() {
     },
   });
 
+  // No explicit Create action - like editing an existing place, a filled
+  // name is sufficient to persist. `enabled` drops as soon as the create
+  // mutation starts so a debounced re-fire can't create a second place.
+  useAutosave({
+    value: { name, body, radiusMeters, coords },
+    enabled: name.trim().length > 0 && !mutation.isPending && !mutation.isSuccess,
+    onSave: () => mutation.mutate(),
+  });
+
   async function onCreateExhibit(title: string) {
     const result = await quickCreatePlaceExhibit(title);
     queryClient.invalidateQueries({ queryKey: ["places"] });
@@ -110,13 +120,6 @@ export function NewPlacePage() {
         onDraftConnectionsChange={setDraftConnections}
         actions={
           <ExhibitActionBar>
-            <button
-              onClick={() => name.trim() && mutation.mutate()}
-              disabled={!name.trim() || mutation.isPending}
-              className="tap-target text-accent hover:underline disabled:opacity-50"
-            >
-              {mutation.isPending ? "Creating —" : "Create"}
-            </button>
             <button
               onClick={() => navigate(resolveChamberPath("/places", "map", shellHosted))}
               className="tap-target text-slate hover:underline"

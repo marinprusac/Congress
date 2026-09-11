@@ -11,6 +11,7 @@ import {
   resolveChamberPath,
   flushDraftConnections,
   FormErrorMessage,
+  useAutosave,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createTask, quickCreateTaskExhibit } from "@/lib/api";
@@ -41,6 +42,15 @@ export function NewTaskPage() {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       navigate(resolveChamberPath(`/t/${created.id}`, "tasks", shellHosted));
     },
+  });
+
+  // No explicit Create action - like editing an existing task, a filled name
+  // is sufficient to persist. `enabled` drops as soon as the create mutation
+  // starts so a debounced re-fire can't create a second task.
+  useAutosave({
+    value: { name, description, dueDate },
+    enabled: name.trim().length > 0 && !mutation.isPending && !mutation.isSuccess,
+    onSave: () => mutation.mutate(),
   });
 
   async function onCreateExhibit(title: string) {
@@ -85,13 +95,6 @@ export function NewTaskPage() {
         onDraftConnectionsChange={setDraftConnections}
         actions={
           <ExhibitActionBar>
-            <button
-              onClick={() => name.trim() && mutation.mutate()}
-              disabled={!name.trim() || mutation.isPending}
-              className="tap-target text-accent hover:underline disabled:opacity-50"
-            >
-              {mutation.isPending ? "Creating —" : "Create"}
-            </button>
             <button
               onClick={() => navigate(resolveChamberPath("/", "tasks", shellHosted))}
               className="tap-target text-slate hover:underline"

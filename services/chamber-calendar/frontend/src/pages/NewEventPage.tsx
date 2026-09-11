@@ -10,6 +10,7 @@ import {
   getChamberIcon,
   flushDraftConnections,
   FormErrorMessage,
+  useAutosave,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
@@ -93,6 +94,15 @@ export function NewEventPage() {
     },
   });
 
+  // No explicit Create action - like editing an existing event, a filled
+  // title is sufficient to persist. `enabled` drops as soon as the create
+  // mutation starts so a debounced re-fire can't create a second event.
+  useAutosave({
+    value: values,
+    enabled: values.title.trim().length > 0 && !mutation.isPending && !mutation.isSuccess,
+    onSave: () => mutation.mutate(),
+  });
+
   return (
     <article>
       <div className="mb-6 border-b border-dust pb-4">
@@ -116,13 +126,6 @@ export function NewEventPage() {
         onDraftConnectionsChange={setDraftConnections}
         actions={
           <ExhibitActionBar>
-            <button
-              onClick={() => values.title.trim() && mutation.mutate()}
-              disabled={!values.title.trim() || mutation.isPending}
-              className="tap-target text-accent hover:underline disabled:opacity-50"
-            >
-              {mutation.isPending ? "Creating —" : "Create"}
-            </button>
             <button
               onClick={() => navigate(resolveChamberPath("/", "calendar", shellHosted))}
               className="tap-target text-slate hover:underline"

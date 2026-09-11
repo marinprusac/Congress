@@ -11,6 +11,7 @@ import {
   resolveChamberPath,
   flushDraftConnections,
   FormErrorMessage,
+  useAutosave,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createNote, quickCreateNoteExhibit } from "@/lib/api";
@@ -40,6 +41,17 @@ export function NewNotePage() {
       queryClient.invalidateQueries({ queryKey: ["notes"] });
       navigate(resolveChamberPath(`/n/${created.id}`, "notes", shellHosted));
     },
+  });
+
+  // No explicit Create action - like editing an existing note, a filled
+  // title is sufficient to persist. `enabled` drops as soon as the create
+  // mutation starts so a debounced re-fire during/after it can't create a
+  // second note; the page unmounts (navigating to the real note) right after
+  // success, so there's never a second window for it to re-arm.
+  useAutosave({
+    value: { title, content },
+    enabled: title.trim().length > 0 && !mutation.isPending && !mutation.isSuccess,
+    onSave: () => mutation.mutate(),
   });
 
   async function onCreateExhibit(refTitle: string) {
@@ -72,13 +84,6 @@ export function NewNotePage() {
         onDraftConnectionsChange={setDraftConnections}
         actions={
           <ExhibitActionBar>
-            <button
-              onClick={() => title.trim() && mutation.mutate()}
-              disabled={!title.trim() || mutation.isPending}
-              className="tap-target text-accent hover:underline disabled:opacity-50"
-            >
-              {mutation.isPending ? "Creating —" : "Create"}
-            </button>
             <button
               onClick={() => navigate(resolveChamberPath("/", "notes", shellHosted))}
               className="tap-target text-slate hover:underline"

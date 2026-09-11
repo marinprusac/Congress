@@ -13,6 +13,7 @@ import {
   FormErrorMessage,
   fetchEventCatalog,
   TriggerEventPicker,
+  useAutosave,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createAutomation, fetchChamberTools } from "@/lib/api";
@@ -74,7 +75,19 @@ export function NewAutomationPage() {
     },
   });
 
-  const canSubmit = title.trim() && triggerEventType.trim() && targetChamber.trim() && toolName.trim();
+  const canSubmit = Boolean(
+    title.trim() && triggerEventType.trim() && targetChamber.trim() && toolName.trim()
+  );
+
+  // No explicit Create action - like editing an existing automation, once
+  // every field the backend requires is filled in that's sufficient to
+  // persist. `enabled` drops as soon as the create mutation starts so a
+  // debounced re-fire can't create a second automation.
+  useAutosave({
+    value: { title, body, triggerEventType, targetChamber, toolName, argsTemplate },
+    enabled: canSubmit && !mutation.isPending && !mutation.isSuccess,
+    onSave: () => mutation.mutate(),
+  });
 
   return (
     <article>
@@ -139,13 +152,6 @@ export function NewAutomationPage() {
         onDraftConnectionsChange={setDraftConnections}
         actions={
           <ExhibitActionBar>
-            <button
-              onClick={() => canSubmit && mutation.mutate()}
-              disabled={!canSubmit || mutation.isPending}
-              className="tap-target text-accent hover:underline disabled:opacity-50"
-            >
-              {mutation.isPending ? "Creating —" : "Create"}
-            </button>
             <button
               onClick={() => navigate(resolveChamberPath("/", "automation", shellHosted))}
               className="tap-target text-slate hover:underline"

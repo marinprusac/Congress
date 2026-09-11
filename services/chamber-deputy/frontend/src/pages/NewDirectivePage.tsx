@@ -12,6 +12,7 @@ import {
   flushDraftConnections,
   FormErrorMessage,
   fetchEventCatalog,
+  useAutosave,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createDirective } from "@/lib/api";
@@ -46,7 +47,14 @@ export function NewDirectivePage() {
     },
   });
 
-  const canSubmit = title.trim().length > 0;
+  // No explicit Create action - like editing an existing directive, a filled
+  // title is sufficient to persist. `enabled` drops as soon as the create
+  // mutation starts so a debounced re-fire can't create a second directive.
+  useAutosave({
+    value: { title, body, schedule },
+    enabled: title.trim().length > 0 && !mutation.isPending && !mutation.isSuccess,
+    onSave: () => mutation.mutate(),
+  });
 
   return (
     <article>
@@ -71,13 +79,6 @@ export function NewDirectivePage() {
         onDraftConnectionsChange={setDraftConnections}
         actions={
           <ExhibitActionBar>
-            <button
-              onClick={() => canSubmit && mutation.mutate()}
-              disabled={!canSubmit || mutation.isPending}
-              className="tap-target text-accent hover:underline disabled:opacity-50"
-            >
-              {mutation.isPending ? "Creating —" : "Create"}
-            </button>
             <button
               onClick={() => navigate(resolveChamberPath("/", "deputy", shellHosted))}
               className="tap-target text-slate hover:underline"

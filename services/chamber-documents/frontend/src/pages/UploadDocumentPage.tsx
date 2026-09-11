@@ -11,6 +11,7 @@ import {
   resolveChamberPath,
   flushDraftConnections,
   FormErrorMessage,
+  useAutosave,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { uploadDocument } from "@/lib/api";
@@ -41,6 +42,19 @@ export function UploadDocumentPage() {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
       navigate(resolveChamberPath(`/d/${created.id}`, "documents", shellHosted));
     },
+  });
+
+  // No explicit Upload action - like editing an existing document, having
+  // both a title and a file picked is sufficient to persist (a document's
+  // file, unlike its title, can't be added afterward on the edit page, so
+  // it's a hard prerequisite rather than optional). `hasFile` stands in for
+  // `file` itself, which isn't JSON-serializable, in the tracked value.
+  // `enabled` drops as soon as the upload mutation starts so a debounced
+  // re-fire can't upload a second document.
+  useAutosave({
+    value: { title, description, hasFile: file !== null },
+    enabled: title.trim().length > 0 && file !== null && !mutation.isPending && !mutation.isSuccess,
+    onSave: () => mutation.mutate(),
   });
 
   return (
@@ -75,13 +89,6 @@ export function UploadDocumentPage() {
         onDraftConnectionsChange={setDraftConnections}
         actions={
           <ExhibitActionBar>
-            <button
-              onClick={() => title.trim() && file && mutation.mutate()}
-              disabled={!title.trim() || !file || mutation.isPending}
-              className="tap-target text-accent hover:underline disabled:opacity-50"
-            >
-              {mutation.isPending ? "Uploading —" : "Upload"}
-            </button>
             <button
               onClick={() => navigate(resolveChamberPath("/", "documents", shellHosted))}
               className="tap-target text-slate hover:underline"
