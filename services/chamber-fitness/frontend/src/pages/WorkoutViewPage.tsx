@@ -2,12 +2,33 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ExhibitLinksLayout, navigateToExhibit, getChamberIcon, useShellHosted } from "@congress/congress-ui";
 import { fetchWorkout } from "@/lib/api";
+import type { WorkoutSetView } from "../../../src/types";
 
 function formatDuration(startIso: string, endIso: string): string {
   const minutes = Math.max(0, Math.round((new Date(endIso).getTime() - new Date(startIso).getTime()) / 60000));
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+}
+
+// A set carries whichever of weight/reps/duration/distance its exercise
+// type uses (Hevy shares one set shape across weight-, duration-, and
+// distance-based exercises) - this picks whichever the set actually has
+// data for, so a cardio set still reads as something instead of a blank
+// "— kg × —".
+function formatSetPrimary(set: WorkoutSetView): string {
+  if (set.weightKg != null && set.reps != null) return `${set.weightKg} kg × ${set.reps}`;
+  if (set.weightKg != null) return `${set.weightKg} kg`;
+  if (set.reps != null) return `${set.reps} reps`;
+  if (set.durationSeconds != null) {
+    const mins = Math.floor(set.durationSeconds / 60);
+    const secs = Math.round(set.durationSeconds % 60);
+    return `${mins}:${String(secs).padStart(2, "0")}`;
+  }
+  if (set.distanceMeters != null) {
+    return set.distanceMeters >= 1000 ? `${(set.distanceMeters / 1000).toFixed(2)} km` : `${set.distanceMeters} m`;
+  }
+  return "—";
 }
 
 export function WorkoutViewPage() {
@@ -51,29 +72,21 @@ export function WorkoutViewPage() {
           {workout.exercises.length === 0 && <p className="font-mono text-sm text-dust">— No exercises recorded —</p>}
           {workout.exercises.map((exercise, exerciseIndex) => (
             <div key={exerciseIndex}>
-              <h3 className="mb-2 font-display text-lg text-ink">{exercise.name}</h3>
-              <table className="w-full font-mono text-sm text-ink">
-                <thead>
-                  <tr className="text-left text-dust">
-                    <th className="pb-1 pr-2 font-normal">#</th>
-                    <th className="pb-1 pr-2 font-normal">Type</th>
-                    <th className="pb-1 pr-2 font-normal">Weight</th>
-                    <th className="pb-1 pr-2 font-normal">Reps</th>
-                    <th className="pb-1 font-normal">RPE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {exercise.sets.map((set, setIndex) => (
-                    <tr key={setIndex} className="border-t border-dust/50">
-                      <td className="py-1 pr-2">{set.index + 1}</td>
-                      <td className="py-1 pr-2 capitalize">{set.type}</td>
-                      <td className="py-1 pr-2">{set.weightKg != null ? `${set.weightKg} kg` : "—"}</td>
-                      <td className="py-1 pr-2">{set.reps ?? "—"}</td>
-                      <td className="py-1">{set.rpe ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <h3 className="mb-1 font-display text-lg text-ink">{exercise.name}</h3>
+              <div>
+                {exercise.sets.map((set, setIndex) => (
+                  <div
+                    key={setIndex}
+                    className="flex items-baseline gap-2 border-t border-dust/50 py-1.5 font-mono text-sm text-ink"
+                  >
+                    <span className="w-4 shrink-0 text-dust">{set.index + 1}</span>
+                    <span className="flex-1">{formatSetPrimary(set)}</span>
+                    <span className="shrink-0 text-xs text-dust">
+                      {set.oneRepMax != null ? `1RM ${set.oneRepMax.toFixed(1)} kg` : "—"}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>

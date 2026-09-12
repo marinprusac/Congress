@@ -40,6 +40,7 @@ export type { RemoteModule } from "./remoteModule.js";
 export { PageHeader } from "./PageHeader.js";
 export { useSearchableList, useListRowPrefetch } from "./listPage.js";
 export { ListSearchInput, ListLoadingState, ListErrorState, ListEmptyState } from "./ListStates.js";
+export { CompactCard, CardFlow, CardFlowLoadingState } from "./CardFlow.js";
 export { FormLabel, FormTextInput, FormErrorMessage, FormSubmitButton } from "./FormPrimitives.js";
 export { formatTimestamp } from "./formatTimestamp.js";
 export { ConfirmSheet } from "./ConfirmSheet.js";

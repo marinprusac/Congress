@@ -1,13 +1,16 @@
 import { Link, useLocation } from "react-router-dom";
 import { ChamberLayout, ChamberMark, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 
-// Workouts is the index route; Health is a second, equally-weighted section
-// with no "default page" to collapse into - same reasoning as Map's own
-// Places/Pending header links.
+// Workouts is the index route; Routines and Health are further,
+// equally-weighted sections with no "default page" to collapse into - same
+// reasoning as Map's own Places/Pending header links.
 function FitnessHeaderLinks() {
   const { pathname } = useLocation();
   const shellHosted = useShellHosted();
-  const links = [{ to: "/metrics", label: "Health" }];
+  const links = [
+    { to: "/routines", label: "Routines" },
+    { to: "/metrics", label: "Health" },
+  ];
   return (
     <>
       {links.map((link) => {

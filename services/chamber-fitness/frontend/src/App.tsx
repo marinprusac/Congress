@@ -3,6 +3,9 @@ import { useAppliedTheme } from "@congress/congress-ui";
 import { Layout } from "@/components/Layout";
 import { WorkoutsListPage } from "@/pages/WorkoutsListPage";
 import { WorkoutViewPage } from "@/pages/WorkoutViewPage";
+import { RoutinesListPage } from "@/pages/RoutinesListPage";
+import { NewRoutinePage } from "@/pages/NewRoutinePage";
+import { RoutineViewPage } from "@/pages/RoutineViewPage";
 import { HealthPage } from "@/pages/HealthPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 
@@ -14,6 +17,9 @@ export function App() {
       <Route element={<Layout />}>
         <Route index element={<WorkoutsListPage />} />
         <Route path="workouts/:id" element={<WorkoutViewPage />} />
+        <Route path="routines" element={<RoutinesListPage />} />
+        <Route path="routines/new" element={<NewRoutinePage />} />
+        <Route path="routines/:id" element={<RoutineViewPage />} />
         {/* Not "health" - that path is reserved by the Chamber contract's
             own liveness check (GET /health, proxied straight to the
             backend in dev and mounted ahead of the SPA fallback in prod),

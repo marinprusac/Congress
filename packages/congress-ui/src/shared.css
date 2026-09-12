@@ -1472,3 +1472,56 @@ a[download] {
   }
 }
 
+/* CompactCard/CardFlow - the shared compact-list replacement for the
+   full-width row idiom above. flex-wrap, not a grid with stretched (1fr)
+   tracks, so each card keeps its own fit-content width and simply wraps to
+   the next line once a row runs out of room (same reasoning as
+   chamber-notes's own .notes-flow, which this is modeled on layout-wise). */
+.compact-card-flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+@media (min-width: 641px) {
+  .compact-card-flow {
+    gap: 1rem;
+  }
+}
+
+.compact-card {
+  display: block;
+  width: fit-content;
+  max-width: min(18rem, 100%);
+  overflow-wrap: anywhere;
+  padding: 0.85rem 0.9rem;
+  background-color: var(--color-parchment);
+  border: 1px solid var(--color-dust);
+  cursor: pointer;
+}
+
+.compact-card:hover,
+.compact-card:focus-visible {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+/* Same size-containment trick as .note-card-excerpt - keeps a long
+   subtitle/detail line from inflating this card's own fit-content width
+   beyond what its title needs. */
+.compact-card-title {
+  display: block;
+}
+
+.compact-card-detail {
+  contain: inline-size;
+}
+
+.compact-card-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 12rem;
+  cursor: default;
+}
+

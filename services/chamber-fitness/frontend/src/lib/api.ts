@@ -1,4 +1,18 @@
-import type { WorkoutSummary, WorkoutDetail, Settings, HevySyncHealth, HealthMetric, HealthLatest, HealthMetricType } from "../../../src/types";
+import type {
+  WorkoutSummary,
+  WorkoutDetail,
+  Settings,
+  HevySyncHealth,
+  HealthMetric,
+  HealthLatest,
+  HealthMetricType,
+  RoutineSummary,
+  RoutineDetail,
+  RoutineFolder,
+  ExerciseTemplate,
+  CreateRoutineRequest,
+  UpdateRoutineRequest,
+} from "../../../src/types";
 import { resolveApiBase, parseJsonResponse as json } from "@congress/congress-ui";
 
 const API_BASE = resolveApiBase("fitness", import.meta.env.PROD);
@@ -53,4 +67,38 @@ export function fetchHealthMetrics(metricType?: HealthMetricType, limit = 50): P
   if (metricType) params.set("type", metricType);
   params.set("limit", String(limit));
   return fetch(`${API_BASE}/health/metrics?${params}`).then((res) => json(res));
+}
+
+export function fetchRoutines(): Promise<RoutineSummary[]> {
+  return fetch(`${API_BASE}/routines`).then((res) => json(res));
+}
+
+export function fetchRoutine(id: string): Promise<RoutineDetail> {
+  return fetch(`${API_BASE}/routines/${id}`).then((res) => json(res));
+}
+
+export function createRoutine(input: CreateRoutineRequest): Promise<RoutineDetail> {
+  return fetch(`${API_BASE}/routines`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  }).then((res) => json(res));
+}
+
+export function updateRoutine(id: string, input: UpdateRoutineRequest): Promise<RoutineDetail> {
+  return fetch(`${API_BASE}/routines/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  }).then((res) => json(res));
+}
+
+export function fetchRoutineFolders(): Promise<RoutineFolder[]> {
+  return fetch(`${API_BASE}/routine-folders`).then((res) => json(res));
+}
+
+export function fetchExerciseTemplates(query: string): Promise<ExerciseTemplate[]> {
+  const params = new URLSearchParams();
+  if (query) params.set("q", query);
+  return fetch(`${API_BASE}/exercise-templates?${params}`).then((res) => json(res));
 }

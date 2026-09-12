@@ -3,23 +3,39 @@ import { z } from "zod";
 // Mirrors Hevy's own set shape (api.hevyapp.com/docs) closely enough to
 // round-trip without lossy coercion - most numeric fields are nullable
 // there too, to accommodate weight-based/duration-based/distance-based
-// exercises sharing one shape.
-export const workoutSetSchema = z.object({
+// exercises sharing one shape. This is the *persisted* shape (what's
+// written into exercisesJson) - no `type`, since set type is no longer
+// tracked at all (not even transiently); see workoutSetViewSchema below for
+// the response shape shown to callers.
+export const persistedWorkoutSetSchema = z.object({
   index: z.number().int(),
-  type: z.enum(["normal", "warmup", "dropset", "failure"]),
   weightKg: z.number().nullable(),
   reps: z.number().int().nullable(),
   durationSeconds: z.number().nullable(),
   distanceMeters: z.number().nullable(),
   rpe: z.number().nullable(),
 });
-export type WorkoutSet = z.infer<typeof workoutSetSchema>;
+export type PersistedWorkoutSet = z.infer<typeof persistedWorkoutSetSchema>;
 
-export const workoutExerciseSchema = z.object({
+export const persistedWorkoutExerciseSchema = z.object({
   name: z.string(),
-  sets: z.array(workoutSetSchema),
+  sets: z.array(persistedWorkoutSetSchema),
 });
-export type WorkoutExercise = z.infer<typeof workoutExerciseSchema>;
+export type PersistedWorkoutExercise = z.infer<typeof persistedWorkoutExerciseSchema>;
+
+// Response/MCP shape - the persisted set plus a value computed fresh at read
+// time from weightKg/reps (never stored, so it can't drift from those two
+// source fields, and needs no migration if the formula ever changes).
+export const workoutSetViewSchema = persistedWorkoutSetSchema.extend({
+  oneRepMax: z.number().nullable(),
+});
+export type WorkoutSetView = z.infer<typeof workoutSetViewSchema>;
+
+export const workoutExerciseViewSchema = z.object({
+  name: z.string(),
+  sets: z.array(workoutSetViewSchema),
+});
+export type WorkoutExerciseView = z.infer<typeof workoutExerciseViewSchema>;
 
 export const workoutSummarySchema = z.object({
   id: z.number().int(),
@@ -37,9 +53,113 @@ export const workoutSummarySchema = z.object({
 export type WorkoutSummary = z.infer<typeof workoutSummarySchema>;
 
 export const workoutDetailSchema = workoutSummarySchema.extend({
-  exercises: z.array(workoutExerciseSchema),
+  exercises: z.array(workoutExerciseViewSchema),
 });
 export type WorkoutDetail = z.infer<typeof workoutDetailSchema>;
+
+// Routines are Hevy-backed, not locally mirrored - there's no local table or
+// integer id for these; `id` is Hevy's own string id throughout. Unlike a
+// workout set, `type` is genuinely editable input here (a routine defines
+// what to do, a workout records what was done), so it's kept - the
+// per-set-type removal above is specific to logged workouts, not a blanket
+// "no more set type" rule.
+export const routineSetSchema = z.object({
+  index: z.number().int(),
+  type: z.enum(["normal", "warmup", "dropset", "failure"]),
+  weightKg: z.number().nullable(),
+  reps: z.number().int().nullable(),
+  repRangeStart: z.number().int().nullable(),
+  repRangeEnd: z.number().int().nullable(),
+  durationSeconds: z.number().nullable(),
+  distanceMeters: z.number().nullable(),
+  // Response-only (Hevy never accepts this in a request) - an average of
+  // logged performances against this routine slot, most likely; never sent
+  // back on create/update.
+  rpe: z.number().nullable(),
+});
+export type RoutineSet = z.infer<typeof routineSetSchema>;
+
+export const routineExerciseSchema = z.object({
+  exerciseTemplateId: z.string(),
+  // Hevy echoes this back directly on every exercise entry - no separate
+  // exercise-template lookup needed to display an existing routine.
+  name: z.string(),
+  supersetId: z.number().int().nullable(),
+  restSeconds: z.number().int().nullable(),
+  sets: z.array(routineSetSchema),
+});
+export type RoutineExercise = z.infer<typeof routineExerciseSchema>;
+
+export const routineSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  folderId: z.number().int().nullable(),
+  updatedAt: z.string(),
+  createdAt: z.string(),
+  exerciseCount: z.number().int(),
+});
+export type RoutineSummary = z.infer<typeof routineSummarySchema>;
+
+// No `notes` field - Hevy's routine response never includes it (even though
+// create/update requests accept one), and PUT is a full replace, so
+// displaying/round-tripping a notes field here would silently blank out
+// whatever notes actually exist in Hevy on the very first save. Left
+// entirely out of scope rather than built as a write-only trap.
+export const routineDetailSchema = routineSummarySchema.omit({ exerciseCount: true }).extend({
+  exercises: z.array(routineExerciseSchema),
+});
+export type RoutineDetail = z.infer<typeof routineDetailSchema>;
+
+export const routineFolderSchema = z.object({
+  id: z.number().int(),
+  index: z.number().int(),
+  title: z.string(),
+});
+export type RoutineFolder = z.infer<typeof routineFolderSchema>;
+
+export const exerciseTemplateSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  primaryMuscleGroup: z.string().nullable(),
+});
+export type ExerciseTemplate = z.infer<typeof exerciseTemplateSchema>;
+
+// Request shapes - what the frontend sends to create/update a routine.
+// Mirrors routineSetSchema/routineExerciseSchema minus the response-only
+// fields (`rpe`, and the exercise's echoed `name`).
+export const routineSetInputSchema = z.object({
+  type: z.enum(["normal", "warmup", "dropset", "failure"]),
+  weightKg: z.number().nullable(),
+  reps: z.number().int().nullable(),
+  repRangeStart: z.number().int().nullable(),
+  repRangeEnd: z.number().int().nullable(),
+  durationSeconds: z.number().nullable(),
+  distanceMeters: z.number().nullable(),
+});
+export type RoutineSetInput = z.infer<typeof routineSetInputSchema>;
+
+export const routineExerciseInputSchema = z.object({
+  exerciseTemplateId: z.string().min(1),
+  supersetId: z.number().int().nullable(),
+  restSeconds: z.number().int().nullable(),
+  sets: z.array(routineSetInputSchema),
+});
+export type RoutineExerciseInput = z.infer<typeof routineExerciseInputSchema>;
+
+export const createRoutineRequestSchema = z.object({
+  title: z.string().trim().min(1),
+  folderId: z.number().int().nullable(),
+  exercises: z.array(routineExerciseInputSchema),
+});
+export type CreateRoutineRequest = z.infer<typeof createRoutineRequestSchema>;
+
+// No folderId - Hevy's PUT /routines/{id} body has no folder_id field at
+// all, so a routine can never be moved between folders after creation.
+export const updateRoutineRequestSchema = z.object({
+  title: z.string().trim().min(1),
+  exercises: z.array(routineExerciseInputSchema),
+});
+export type UpdateRoutineRequest = z.infer<typeof updateRoutineRequestSchema>;
 
 export const settingsSchema = z.object({
   hevyApiKey: z.string().nullable(),

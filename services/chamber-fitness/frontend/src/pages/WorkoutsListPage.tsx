@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { useState } from "react";
 import {
   useShellHosted,
@@ -6,9 +5,11 @@ import {
   useSearchableList,
   useListRowPrefetch,
   ListSearchInput,
-  ListLoadingState,
   ListErrorState,
   ListEmptyState,
+  CompactCard,
+  CardFlow,
+  CardFlowLoadingState,
 } from "@congress/congress-ui";
 import { fetchWorkouts, fetchWorkout } from "@/lib/api";
 
@@ -31,27 +32,29 @@ export function WorkoutsListPage() {
           no "new workout" flow in this Chamber. */}
       <ListSearchInput value={query} onChange={setQuery} placeholder="Search workouts —" />
 
-      <div className="border-t border-dust">
-        {isLoading && <ListLoadingState />}
+      <div className="mt-4">
+        {isLoading && <CardFlowLoadingState />}
         {isError && <ListErrorState label="Workouts" />}
         {!isLoading && !isError && data?.length === 0 && <ListEmptyState label="workouts" hasQuery={!!query} />}
-        {!isLoading &&
-          !isError &&
-          data?.map((workout) => (
-            <Link
-              key={workout.id}
-              to={resolveChamberPath(`/workouts/${workout.id}`, "fitness", shellHosted)}
-              onMouseEnter={() => prefetchWorkout(workout.id)}
-              onFocus={() => prefetchWorkout(workout.id)}
-              className="block border-b border-dust px-1 py-3 hover:bg-ink/[0.03]"
-            >
-              <span className="font-display text-lg text-ink">{workout.exhibitTitle}</span>
-              <p className="mt-1 text-sm text-slate">
-                {workout.exerciseCount} exercise{workout.exerciseCount === 1 ? "" : "s"}
-                {workout.totalVolumeKg != null && ` · ${Math.round(workout.totalVolumeKg).toLocaleString()} kg`}
-              </p>
-            </Link>
-          ))}
+        {!isLoading && !isError && data && data.length > 0 && (
+          <CardFlow>
+            {data.map((workout) => (
+              <CompactCard
+                key={workout.id}
+                href={resolveChamberPath(`/workouts/${workout.id}`, "fitness", shellHosted)}
+                onMouseEnter={() => prefetchWorkout(workout.id)}
+                onFocus={() => prefetchWorkout(workout.id)}
+                title={workout.exhibitTitle}
+                subtitle={
+                  <>
+                    {workout.exerciseCount} exercise{workout.exerciseCount === 1 ? "" : "s"}
+                    {workout.totalVolumeKg != null && ` · ${Math.round(workout.totalVolumeKg).toLocaleString()} kg`}
+                  </>
+                }
+              />
+            ))}
+          </CardFlow>
+        )}
       </div>
     </section>
   );

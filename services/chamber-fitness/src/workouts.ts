@@ -1,5 +1,7 @@
 import { desc, eq, gte } from "drizzle-orm";
-import type { WorkoutSummary, WorkoutDetail, WorkoutExercise } from "./types.js";
+import type { WorkoutSummary, WorkoutDetail, PersistedWorkoutExercise, WorkoutExerciseView } from "./types.js";
+import { persistedWorkoutExerciseSchema } from "./types.js";
+import { computeOneRepMax } from "./oneRepMax.js";
 import { db } from "./db/client.js";
 import { workouts } from "./db/schema.js";
 import { toExhibitId, parseWorkoutId, pushExhibitSync } from "./exhibits.js";
@@ -20,7 +22,19 @@ function toSummary(row: typeof workouts.$inferSelect): WorkoutSummary {
 }
 
 function toDetail(row: typeof workouts.$inferSelect): WorkoutDetail {
-  return { ...toSummary(row), exercises: JSON.parse(row.exercisesJson) as WorkoutExercise[] };
+  const parsed = persistedWorkoutExerciseSchema.array().safeParse(JSON.parse(row.exercisesJson));
+  // Tolerant, not a hard parse - a legacy row's exercisesJson may still
+  // carry a stale `type` key from before it stopped being persisted (zod
+  // strips it silently) or, in principle, some other shape mismatch; either
+  // way this should never turn into a 500 on GET /api/workouts/:id, so an
+  // unparseable blob just renders as "no exercises" rather than throwing.
+  const exercises: WorkoutExerciseView[] = parsed.success
+    ? parsed.data.map((exercise) => ({
+        name: exercise.name,
+        sets: exercise.sets.map((set) => ({ ...set, oneRepMax: computeOneRepMax(set.weightKg, set.reps) })),
+      }))
+    : [];
+  return { ...toSummary(row), exercises };
 }
 
 export async function listWorkouts(limit = 50): Promise<WorkoutSummary[]> {
@@ -63,7 +77,7 @@ export async function getWeekStats(): Promise<WeekStats> {
   };
 }
 
-function computeExerciseStats(exercises: WorkoutExercise[]): {
+function computeExerciseStats(exercises: PersistedWorkoutExercise[]): {
   exerciseCount: number;
   totalVolumeKg: number | null;
   exerciseNames: string;
@@ -129,7 +143,7 @@ export async function upsertWorkoutFromHevy(
   title: string,
   startTime: Date,
   endTime: Date,
-  exercises: WorkoutExercise[]
+  exercises: PersistedWorkoutExercise[]
 ): Promise<UpsertResult> {
   const stats = computeExerciseStats(exercises);
   const exercisesJson = JSON.stringify(exercises);
