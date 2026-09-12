@@ -15,6 +15,8 @@ import {
 import { AgendaGapRow } from "@/components/AgendaGapRow";
 import { DraggableEventBlock } from "@/components/DraggableEventBlock";
 import { OverlapEventBlock } from "@/components/OverlapEventBlock";
+import { useAgendaDragController, MIN_BLOCK_HEIGHT_PX } from "@/lib/useAgendaDragController";
+import type { CalendarEvent } from "../../../src/types";
 
 // How often the now-indicator's position is recomputed while the page sits
 // open - fine-grained enough that it visibly moves over a session, without
@@ -24,10 +26,6 @@ const NOW_REFRESH_MS = 60_000;
 // The agenda is always anchored to today with no way to page it forward or
 // back - just a long enough forward window to be genuinely useful.
 const WINDOW_DAYS = 30;
-
-// A block never renders shorter than this, regardless of the event's own
-// duration - short meetings still need room for a title and calendar name.
-const MIN_BLOCK_HEIGHT_PX = 24;
 
 function addDays(date: Date, days: number): Date {
   const d = new Date(date);
@@ -98,17 +96,36 @@ export function AgendaPage() {
     return () => clearInterval(id);
   }, []);
 
+  // Owns the Agenda's move/resize drag gesture at the page level - see
+  // useAgendaDragController's own top comment for why it has to live here
+  // rather than inside DraggableEventBlock/OverlapEventBlock: the live
+  // preview below causes exactly those two components to swap into and out
+  // of each other mid-drag as the dragged event's tentative time joins or
+  // leaves a genuinely-overlapping cluster, which would otherwise unmount
+  // whichever one owned the gesture and silently abandon it.
+  const dragController = useAgendaDragController();
+  const livePreview = dragController.livePreview;
+  const previewEvents = useMemo<CalendarEvent[]>(() => {
+    const events = data?.events ?? [];
+    if (!livePreview) return events;
+    return events.map((e) =>
+      e.accountId === livePreview.accountId && e.calendarId === livePreview.calendarId && e.id === livePreview.id
+        ? { ...e, start: livePreview.start, end: livePreview.end }
+        : e
+    );
+  }, [data, livePreview]);
+
   // windowEnd is a pure function of anchor (see addDays above), so anchor
   // alone is a sufficient/complete dependency without also listing the new
   // Date object windowEnd happens to be on every render.
   const timeline = useMemo(
     () =>
-      buildAgendaTimeline(data?.events ?? [], {
+      buildAgendaTimeline(previewEvents, {
         nowMs: nowTick,
         windowStartMs: anchor.getTime(),
         windowEndMs: windowEnd.getTime(),
       }),
-    [data, nowTick, anchor]
+    [previewEvents, nowTick, anchor]
   );
   // A leading now-marker (kind "now") can sit before the first date caption
   // without disturbing layout (it renders at zero height) - the caption
@@ -269,25 +286,32 @@ export function AgendaPage() {
                   block.nowOffsetMinutes !== undefined
                     ? Math.min(100, Math.max(0, (block.nowOffsetMinutes / Math.max(1, block.durationMinutes)) * 100))
                     : null;
+                // While a resize is actively (imperatively) driving this
+                // element's real height, the ordinary coarse minHeight below
+                // must not compete with it - see OverlapEventBlock's
+                // identical liveHeight comment for the full reasoning.
+                const isActiveResize = dragController.forEvent(event).isActiveResize;
                 return (
                   <DraggableEventBlock
                     key={entry.key}
                     event={event}
                     href={eventHref(event)}
                     onPrefetch={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
+                    dragController={dragController}
                     className="group relative flex items-start gap-3 px-1"
                   >
-                    {(resizeOffsetPx) => (
+                    {({ resizeRef, handles }) => (
                       <>
                         <div className="w-16 shrink-0 pt-2 text-right font-mono text-[11px] leading-tight text-dust">
                           <div>{formatEventStartTime(event)}</div>
                           <div className="text-dust/60">{formatEventEndTime(event)}</div>
                         </div>
                         <div
+                          ref={resizeRef}
                           className={`relative min-w-0 flex-1 border-l-2 px-3 py-2 group-hover:bg-accent/[0.12] ${
                             unconfirmed ? "border-dashed border-accent/50 bg-accent/[0.02]" : "border-accent bg-accent/[0.06]"
                           }`}
-                          style={{ minHeight: Math.max(MIN_BLOCK_HEIGHT_PX, clusterHeightPx + resizeOffsetPx) }}
+                          style={{ minHeight: isActiveResize ? MIN_BLOCK_HEIGHT_PX : Math.max(MIN_BLOCK_HEIGHT_PX, clusterHeightPx) }}
                         >
                           <div className={`font-display text-base leading-snug ${unconfirmed ? "text-ink/70" : "text-ink"}`}>
                             {event.title}
@@ -302,6 +326,7 @@ export function AgendaPage() {
                               <span className="absolute -left-[5px] top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-alert" />
                             </div>
                           )}
+                          {handles}
                         </div>
                         {/* An event that itself runs past midnight (10pm-2am) has
                             no ordinary gap to hang the crossed day's header on -
@@ -411,6 +436,7 @@ export function AgendaPage() {
                           nowPercent={nowPercent}
                           href={eventHref(event)}
                           onPrefetch={() => prefetchEvent(event.accountId, event.calendarId, event.id)}
+                          dragController={dragController}
                         />
                       );
                     })}

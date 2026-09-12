@@ -39,10 +39,10 @@ export function EventMoveHandle({ onPointerDown, style }: EventDragHandleProps) 
     <div
       aria-hidden="true"
       onPointerDown={handlePointerDown}
-      className="absolute right-0 top-1/2 z-30 flex h-6 w-6 -translate-y-1/2 translate-x-1/2 items-center justify-center sm:hidden"
+      className="absolute right-0 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 translate-x-1/2 items-center justify-center sm:hidden"
       style={style}
     >
-      <span className="h-2.5 w-2.5 rounded-full border border-accent bg-parchment" />
+      <span className="h-2.5 w-2.5 rounded-full border border-accent/40 bg-parchment/70" />
     </div>
   );
 }
@@ -57,10 +57,10 @@ export function EventResizeHandle({ onPointerDown, style }: EventDragHandleProps
     <div
       aria-hidden="true"
       onPointerDown={handlePointerDown}
-      className="absolute bottom-0 left-1/2 z-30 flex h-4 w-10 -translate-x-1/2 translate-y-1/2 items-center justify-center sm:inset-x-0 sm:left-0 sm:w-auto sm:translate-x-0"
+      className="absolute bottom-0 left-1/2 z-10 flex h-4 w-10 -translate-x-1/2 translate-y-1/2 items-center justify-center sm:inset-x-0 sm:left-0 sm:w-auto sm:translate-x-0"
       style={{ cursor: "ns-resize", ...style }}
     >
-      <span className="h-1.5 w-8 rounded-full border border-accent bg-parchment sm:hidden" />
+      <span className="h-1.5 w-8 rounded-full border border-accent/40 bg-parchment/70 sm:hidden" />
     </div>
   );
 }
