@@ -4,7 +4,7 @@ import { mcpTextResult as textResult } from "@congress/chamber-kit";
 import { listWorkouts, getWorkout } from "../workouts.js";
 import { listHealthMetrics, getLatestHealthMetrics } from "../healthMetrics.js";
 import { healthMetricTypeSchema, routineSetInputSchema, routineExerciseInputSchema } from "../types.js";
-import { RoutinesError, listRoutines, getRoutine, createRoutine, updateRoutine } from "../routines.js";
+import { RoutinesError, listRoutines, getRoutine, createRoutine, updateRoutine, listRoutineFolders, searchExerciseTemplates } from "../routines.js";
 
 const routineSetInputZod = z.object({
   type: routineSetInputSchema.shape.type,
@@ -105,6 +105,39 @@ export function registerTools(server: McpServer) {
         const routine = await getRoutine(id);
         if (!routine) return textResult({ error: "not_found", id });
         return textResult(routine);
+      } catch (err) {
+        return textResult(err instanceof RoutinesError ? { error: err.code } : { error: "unknown_error" });
+      }
+    }
+  );
+
+  server.registerTool(
+    "search_exercise_templates",
+    {
+      title: "Search Exercise Templates",
+      description:
+        "Search Hevy's exercise library by name to find the exerciseTemplateId values create_routine/update_routine need - an exercise can't be added to a routine by guessing an id. Empty query returns the full catalog.",
+      inputSchema: { query: z.string().optional() },
+    },
+    async ({ query }) => {
+      try {
+        return textResult(await searchExerciseTemplates(query ?? ""));
+      } catch (err) {
+        return textResult(err instanceof RoutinesError ? { error: err.code } : { error: "unknown_error" });
+      }
+    }
+  );
+
+  server.registerTool(
+    "list_routine_folders",
+    {
+      title: "List Routine Folders",
+      description: "List Hevy routine folders - use to find a valid folderId for create_routine (optional; routines can also have no folder).",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        return textResult(await listRoutineFolders());
       } catch (err) {
         return textResult(err instanceof RoutinesError ? { error: err.code } : { error: "unknown_error" });
       }
