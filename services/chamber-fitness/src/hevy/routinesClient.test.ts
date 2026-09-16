@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createRoutine, updateRoutine } from "./client.js";
+import { HevyApiError, createRoutine, updateRoutine } from "./client.js";
 import { normalizeRoutine, buildHevyCreateRoutineBody } from "./normalize.js";
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
   return { ok, status, statusText: "", text: () => Promise.resolve(JSON.stringify(body)) } as unknown as Response;
+}
+
+function errorResponse(status: number, statusText: string, bodyText: string): Response {
+  return { ok: false, status, statusText, text: () => Promise.resolve(bodyText) } as unknown as Response;
 }
 
 beforeEach(() => {
@@ -49,6 +53,25 @@ describe("updateRoutine", () => {
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body).toEqual({ routine: { title: "Push Day", exercises: [] } });
     expect(body.routine).not.toHaveProperty("folder_id");
+  });
+
+  // Previously the failure status/statusText were kept but Hevy's own
+  // response body (where a validation error actually names the rejected
+  // field) was discarded - every write rejection surfaced as an opaque
+  // "unknown_error" all the way up to whoever called the MCP tool.
+  it("includes Hevy's response body in the thrown error's message", async () => {
+    vi.mocked(fetch).mockResolvedValue(errorResponse(400, "Bad Request", JSON.stringify({ message: "exercise_template_id is invalid" })));
+
+    await expect(updateRoutine("fake-key", "r1", { title: "Push Day", exercises: [] })).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringContaining("exercise_template_id is invalid"),
+    });
+  });
+
+  it("throws a HevyApiError instance on failure", async () => {
+    vi.mocked(fetch).mockResolvedValue(errorResponse(500, "Internal Server Error", ""));
+
+    await expect(updateRoutine("fake-key", "r1", { title: "Push Day", exercises: [] })).rejects.toBeInstanceOf(HevyApiError);
   });
 });
 

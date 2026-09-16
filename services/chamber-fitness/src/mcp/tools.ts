@@ -5,6 +5,19 @@ import { listWorkouts, getWorkout } from "../workouts.js";
 import { listHealthMetrics, getLatestHealthMetrics } from "../healthMetrics.js";
 import { healthMetricTypeSchema, routineSetInputSchema, routineExerciseInputSchema } from "../types.js";
 import { RoutinesError, listRoutines, getRoutine, createRoutine, updateRoutine, listRoutineFolders, searchExerciseTemplates } from "../routines.js";
+import { HevyApiError } from "../hevy/client.js";
+
+// A RoutinesError carries a stable, named `code` (e.g. `hevy_not_configured`)
+// that's safe to branch on; anything else (almost always a HevyApiError from
+// a failed Hevy request) is a one-off failure whose actual cause only shows
+// up in its message - collapsing it to a bare "unknown_error" (as this used
+// to) turns every write rejection into an unfixable black box for whoever's
+// calling the tool. Surface the real status/message instead.
+export function routineToolError(err: unknown): { error: string; status?: number; message: string } {
+  if (err instanceof RoutinesError) return { error: err.code, message: err.message };
+  if (err instanceof HevyApiError) return { error: "hevy_api_error", status: err.status, message: err.message };
+  return { error: "unknown_error", message: err instanceof Error ? err.message : String(err) };
+}
 
 const routineSetInputZod = z.object({
   type: routineSetInputSchema.shape.type,
@@ -88,7 +101,7 @@ export function registerTools(server: McpServer) {
       try {
         return textResult(await listRoutines());
       } catch (err) {
-        return textResult(err instanceof RoutinesError ? { error: err.code } : { error: "unknown_error" });
+        return textResult(routineToolError(err));
       }
     }
   );
@@ -106,7 +119,7 @@ export function registerTools(server: McpServer) {
         if (!routine) return textResult({ error: "not_found", id });
         return textResult(routine);
       } catch (err) {
-        return textResult(err instanceof RoutinesError ? { error: err.code } : { error: "unknown_error" });
+        return textResult(routineToolError(err));
       }
     }
   );
@@ -123,7 +136,7 @@ export function registerTools(server: McpServer) {
       try {
         return textResult(await searchExerciseTemplates(query ?? ""));
       } catch (err) {
-        return textResult(err instanceof RoutinesError ? { error: err.code } : { error: "unknown_error" });
+        return textResult(routineToolError(err));
       }
     }
   );
@@ -139,7 +152,7 @@ export function registerTools(server: McpServer) {
       try {
         return textResult(await listRoutineFolders());
       } catch (err) {
-        return textResult(err instanceof RoutinesError ? { error: err.code } : { error: "unknown_error" });
+        return textResult(routineToolError(err));
       }
     }
   );
@@ -159,7 +172,7 @@ export function registerTools(server: McpServer) {
       try {
         return textResult(await createRoutine(input));
       } catch (err) {
-        return textResult(err instanceof RoutinesError ? { error: err.code } : { error: "unknown_error" });
+        return textResult(routineToolError(err));
       }
     }
   );
@@ -181,7 +194,7 @@ export function registerTools(server: McpServer) {
         if (!routine) return textResult({ error: "not_found", id });
         return textResult(routine);
       } catch (err) {
-        return textResult(err instanceof RoutinesError ? { error: err.code } : { error: "unknown_error" });
+        return textResult(routineToolError(err));
       }
     }
   );

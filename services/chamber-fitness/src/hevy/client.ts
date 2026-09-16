@@ -30,7 +30,13 @@ async function hevyFetch(apiKey: string, path: string, opts: HevyFetchOptions = 
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   });
   if (!res.ok) {
-    throw new HevyApiError(`Hevy API request failed: ${res.status} ${res.statusText}`, res.status);
+    // Hevy's own error responses usually carry a JSON body explaining what
+    // was rejected (e.g. a validation message naming the offending field) -
+    // discarding it and keeping only status/statusText is what previously
+    // turned every write failure into an opaque "unknown_error" for callers.
+    const bodyText = await res.text().catch(() => "");
+    const detail = bodyText.slice(0, 500);
+    throw new HevyApiError(`Hevy API request failed: ${res.status} ${res.statusText}${detail ? ` - ${detail}` : ""}`, res.status);
   }
   // POST /v1/routines can legitimately return `{}` on success (Hevy's own
   // response schema documents this as a possible shape) - an empty body
