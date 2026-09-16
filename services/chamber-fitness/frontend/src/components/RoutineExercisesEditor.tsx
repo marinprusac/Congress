@@ -34,7 +34,7 @@ export interface RoutineExercisesEditorProps {
   // Weight/reps/rest field edits - autosaved on the caller's own debounce.
   onLeafChange: (next: DraftExercise[]) => void;
   // Add/remove/reorder an exercise or set - the caller saves this
-  // immediately, bypassing the debounce (see RoutineViewPage/NewRoutinePage).
+  // immediately, bypassing the debounce (see RoutineEditorPage).
   onStructuralChange: (next: DraftExercise[]) => void;
 }
 

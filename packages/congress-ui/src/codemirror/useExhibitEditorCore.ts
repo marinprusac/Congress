@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { EditorState, type Extension } from "@codemirror/state";
+import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { EditorView, keymap, placeholder as placeholderExtension } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
@@ -50,6 +50,15 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
 
   const containerElRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
+  // Reused across a full teardown+recreate (see containerRef's own comment
+  // on [readOnly, mode]) so the effect below can reconfigure whichever view
+  // currently exists - unlike `readOnly`/`mode`, a page that stays mounted
+  // across a create -> persisted transition (or one persisted id to
+  // another) can have its `placeholder` text change without either of
+  // those, and a CM6 extension baked in once at construction time would
+  // otherwise silently keep showing the placeholder from whenever this
+  // editor was first built.
+  const placeholderCompartmentRef = useRef<Compartment>(new Compartment());
 
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -245,7 +254,7 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
       // and single-line Enter binding both take priority over their defaults
       // at the same precedence level.
       extensions.push(keymap.of([...defaultKeymap, ...historyKeymap]));
-      if (placeholder) extensions.push(placeholderExtension(placeholder));
+      extensions.push(placeholderCompartmentRef.current.of(placeholder ? placeholderExtension(placeholder) : []));
 
       const state = EditorState.create({ doc: valueRef.current, extensions });
       const view = new EditorView({ state, parent: el });
@@ -293,6 +302,19 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } });
     }
   }, [value]);
+
+  // Keeps the placeholder extension live across a `containerRef` that
+  // isn't being torn down/recreated for this change (see the compartment's
+  // own comment above) - runs once redundantly on mount alongside the
+  // initial construction above, same harmless-overlap shape as the `value`
+  // effect right above it.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: placeholderCompartmentRef.current.reconfigure(placeholder ? placeholderExtension(placeholder) : []),
+    });
+  }, [placeholder]);
 
   const picker: ExhibitPickerState = {
     open: trigger !== null,

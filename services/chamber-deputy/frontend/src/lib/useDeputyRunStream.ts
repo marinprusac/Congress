@@ -30,7 +30,7 @@ const IDLE_STATE: DeputyRunStreamState = { active: false, kind: null, directiveI
 // most one run globally (jobQueue.ts is concurrency-1), so this is a single
 // shared "what's happening right now" view, not scoped to any one
 // directive/chat - callers filter by `kind`/`directiveId` themselves (see
-// ChatPage/DirectivesListPage/DirectiveViewPage). EventSource reconnects on
+// ChatPage/DirectivesListPage/DirectiveEditorPage). EventSource reconnects on
 // its own if the connection drops; the server always replays the current
 // run's full event log (or "idle") to a newly (re)connected client, so a
 // reconnect naturally rebuilds the right state without any special-casing

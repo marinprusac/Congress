@@ -44,7 +44,7 @@ export const widgets: Record<string, ComponentType> = Object.fromEntries(
   Object.entries(rawWidgets).map(([id, Widget]) => [id, withQueryClient(Widget)])
 );
 
-// No `settings` export: everything here now autosaves (see NoteViewPage),
+// No `settings` export: everything here now autosaves (see NoteEditorPage),
 // so there's nothing left to configure. Congress's unified Settings page
 // already tolerates a Chamber with no `settings` export by simply omitting
 // its tab (see SettingsPage.tsx's useChamberSettingsPanels).

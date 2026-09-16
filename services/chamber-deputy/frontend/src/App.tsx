@@ -3,8 +3,7 @@ import { useAppliedTheme } from "@congress/congress-ui";
 import { Layout } from "@/components/Layout";
 import { ChatPage } from "@/pages/ChatPage";
 import { DirectivesListPage } from "@/pages/DirectivesListPage";
-import { DirectiveViewPage } from "@/pages/DirectiveViewPage";
-import { NewDirectivePage } from "@/pages/NewDirectivePage";
+import { DirectiveEditorPage } from "@/pages/DirectiveEditorPage";
 
 export function App() {
   useAppliedTheme();
@@ -13,8 +12,8 @@ export function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<DirectivesListPage />} />
-        <Route path="directives/new" element={<NewDirectivePage />} />
-        <Route path="d/:id" element={<DirectiveViewPage />} />
+        <Route path="directives/new" element={<DirectiveEditorPage />} />
+        <Route path="d/:id" element={<DirectiveEditorPage />} />
         <Route path="chat" element={<ChatPage />} />
       </Route>
     </Routes>

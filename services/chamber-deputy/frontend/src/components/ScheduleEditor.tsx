@@ -60,8 +60,8 @@ interface ScheduleEditorProps {
 // (existing), daily/weekly at a wall-clock time (new - see
 // services/chamber-deputy/src/scheduling.ts for the zoned-time math this
 // feeds), or immediately whenever a chosen cross-Chamber event fires (new -
-// see eventReceive.ts). Used identically by NewDirectivePage and
-// DirectiveViewPage's edit mode.
+// see eventReceive.ts). Used identically by DirectiveEditorPage's create
+// and edit modes.
 export function ScheduleEditor({ value, onChange, eventCatalog, eventCatalogLoading }: ScheduleEditorProps) {
   function setType(scheduleType: DirectiveScheduleType | null) {
     if (scheduleType !== "daily" && scheduleType !== "weekly") {
