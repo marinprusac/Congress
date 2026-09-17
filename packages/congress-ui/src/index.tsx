@@ -51,6 +51,7 @@ export { showToast } from "./toast.js";
 export { useAutosave } from "./useAutosave.js";
 export { useDraftCreate } from "./useDraftCreate.js";
 export { resolveEditorIdentity } from "./editorIdentity.js";
+export { useSelfNavigateGuard } from "./selfNavigateGuard.js";
 export type { ToastDetail } from "./toast.js";
 export { useLongPressDrag } from "./useLongPressDrag.js";
 export type { UseLongPressDragOptions, UseLongPressDragResult } from "./useLongPressDrag.js";

@@ -15,6 +15,7 @@ import {
   useAutosave,
   useDraftCreate,
   resolveEditorIdentity,
+  useSelfNavigateGuard,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createTask, fetchTask, updateTask, deleteTask, quickCreateTaskExhibit } from "@/lib/api";
@@ -47,6 +48,7 @@ export function TaskEditorPage() {
   const [draftDueDate, setDraftDueDate] = useState("");
   const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const { markSelfNavigate, consumeSelfNavigate } = useSelfNavigateGuard();
 
   const taskQuery = useQuery({
     queryKey: ["task", taskId],
@@ -71,6 +73,7 @@ export function TaskEditorPage() {
       initializedTaskIdRef.current = created.id;
       markSaved(draft);
       setTaskId(created.id);
+      markSelfNavigate();
       navigate(resolveChamberPath(`/t/${created.id}`, "tasks", shellHosted), { replace: true });
     },
     onError: () => {
@@ -89,8 +92,11 @@ export function TaskEditorPage() {
 
   // A navigation between two different ids, or back to the draft/"new"
   // route, reuses this same mounted component - see resolveEditorIdentity's
-  // own comment.
+  // own comment. consumeSelfNavigate() must run first - see
+  // useSelfNavigateGuard's own comment for the params-vs-state race it
+  // closes (and the duplicate create it caused before this guard existed).
   useEffect(() => {
+    if (consumeSelfNavigate()) return;
     const fromUrl = parseTaskId(idParam);
     if (resolveEditorIdentity(fromUrl, taskId) === "keep") return;
     draftCreate.attempt();

@@ -13,6 +13,7 @@ import {
   useAutosave,
   useDraftCreate,
   resolveEditorIdentity,
+  useSelfNavigateGuard,
   FormErrorMessage,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
@@ -140,6 +141,7 @@ export function EventEditorPage() {
   );
   const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const { markSelfNavigate, consumeSelfNavigate } = useSelfNavigateGuard();
 
   const { data: event, isLoading, isError } = useQuery({
     queryKey: eventQueryKey(eventIdentity),
@@ -178,6 +180,7 @@ export function EventEditorPage() {
       markSaved(v);
       currentCalendarKeyRef.current = v.calendarKey;
       setEventIdentity(createdIdentity);
+      markSelfNavigate();
       navigate(
         resolveChamberPath(
           `/e/${created.accountId}/${encodeURIComponent(created.calendarId)}/${encodeURIComponent(created.id)}`,
@@ -207,7 +210,11 @@ export function EventEditorPage() {
   // since that mutation deliberately doesn't touch `eventIdentity` itself,
   // this effect treats the new url exactly like a different event and
   // repopulates from the server, matching this page's pre-merge behavior.
+  // consumeSelfNavigate() must run first - see useSelfNavigateGuard's own
+  // comment for the params-vs-state race it closes (and the duplicate
+  // create it caused before this guard existed).
   useEffect(() => {
+    if (consumeSelfNavigate()) return;
     const fromUrl = parseEventIdentity(params);
     if (resolveEditorIdentity(identityKey(fromUrl), identityKey(eventIdentity)) === "keep") return;
     draftCreate.attempt();

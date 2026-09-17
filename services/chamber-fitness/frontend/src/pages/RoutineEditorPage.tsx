@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useShellHosted, resolveChamberPath, useAutosave, useDraftCreate, resolveEditorIdentity, FormErrorMessage } from "@congress/congress-ui";
+import { useShellHosted, resolveChamberPath, useAutosave, useDraftCreate, resolveEditorIdentity, useSelfNavigateGuard, FormErrorMessage } from "@congress/congress-ui";
 import { createRoutine, fetchRoutine, updateRoutine, fetchRoutineFolders } from "@/lib/api";
 import { RoutineExercisesEditor, type DraftExercise, toRoutineExerciseInput } from "@/components/RoutineExercisesEditor";
 
@@ -29,6 +29,7 @@ export function RoutineEditorPage() {
   const [folderId, setFolderId] = useState<number | null>(null);
   const [draftExercises, setDraftExercises] = useState<DraftExercise[]>([]);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const { markSelfNavigate, consumeSelfNavigate } = useSelfNavigateGuard();
 
   const foldersQuery = useQuery({ queryKey: ["routine-folders"], queryFn: fetchRoutineFolders });
 
@@ -56,6 +57,7 @@ export function RoutineEditorPage() {
       // an unsaved change and fire a redundant update right after creation.
       markSaved({ title: draft.title, exercises: draft.exercises });
       setRoutineId(created.id);
+      markSelfNavigate();
       navigate(resolveChamberPath(`/routines/${created.id}`, "fitness", shellHosted), { replace: true });
     },
     onError: () => draftCreate.reset(),
@@ -87,8 +89,13 @@ export function RoutineEditorPage() {
 
   // A navigation between two different ids, or back to the draft/"new"
   // route, reuses this same mounted component - see resolveEditorIdentity's
-  // own comment.
+  // own comment. consumeSelfNavigate() must run first - see
+  // useSelfNavigateGuard's own comment for the params-vs-state race it
+  // closes (and the duplicate create it caused before this guard existed) -
+  // a duplicate here would be a *permanent* Hevy routine (see the module
+  // comment on why there's no cleanup path for one).
   useEffect(() => {
+    if (consumeSelfNavigate()) return;
     const fromUrl = idParam ?? null;
     if (resolveEditorIdentity(fromUrl, routineId) === "keep") return;
     draftCreate.attempt();

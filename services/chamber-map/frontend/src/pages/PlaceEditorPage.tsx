@@ -15,6 +15,7 @@ import {
   useAutosave,
   useDraftCreate,
   resolveEditorIdentity,
+  useSelfNavigateGuard,
   FormErrorMessage,
   FormLabel,
 } from "@congress/congress-ui";
@@ -53,6 +54,7 @@ export function PlaceEditorPage() {
   });
   const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const { markSelfNavigate, consumeSelfNavigate } = useSelfNavigateGuard();
 
   // Best-effort prefill so a brand new place's picker doesn't open centered
   // on the ocean - the owner can still drag/click to adjust either way.
@@ -95,6 +97,7 @@ export function PlaceEditorPage() {
       initializedPlaceIdRef.current = created.id;
       markSaved(d);
       setPlaceId(created.id);
+      markSelfNavigate();
       navigate(resolveChamberPath(`/p/${created.id}`, "map", shellHosted), { replace: true });
     },
     onError: () => {
@@ -113,8 +116,11 @@ export function PlaceEditorPage() {
 
   // A navigation between two different ids, or back to the draft/"new"
   // route, reuses this same mounted component - see resolveEditorIdentity's
-  // own comment.
+  // own comment. consumeSelfNavigate() must run first - see
+  // useSelfNavigateGuard's own comment for the params-vs-state race it
+  // closes (and the duplicate create it caused before this guard existed).
   useEffect(() => {
+    if (consumeSelfNavigate()) return;
     const fromUrl = parsePlaceId(idParam);
     if (resolveEditorIdentity(fromUrl, placeId) === "keep") return;
     draftCreate.attempt();

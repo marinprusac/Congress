@@ -16,6 +16,7 @@ import {
   useAutosave,
   useDraftCreate,
   resolveEditorIdentity,
+  useSelfNavigateGuard,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createDirective, fetchDirective, updateDirective, deleteDirective, runDirective, fetchSettings } from "@/lib/api";
@@ -47,6 +48,7 @@ export function DirectiveEditorPage() {
   const [schedule, setSchedule] = useState<ScheduleDraft>(EMPTY_SCHEDULE);
   const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const { markSelfNavigate, consumeSelfNavigate } = useSelfNavigateGuard();
 
   // See DirectivesListPage's own comment on this same query - a paused
   // Deputy (budget cap or owner-paused) makes "Run now" return instantly
@@ -92,6 +94,7 @@ export function DirectiveEditorPage() {
       initializedDirectiveIdRef.current = created.id;
       markSaved(merged);
       setDirectiveId(created.id);
+      markSelfNavigate();
       navigate(resolveChamberPath(`/d/${created.id}`, "deputy", shellHosted), { replace: true });
     },
     onError: () => {
@@ -110,8 +113,11 @@ export function DirectiveEditorPage() {
 
   // A navigation between two different ids, or back to the draft/"new"
   // route, reuses this same mounted component - see resolveEditorIdentity's
-  // own comment.
+  // own comment. consumeSelfNavigate() must run first - see
+  // useSelfNavigateGuard's own comment for the params-vs-state race it
+  // closes (and the duplicate create it caused before this guard existed).
   useEffect(() => {
+    if (consumeSelfNavigate()) return;
     const fromUrl = parseDirectiveId(idParam);
     if (resolveEditorIdentity(fromUrl, directiveId) === "keep") return;
     draftCreate.attempt();

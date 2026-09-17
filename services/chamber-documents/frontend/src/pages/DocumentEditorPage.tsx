@@ -15,6 +15,7 @@ import {
   useAutosave,
   useDraftCreate,
   resolveEditorIdentity,
+  useSelfNavigateGuard,
   FormErrorMessage,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
@@ -52,6 +53,7 @@ export function DocumentEditorPage() {
   const [file, setFile] = useState<File | null>(null);
   const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const { markSelfNavigate, consumeSelfNavigate } = useSelfNavigateGuard();
 
   const documentQuery = useQuery({
     queryKey: ["document", documentId],
@@ -82,6 +84,7 @@ export function DocumentEditorPage() {
       // unsaved change and fire a redundant update right after creation.
       markSaved(v);
       setDocumentId(created.id);
+      markSelfNavigate();
       navigate(resolveChamberPath(`/d/${created.id}`, "documents", shellHosted), { replace: true });
     },
     onError: () => {
@@ -112,8 +115,12 @@ export function DocumentEditorPage() {
 
   // A navigation between two different documents, or back to the draft/
   // "new" route, reuses this same mounted component - see
-  // resolveEditorIdentity's own comment.
+  // resolveEditorIdentity's own comment. consumeSelfNavigate() must run
+  // first - see useSelfNavigateGuard's own comment for the params-vs-state
+  // race it closes (and the duplicate create/upload it caused before this
+  // guard existed).
   useEffect(() => {
+    if (consumeSelfNavigate()) return;
     const fromUrl = parseDocumentId(idParam);
     if (resolveEditorIdentity(fromUrl, documentId) === "keep") return;
     draftCreate.attempt();

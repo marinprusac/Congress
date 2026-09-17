@@ -15,6 +15,7 @@ import {
   useAutosave,
   useDraftCreate,
   resolveEditorIdentity,
+  useSelfNavigateGuard,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createNote, fetchNote, updateNote, deleteNote, setPinned, quickCreateNoteExhibit } from "@/lib/api";
@@ -52,6 +53,7 @@ export function NoteEditorPage() {
   const [draftContent, setDraftContent] = useState("");
   const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const { markSelfNavigate, consumeSelfNavigate } = useSelfNavigateGuard();
 
   const noteQuery = useQuery({
     queryKey: ["note", noteId],
@@ -82,6 +84,7 @@ export function NoteEditorPage() {
       initializedNoteIdRef.current = created.id;
       markSaved(draft);
       setNoteId(created.id);
+      markSelfNavigate();
       navigate(resolveChamberPath(`/n/${created.id}`, "notes", shellHosted), { replace: true });
     },
     onError: () => {
@@ -108,8 +111,12 @@ export function NoteEditorPage() {
   // opening a different note instead of silently continuing to show the
   // previous one. resolveEditorIdentity tells it apart from the
   // identical-looking case of the URL catching up with this page's own
-  // create `navigate(..., { replace: true })`, which must NOT reset.
+  // create `navigate(..., { replace: true })`, which must NOT reset -
+  // consumeSelfNavigate() must run first, see its own comment for the
+  // params-vs-state race it closes (and the duplicate create it caused
+  // before this guard existed).
   useEffect(() => {
+    if (consumeSelfNavigate()) return;
     const fromUrl = parseNoteId(idParam);
     if (resolveEditorIdentity(fromUrl, noteId) === "keep") return;
     // Flushes a half-typed, never-blurred draft before abandoning it (e.g.

@@ -17,6 +17,7 @@ import {
   useAutosave,
   useDraftCreate,
   resolveEditorIdentity,
+  useSelfNavigateGuard,
   FormLabel,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
@@ -68,6 +69,7 @@ export function AutomationEditorPage() {
   const [draft, setDraft] = useState<UpdateAutomationRequest>({ title: searchParams.get("name") ?? "", body: "" });
   const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const { markSelfNavigate, consumeSelfNavigate } = useSelfNavigateGuard();
 
   const automationQuery = useQuery({
     queryKey: ["automation", automationId],
@@ -112,6 +114,7 @@ export function AutomationEditorPage() {
       initializedAutomationIdRef.current = created.id;
       markSaved(d);
       setAutomationId(created.id);
+      markSelfNavigate();
       navigate(resolveChamberPath(`/a/${created.id}`, "automation", shellHosted), { replace: true });
     },
     onError: () => {
@@ -145,8 +148,11 @@ export function AutomationEditorPage() {
 
   // A navigation between two different ids, or back to the draft/"new"
   // route, reuses this same mounted component - see resolveEditorIdentity's
-  // own comment.
+  // own comment. consumeSelfNavigate() must run first - see
+  // useSelfNavigateGuard's own comment for the params-vs-state race it
+  // closes (and the duplicate create it caused before this guard existed).
   useEffect(() => {
+    if (consumeSelfNavigate()) return;
     const fromUrl = parseAutomationId(idParam);
     if (resolveEditorIdentity(fromUrl, automationId) === "keep") return;
     draftCreate.attempt();
