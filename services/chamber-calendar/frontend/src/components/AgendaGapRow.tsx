@@ -43,7 +43,14 @@ interface AgendaGapRowProps {
 // (packages/congress-ui) - this component only turns a raw pixel delta from
 // that hook into a snapped time via fineTimeFromDelta.
 export function AgendaGapRow({ entry, onPick }: AgendaGapRowProps) {
-  const heightPx = gapHeightPx(entry.minutes, entry.dayBreaks.length + 1);
+  // Only a genuinely idle (content-free) merged day should count toward the
+  // multi-day floor - every cross-midnight gap also carries one non-empty
+  // break for the *next* content-bearing day's own header (see emptyDay's
+  // own doc comment), which must not itself count as a merged idle day or
+  // an ordinary single-midnight overnight gap would always be forced to a
+  // full day's height regardless of its real duration.
+  const emptyDaysMerged = entry.dayBreaks.filter((brk) => brk.emptyDay).length;
+  const heightPx = gapHeightPx(entry.minutes, emptyDaysMerged);
   const rootRef = useRef<HTMLDivElement>(null);
   const [preview, setPreview] = useState<Preview>(null);
 

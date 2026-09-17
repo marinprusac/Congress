@@ -146,11 +146,14 @@ export function durationPx(minutes: number): number {
 // days pile up - exactly backwards for this row's interactive job
 // (AgendaGapRow), where absolute pointer position is what picks a coarse
 // time in the first place. This floor only kicks in once a gap actually
-// spans more than one calendar day (daysSpanned > 1, i.e. it carries at
-// least one dayBreak) - an ordinary same-day gap between two events (a
-// 30-minute breather between meetings, say) is not a merged idle day and
-// must keep scaling by its own real duration, not balloon to a full day's
-// height just because it "spans" the one day it's already on.
+// merges in at least one entirely idle calendar day (daysSpanned > 1, i.e.
+// it carries at least one dayBreak with emptyDay true) - an ordinary
+// same-day gap between two events (a 30-minute breather between meetings,
+// say), or an ordinary overnight gap that merely crosses one midnight
+// between two days that both have real content, is not a merged idle day
+// and must keep scaling by its own real duration, not balloon to a full
+// day's height just because it "spans" the one calendar boundary it's
+// already sitting on.
 const MIN_PX_PER_DAY = durationPx(24 * 60);
 
 export function gapHeightPx(minutes: number, daysSpanned: number): number {
@@ -249,6 +252,14 @@ export interface AgendaGapDayBreak {
   // an event.
   offsetMinutes: number;
   label: string;
+  // True only when this break is a day that itself produced no content of
+  // its own (no timed events, no all-day events) and got folded into this
+  // gap as idle time - false for the one trailing break every cross-midnight
+  // gap carries regardless (the *next* content-bearing day's own header,
+  // parked here simply because the flush needed somewhere to put it before
+  // that day's first event). gapHeightPx's multi-day floor must count only
+  // the former - see its call site in AgendaGapRow.
+  emptyDay: boolean;
 }
 
 // Idle time between two consecutive timed events on the same day, between
@@ -617,6 +628,10 @@ export function buildAgendaTimeline(events: CalendarEvent[], window: AgendaNowCo
             key: dateKey,
             offsetMinutes: Math.max(0, Math.round((midnightMs - block.startMs) / 60000)),
             label: formatAgendaDayLabel(dateKey),
+            // Not a gap's day-break (emptyDay is only meaningful there, see
+            // its own doc comment) - the day this block is still running
+            // through is never empty by definition.
+            emptyDay: false,
           });
           embeddedDayKeys.add(dateKey);
           cursor.setDate(cursor.getDate() + 1);
@@ -645,6 +660,7 @@ export function buildAgendaTimeline(events: CalendarEvent[], window: AgendaNowCo
           key: day.dateKey,
           offsetMinutes: Math.max(0, Math.round((dayMidnightMs - previousContentEndMs) / 60000)),
           label: headerLabel,
+          emptyDay: true,
         });
       }
       continue;
@@ -661,6 +677,9 @@ export function buildAgendaTimeline(events: CalendarEvent[], window: AgendaNowCo
           key: day.dateKey,
           offsetMinutes: Math.max(0, Math.round((dayMidnightMs - previousContentEndMs) / 60000)),
           label: headerLabel,
+          // This day has its own real content - it's not a merged idle day,
+          // just the terminal header this flush needed somewhere to place.
+          emptyDay: false,
         });
       }
       flushPending(anchorStartMs);

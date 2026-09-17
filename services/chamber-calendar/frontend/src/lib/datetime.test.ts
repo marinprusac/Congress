@@ -87,6 +87,12 @@ describe("buildAgendaTimeline - day visibility", () => {
     for (const brk of gap.dayBreaks) {
       expect(brk.label).toMatch(/Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday/);
     }
+
+    // Jan 2 is genuinely empty (merged idle day); Jan 3 has the next real
+    // event and is only riding along for its own header's sake - only the
+    // former should count toward AgendaGapRow's multi-day height floor.
+    expect(gap.dayBreaks[0]!.emptyDay).toBe(true);
+    expect(gap.dayBreaks[1]!.emptyDay).toBe(false);
   });
 
   it("still merges into one gap when only a single midnight is crossed, with no empty day in between", () => {
@@ -113,6 +119,14 @@ describe("buildAgendaTimeline - day visibility", () => {
     expect(gap.dayBreaks).toHaveLength(1);
     expect(gap.dayBreaks[0]!.key).toBe("2030-01-02");
     expect(gap.dayBreaks[0]!.offsetMinutes).toBe(4 * 60); // 20:00 Jan 1 -> 00:00 Jan 2
+
+    // Jan 2 has its own real event - this break is only riding along to give
+    // the flush somewhere to put its header, not a merged idle day, so
+    // AgendaGapRow's height floor must not count it (see AgendaGapRow.tsx
+    // and gapHeightPx's own daysSpanned contract below).
+    expect(gap.dayBreaks[0]!.emptyDay).toBe(false);
+    const emptyDaysMerged = gap.dayBreaks.filter((b) => b.emptyDay).length;
+    expect(gapHeightPx(gap.minutes, emptyDaysMerged)).toBeCloseTo(durationPx(gap.minutes), 5);
   });
 
   it("carries a weekday name even for a day far beyond the old 7-day cutoff", () => {
@@ -190,6 +204,76 @@ describe("buildAgendaTimeline - overnight events", () => {
     expect(dayGap).toBeDefined();
     expect(dayGap.minutes).toBe(7 * 60);
     expect(dayGap.dayBreaks).toEqual([]);
+  });
+});
+
+// End-to-end regression coverage for the "Sleep event rendered way below the
+// start of its day" bug: AgendaGapRow derives a gap's rendered height from
+// buildAgendaTimeline's own output (entry.minutes and entry.dayBreaks), not
+// from gapHeightPx's raw parameters directly - these tests exercise that
+// exact real pipeline (build the timeline, then reduce dayBreaks to an
+// emptyDay count the same way AgendaGapRow.tsx does, then call gapHeightPx)
+// so a regression in either half alone gets caught.
+describe("buildAgendaTimeline -> gapHeightPx - Agenda event vertical spacing", () => {
+  const windowStartMs = new Date("2030-03-01T00:00:00").getTime();
+  const windowEndMs = new Date("2030-03-10T00:00:00").getTime();
+  const window = { nowMs: windowStartMs - 1, windowStartMs, windowEndMs };
+
+  function heightForGap(gap: AgendaGapEntry): number {
+    const emptyDaysMerged = gap.dayBreaks.filter((b) => b.emptyDay).length;
+    return gapHeightPx(gap.minutes, emptyDaysMerged);
+  }
+
+  it("positions an ordinary overnight gap (e.g. a late event into an early-morning one the next day) by its own real duration, not a merged-multi-day floor", () => {
+    const events = [
+      // Last event of the day, ending at 10pm.
+      makeEvent({ start: "2030-03-01T20:30:00", end: "2030-03-01T22:00:00" }),
+      // An early-morning event the very next day (the "Sleep" shape from the
+      // reported bug) - 2:25am, only 4h25m after the previous event ended.
+      makeEvent({ start: "2030-03-02T02:25:00", end: "2030-03-02T10:40:00" }),
+    ];
+
+    const timeline = buildAgendaTimeline(events, window);
+    const gapEntries = timeline.filter((e): e is AgendaGapEntry => e.kind === "gap");
+    const overnightGap = gapEntries.find((g) => g.startMs === new Date("2030-03-01T22:00:00").getTime())!;
+    expect(overnightGap).toBeDefined();
+    expect(overnightGap.minutes).toBe(4 * 60 + 25); // 22:00 -> 02:25, real elapsed idle time
+
+    // Neither Mar 1 nor Mar 2 is an empty day - Mar 2's break is only here
+    // for its own header's sake - so no day counts toward the floor and the
+    // gap must render at its true (small) sqrt-scaled height...
+    const height = heightForGap(overnightGap);
+    expect(height).toBeCloseTo(durationPx(overnightGap.minutes), 5);
+
+    // ...specifically, far short of what wrongly treating the crossed
+    // midnight as a merged idle day would have produced (what the bug did:
+    // dayBreaks.length + 1 = 2, forcing a 2-full-days-tall floor regardless
+    // of the real ~3.5h gap).
+    const buggyHeight = gapHeightPx(overnightGap.minutes, overnightGap.dayBreaks.length + 1);
+    expect(height).toBeLessThan(buggyHeight);
+    expect(height).toBeLessThan(durationPx(24 * 60)); // nowhere near a full day's height
+  });
+
+  it("still gives real merged idle days their full floor so multi-day-empty stretches stay tappable", () => {
+    const events = [
+      makeEvent({ start: "2030-03-01T09:00:00", end: "2030-03-01T10:00:00" }),
+      // Mar 2, 3, 4 are entirely empty - genuinely merged idle days.
+      makeEvent({ start: "2030-03-05T09:00:00", end: "2030-03-05T10:00:00" }),
+    ];
+
+    const timeline = buildAgendaTimeline(events, window);
+    const gapEntries = timeline.filter((e): e is AgendaGapEntry => e.kind === "gap");
+    const mergedGap = gapEntries.find((g) => g.startMs === new Date("2030-03-01T10:00:00").getTime())!;
+    expect(mergedGap).toBeDefined();
+
+    const emptyDaysMerged = mergedGap.dayBreaks.filter((b) => b.emptyDay).length;
+    expect(emptyDaysMerged).toBe(3); // Mar 2, 3, 4 - not Mar 5, which has its own real event
+
+    const height = heightForGap(mergedGap);
+    expect(height).toBeCloseTo(3 * durationPx(24 * 60), 5);
+    // The floor actually matters here - raw sqrt-scaling alone would compress
+    // three idle days into much less room than each deserves on its own.
+    expect(durationPx(mergedGap.minutes)).toBeLessThan(height);
   });
 });
 
