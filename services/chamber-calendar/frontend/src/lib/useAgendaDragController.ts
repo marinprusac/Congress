@@ -357,8 +357,16 @@ export function useAgendaDragController(): AgendaDragController {
         calendarId: event.calendarId,
         id: event.id,
         mode: "move",
-        start: newStart.toISOString(),
-        end: newEnd.toISOString(),
+        // Local-naive, like every genuinely stored event's own start/end
+        // (see localEvents.ts) - not a raw toISOString() UTC string.
+        // buildAgendaTimeline's dayKey() slices the first 10 characters of
+        // this string directly to bucket the event by calendar day, with no
+        // timezone-aware Date parsing in between - a UTC string here would
+        // silently misfile the event into the wrong day (and so the wrong
+        // gap/header) for anyone not sitting in UTC, exactly whenever local
+        // time and UTC time fall on different calendar dates.
+        start: toDatetimeLocalInput(newStart.toISOString()),
+        end: toDatetimeLocalInput(newEnd.toISOString()),
       });
     },
     onDragEnd: (deltaPx) => {
@@ -385,7 +393,17 @@ export function useAgendaDragController(): AgendaDragController {
       const durationMs = new Date(event.end).getTime() - new Date(event.start).getTime();
       const newStart = new Date(new Date(event.start).getTime() + deltaMs);
       const newEnd = new Date(newStart.getTime() + durationMs);
-      patchEventCache(queryClient, { ...event, start: newStart.toISOString(), end: newEnd.toISOString() });
+      // Local-naive here too - see the identical dayKey note on the
+      // onDragMove preview above. This patches the same query cache
+      // buildAgendaTimeline reads from, so a raw UTC string would misfile
+      // the moved event's day for the same reason, just surviving past drop
+      // instead of only during the drag (until the mutation's own refetch
+      // eventually overwrites it with the server's correctly-local value).
+      patchEventCache(queryClient, {
+        ...event,
+        start: toDatetimeLocalInput(newStart.toISOString()),
+        end: toDatetimeLocalInput(newEnd.toISOString()),
+      });
       moveMutation.mutate({ event, previousEvent: event, deltaMs });
     },
     onDragCancel: () => {
@@ -427,7 +445,15 @@ export function useAgendaDragController(): AgendaDragController {
         return;
       }
       const newEnd = new Date(new Date(event.end).getTime() + snappedMs);
-      setLivePreview({ accountId: event.accountId, calendarId: event.calendarId, id: event.id, mode: "resize", start: event.start, end: newEnd.toISOString() });
+      // Local-naive - see the identical dayKey note in move's onDragMove.
+      setLivePreview({
+        accountId: event.accountId,
+        calendarId: event.calendarId,
+        id: event.id,
+        mode: "resize",
+        start: event.start,
+        end: toDatetimeLocalInput(newEnd.toISOString()),
+      });
     },
     onDragEnd: (deltaPx) => {
       const event = activeResizeEventRef.current;
@@ -447,7 +473,11 @@ export function useAgendaDragController(): AgendaDragController {
       const deltaMs = snappedDeltaMs(clampedPx, PX_PER_QUARTER_HOUR, 15);
       if (deltaMs === 0) return;
       const newEnd = new Date(new Date(event.end).getTime() + deltaMs);
-      patchEventCache(queryClient, { ...event, end: newEnd.toISOString() });
+      // Local-naive - see the identical dayKey note on move's own cache
+      // patch above. resizeMutation's own mutationFn still gets the raw
+      // newEndIso below (it round-trips through toDatetimeLocalInput itself
+      // before sending to the server - see its mutationFn).
+      patchEventCache(queryClient, { ...event, end: toDatetimeLocalInput(newEnd.toISOString()) });
       resizeMutation.mutate({ event, previousEvent: event, newEndIso: newEnd.toISOString() });
     },
     onDragCancel: () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { CalendarEvent } from "../../../src/types";
 import {
   addMinutesToLocalInput,
@@ -13,6 +13,7 @@ import {
   snappedDeltaMs,
   snappedPxFromDeltaMs,
   snapToHalfHour,
+  toDatetimeLocalInput,
 } from "./datetime";
 import type { AgendaClusterEntry, AgendaDateEntry, AgendaGapEntry } from "./datetime";
 
@@ -274,6 +275,91 @@ describe("buildAgendaTimeline -> gapHeightPx - Agenda event vertical spacing", (
     // The floor actually matters here - raw sqrt-scaling alone would compress
     // three idle days into much less room than each deserves on its own.
     expect(durationPx(mergedGap.minutes)).toBeLessThan(height);
+  });
+});
+
+// Regression coverage for the "day-break renders after the event instead of
+// before it while dragging" bug: useAgendaDragController's live drag preview
+// used to build its tentative start/end with a raw `.toISOString()` (UTC),
+// while every genuinely stored event's start/end is a timezone-naive local
+// string (see localEvents.ts) that dayKey() (above) reads by slicing its
+// first 10 characters directly, with no timezone-aware Date parsing at all.
+// In any timezone ahead of UTC, an event dragged to just after local
+// midnight can still be *before* midnight in UTC - dayKey() then bucketed it
+// under the wrong (previous) calendar day, so its own day's header ended up
+// riding in the gap *after* it instead of the one before, and flipped back
+// and forth as the drag crossed the UTC/local boundary ("jumps ... when it
+// should just slide"). The fix routes the live preview's start/end through
+// toDatetimeLocalInput first, exactly like every real committed event.
+describe("buildAgendaTimeline - live drag preview day bucketing (local vs UTC)", () => {
+  // Frontend tsconfig has no Node types (browser code never sees `process`),
+  // so the TZ env mutation below goes through `globalThis` with an explicit
+  // `any` rather than a typed `process.env` reference - same pattern as
+  // chamber-tasks/frontend/src/lib/dateInput.test.ts.
+  const nodeProcess = (globalThis as { process?: { env: Record<string, string | undefined> } }).process!;
+  const originalTz = nodeProcess.env.TZ;
+  beforeEach(() => {
+    // A fixed, well-ahead-of-UTC zone (no DST complications) so this test's
+    // outcome doesn't depend on whichever timezone happens to run it -
+    // Node's Date/Intl read process.env.TZ dynamically, see toDatetimeLocalInput.
+    nodeProcess.env.TZ = "Pacific/Auckland"; // UTC+12/+13
+  });
+  afterEach(() => {
+    nodeProcess.env.TZ = originalTz;
+  });
+
+  const windowStartMs = new Date("2026-09-17T00:00:00").getTime();
+  const windowEndMs = new Date("2026-09-20T00:00:00").getTime();
+  const window = { nowMs: windowStartMs - 1, windowStartMs, windowEndMs };
+
+  function scenario(sleepStartIso: string, sleepEndIso: string) {
+    return [
+      makeEvent({ start: "2026-09-17T21:00:00", end: "2026-09-17T22:00:00", title: "Task" }),
+      makeEvent({ start: sleepStartIso, end: sleepEndIso, title: "Sleep" }),
+      makeEvent({ start: "2026-09-18T14:30:00", end: "2026-09-18T15:30:00", title: "Meet" }),
+    ];
+  }
+
+  it("buckets a live-dragged event by its local calendar day, not UTC's, once routed through toDatetimeLocalInput", () => {
+    // Mirrors useAgendaDragController's own onDragMove: parse the original
+    // local-naive start, add the drag's delta in real elapsed ms, then
+    // format the result back through toDatetimeLocalInput - never a raw
+    // toISOString(). Dragged 2h later: 23:20 Thu local -> 01:20 Fri local,
+    // which in UTC+12/13 is still Thursday afternoon UTC.
+    const origStartMs = new Date("2026-09-17T23:20:00").getTime();
+    const durationMs = 495 * 60_000; // 8h15m
+    const newStartMs = origStartMs + 120 * 60_000;
+    const newStart = toDatetimeLocalInput(new Date(newStartMs).toISOString());
+    const newEnd = toDatetimeLocalInput(new Date(newStartMs + durationMs).toISOString());
+
+    const timeline = buildAgendaTimeline(scenario(newStart, newEnd), window);
+    const sleepIndex = timeline.findIndex((e) => e.kind === "cluster" && e.blocks[0]!.event.title === "Sleep");
+    const fridayGapIndex = timeline.findIndex(
+      (e) => e.kind === "gap" && e.dayBreaks.some((b) => b.key === "2026-09-18")
+    );
+    expect(sleepIndex).toBeGreaterThan(-1);
+    expect(fridayGapIndex).toBeGreaterThan(-1);
+    // Friday's header rides in the gap *before* the first Friday event, same
+    // as every non-dragged day - see the "overnight events" describe above.
+    expect(fridayGapIndex).toBeLessThan(sleepIndex);
+  });
+
+  it("documents why: the same drag expressed as a raw UTC toISOString() misfiles the event into the previous local day", () => {
+    const origStartMs = new Date("2026-09-17T23:20:00").getTime();
+    const durationMs = 495 * 60_000;
+    const newStartMs = origStartMs + 120 * 60_000;
+    const buggyStart = new Date(newStartMs).toISOString();
+    const buggyEnd = new Date(newStartMs + durationMs).toISOString();
+
+    const timeline = buildAgendaTimeline(scenario(buggyStart, buggyEnd), window);
+    const sleepIndex = timeline.findIndex((e) => e.kind === "cluster" && e.blocks[0]!.event.title === "Sleep");
+    const fridayGapIndex = timeline.findIndex(
+      (e) => e.kind === "gap" && e.dayBreaks.some((b) => b.key === "2026-09-18")
+    );
+    // The bug this guards against: dayKey() sliced the raw UTC string's own
+    // date, so Friday's header lands in the gap *after* Sleep instead of
+    // before it.
+    expect(fridayGapIndex).toBeGreaterThan(sleepIndex);
   });
 });
 
