@@ -133,10 +133,9 @@ export function AgendaPage() {
   // meant for a date change further down.
   const firstContentIndex = timeline.findIndex((entry) => entry.kind !== "now");
 
-  // Matches EventViewPage's own queryKey exactly - it reads accountId back
-  // out of the URL via useParams (always a string), not from the number
-  // fetchEvent expects, so the key here has to use the string form too or
-  // this prefetch just populates a cache entry the view page never sees.
+  // Matches EventEditorPage's own eventQueryKey exactly (String(accountId),
+  // not the number fetchEvent expects) - a mismatch here would silently turn
+  // this prefetch into a wasted, never-read cache entry.
   function prefetchEvent(accountId: number, calendarId: string, eventId: string) {
     queryClient.prefetchQuery({
       queryKey: ["events", String(accountId), calendarId, eventId],
