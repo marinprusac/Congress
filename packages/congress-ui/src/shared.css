@@ -73,10 +73,13 @@ a[download] {
 /* Mobile default: title row, then actions (search + nav) stacked below it
    full-width - there's no room to fit a search field beside a 2.25rem
    title on a phone screen. */
+/* padding-right keeps header content clear of Congress's fixed top-right
+   notification bell (.shell-bell, services/congress/frontend). */
 .chamber-header-row {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  padding-right: 3rem;
 }
 
 @media (min-width: 641px) {
@@ -142,7 +145,7 @@ a[download] {
 
 /* Settings gear, and the model for any other icon-only header button - a
    real ~44pt tap target regardless of the icon's own visual size, same
-   idiom as chamber-logs' own .notification-bell-trigger. */
+   idiom as Congress's own .notification-bell-trigger. */
 .chamber-header-icon-link {
   display: flex;
   flex-shrink: 0;

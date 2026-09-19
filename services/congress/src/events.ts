@@ -1,6 +1,7 @@
 import type { EventPublishRequest, ChamberSubscription } from "@congress/shared-types";
 import { listChambers, getChamber } from "./registry.js";
 import { env } from "./env.js";
+import { handleReceivedEvent } from "./eventReceive.js";
 
 // A publish is retried against a briefly-unreachable Chamber with
 // increasing delays rather than given up on immediately - a redeploy
@@ -66,6 +67,14 @@ async function deliverToChamber(chamberName: string, body: unknown): Promise<voi
 export function publishEvent(req: EventPublishRequest): void {
   const occurredAt = req.occurredAt ?? new Date().toISOString();
   const body = { chamber: req.chamber, type: req.type, payload: req.payload, occurredAt, actor: req.actor };
+
+  // Congress's own log rules (record to history / push a notification) are
+  // core now, not a subscribing Chamber - handled in-process for every
+  // publish, no registry lookup or HTTP hop. handleReceivedEvent does its
+  // own precise per-event-type check, so no coarse subscription gate either.
+  handleReceivedEvent(body).catch((err: unknown) => {
+    console.warn(`Log rule handling failed for ${req.type}: ${(err as Error).message}`);
+  });
 
   const targets = listChambers().filter((c) => c.status === "active" && subscriptionMatches(c.subscriptions, req.type));
   for (const chamber of targets) {

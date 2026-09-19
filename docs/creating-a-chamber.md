@@ -12,7 +12,7 @@ If you just want to start: skip to [Quickstart](#quickstart).
 
 ## 1. What a Chamber is
 
-Every Chamber — Capitol included — implements the same small contract:
+Every Chamber implements the same small contract:
 
 - `GET /manifest` — self-description (name, routes, apiBase, mcpUrl, healthUrl, widgets).
 - `GET /health` — liveness.
@@ -93,7 +93,7 @@ actually edit to turn "Budget" into your real domain:
 | `src/exhibits.ts` | Update `idPrefix`, `type`, `urlFor`, and the search/resolve/toContent callbacks for your real table/columns. |
 | `src/mcp/tools.ts` | Your entity's MCP tools — usually a thin wrapper around the same functions the REST routes call. |
 | `frontend/src/pages/*.tsx` | The actual UI. Keep using the shared primitives (see the table below) rather than hand-rolling list/form chrome. |
-| `frontend/src/widgets/*.tsx` + `frontend/src/widgets/index.ts` | Your homepage widget(s) for Capitol's canvas — see §5.1. Add a new file + a `widgets` map entry per widget; each one needs a matching entry in `src/manifest.ts`'s `widgets` array (`id`/`width`/`height`/`label`). |
+| `frontend/src/widgets/*.tsx` + `frontend/src/widgets/index.ts` | Your homepage widget(s) for Congress's canvas — see §5.1. Add a new file + a `widgets` map entry per widget; each one needs a matching entry in `src/manifest.ts`'s `widgets` array (`id`/`width`/`height`/`label`). |
 | `frontend/src/components/Layout.tsx` | Nav links specific to your Chamber. |
 | `frontend/public/icons/mark.svg` | Optional — swap the placeholder diamond for real artwork whenever you like. Not required for anything else to work; see §5. |
 
@@ -155,7 +155,7 @@ hand instead of using the factory.
 ## 5. Plugging into Congress
 
 This is automatic. `gateway.ts`'s `/api/:chamber/*` and `/<chamberName>/*`
-proxying, the chamber registry, Capitol's homepage canvas, the nav picker,
+proxying, the chamber registry, Congress's homepage canvas, the nav picker,
 and Congress's shell-hosting (`ChamberHost` dynamically `import()`ing your
 Chamber's `remote-entry.js`) are all driven by the `/congress/registry` API
 — they pick up a new Chamber the moment it successfully registers and
@@ -164,9 +164,8 @@ appear.
 
 ### 5.1 Homepage widgets
 
-Capitol's homepage is a cell-based canvas the owner can edit to place and
-move widgets (see `services/chamber-capitol/frontend/src/components/
-Canvas.tsx`). A Chamber can register any number of widgets, each with a
+Congress's homepage is a cell-based canvas the owner can edit to place and
+move widgets (see `services/congress/frontend/src/components/Canvas.tsx`). A Chamber can register any number of widgets, each with a
 fixed footprint in canvas cells declared in `src/manifest.ts`:
 
 ```ts
@@ -174,7 +173,7 @@ widgets: [{ id: "recent", width: 2, height: 2, label: "Recent" }],
 ```
 
 `id` is a stable, never-shown identifier — it's the key into
-`frontend/src/widgets/index.ts`'s `widgets` map, and part of how Capitol
+`frontend/src/widgets/index.ts`'s `widgets` map, and part of how Congress
 stores this widget's canvas position. `width`/`height` are fixed by you, not
 user-resizable; the owner can only place and move whole widgets on the
 canvas, never resize them. `label` is what the owner sees in the edit-mode
@@ -184,16 +183,16 @@ ever shown, since the canvas itself draws no per-widget header (see below).
 A widget's content is an ordinary React component — `frontend/src/widgets/
 RecentItemsWidget.tsx` in the scaffold — exported from `frontend/src/
 widgets/index.ts` and re-exported (wrapped in this Chamber's own
-`QueryClientProvider`) from `frontend/src/remote.tsx`. Capitol's canvas
+`QueryClientProvider`) from `frontend/src/remote.tsx`. Congress's canvas
 resolves it directly out of your already-built `remote-entry.js` (the same
 artifact `build:remote` produces for full shell-hosted navigation — no
 separate build step, no URL, no iframe) via `loadRemoteModule` from
 `@congress/congress-ui`. Wrap your widget's content in `WidgetPreviewShell`
 for the standard label/"+ New"/loading/empty chrome, but beyond that its
-content is entirely your own discretion — Capitol only ever draws a plain
+content is entirely your own discretion — Congress only ever draws a plain
 border around it, never a chamber name/icon header. Any in-widget links
 should go through `resolveChamberPath`/`useShellHosted` (the widget is
-mounted directly into Capitol's own React tree, not an isolated document),
+mounted directly into Congress's own React tree, not an isolated document),
 same as any other Chamber-owned link.
 
 Icons work the same way: your Chamber serves its own, Congress fetches it —
@@ -237,7 +236,7 @@ wraps each widget component above. **This is not automatic just because
 `SettingsPage.tsx` exists** — the scaffold generates that file for you, but
 Congress's Settings hub only shows a tab for a Chamber whose remote entry
 actually exports `settings`; a Chamber with nothing configurable is meant to
-omit it (Capitol does this — it has no `SettingsPage.tsx` at all), but for
+omit it, but for
 every other Chamber, forgetting this one line is easy to do and easy to
 miss, since your own Chamber's `/‹name›/settings` route still works
 standalone — only the *unified* tab silently disappears, with nothing
@@ -251,7 +250,7 @@ about this" (a due date, an incoming webhook, anything else only your
 Chamber can detect) — or that something should happen elsewhere in
 response — don't invent your own alert UI, don't push a notification
 directly, and don't call another Chamber's API yourself. Publish a domain
-event instead, and let Logs Chamber's own rules and Automation Chamber's
+event instead, and let Congress's own log rules (Settings → Logs) and Automation Chamber's
 own automations (both Exhibits the owner edits) decide whether/what to do
 about it. This keeps the "should this even fire, and what happens" decision
 editable without a code change, and means your Chamber has no idea whether
@@ -296,7 +295,7 @@ events: [
 ```
 
 This is purely a declared catalog — it's what populates the trigger-event
-picker on Logs Chamber's and Automation Chamber's own editors (read live off
+picker on Congress's Logs settings and Automation Chamber's own editor (read live off
 `GET /congress/registry`, never hardcoded to a specific chamber name), not a
 subscription or a requirement to actually fire that event. Defaulted to
 `[]` like `widgets`, so most Chambers never touch this field at all.
@@ -326,10 +325,10 @@ const { heartbeatNow } = createChamberBootstrap({
 ```
 
 `getSubscriptions` is read fresh on every heartbeat (not baked into the
-static manifest), so it can — and for Logs/Automation Chamber, does —
+static manifest), so it can — and for Automation Chamber, does —
 reflect owner-editable state: recompute it from whatever rules/automations
 currently reference a trigger type, aggregating to one entry per type (see
-`chamber-logs/src/subscriptions.ts` for the worked pattern). `type: "*"`
+`chamber-automation/src/subscriptions.ts` for the worked pattern). `type: "*"`
 subscribes to every event type regardless of what it's called — used by a
 Chamber whose own logic doesn't filter by type at all (Deputy Chamber).
 Congress's own filter is only ever a coarse "could this possibly interest
@@ -425,7 +424,7 @@ deploy.
 
 | Symptom | Likely cause |
 |---|---|
-| New Chamber never appears in the nav or on Capitol's homepage | Check its process logs for registration errors — usually a wrong `CAPITOL_URL` or mismatched `CONGRESS_INTERNAL_TOKEN` between the Chamber's `.env` and Congress's. |
+| New Chamber never appears in the nav or on Congress's homepage | Check its process logs for registration errors — usually a wrong `CAPITOL_URL` or mismatched `CONGRESS_INTERNAL_TOKEN` between the Chamber's `.env` and Congress's. |
 | Chamber shows as `offline` in the registry | Missed heartbeats — check the process is actually still running and `HEARTBEAT_INTERVAL_MS` vs. Congress's sweep timeout haven't drifted apart. |
 | `chamber_unreachable` 503 from Congress's gateway | The registered `apiBase` in the manifest doesn't actually resolve (typo, wrong port, or the Chamber crashed after registering but before deregistering). |
 | Exhibit chips render as a generic diamond icon everywhere | That Chamber hasn't shipped `frontend/public/icons/mark.svg` yet, is offline, or the fetch to `/congress/chambers/<name>/icon` failed — see §5. Not a bug, just unbranded. |

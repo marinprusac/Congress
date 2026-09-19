@@ -1,9 +1,11 @@
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchRegistry, NavPanel } from "@congress/congress-ui";
 import { LoginGate } from "@/components/LoginGate";
 import { ChamberHost } from "@/components/ChamberHost";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { HomePage } from "@/pages/HomePage";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export function App() {
   // The registry changes when a Chamber (re)starts or goes stale, not on any
@@ -17,17 +19,12 @@ export function App() {
     refetchInterval: 5 * 60_000,
   });
 
-  // Every chamber-shaped route is "/:chamber/*" now that Capitol is an
-  // ordinary registered Chamber rather than living at "/" - so the current
-  // Chamber's own name is just the URL's first segment, with "/" (which
-  // ChamberHost never renders) left undefined.
+  // Every chamber-shaped route is "/:chamber/*", so the current Chamber's own
+  // name is just the URL's first segment. "/" is Congress's own homepage
+  // canvas, not a Chamber - NavPanel knows it as "home".
   const location = useLocation();
-  // "/" redirects to "/capitol" below (Congress has no homepage content of
-  // its own), so treated as "capitol" here too rather than left undefined -
-  // that redirect fires before anything ever paints, and an undefined
-  // current would otherwise make NavPanel briefly show a bogus row for
-  // chamber name "" (see buildChamberList's own fallback in NavPanel.tsx).
-  const currentChamberName = location.pathname === "/" ? "capitol" : (location.pathname.split("/")[1] ?? "capitol");
+  const navigate = useNavigate();
+  const currentChamberName = location.pathname === "/" ? "home" : (location.pathname.split("/")[1] ?? "home");
 
   return (
     // One LoginGate around everything, not one per route (each used to wrap
@@ -51,13 +48,21 @@ export function App() {
           currentChamberName === "settings" ? "Settings" : registry?.find((c) => c.name === currentChamberName)?.displayName
         }
       />
+      {/* Notification bell - fixed top-right chrome on every route, homepage
+          and Chambers alike (see NotificationBell). A sibling of Routes for
+          the same reason NavPanel is. */}
+      <div className="shell-bell">
+        <NotificationBell navigate={(path) => navigate(path)} />
+      </div>
       <Routes>
-        {/* Congress itself has no homepage content of its own - Capitol
-            (the Chamber registered as "capitol") is the widget canvas that
-            makes up the landing page, so root just hands off to it. If
-            Capitol isn't registered, the same ChamberUnavailable state every
-            other missing Chamber gets shows up instead of a blank page. */}
-        <Route path="/" element={<Navigate to="/capitol" replace />} />
+        {/* Congress's own homepage: the widget canvas. Not a Chamber - it
+            works with none registered. */}
+        <Route path="/" element={<HomePage />} />
+        {/* Capitol used to be a Chamber at /capitol - old bookmarks and the
+            installed PWA's saved URL land here. */}
+        <Route path="/capitol/*" element={<Navigate to="/" replace />} />
+        {/* Same for the old Logs Chamber - its config lives in Settings now. */}
+        <Route path="/logs/*" element={<Navigate to="/settings?from=logs" replace />} />
         {/* Congress's own unified Settings - every Chamber's own settings
             content mounted as one tab-category each (see SettingsPage),
             reached through NavPanel's single Settings entry point instead
@@ -66,7 +71,7 @@ export function App() {
             own static-over-dynamic ranking would already prefer it either
             way. */}
         <Route path="/settings" element={<SettingsPage />} />
-        {/* Every Chamber - Capitol included - renders here, hosted directly
+        {/* Every Chamber renders here, hosted directly
             in this shell instead of navigating away to it. See ChamberHost's
             own comment for how that works. */}
         <Route path="/:chamber/*" element={<ChamberHost />} />

@@ -96,21 +96,11 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // Congress's own API (registry/settings/exhibits/sharing/...).
+      // Congress's own API (registry/settings/exhibits/layout/notifications/...).
       "/congress": PROXY_TARGET,
       // Session auth (LoginGate) - server.ts mounts these at top-level
       // "/auth", not under "/congress/*", so they need their own rule here.
       "/auth": PROXY_TARGET,
-      // Not Congress's own API - this is the gateway's chamber-frontend
-      // proxy (forwardToChamberFrontend), needed here so dev:web can reach
-      // the Capitol Chamber's static build/remote-entry the same way
-      // production does. Other Chambers have the same gap in dev (no
-      // equivalent "/notes", "/calendar", ... rule) - pre-existing, unrelated
-      // to the Congress/Capitol split. Not "fixed" by hardcoding more chamber
-      // names here: a dev proxy rule naming a specific Chamber assumes that
-      // Chamber exists, which isn't true of every deployment (Capitol
-      // included - it's optional too, same as any other Chamber).
-      "/capitol": PROXY_TARGET,
       "/api": PROXY_TARGET,
       "/manifest": PROXY_TARGET,
       "/health": PROXY_TARGET,

@@ -104,6 +104,13 @@ describe("session-only routes", () => {
     { method: "PUT", path: "/congress/settings", body: { darkMode: true } },
     { method: "GET", path: "/congress/exhibits/search?q=x" },
     { method: "GET", path: "/congress/exhibits/note-1/connections" },
+    // Core features folded in from the retired Capitol/Logs Chambers.
+    { method: "GET", path: "/congress/layout/desktop" },
+    { method: "PUT", path: "/congress/layout/desktop/notes/recent", body: { x: 0, y: 0 } },
+    { method: "GET", path: "/congress/event-settings" },
+    { method: "GET", path: "/congress/history" },
+    { method: "GET", path: "/congress/notifications" },
+    { method: "GET", path: "/congress/push/config" },
   ];
 
   it.each(cases)("401s $method $path without a session", async ({ method, path, body }) => {

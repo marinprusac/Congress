@@ -21,6 +21,7 @@ import {
   loadRemoteModule,
 } from "@congress/congress-ui";
 import { SignOutControl } from "@/components/LoginGate";
+import { LogsTab } from "@/pages/LogsTab";
 
 function SettingsGearIcon() {
   return (
@@ -80,7 +81,7 @@ function useChamberSettingsPanels(chambers: { name: string; displayName: string 
   });
 }
 
-// Mirrors getWidgetComponent's own pattern (chamber-capitol's
+// Mirrors getWidgetComponent's own pattern (components/canvas/
 // widgetComponent.ts) - a plain in-memory Map, never react-query, so the
 // resolved component itself never touches the persisted cache above.
 const settingsComponentCache = new Map<string, LazyExoticComponent<ComponentType>>();
@@ -197,7 +198,7 @@ export function SettingsPage() {
   // will never appear (see the fallback render below for the loading gap
   // in between).
   useEffect(() => {
-    if (!panels || tab === "general") return;
+    if (!panels || tab === "general" || tab === "logs") return;
     if (!panels.some((panel) => panel.name === tab)) setTab("general");
   }, [panels, tab]);
 
@@ -218,6 +219,15 @@ export function SettingsPage() {
           >
             General
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "logs"}
+            className={tab === "logs" ? "settings-tab active" : "settings-tab"}
+            onClick={() => setTab("logs")}
+          >
+            Logs
+          </button>
           {(panels ?? []).map((panel) => (
             <button
               key={panel.name}
@@ -235,6 +245,8 @@ export function SettingsPage() {
         <section className="settings-tab-panel">
           {tab === "general" ? (
             <GeneralTab />
+          ) : tab === "logs" ? (
+            <LogsTab />
           ) : ActivePanelComponent && activePanel ? (
             <SettingsPanelErrorBoundary key={activePanel.name} chamberName={activePanel.displayName}>
               <Suspense fallback={<p className="font-mono text-sm text-dust">Loading —</p>}>

@@ -65,12 +65,7 @@ export function useShellHosted(): boolean {
 // literal string needs the chamber's own prefix added explicitly to land in
 // the right place under Congress's single, basename-less Router - and
 // `useLocation().pathname` there is the full unstripped path, so an active
-// check needs the same prefix added to compare correctly too. "capitol" is
-// an ordinary Chamber name here like any other (it used to be a special
-// no-op case, back when Capitol *was* the shell itself and sat at "/" -
-// since the Congress/Capitol split, Congress is the shell and Capitol is
-// just the Chamber registered as "capitol", proxied at "/capitol" the same
-// as every other Chamber). Only chamberName "" (no Chamber owns this page -
+// check needs the same prefix added to compare correctly too. Only chamberName "" (no Chamber owns this page -
 // Congress's own shell chrome) stays a no-op passthrough.
 export function resolveChamberPath(path: string, chamberName: string, shellHosted: boolean): string {
   if (!shellHosted || !chamberName) return path;

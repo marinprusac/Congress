@@ -15,6 +15,16 @@ const envSchema = z.object({
   DB_PATH: z.string().default("./data/capitol.sqlite3"),
   HEARTBEAT_TIMEOUT_MS: z.coerce.number().int().positive().default(90_000),
   HEARTBEAT_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(15_000),
+  // Web Push is additive (the in-app notification center works without it),
+  // so an unset keypair must never crash boot - sendWebPush no-ops with a
+  // one-time warning and GET /congress/push/config reports publicKey: null.
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().default("mailto:congress@example.com"),
+  // One-time import of the retired Capitol/Logs Chambers' own SQLite files -
+  // see legacyImport.ts. Unset/missing files are simply skipped.
+  LEGACY_CAPITOL_DB_PATH: z.string().default("../chamber-capitol/data/capitol.sqlite3"),
+  LEGACY_LOGS_DB_PATH: z.string().default("../chamber-logs/data/logs.sqlite3"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 

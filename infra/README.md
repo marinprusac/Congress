@@ -19,8 +19,7 @@ decision. See "Access control" below for what that means in practice.
 - Ports: this VPS already runs other services on `3000` and `4000`, so
   Congress's production port differs from its dev default: **Congress
   `8000`**, **Notes Chamber `8011`**, **Calendar Chamber `8012`**, **Documents
-  Chamber `8013`**, **Tasks Chamber `8014`**, **Capitol Chamber `8015`**,
-  **Logs Chamber `8016`**, **Automation Chamber `8017`**, **Deputy Chamber
+  Chamber `8013`**, **Tasks Chamber `8014`**, **Automation Chamber `8017`**, **Deputy Chamber
   `8018`**, **Map Chamber `8019`**, **Fitness Chamber `8020`** (each Chamber
   matches its dev default). All bind `127.0.0.1` only — the only thing
   reachable from outside the box at all is Caddy, on 80/443.
@@ -34,7 +33,7 @@ decision. See "Access control" below for what that means in practice.
 
 Every service (`congress-core`, `congress-chamber-notes`,
 `congress-chamber-calendar`, `congress-chamber-documents`,
-`congress-chamber-tasks`, `congress-chamber-capitol`, `congress-chamber-logs`,
+`congress-chamber-tasks`,
 `congress-chamber-automation`, `congress-chamber-deputy`,
 `congress-chamber-map`, `congress-chamber-fitness`) has its own discrete unit
 under `infra/systemd/`, installed at `/etc/systemd/system/` and enabled
@@ -219,7 +218,7 @@ sudo apt-get install -y rsync                     # if not already present
 # Create every service's .env by hand (untracked) from the .env.example
 # rsync just delivered: services/congress/.env, services/chamber-notes/.env,
 # .../chamber-calendar/.env, .../chamber-documents/.env,
-# .../chamber-tasks/.env, .../chamber-capitol/.env, and so on for every
+# .../chamber-tasks/.env, and so on for every
 # chamber-*/ directory present. Set NODE_ENV=production, the real
 # production PORT (8000/8011/8012/...), one shared CONGRESS_INTERNAL_TOKEN
 # across every file, and - for every Chamber - CAPITOL_URL=http://127.0.0.1:8000
@@ -245,3 +244,22 @@ sudo systemctl reload caddy
 # Re-run the deploy workflow (or push an empty commit) now that units exist
 # - this time the restart step succeeds too.
 ```
+
+## Retiring the Capitol and Logs Chambers (one-time)
+
+Capitol and Logs were folded into Congress. On the server, once, after the
+first deploy that contains this change:
+
+1. Copy `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` from the old
+   `services/chamber-logs/.env` into `services/congress/.env` (Web Push now
+   sends from Congress).
+2. `sudo systemctl disable --now congress-chamber-capitol congress-chamber-logs`
+   and remove `/etc/systemd/system/congress-chamber-{capitol,logs}.service`
+   (deploys only restart directory-discovered services, so these would
+   otherwise keep failing in a restart loop).
+3. Congress imports the old `services/chamber-capitol/data/` and
+   `services/chamber-logs/data/` SQLite files on its first boot
+   (`legacyImport.ts`; both `data/` dirs survive the rsync `--delete` via
+   `rsync-exclude.txt`). Check `journalctl -u congress-core` for the
+   `Legacy Capitol/Logs import:` line. Once it has run, the old directories
+   can be deleted, and so can `legacyImport.ts`.

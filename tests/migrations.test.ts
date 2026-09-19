@@ -19,8 +19,6 @@ const SERVICES: { name: string; load: () => Promise<DbClientModule> }[] = [
   { name: "chamber-calendar", load: () => import("../services/chamber-calendar/src/db/client.js") },
   { name: "chamber-documents", load: () => import("../services/chamber-documents/src/db/client.js") },
   { name: "chamber-tasks", load: () => import("../services/chamber-tasks/src/db/client.js") },
-  { name: "chamber-capitol", load: () => import("../services/chamber-capitol/src/db/client.js") },
-  { name: "chamber-logs", load: () => import("../services/chamber-logs/src/db/client.js") },
   { name: "chamber-automation", load: () => import("../services/chamber-automation/src/db/client.js") },
   { name: "chamber-map", load: () => import("../services/chamber-map/src/db/client.js") },
   { name: "chamber-deputy", load: () => import("../services/chamber-deputy/src/db/client.js") },

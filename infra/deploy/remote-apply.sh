@@ -24,8 +24,20 @@ pnpm install --frozen-lockfile
 
 SERVICES=(congress-core)
 for dir in "$REPO_DIR"/services/chamber-*/; do
+  # A retired Chamber's directory can linger (rsync --delete keeps its
+  # untracked data/, .env and node_modules) - only real ones have a package.json.
+  [ -f "$dir/package.json" ] || continue
   name="$(basename "$dir")"
   SERVICES+=("congress-$name")
+done
+
+# Capitol and Logs were folded into Congress. Their directories are gone from
+# the pushed tree, so the discovery loop above no longer restarts them - stop
+# them explicitly if a unit is still around (best-effort: needs a sudoers
+# entry for stop/disable; otherwise do it once by hand, see infra/README.md's
+# "Retiring the Capitol and Logs Chambers").
+for retired in congress-chamber-capitol congress-chamber-logs; do
+  sudo /usr/bin/systemctl disable --now "$retired" 2>/dev/null || true
 done
 
 for svc in "${SERVICES[@]}"; do

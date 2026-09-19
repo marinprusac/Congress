@@ -1,1 +1,0 @@
-ALTER TABLE `automations` DROP COLUMN `action_kind`;

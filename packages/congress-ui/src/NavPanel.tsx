@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { fetchRegistry } from "./registry.js";
-import { ChamberMark, getChamberIcon } from "./ChamberMarks.js";
+import { CapitolMark, ChamberMark, getChamberIcon } from "./ChamberMarks.js";
 import { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
 import { useShellHosted } from "./ShellHostContext.js";
 import { useChamberOrder } from "./useChamberOrder.js";
@@ -10,8 +10,8 @@ import { useNavPanelSwipe } from "./useNavPanelSwipe.js";
 import { useReorderableList } from "./useReorderableList.js";
 
 interface NavPanelProps {
-  // "capitol", a Chamber's manifest name, or "settings" - which entry is
-  // highlighted as the one currently open.
+  // "home" (Congress's own homepage canvas), a Chamber's manifest name, or
+  // "settings" - which entry is highlighted as the one currently open.
   current: string;
   // Display name for the current Chamber's own row - rendered immediately
   // from this rather than waiting on the registry fetch below (which is
@@ -28,10 +28,8 @@ interface PanelChamber {
   href: string;
 }
 
-// Capitol is an ordinary registered Chamber here, same as Notes/Calendar/...
-// - no special-cased row, no fixed position, reorderable right alongside
-// every other entry (see NavPanel's own top comment). Same
-// "prepend the current Chamber if the registry hasn't caught up yet"
+// Home is not a Chamber - it has its own fixed row (HomeRow) above this list.
+// Same "prepend the current Chamber if the registry hasn't caught up yet"
 // reasoning the old ChamberPicker carried, so a Chamber's own row never
 // flickers away while its registry entry is still loading.
 function buildChamberList(
@@ -40,7 +38,7 @@ function buildChamberList(
   currentLabel: string | undefined
 ): PanelChamber[] {
   const fromRegistry = registryChambers.map((c) => ({ name: c.name, displayName: c.displayName, href: c.routes.home }));
-  if (current === "settings" || fromRegistry.some((c) => c.name === current)) {
+  if (current === "settings" || current === "home" || fromRegistry.some((c) => c.name === current)) {
     return fromRegistry;
   }
   return [{ name: current, displayName: currentLabel ?? current, href: `/${current}` }, ...fromRegistry];
@@ -55,7 +53,7 @@ function SettingsIcon(props: { className?: string }) {
   );
 }
 
-// A NavPanel target (Capitol, Settings, another Chamber) is always a genuine
+// A NavPanel target (Home, Settings, another Chamber) is always a genuine
 // cross-app jump, never this app's own internal route - only safe as a
 // <Link> when this tree is shell-hosted (no basename in the way). Standalone
 // (a Chamber's own `BrowserRouter basename="/<chamber>"`), it has to stay a
@@ -140,6 +138,28 @@ function SettingsRow({
   );
 }
 
+// Congress's own homepage canvas - fixed at the top of the list, not
+// reorderable, and not a registered Chamber (it's core Congress).
+function HomeRow({
+  current,
+  shellHosted,
+  onNavigate,
+  variant,
+}: {
+  current: string;
+  shellHosted: boolean;
+  onNavigate: () => void;
+  variant: "desktop" | "mobile";
+}) {
+  const className = `nav-panel-link nav-panel-link--${variant}${current === "home" ? " active" : ""}`;
+  return (
+    <CrossAppLink to="/" shellHosted={shellHosted} onNavigate={onNavigate} className={className}>
+      <CapitolMark className="nav-panel-icon" />
+      <span className="nav-panel-label">Home</span>
+    </CrossAppLink>
+  );
+}
+
 function ChamberRow({
   chamber,
   current,
@@ -209,10 +229,10 @@ export function NavPanel({ current, currentLabel }: NavPanelProps) {
   // directly rather than threading a navigate prop through from every
   // caller the way GlobalExhibitSearch used to require of ChamberHeader.
   const navigate = useNavigate();
-  // Search results from Capitol/Settings itself never route locally - only
+  // Search results from Home/Settings itself never route locally - only
   // an actual Chamber owns exhibits (see GlobalExhibitSearch's own
   // ownChamber doc).
-  const searchOwnChamber = current === "capitol" || current === "settings" ? "" : current;
+  const searchOwnChamber = current === "home" || current === "settings" ? "" : current;
   // Carries the Chamber being left behind into Settings' own query string,
   // so NavPanel's single Settings entry point opens straight to that
   // Chamber's own tab instead of always defaulting to General - see
@@ -257,7 +277,10 @@ export function NavPanel({ current, currentLabel }: NavPanelProps) {
           renderIcon={getChamberIcon}
           className="nav-panel-search"
         />
-        <div className="nav-panel-chambers">{renderChamberRows("desktop")}</div>
+        <div className="nav-panel-chambers">
+          <HomeRow current={current} shellHosted={shellHosted} onNavigate={close} variant="desktop" />
+          {renderChamberRows("desktop")}
+        </div>
         <SettingsRow current={current} to={settingsTo} shellHosted={shellHosted} onNavigate={close} variant="desktop" />
       </nav>
 
@@ -277,7 +300,10 @@ export function NavPanel({ current, currentLabel }: NavPanelProps) {
         ref={panelRef}
         style={dragOffsetPx !== null ? { transform: `translateX(${dragOffsetPx}px)`, transition: "none" } : undefined}
       >
-        <div className="nav-panel-mobile-chambers">{renderChamberRows("mobile")}</div>
+        <div className="nav-panel-mobile-chambers">
+          <HomeRow current={current} shellHosted={shellHosted} onNavigate={close} variant="mobile" />
+          {renderChamberRows("mobile")}
+        </div>
         <div className="nav-panel-mobile-bottom">
           <SettingsRow current={current} to={settingsTo} shellHosted={shellHosted} onNavigate={close} variant="mobile" />
           <GlobalExhibitSearch
