@@ -250,9 +250,8 @@ about this" (a due date, an incoming webhook, anything else only your
 Chamber can detect) — or that something should happen elsewhere in
 response — don't invent your own alert UI, don't push a notification
 directly, and don't call another Chamber's API yourself. Publish a domain
-event instead, and let Congress's own log rules (Settings → Logs) and Automation Chamber's
-own automations (both Exhibits the owner edits) decide whether/what to do
-about it. This keeps the "should this even fire, and what happens" decision
+event instead, and let Congress's own log rules (Settings → Logs) and Deputy's directives
+decide whether/what to do about it. This keeps the "should this even fire, and what happens" decision
 editable without a code change, and means your Chamber has no idea whether
 anything is listening at all.
 
@@ -295,7 +294,7 @@ events: [
 ```
 
 This is purely a declared catalog — it's what populates the trigger-event
-picker on Congress's Logs settings and Automation Chamber's own editor (read live off
+picker on Congress's Logs settings and Deputy's directive editor (read live off
 `GET /congress/registry`, never hardcoded to a specific chamber name), not a
 subscription or a requirement to actually fire that event. Defaulted to
 `[]` like `widgets`, so most Chambers never touch this field at all.
@@ -325,16 +324,16 @@ const { heartbeatNow } = createChamberBootstrap({
 ```
 
 `getSubscriptions` is read fresh on every heartbeat (not baked into the
-static manifest), so it can — and for Automation Chamber, does —
-reflect owner-editable state: recompute it from whatever rules/automations
+static manifest), so it can — and for Deputy, does —
+reflect owner-editable state: recompute it from whatever directives
 currently reference a trigger type, aggregating to one entry per type (see
-`chamber-automation/src/subscriptions.ts` for the worked pattern). `type: "*"`
+`chamber-deputy/src/subscriptions.ts` for the worked pattern). `type: "*"`
 subscribes to every event type regardless of what it's called — used by a
 Chamber whose own logic doesn't filter by type at all (Deputy Chamber).
 Congress's own filter is only ever a coarse "could this possibly interest
 this Chamber" gate; do your own precise per-rule matching (condition
 fields, whatever else you need) inside `onEvent` after receiving, same as
-before this system moved off polling. If a rule/automation mutation
+before this system moved off polling. If a rule/directive mutation
 changes what `getSubscriptions()` would now return, call the returned
 `heartbeatNow()` right after the mutation so Congress's copy updates
 immediately instead of waiting up to `HEARTBEAT_INTERVAL_MS` for the next
@@ -345,17 +344,15 @@ A Chamber that never expects to react to another Chamber's events omits
 to opt into structurally, and Congress simply never has anything to push to
 it.
 
-### 5.4 Being called by an automation
+### 5.4 Being called through MCP
 
 Any MCP tool your Chamber registers via `registerTools` (§4) is automatically
-callable by an Automation Chamber automation — there's nothing to opt into
-or declare separately, since Automation Chamber just resolves your
-`mcpUrl` off the registry and calls whatever `tools/list` returns. Write
-your tools the same way regardless of who's calling them (a human via
-Claude Code, or an automation reacting to an event): a clear `description`
-and per-property `description`s in your `inputSchema` are what the owner
-sees when building an automation against your Chamber in the editor, so
-they're worth the same care as your REST API's own request validation.
+callable by Deputy (and any MCP client) — there's nothing to opt into
+or declare separately, since callers just resolve your `mcpUrl` off the
+registry and call whatever `tools/list` returns. A clear `description`
+and per-property `description`s in your `inputSchema` are what the agent
+sees when deciding how to use your tools, so they're worth the same care
+as your REST API's own request validation.
 
 ## 6. Local dev workflow
 

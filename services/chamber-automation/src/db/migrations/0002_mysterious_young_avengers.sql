@@ -1,1 +1,0 @@
-CREATE INDEX `automations_updated_at_idx` ON `automations` (`updated_at`);
