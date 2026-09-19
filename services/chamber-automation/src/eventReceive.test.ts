@@ -158,7 +158,7 @@ describe("handleReceivedEvent", () => {
     expect(callChamberTool).toHaveBeenCalledWith(expect.any(String), expect.any(String), "create_note", {
       title: "Due: Taxes",
       taskId: 7,
-    });
+    }, "automation");
   });
 
   it("ignores an event no automation is waiting for", async () => {

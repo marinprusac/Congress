@@ -96,7 +96,7 @@ async function runAutomation(automation: ReturnType<typeof listEnabledAutomation
   const args = buildArgs(JSON.parse(automation.argsTemplateJson), event.payload);
 
   try {
-    const result = await callChamberTool(target.mcpUrl, env.CONGRESS_INTERNAL_TOKEN, automation.toolName, args);
+    const result = await callChamberTool(target.mcpUrl, env.CONGRESS_INTERNAL_TOKEN, automation.toolName, args, "automation");
     recordRun(automation.id, event.payload, automation.targetChamber, automation.toolName, true, JSON.stringify(result), null);
     void publishEvent({
       type: "automation.run_succeeded",

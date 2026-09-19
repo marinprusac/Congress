@@ -237,6 +237,9 @@ function HistoryEntryRow({ entry }: { entry: EventHistoryEntry }) {
         <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 marker:content-none [&::-webkit-details-marker]:hidden">
           <span className="flex min-w-0 items-baseline gap-2">
             <span className="shrink-0 text-dust transition-transform group-open:rotate-90">▸</span>
+            <span className="shrink-0 border border-dust px-1 text-[10px] uppercase tracking-wide text-slate" title="Who performed the action">
+              {entry.actor}
+            </span>
             <span className="min-w-0 truncate text-dust">{summarizePayload(entry.payload)}</span>
           </span>
           <span className="flex shrink-0 items-baseline gap-2 text-dust">

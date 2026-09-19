@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import type { ChamberRegistryEntry } from "@congress/shared-types";
+import { ACTOR_HEADER, type ChamberRegistryEntry } from "@congress/shared-types";
 import { getChamber } from "./registry.js";
 
 const FORWARD_TIMEOUT_MS = 10_000;
@@ -70,13 +70,24 @@ const HOP_BY_HOP_HEADERS = new Set([
   "host",
 ]);
 
-async function proxyRequest(c: Context, targetUrl: string, timeoutMs: number = FORWARD_TIMEOUT_MS): Promise<Response> {
+// `actor` is who this request is attributed to downstream (see ACTOR_HEADER in
+// shared-types). A client-supplied value is always discarded - the gateway is
+// the only thing that vouches for identity - so a request with no `actor`
+// reaches the Chamber unattributed rather than self-declared.
+async function proxyRequest(
+  c: Context,
+  targetUrl: string,
+  timeoutMs: number = FORWARD_TIMEOUT_MS,
+  actor?: string,
+): Promise<Response> {
   const forwardHeaders = new Headers();
   for (const [key, value] of c.req.raw.headers.entries()) {
     if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
       forwardHeaders.set(key, value);
     }
   }
+  forwardHeaders.delete(ACTOR_HEADER);
+  if (actor) forwardHeaders.set(ACTOR_HEADER, actor);
 
   const method = c.req.method;
   const hasBody = method !== "GET" && method !== "HEAD";
@@ -138,7 +149,8 @@ export async function forwardToChamber(c: Context): Promise<Response> {
   const targetUrl = rewriteChamberPath(c.req.path, apiPrefix, chamber.apiBase, search);
 
   try {
-    return await proxyRequest(c, targetUrl, timeoutFor(chamberName, c.req.method, remainder));
+    // Only reached behind requireSession (server.ts), so the caller is the owner.
+    return await proxyRequest(c, targetUrl, timeoutFor(chamberName, c.req.method, remainder), "me");
   } catch {
     return c.json({ error: "chamber_unreachable", chamber: chamberName }, 503);
   }
@@ -149,7 +161,14 @@ export async function forwardToChamber(c: Context): Promise<Response> {
 // (as forwardToChamber does for "/api/:chamber/*"). Used by the manual-refs
 // routes, whose own URL shape ("/congress/exhibits/:id/refs") has nothing to
 // do with the target Chamber route ("/exhibits/:id/refs").
-export async function proxyToChamberPath(c: Context, chamberName: string, path: string): Promise<Response> {
+// `actor` defaults to the owner since the session-gated manual-refs routes are
+// the usual caller; the unauthenticated device-token ingest passes "system".
+export async function proxyToChamberPath(
+  c: Context,
+  chamberName: string,
+  path: string,
+  actor: string = "me",
+): Promise<Response> {
   const chamber = getChamber(chamberName);
 
   if (!chamber) {
@@ -164,7 +183,7 @@ export async function proxyToChamberPath(c: Context, chamberName: string, path: 
   const targetUrl = `${chamber.apiBase}${path}${search}`;
 
   try {
-    return await proxyRequest(c, targetUrl);
+    return await proxyRequest(c, targetUrl, FORWARD_TIMEOUT_MS, actor);
   } catch {
     return c.json({ error: "chamber_unreachable", chamber: chamberName }, 503);
   }

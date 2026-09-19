@@ -241,6 +241,7 @@ export async function reportRun(trigger: DeputyRunTrigger, spawnResult: SpawnRes
 
   await publishEvent({
     type: "deputy.directive_run",
+    actor: "deputy",
     payload: {
       trigger,
       directiveId: directive?.id ?? null,

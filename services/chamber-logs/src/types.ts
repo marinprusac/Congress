@@ -54,6 +54,7 @@ export const eventHistoryEntrySchema = z.object({
   chamber: z.string(),
   type: z.string(),
   payload: z.record(z.string(), z.unknown()),
+  actor: z.string(),
   occurredAt: z.string(),
 });
 export type EventHistoryEntry = z.infer<typeof eventHistoryEntrySchema>;

@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+// Who performed an action: "me" (the owner, via the UI), "deputy" (Deputy
+// Chamber's agent, via MCP), "automation" (Automation Chamber), or "system"
+// (timers/pollers/devices - no human or agent in the loop). A plain
+// namespaced string rather than an enum so future collaborators can be
+// "user:<name>" without a schema change. Carried on the ACTOR_HEADER between
+// services (set by Congress's gateway for the owner's session and by
+// Deputy/Automation for their own MCP calls, never trusted from a browser),
+// and stamped onto every event a Chamber publishes while handling such a call.
+export const ACTOR_HEADER = "X-Congress-Actor";
+export const DEFAULT_ACTOR = "system";
+export const actorSchema = z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9:_.-]*$/i);
+export type Actor = z.infer<typeof actorSchema>;
+
 // Published by a Chamber that wants something to happen when a condition
 // only it can detect becomes true - "task is due soon", "event starting in
 // 5 min" - without knowing or caring whether anything is listening.
@@ -16,6 +29,7 @@ export const eventPublishRequestSchema = z.object({
   type: z.string().min(1),
   payload: z.record(z.string(), z.unknown()).default({}),
   occurredAt: z.string().optional(),
+  actor: actorSchema.optional(),
 });
 export type EventPublishRequest = z.infer<typeof eventPublishRequestSchema>;
 
@@ -30,6 +44,8 @@ export const eventDeliverySchema = z.object({
   type: z.string(),
   payload: z.record(z.string(), z.unknown()),
   occurredAt: z.string(),
+  // Absent on a delivery from a Congress older than this field.
+  actor: actorSchema.optional(),
 });
 export type EventDelivery = z.infer<typeof eventDeliverySchema>;
 
@@ -43,6 +59,7 @@ export const eventLogEntrySchema = z.object({
   type: z.string(),
   payload: z.record(z.string(), z.unknown()),
   occurredAt: z.string(),
+  actor: actorSchema.optional(),
 });
 export type EventLogEntry = z.infer<typeof eventLogEntrySchema>;
 

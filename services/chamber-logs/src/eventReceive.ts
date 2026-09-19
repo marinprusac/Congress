@@ -21,6 +21,7 @@ export async function handleReceivedEvent(event: EventDelivery): Promise<void> {
       chamber: event.chamber,
       type: event.type,
       payload: event.payload,
+      actor: event.actor,
       occurredAt: new Date(event.occurredAt),
       retentionMs: row.historyRetentionMs,
     });

@@ -49,6 +49,11 @@ export const markdownHighlightStyle: Extension = syntaxHighlighting(
     { tag: [tags.heading5, tags.heading6], fontFamily: "var(--font-display)", fontWeight: "700", color: "var(--color-slate)" },
     { tag: tags.strong, fontWeight: "700" },
     { tag: tags.emphasis, fontStyle: "italic" },
+    { tag: tags.quote, color: "var(--color-slate)", fontStyle: "italic" },
+    { tag: tags.list, color: "var(--color-slate)" },
+    // Must stay after quote/list: lezer-markdown tags every descendant of a
+    // list/blockquote with that tag too, and equal-specificity rules resolve by
+    // source order, so a link inside a bullet would otherwise turn gray.
     {
       tag: tags.link,
       color: "var(--color-accent)",
@@ -69,12 +74,12 @@ export const markdownHighlightStyle: Extension = syntaxHighlighting(
         WebkitMaskRepeat: "no-repeat",
       },
     },
+    // Bare https://... (lezer Autolink) and a link's revealed "(url)" segment.
+    { tag: tags.url, color: "var(--color-accent)" },
     {
       tag: tags.monospace,
       fontFamily: "var(--font-mono)",
       backgroundColor: "color-mix(in srgb, var(--color-dust) 15%, transparent)",
     },
-    { tag: tags.quote, color: "var(--color-slate)", fontStyle: "italic" },
-    { tag: tags.list, color: "var(--color-slate)" },
   ])
 );

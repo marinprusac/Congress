@@ -33,6 +33,9 @@ export function HistoryFeed({ label, emptyLabel }: { label: string; emptyLabel: 
         >
           {getChamberIcon(entry.chamber, { className: "h-4 w-4 shrink-0 text-dust" })}
           <span className="min-w-0 truncate">{entry.label}</span>
+          {entry.actor !== "system" && (
+            <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-wide text-slate">{entry.actor}</span>
+          )}
         </Link>
       ))}
     </WidgetPreviewShell>

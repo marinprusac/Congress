@@ -69,6 +69,10 @@ export const eventHistory = sqliteTable(
     chamber: text("chamber").notNull(),
     type: text("type").notNull(),
     payloadJson: text("payload_json").notNull(),
+    // Who performed the action that published this event ("me", "deputy",
+    // "automation", "system", ...) - see ACTOR_HEADER in shared-types. Null on
+    // rows recorded before this column existed; read back as "system".
+    actor: text("actor"),
     occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull(),
     expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
   },

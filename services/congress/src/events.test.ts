@@ -55,6 +55,13 @@ describe("publishEvent fan-out", () => {
     expect(JSON.parse(delivery.body)).toMatchObject({ chamber: "tasks", type: "tasks.due_soon", payload: { taskId: 1 } });
   });
 
+  it("relays who performed the action", async () => {
+    const fake = await subscriber("relay-actor", [{ type: "*" }]);
+    publishEvent({ chamber: "tasks", type: "tasks.created", payload: {}, actor: "deputy" });
+    await waitFor(() => fake.received.length > 0, 2_000, "delivery to relay-actor");
+    expect(JSON.parse(fake.received[0]!.body).actor).toBe("deputy");
+  });
+
   it("stamps occurredAt when the publisher did not supply one", async () => {
     const fake = await subscriber("relay-b", [{ type: "*" }]);
     publishEvent({ chamber: "tasks", type: "anything", payload: {} });

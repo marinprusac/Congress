@@ -53,12 +53,12 @@ describe("writeMcpConfigFile", () => {
       expect(config.mcpServers.congress).toEqual({
         type: "http",
         url: `${fakeCongress.origin}/mcp`,
-        headers: { "X-Congress-Internal-Token": TEST_INTERNAL_TOKEN },
+        headers: { "X-Congress-Internal-Token": TEST_INTERNAL_TOKEN, "X-Congress-Actor": "deputy" },
       });
       expect(config.mcpServers.notes).toEqual({
         type: "http",
         url: "http://127.0.0.1:8011/mcp",
-        headers: { "X-Congress-Internal-Token": TEST_INTERNAL_TOKEN },
+        headers: { "X-Congress-Internal-Token": TEST_INTERNAL_TOKEN, "X-Congress-Actor": "deputy" },
       });
     } finally {
       await cleanup();

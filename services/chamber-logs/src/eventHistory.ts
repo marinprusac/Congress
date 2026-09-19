@@ -1,6 +1,7 @@
-import { eq, and, desc, lt } from "drizzle-orm";
+import { eq, and, or, isNull, desc, lt } from "drizzle-orm";
 import { db } from "./db/client.js";
 import { eventHistory, eventSettings } from "./db/schema.js";
+import { DEFAULT_ACTOR } from "@congress/shared-types";
 import type { EventHistoryEntry } from "./types.js";
 
 // Used when an event type's own historyRetentionMs is unset - a durable
@@ -17,6 +18,7 @@ function toEntry(row: typeof eventHistory.$inferSelect, label: string): EventHis
     chamber: row.chamber,
     type: row.type,
     payload: JSON.parse(row.payloadJson),
+    actor: row.actor ?? DEFAULT_ACTOR,
     occurredAt: row.occurredAt.toISOString(),
   };
 }
@@ -30,6 +32,7 @@ export function recordHistory(opts: {
   chamber: string;
   type: string;
   payload: Record<string, unknown>;
+  actor?: string;
   occurredAt: Date;
   retentionMs: number | null;
 }): void {
@@ -38,6 +41,7 @@ export function recordHistory(opts: {
       chamber: opts.chamber,
       type: opts.type,
       payloadJson: JSON.stringify(opts.payload),
+      actor: opts.actor ?? DEFAULT_ACTOR,
       occurredAt: opts.occurredAt,
       expiresAt: new Date(opts.occurredAt.getTime() + (opts.retentionMs ?? DEFAULT_HISTORY_RETENTION_MS)),
     })
@@ -48,9 +52,17 @@ export function recordHistory(opts: {
 // Joined against eventSettings for each entry's own display label (a
 // settings row is never deleted, but the join is still a left-join-shaped
 // best-effort in case a row's own event type has since gone stale).
-export function listHistory(opts: { eventType?: string; limit?: number } = {}): EventHistoryEntry[] {
+export function listHistory(opts: { eventType?: string; actor?: string; limit?: number } = {}): EventHistoryEntry[] {
   const limit = opts.limit ?? LIST_LIMIT;
-  const conditions = [opts.eventType !== undefined ? eq(eventHistory.type, opts.eventType) : undefined].filter(
+  const conditions = [
+    opts.eventType !== undefined ? eq(eventHistory.type, opts.eventType) : undefined,
+    // Rows recorded before the actor column existed read back as "system".
+    opts.actor === undefined
+      ? undefined
+      : opts.actor === DEFAULT_ACTOR
+        ? or(eq(eventHistory.actor, opts.actor), isNull(eventHistory.actor))
+        : eq(eventHistory.actor, opts.actor),
+  ].filter(
     (c) => c !== undefined
   );
   const rows = db

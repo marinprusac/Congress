@@ -71,6 +71,13 @@
       "when": 1787963861575,
       "tag": "0009_high_wasp",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1789830015692,
+      "tag": "0010_majestic_blazing_skull",
+      "breakpoints": true
     }
   ]
 }

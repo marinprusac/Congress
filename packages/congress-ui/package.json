@@ -26,6 +26,7 @@
     "@fontsource/ibm-plex-sans-condensed": "^5.1.0",
     "@lezer/common": "^1.5.2",
     "@lezer/highlight": "^1.2.3",
+    "@lezer/markdown": "^1.7.2",
     "@tanstack/query-async-storage-persister": "^5.101.4",
     "@tanstack/react-query-persist-client": "^5.101.4",
     "idb-keyval": "^6.3.0",

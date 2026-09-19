@@ -9,6 +9,7 @@ import {
   forwardToChamber,
   forwardToChamberFrontend,
   frontendBaseOf,
+  proxyToChamberPath,
   proxyToChamberIcon,
   rewriteChamberPath,
   timeoutFor,
@@ -114,6 +115,7 @@ describe("proxying", () => {
     detachChamber("parked");
 
     app.all("/api/:chamber/*", forwardToChamber);
+    app.post("/device/:chamber", (c) => proxyToChamberPath(c, c.req.param("chamber"), "/echo", "system"));
     app.get("/congress/chambers/:name/icon", (c) => proxyToChamberIcon(c, c.req.param("name")));
     app.all("/:chamberName/*", (c) => {
       const chamber = getChamber(c.req.param("chamberName") ?? "");
@@ -129,6 +131,17 @@ describe("proxying", () => {
 
   afterAll(async () => {
     await upstream.close();
+  });
+
+  describe("proxyToChamberPath", () => {
+    it("attributes an unauthenticated caller to the actor it is given, not the client's claim", async () => {
+      await app.request("/device/upstream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-congress-actor": "me" },
+        body: "{}",
+      });
+      expect(upstream.received.at(-1)!.headers["x-congress-actor"]).toBe("system");
+    });
   });
 
   describe("forwardToChamber", () => {
@@ -160,6 +173,13 @@ describe("proxying", () => {
       expect(seen.host).not.toBe("congress.example.com");
       expect(seen["proxy-authorization"]).toBeUndefined();
       expect(seen.te).toBeUndefined();
+    });
+
+    it("attributes the request to the owner, discarding any actor the client claimed", async () => {
+      // Only the session-gated gateway may vouch for who is acting - a browser
+      // (or anything else) must not be able to sign as "deputy".
+      await app.request("/api/upstream/echo", { headers: { "x-congress-actor": "deputy" } });
+      expect(upstream.received.at(-1)!.headers["x-congress-actor"]).toBe("me");
     });
 
     it("passes ordinary headers through", async () => {

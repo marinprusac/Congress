@@ -6,6 +6,8 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import { ACTOR_HEADER } from "@congress/shared-types";
+import { runWithActor } from "./actorContext.js";
 
 export function mcpTextResult(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
@@ -42,7 +44,9 @@ export function createMcpApp(name: string, registerTools: (server: McpServer) =>
       const body =
         c.req.method === "GET" || c.req.method === "HEAD" ? undefined : await c.req.json().catch(() => undefined);
 
-      await transport.handleRequest(c.env.incoming, c.env.outgoing, body);
+      // Tool callbacks run inside this call, so anything they publish is
+      // stamped with the caller's actor (Deputy sets it on its MCP config).
+      await runWithActor(c.req.header(ACTOR_HEADER), () => transport.handleRequest(c.env.incoming, c.env.outgoing, body));
 
       return RESPONSE_ALREADY_SENT;
     } catch (err) {
@@ -65,10 +69,18 @@ const CALL_TIMEOUT_MS = 10_000;
 // discover a target Chamber's callable tools (editor UI) and invoke one
 // (eventPoller.ts) - both low-volume, event-driven call sites, not a hot
 // path that would want connection pooling.
-async function withMcpClient<T>(mcpUrl: string, internalToken: string, fn: (client: Client) => Promise<T>): Promise<T> {
+async function withMcpClient<T>(
+  mcpUrl: string,
+  internalToken: string,
+  actor: string | undefined,
+  fn: (client: Client) => Promise<T>,
+): Promise<T> {
   const client = new Client({ name: "congress-automation-client", version: "0.1.0" });
   const transport = new StreamableHTTPClientTransport(new URL(mcpUrl), {
-    requestInit: { headers: { "X-Congress-Internal-Token": internalToken }, signal: AbortSignal.timeout(CALL_TIMEOUT_MS) },
+    requestInit: {
+      headers: { "X-Congress-Internal-Token": internalToken, ...(actor ? { [ACTOR_HEADER]: actor } : {}) },
+      signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+    },
   });
   await client.connect(transport);
   try {
@@ -84,10 +96,18 @@ async function withMcpClient<T>(mcpUrl: string, internalToken: string, fn: (clie
 // catalog like events, since MCP already gives every tool a full input
 // schema for free.
 export async function listChamberTools(mcpUrl: string, internalToken: string): Promise<Tool[]> {
-  const { tools } = await withMcpClient(mcpUrl, internalToken, (client) => client.listTools());
+  const { tools } = await withMcpClient(mcpUrl, internalToken, undefined, (client) => client.listTools());
   return tools;
 }
 
-export async function callChamberTool(mcpUrl: string, internalToken: string, toolName: string, args: Record<string, unknown>) {
-  return withMcpClient(mcpUrl, internalToken, (client) => client.callTool({ name: toolName, arguments: args }));
+// `actor` is who the call is made on behalf of (e.g. "automation") - the
+// target Chamber stamps it onto whatever events the tool call publishes.
+export async function callChamberTool(
+  mcpUrl: string,
+  internalToken: string,
+  toolName: string,
+  args: Record<string, unknown>,
+  actor?: string,
+) {
+  return withMcpClient(mcpUrl, internalToken, actor, (client) => client.callTool({ name: toolName, arguments: args }));
 }

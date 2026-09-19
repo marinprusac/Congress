@@ -9,9 +9,14 @@ import {
   type Manifest,
 } from "@congress/shared-types";
 
+import { actorMiddleware } from "./actorContext.js";
+
 type ChamberApp = Hono<{ Bindings: HttpBindings }>;
 
 export function mountManifestAndHealth(app: ChamberApp, manifest: Manifest): void {
+  // First thing every Chamber mounts, so this covers every /api/* route it
+  // adds afterwards - see actorContext.ts.
+  app.use("/api/*", actorMiddleware);
   app.get("/manifest", (c) => c.json(manifest));
   app.get("/health", (c) => c.json({ status: "ok" }));
 }

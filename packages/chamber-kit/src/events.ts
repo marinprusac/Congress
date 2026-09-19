@@ -1,4 +1,5 @@
 import type { EventPublishRequest } from "@congress/shared-types";
+import { currentActor } from "./actorContext.js";
 
 // Publishes a domain event to Congress's generic event log
 // (POST /congress/events/publish) - same "best-effort, never blocks the
@@ -16,7 +17,9 @@ export function createPublishEvent(opts: { chamber: string; capitolUrl: string; 
           "Content-Type": "application/json",
           "X-Congress-Internal-Token": opts.internalToken,
         },
-        body: JSON.stringify({ chamber: opts.chamber, ...event }),
+        // Explicit actor wins; otherwise whoever's request we're handling
+        // (or "system" from a timer/poller with no request context).
+        body: JSON.stringify({ chamber: opts.chamber, ...event, actor: event.actor ?? currentActor() }),
         signal: AbortSignal.timeout(5_000),
       });
       if (!res.ok) {

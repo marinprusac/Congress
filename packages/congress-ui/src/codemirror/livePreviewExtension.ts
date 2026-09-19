@@ -33,6 +33,9 @@ function buildHiddenRanges(view: EditorView, mode: "multiline" | "inline"): Deco
         // anywhere inside "**bold**" should reveal both "**"s, not just
         // whichever one it happens to be nearest.
         const parent = node.node.parent;
+        // An Autolink's URL *is* its visible text (bare or <...>); only a
+        // Link's "(url)" segment is hidden behind its label.
+        if (HIDDEN_NON_MARK_NODES.has(node.name) && parent?.name !== "Link") return;
         const spanFrom = parent?.from ?? node.from;
         const spanTo = parent?.to ?? node.to;
         if (selection.from <= spanTo && selection.to >= spanFrom) return;

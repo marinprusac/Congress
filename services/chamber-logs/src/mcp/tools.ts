@@ -59,10 +59,11 @@ export function registerTools(server: McpServer) {
     "list_event_history",
     {
       title: "List Event History",
-      description: "List this Chamber's recorded event history, most recent first.",
-      inputSchema: { limit: z.number().int().positive().optional() },
+      description:
+        "List this Chamber's recorded event history, most recent first. Each entry has an `actor` - who performed the action that produced the event (\"me\" for the owner, \"deputy\", \"automation\", \"system\" for timers/pollers). Pass `actor` to see only one party's actions, e.g. \"deputy\" for your own.",
+      inputSchema: { limit: z.number().int().positive().optional(), actor: z.string().optional() },
     },
-    async ({ limit }) => textResult(listHistory({ limit }))
+    async ({ limit, actor }) => textResult(listHistory({ limit, actor }))
   );
 
   server.registerTool(

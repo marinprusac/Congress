@@ -65,7 +65,7 @@ async function deliverToChamber(chamberName: string, body: unknown): Promise<voi
 // background.
 export function publishEvent(req: EventPublishRequest): void {
   const occurredAt = req.occurredAt ?? new Date().toISOString();
-  const body = { chamber: req.chamber, type: req.type, payload: req.payload, occurredAt };
+  const body = { chamber: req.chamber, type: req.type, payload: req.payload, occurredAt, actor: req.actor };
 
   const targets = listChambers().filter((c) => c.status === "active" && subscriptionMatches(c.subscriptions, req.type));
   for (const chamber of targets) {

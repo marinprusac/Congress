@@ -19,9 +19,10 @@ export function updateEventSettings(eventType: string, input: UpdateEventSetting
   }).then((res) => json(res));
 }
 
-export function fetchHistory(opts: { eventType?: string; limit?: number } = {}): Promise<EventHistoryEntry[]> {
+export function fetchHistory(opts: { eventType?: string; actor?: string; limit?: number } = {}): Promise<EventHistoryEntry[]> {
   const params = new URLSearchParams();
   if (opts.eventType !== undefined) params.set("eventType", opts.eventType);
+  if (opts.actor !== undefined) params.set("actor", opts.actor);
   if (opts.limit) params.set("limit", String(opts.limit));
   const qs = params.toString();
   return fetch(`${API_BASE}/history${qs ? `?${qs}` : ""}`).then((res) => json(res));

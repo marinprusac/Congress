@@ -218,7 +218,7 @@ app.delete("/congress/exhibits/:id/connections/:otherExhibitId", requireSession,
 // already is. No dedicated auth middleware here on purpose - Congress
 // asserts nothing about the caller for this one path, so a middleware whose
 // only job would be to call next() is pure ceremony.
-app.post("/api/fitness/health/ingest", (c) => proxyToChamberPath(c, "fitness", "/health/ingest"));
+app.post("/api/fitness/health/ingest", (c) => proxyToChamberPath(c, "fitness", "/health/ingest", "system"));
 
 app.all("/api/:chamber/*", requireSession, forwardToChamber);
 

@@ -56,7 +56,7 @@ app.get("/api/history", (c) => {
   const eventType = c.req.query("eventType") ?? undefined;
   const rawLimit = c.req.query("limit");
   const limit = rawLimit && Number.isInteger(Number(rawLimit)) ? Number(rawLimit) : undefined;
-  return c.json(listHistory({ eventType, limit }));
+  return c.json(listHistory({ eventType, actor: c.req.query("actor") ?? undefined, limit }));
 });
 
 // The notification center itself - formerly owned by Congress

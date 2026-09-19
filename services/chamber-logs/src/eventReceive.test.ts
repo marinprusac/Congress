@@ -55,6 +55,39 @@ function deliver(type: string, payload: Record<string, unknown> = {}) {
   });
 }
 
+describe("action signatures", () => {
+  it("records who performed the action alongside the event", async () => {
+    settingsFor("tasks.created", { recordToHistory: true });
+    await handleReceivedEvent({
+      chamber: "tasks",
+      type: "tasks.created",
+      payload: {},
+      occurredAt: "2026-03-01T08:00:00.000Z",
+      actor: "deputy",
+    });
+    expect(listHistory().map((h) => h.actor)).toEqual(["deputy"]);
+  });
+
+  it("reads an event with no actor back as system, and filters by actor", async () => {
+    settingsFor("tasks.created", { recordToHistory: true });
+    await deliver("tasks.created");
+    await handleReceivedEvent({ chamber: "tasks", type: "tasks.created", payload: {}, occurredAt: "2026-03-01T09:00:00.000Z", actor: "me" });
+
+    expect(listHistory().map((h) => h.actor).sort()).toEqual(["me", "system"]);
+    expect(listHistory({ actor: "me" })).toHaveLength(1);
+    expect(listHistory({ actor: "system" })).toHaveLength(1);
+  });
+
+  it("counts a row from before the actor column existed as system", async () => {
+    settingsFor("tasks.created", { recordToHistory: true });
+    db.insert(eventHistory)
+      .values({ chamber: "tasks", type: "tasks.created", payloadJson: "{}", occurredAt: new Date(), expiresAt: new Date(Date.now() + 1e6) })
+      .run();
+    expect(listHistory()[0]!.actor).toBe("system");
+    expect(listHistory({ actor: "system" })).toHaveLength(1);
+  });
+});
+
 describe("an event type with no settings row", () => {
   it("is ignored entirely", async () => {
     await deliver("tasks.unknown");

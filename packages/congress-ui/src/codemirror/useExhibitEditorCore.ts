@@ -14,6 +14,8 @@ import { createExhibitTriggerExtension, type ExhibitPickerController } from "./e
 import type { ExhibitEditorRuntimeRef } from "./runtime.js";
 import { exhibitEditorTheme, markdownHighlightStyle } from "./theme.js";
 import { createLivePreviewExtension } from "./livePreviewExtension.js";
+import { createLinkClickExtension } from "./linkClickExtension.js";
+import { Autolink } from "@lezer/markdown";
 import { createSingleLineExtension } from "./singleLineExtension.js";
 
 export interface UseExhibitEditorCoreOptions {
@@ -232,9 +234,12 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
 
       const extensions: Extension[] = [
         history(),
-        markdown(),
+        // Autolink makes a bare https://... a link node (green, ctrl+click-able)
+        // without pulling in the rest of GFM (tables, task lists, strikethrough).
+        markdown({ extensions: [Autolink] }),
         markdownHighlightStyle,
         createLivePreviewExtension(mode),
+        createLinkClickExtension(),
         exhibitEditorTheme,
         EditorView.lineWrapping,
         ...createExhibitChipExtensions(runtimeRef.current),

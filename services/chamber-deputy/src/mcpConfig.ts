@@ -2,6 +2,7 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fetchRegistry } from "@congress/chamber-kit";
+import { ACTOR_HEADER } from "@congress/shared-types";
 import { env } from "./env.js";
 
 // One `type: "http"` MCP server entry per active, MCP-capable Chamber - the
@@ -28,6 +29,11 @@ export interface McpConfigFile {
   cleanup: () => Promise<void>;
 }
 
+// Every tool call the claude subprocess makes carries this actor, so whatever
+// event the called Chamber publishes as a side effect is attributed to Deputy
+// rather than the owner (see ACTOR_HEADER in shared-types).
+const MCP_HEADERS = { "X-Congress-Internal-Token": env.CONGRESS_INTERNAL_TOKEN, [ACTOR_HEADER]: "deputy" };
+
 export async function writeMcpConfigFile(): Promise<McpConfigFile> {
   const registry = await fetchRegistry(env.CAPITOL_URL, env.CONGRESS_INTERNAL_TOKEN);
 
@@ -35,7 +41,7 @@ export async function writeMcpConfigFile(): Promise<McpConfigFile> {
     congress: {
       type: "http",
       url: `${env.CAPITOL_URL}/mcp`,
-      headers: { "X-Congress-Internal-Token": env.CONGRESS_INTERNAL_TOKEN },
+      headers: MCP_HEADERS,
     },
   };
   for (const chamber of registry) {
@@ -43,7 +49,7 @@ export async function writeMcpConfigFile(): Promise<McpConfigFile> {
     mcpServers[chamber.name] = {
       type: "http",
       url: chamber.mcpUrl,
-      headers: { "X-Congress-Internal-Token": env.CONGRESS_INTERNAL_TOKEN },
+      headers: MCP_HEADERS,
     };
   }
 
