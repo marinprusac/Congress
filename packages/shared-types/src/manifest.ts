@@ -73,12 +73,12 @@ export type ManifestEvent = z.infer<typeof manifestEventSchema>;
 
 // Congress is the one publisher with no manifest of its own to declare these
 // in - it's the registry owner, not a registrant (see CLAUDE.md), so it never
-// appears in the live registry chamber-logs' eventCatalogSync.ts iterates to
+// appears in the live registry Congress's own eventCatalogSync.ts iterates to
 // auto-derive event_settings rows. This is that catalog entry, hand-written
-// here instead, so Congress's own chamber-health events are still
-// configurable (notify/record toggles) from the Logs UI like any other
-// Chamber's declared events - see eventCatalogSync.ts's synthetic-chamber
-// merge and registry.ts's actual publish sites.
+// here instead, so Congress's own events are still configurable
+// (notify/record toggles) from Settings -> Logs like any other Chamber's
+// declared events - see eventCatalogSync.ts's synthetic-chamber merge and
+// registry.ts's actual publish sites.
 export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
   {
     type: "congress.chamber_offline",
@@ -97,6 +97,12 @@ export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
     label: "App updated",
     description: "The PWA's service worker activated a newly deployed version and the shell reloaded onto it.",
   },
+  {
+    type: "logs.rule_updated",
+    label: "Log rule updated",
+    description: "The owner changed a per-event-type record/notify setting - useful for spotting why an expected notification went quiet.",
+    payloadFields: { eventType: { type: "string" }, label: { type: "string" } },
+  },
 ];
 
 export const manifestSchema = z.object({
@@ -107,9 +113,9 @@ export const manifestSchema = z.object({
   apiBase: z.string().url(),
   mcpUrl: z.string().url().optional(),
   healthUrl: z.string().url(),
-  // Homepage widgets this Chamber contributes to Capitol's canvas. Defaulted
+  // Homepage widgets this Chamber contributes to Congress's canvas. Defaulted
   // so a Chamber registering against an old manifest shape (or a chamber with
-  // no widgets, like Capitol itself) never has to think about this field.
+  // no widgets) never has to think about this field.
   widgets: z.array(manifestWidgetSchema).default([]),
   // Domain events this Chamber may publish. Defaulted the same way as
   // widgets - most Chambers publish none.

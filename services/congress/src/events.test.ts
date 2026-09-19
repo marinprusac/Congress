@@ -178,3 +178,29 @@ describe("publishEvent delivery retries", () => {
     expect(calls).toHaveLength(1);
   });
 });
+
+// Congress's own log rules run in-process on every publish - no subscription
+// entry, registry lookup, or HTTP hop involved (see events.ts).
+describe("publishEvent -> log rules", () => {
+  it("records to history without any subscribed chamber", async () => {
+    const { db } = await import("./db/client.js");
+    const { eventSettings } = await import("./db/schema.js");
+    const { listHistory } = await import("./eventHistory.js");
+    db.insert(eventSettings)
+      .values({
+        eventType: "inproc.test_event",
+        chamber: "inproc",
+        label: "In-process test",
+        recordToHistory: true,
+        notify: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .run();
+
+    publishEvent({ chamber: "inproc", type: "inproc.test_event", payload: { n: 1 } });
+
+    await waitFor(() => listHistory({ eventType: "inproc.test_event" }).length > 0, 2_000, "history row");
+    expect(listHistory({ eventType: "inproc.test_event" })[0]).toMatchObject({ chamber: "inproc", payload: { n: 1 } });
+  });
+});

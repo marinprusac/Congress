@@ -1,1 +1,0 @@
-ALTER TABLE `event_history` ADD `actor` text;

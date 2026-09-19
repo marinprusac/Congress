@@ -4,6 +4,11 @@ import type { HttpBindings } from "@hono/node-server";
 import { z } from "zod";
 import { mountManifestAndHealth, mountStaticFrontend } from "@congress/chamber-kit";
 import {
+  canvasScopeSchema,
+  upsertPlacementRequestSchema,
+  updateEventSettingsRequestSchema,
+  pushSubscriptionRequestSchema,
+  pushUnsubscribeRequestSchema,
   manifestSchema,
   exhibitSyncRequestSchema,
   updateCapitolSettingsRequestSchema,
@@ -35,6 +40,12 @@ import {
 } from "./exhibits.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { publishEvent } from "./events.js";
+import { listPlacements, upsertPlacement, deletePlacement } from "./layout.js";
+import { listEventSettings, getEventSettingsByType, updateEventSettings } from "./eventSettings.js";
+import { syncEventCatalog } from "./eventCatalogSync.js";
+import { listHistory } from "./eventHistory.js";
+import { listNotifications, markNotificationRead, markAllNotificationsRead, dismissNotification } from "./notifications.js";
+import { publicKey, saveSubscription, removeSubscription } from "./pushSubscriptions.js";
 import { mcpApp } from "./mcp/server.js";
 
 // Only Capitol itself validates register/deregister/heartbeat/exhibit-resolve
@@ -78,6 +89,100 @@ app.put("/congress/settings", requireSession, async (c) => {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
   return c.json(await updateSettings(parsed.data));
+});
+
+// Homepage canvas layout - where each registered widget sits per viewport
+// class. See layout.ts / db/schema.ts's widgetLayouts.
+app.get("/congress/layout/:scope", requireSession, (c) => {
+  const scope = canvasScopeSchema.safeParse(c.req.param("scope"));
+  if (!scope.success) return c.json({ error: "invalid_scope" }, 400);
+  return c.json(listPlacements(scope.data));
+});
+
+app.put("/congress/layout/:scope/:chamber/:widgetId", requireSession, async (c) => {
+  const scope = canvasScopeSchema.safeParse(c.req.param("scope"));
+  if (!scope.success) return c.json({ error: "invalid_scope" }, 400);
+  const body = await c.req.json().catch(() => null);
+  const parsed = upsertPlacementRequestSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+
+  const placement = upsertPlacement(scope.data, c.req.param("chamber"), c.req.param("widgetId"), parsed.data.x, parsed.data.y);
+  if (!placement) return c.json({ error: "cell_occupied" }, 409);
+  return c.json(placement);
+});
+
+app.delete("/congress/layout/:scope/:chamber/:widgetId", requireSession, (c) => {
+  const scope = canvasScopeSchema.safeParse(c.req.param("scope"));
+  if (!scope.success) return c.json({ error: "invalid_scope" }, 400);
+  deletePlacement(scope.data, c.req.param("chamber"), c.req.param("widgetId"));
+  return c.body(null, 204);
+});
+
+// One row per known event type, auto-derived from the live registry - no
+// create/delete route exists, see eventSettings.ts. Synced before listing so
+// the page is current the moment it's opened, not just on the next sweep.
+app.get("/congress/event-settings", requireSession, async (c) => {
+  syncEventCatalog();
+  return c.json(await listEventSettings());
+});
+
+app.get("/congress/event-settings/:eventType", requireSession, async (c) => {
+  const row = await getEventSettingsByType(c.req.param("eventType"));
+  if (!row) return c.json({ error: "not_found" }, 404);
+  return c.json(row);
+});
+
+app.put("/congress/event-settings/:eventType", requireSession, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = updateEventSettingsRequestSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  const row = await updateEventSettings(c.req.param("eventType"), parsed.data);
+  if (!row) return c.json({ error: "not_found" }, 404);
+  return c.json(row);
+});
+
+app.get("/congress/history", requireSession, (c) => {
+  const rawLimit = c.req.query("limit");
+  const limit = rawLimit && Number.isInteger(Number(rawLimit)) ? Number(rawLimit) : undefined;
+  return c.json(listHistory({ eventType: c.req.query("eventType") ?? undefined, actor: c.req.query("actor") ?? undefined, limit }));
+});
+
+// The owner's notification inbox + Web Push subscriptions.
+app.get("/congress/notifications", requireSession, (c) => c.json(listNotifications()));
+
+app.post("/congress/notifications/read-all", requireSession, (c) => {
+  markAllNotificationsRead();
+  return c.json({ ok: true });
+});
+
+app.post("/congress/notifications/:id/read", requireSession, (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || !markNotificationRead(id)) return c.json({ error: "not_found" }, 404);
+  return c.json({ ok: true });
+});
+
+app.delete("/congress/notifications/:id", requireSession, (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || !dismissNotification(id)) return c.json({ error: "not_found" }, 404);
+  return c.json({ ok: true });
+});
+
+app.get("/congress/push/config", requireSession, (c) => c.json({ publicKey: publicKey() }));
+
+app.post("/congress/push/subscribe", requireSession, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = pushSubscriptionRequestSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  saveSubscription(parsed.data);
+  return c.json({ ok: true });
+});
+
+app.post("/congress/push/unsubscribe", requireSession, async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = pushUnsubscribeRequestSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  removeSubscription(parsed.data.endpoint);
+  return c.json({ ok: true });
 });
 
 app.post("/congress/register", requireInternalToken, async (c) => {

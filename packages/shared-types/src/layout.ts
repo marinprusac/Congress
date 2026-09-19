@@ -1,0 +1,20 @@
+import { z } from "zod";
+
+// Homepage canvas layout - exactly two shared layouts, matching the app's
+// existing `min-width: 641px` breakpoint, not one per physical device.
+export const canvasScopeSchema = z.enum(["mobile", "desktop"]);
+export type CanvasScope = z.infer<typeof canvasScopeSchema>;
+
+export const widgetPlacementSchema = z.object({
+  chamber: z.string(),
+  widgetId: z.string(),
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
+});
+export type WidgetPlacement = z.infer<typeof widgetPlacementSchema>;
+
+export const upsertPlacementRequestSchema = z.object({
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
+});
+export type UpsertPlacementRequest = z.infer<typeof upsertPlacementRequestSchema>;

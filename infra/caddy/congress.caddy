@@ -8,7 +8,7 @@
 #
 # Congress has no network-level access control now that this is public
 # (see infra/README.md) - the master-password session cookie in
-# services/capitol/src/sessionAuth.ts is the only gate. That cookie is set
+# services/congress/src/sessionAuth.ts is the only gate. That cookie is set
 # with Secure, so it only works over HTTPS, which is exactly what this
 # block provides.
 congress.marinprusac.com {

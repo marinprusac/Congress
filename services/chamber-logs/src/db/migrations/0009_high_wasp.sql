@@ -1,1 +1,0 @@
-ALTER TABLE `event_settings` ADD `payload_fields_json` text;

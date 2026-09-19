@@ -164,9 +164,8 @@ appear.
 
 ### 5.1 Homepage widgets
 
-Capitol's homepage is a cell-based canvas the owner can edit to place and
-move widgets (see `services/chamber-capitol/frontend/src/components/
-Canvas.tsx`). A Chamber can register any number of widgets, each with a
+Congress's homepage is a cell-based canvas the owner can edit to place and
+move widgets (see `services/congress/frontend/src/components/Canvas.tsx`). A Chamber can register any number of widgets, each with a
 fixed footprint in canvas cells declared in `src/manifest.ts`:
 
 ```ts
@@ -251,7 +250,7 @@ about this" (a due date, an incoming webhook, anything else only your
 Chamber can detect) — or that something should happen elsewhere in
 response — don't invent your own alert UI, don't push a notification
 directly, and don't call another Chamber's API yourself. Publish a domain
-event instead, and let Logs Chamber's own rules and Automation Chamber's
+event instead, and let Congress's own log rules (Settings → Logs) and Automation Chamber's
 own automations (both Exhibits the owner edits) decide whether/what to do
 about it. This keeps the "should this even fire, and what happens" decision
 editable without a code change, and means your Chamber has no idea whether
@@ -296,7 +295,7 @@ events: [
 ```
 
 This is purely a declared catalog — it's what populates the trigger-event
-picker on Logs Chamber's and Automation Chamber's own editors (read live off
+picker on Congress's Logs settings and Automation Chamber's own editor (read live off
 `GET /congress/registry`, never hardcoded to a specific chamber name), not a
 subscription or a requirement to actually fire that event. Defaulted to
 `[]` like `widgets`, so most Chambers never touch this field at all.
@@ -326,10 +325,10 @@ const { heartbeatNow } = createChamberBootstrap({
 ```
 
 `getSubscriptions` is read fresh on every heartbeat (not baked into the
-static manifest), so it can — and for Logs/Automation Chamber, does —
+static manifest), so it can — and for Automation Chamber, does —
 reflect owner-editable state: recompute it from whatever rules/automations
 currently reference a trigger type, aggregating to one entry per type (see
-`chamber-logs/src/subscriptions.ts` for the worked pattern). `type: "*"`
+`chamber-automation/src/subscriptions.ts` for the worked pattern). `type: "*"`
 subscribes to every event type regardless of what it's called — used by a
 Chamber whose own logic doesn't filter by type at all (Deputy Chamber).
 Congress's own filter is only ever a coarse "could this possibly interest
