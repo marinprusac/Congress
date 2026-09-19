@@ -8,6 +8,7 @@ import { fetchVisits, fetchTrips, fetchVisit, fetchVisitActiveAt, fetchPollHealt
 import { trackingFreshness } from "@/lib/freshness";
 import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
 import { formatDuration } from "@/lib/formatDuration";
+import { InvalidateSizeOnResize } from "@/components/InvalidateSizeOnResize";
 import { placeMarkerIcon } from "@/lib/markerIcon";
 import { tripPositions } from "@/lib/tripPath";
 import type { Trip, Visit } from "../../../src/types";
@@ -280,6 +281,7 @@ export function MapPage() {
           style={{ height: "100%", width: "100%" }}
         >
           <TileLayer url={tileUrl} attribution={MAP_TILE_ATTRIBUTION} className={tileClassName} />
+          <InvalidateSizeOnResize />
           <FitToDay markers={markers} paths={tripPaths} />
           {markers.map((v) => (
             <Marker key={v.id} position={[v.latitude!, v.longitude!]} icon={placeMarkerIcon}>

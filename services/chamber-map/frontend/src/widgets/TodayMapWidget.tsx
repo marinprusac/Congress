@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
 import { WidgetPreviewShell } from "@congress/congress-ui";
 import { fetchVisits, fetchTrips } from "@/lib/api";
 import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
+import { InvalidateSizeOnResize } from "@/components/InvalidateSizeOnResize";
 import { placeMarkerIcon } from "@/lib/markerIcon";
 import { tripPositions } from "@/lib/tripPath";
 import type { Trip, Visit } from "../../../src/types";
@@ -66,6 +67,7 @@ export function TodayMapWidget() {
             scrollWheelZoom={false}
             doubleClickZoom={false}
           >
+            <InvalidateSizeOnResize />
             <TileLayer url={tileUrl} attribution={MAP_TILE_ATTRIBUTION} className={tileClassName} />
             {markers.map((v) => (
               <Marker key={v.id} position={[v.latitude!, v.longitude!]} icon={placeMarkerIcon} />
