@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Circle, useMap, useMapEvents } from "r
 import type L from "leaflet";
 import { useCapitolSettings } from "@congress/congress-ui";
 import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
+import { InvalidateSizeOnResize } from "./InvalidateSizeOnResize";
 import { placeMarkerIcon } from "@/lib/markerIcon";
 import "leaflet/dist/leaflet.css";
 import "./mapMarker.css";
@@ -51,6 +52,7 @@ export function PlacePicker({ latitude, longitude, radiusMeters, onChange, heigh
     >
       <MapContainer center={initialCenter.current} zoom={16} style={{ height: "100%", width: "100%" }} dragging={!readOnly} scrollWheelZoom={!readOnly}>
         <TileLayer url={tileUrl} attribution={MAP_TILE_ATTRIBUTION} className={tileClassName} />
+        <InvalidateSizeOnResize />
         <Recenter latitude={latitude} longitude={longitude} />
         {!readOnly && <ClickToMove onChange={onChange} />}
         <Marker
