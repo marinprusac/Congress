@@ -134,6 +134,13 @@
       "when": 1789831061131,
       "tag": "0018_fold_capitol_and_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1789833990522,
+      "tag": "0019_drop_automation_chamber",
+      "breakpoints": true
     }
   ]
 }

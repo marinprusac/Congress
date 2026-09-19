@@ -36,7 +36,7 @@ done
 # them explicitly if a unit is still around (best-effort: needs a sudoers
 # entry for stop/disable; otherwise do it once by hand, see infra/README.md's
 # "Retiring the Capitol and Logs Chambers").
-for retired in congress-chamber-capitol congress-chamber-logs; do
+for retired in congress-chamber-capitol congress-chamber-logs congress-chamber-automation; do
   sudo /usr/bin/systemctl disable --now "$retired" 2>/dev/null || true
 done
 
