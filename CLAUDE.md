@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Congress is a personal, self-hosted productivity system for a single user, deployed at `congress.marinprusac.com`. It's a monorepo of **genuinely independent services** — not a single app with logical modules. The full design intent is in `docs/congress-project-brief.md`; read it for the "why" behind anything that looks unusual. Note that two things have changed since that brief was written: the brief specifies Tailscale-only private access, but the deployed system now uses public access gated by a master-password session cookie instead (see `infra/README.md`, "Access control"); and the brief describes one widget per Chamber rendered in an iframe, but Capitol's homepage is now a cell-based canvas where each Chamber can register multiple widgets, mounted as real components (not iframes) that the owner can place and move — see "Settings & theming" and `docs/creating-a-chamber.md` §5.1 for the current model. Trust `infra/README.md` and this file over the brief on deployment/access and widget details respectively.
+Congress is a personal, self-hosted productivity system for a single user, deployed at `congress.marinprusac.com`. It's a monorepo of **genuinely independent services** — not a single app with logical modules. The full design intent is in `docs/congress-project-brief.md`; read it for the "why" behind anything that looks unusual. Note that two things have changed since that brief was written: the brief specifies Tailscale-only private access, but the deployed system now uses public access gated by a master-password session cookie instead (see `infra/README.md`, "Access control"); and the brief describes one widget per Chamber rendered in an iframe, but Congress's homepage is now a cell-based canvas where each Chamber can register multiple widgets, mounted as real components (not iframes) that the owner can place and move — see "Settings & theming" and `docs/creating-a-chamber.md` §5.1 for the current model. Trust `infra/README.md` and this file over the brief on deployment/access and widget details respectively.
 
 Three names are used consistently in code, folders, and package names:
 
@@ -70,15 +70,15 @@ A Chamber's frontend dev server proxies `/api`, `/manifest`, `/health`, `/mcp` t
 
 ### The Chamber contract
 
-Every Chamber — Capitol included — implements the same contract (defined in `docs/congress-project-brief.md` section 4, scaffolded by `chamber-kit`):
+Every Chamber implements the same contract (defined in `docs/congress-project-brief.md` section 4, scaffolded by `chamber-kit`):
 
 - `GET /manifest` — self-description (name, routes, apiBase, mcpUrl, healthUrl, widgets).
 - `GET /health` — liveness, used by Congress's heartbeat sweep.
-- Home / settings frontend routes, plus zero or more homepage widgets (each with a fixed size in canvas cells) for Capitol's canvas.
+- Home / settings frontend routes, plus zero or more homepage widgets (each with a fixed size in canvas cells) for Congress's homepage canvas.
 - A REST API under `/api/*`.
 - An MCP server at `/mcp` (Streamable HTTP transport, official `@modelcontextprotocol/sdk`), wrapping the same REST logic rather than touching the DB directly.
 
-On boot, a Chamber calls `POST /congress/register` with its manifest (retrying with backoff if Congress isn't up yet — start order must never matter), then heartbeats `POST /congress/heartbeat` on an interval; Congress marks it `offline` in its registry if a heartbeat is missed past a threshold. Registration/heartbeat/exhibit-sync calls are authenticated with a shared `CONGRESS_INTERNAL_TOKEN` header (`requireInternalToken` in `services/congress/src/auth.ts`) — this is a "stop stray local processes" gate, not real auth. Congress itself is the registry owner, not a registrant — it never calls these on itself. (Congress's own API lives under `/congress/*` — not to be confused with `/capitol/*`, which is the Capitol Chamber's own proxied frontend path, same shape as `/notes/*` for Notes. The two collided at `/capitol/settings` until this rename — a full-page load of Capitol's Settings page would hit Congress's API route of the same name instead of the SPA.)
+On boot, a Chamber calls `POST /congress/register` with its manifest (retrying with backoff if Congress isn't up yet — start order must never matter), then heartbeats `POST /congress/heartbeat` on an interval; Congress marks it `offline` in its registry if a heartbeat is missed past a threshold. Registration/heartbeat/exhibit-sync calls are authenticated with a shared `CONGRESS_INTERNAL_TOKEN` header (`requireInternalToken` in `services/congress/src/auth.ts`) — this is a "stop stray local processes" gate, not real auth. Congress itself is the registry owner, not a registrant — it never calls these on itself. (Congress's own API lives under `/congress/*` — a Chamber's own proxied frontend lives under `/<chamberName>/*`, so the two never collide.)
 
 Each service owns exactly one SQLite file, opened only by its own process. Cross-Chamber data access always goes over HTTP through the owning Chamber's own API — never a shared DB, never one service importing another's Drizzle schema.
 

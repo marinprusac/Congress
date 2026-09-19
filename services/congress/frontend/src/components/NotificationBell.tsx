@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useShellHosted, navigateToExhibit, formatTimestamp, getChamberIcon } from "@congress/congress-ui";
+import { resolveChamberPath, formatTimestamp, getChamberIcon } from "@congress/congress-ui";
 import type { Notification, NotificationsListResponse } from "@congress/shared-types";
 
 interface NotificationBellProps {
@@ -29,7 +29,6 @@ async function fetchNotifications(): Promise<NotificationsListResponse> {
 export function NotificationBell({ navigate }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
 
   const { data } = useQuery({
@@ -81,7 +80,12 @@ export function NotificationBell({ navigate }: NotificationBellProps) {
   function openNotification(n: Notification) {
     void markRead(n.id);
     if (n.chamberUrl) {
-      navigateToExhibit("", { id: String(n.id), chamber: n.chamber, name: n.title, url: n.chamberUrl }, navigate, shellHosted);
+      // A notification's url is relative to its emitting Chamber's own root
+      // (e.g. "/e/3"), and this bell is always shell-hosted chrome, so it
+      // navigates client-side - never the full page load navigateToExhibit
+      // falls back to for a cross-Chamber jump. Congress's own events
+      // (chamber "congress") are already root-relative.
+      navigate(n.chamber === "congress" ? n.chamberUrl : resolveChamberPath(n.chamberUrl, n.chamber, true));
     }
     setOpen(false);
   }

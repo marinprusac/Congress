@@ -61,6 +61,8 @@ export function App() {
         {/* Capitol used to be a Chamber at /capitol - old bookmarks and the
             installed PWA's saved URL land here. */}
         <Route path="/capitol/*" element={<Navigate to="/" replace />} />
+        {/* Same for the old Logs Chamber - its config lives in Settings now. */}
+        <Route path="/logs/*" element={<Navigate to="/settings?from=logs" replace />} />
         {/* Congress's own unified Settings - every Chamber's own settings
             content mounted as one tab-category each (see SettingsPage),
             reached through NavPanel's single Settings entry point instead
