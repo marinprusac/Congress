@@ -42,18 +42,18 @@ export function App() {
           only needed to avoid a flicker before the registry query above
           resolves - same reasoning each Chamber's own Layout passed its own
           hardcoded title for. */}
-      {/* Notification bell - fixed top-right chrome on every route, homepage
-          and Chambers alike (see NotificationBell). A sibling of Routes for
-          the same reason NavPanel is. */}
-      <div className="shell-bell">
-        <NotificationBell navigate={(path) => navigate(path)} />
-      </div>
       <NavPanel
         current={currentChamberName}
         currentLabel={
           currentChamberName === "settings" ? "Settings" : registry?.find((c) => c.name === currentChamberName)?.displayName
         }
       />
+      {/* Notification bell - fixed top-right chrome on every route, homepage
+          and Chambers alike (see NotificationBell). A sibling of Routes for
+          the same reason NavPanel is. */}
+      <div className="shell-bell">
+        <NotificationBell navigate={(path) => navigate(path)} />
+      </div>
       <Routes>
         {/* Congress's own homepage: the widget canvas. Not a Chamber - it
             works with none registered. */}
