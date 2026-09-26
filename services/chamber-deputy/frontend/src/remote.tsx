@@ -46,3 +46,7 @@ export const widgets: Record<string, ComponentType> = Object.fromEntries(
 
 // No `settings` export: every knob Deputy had (context, budget, model,
 // pause) was the AI engine's, and lives under Congress's Settings -> AI now.
+
+// Home feed cards (see src/manifest.ts's `views`) - the same components the
+// canvas mounts as widgets, until the canvas is removed.
+export const views = widgets;

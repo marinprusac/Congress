@@ -14,6 +14,7 @@ import {
   mountSettingsRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
+  mountFeedRoute,
 } from "@congress/chamber-kit";
 import { manifest } from "./manifest.js";
 import {
@@ -30,6 +31,7 @@ import {
   resyncPlaceExhibitByExhibitId,
 } from "./places.js";
 import { listVisits, getVisit, getVisitActiveAt, classifyVisit, listTrips } from "./visits.js";
+import { mapFeedCandidates } from "./feedRules.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { getPollState, toPollHealth } from "./pollState.js";
 import { reprocessRange } from "./reprocess.js";
@@ -174,6 +176,13 @@ app.post("/api/reprocess", async (c) => {
 });
 
 mountExhibitSearchRoutes(app, { search: searchPlaceExhibits, resolve: resolvePlaceExhibits });
+
+// Home feed candidates - see feedRules.ts.
+mountFeedRoute(app, async (now) => {
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const [pending, today] = await Promise.all([listVisits({ status: "pending" }), listVisits({ from: midnight })]);
+  return mapFeedCandidates({ pending, today });
+});
 
 mountManualRefsRoutes(
   app,

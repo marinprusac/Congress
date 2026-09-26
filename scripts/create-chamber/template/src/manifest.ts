@@ -19,5 +19,9 @@ export const manifest: Manifest = {
   // than one. width/height are in canvas cells, fixed by this Chamber, not
   // user-resizable. See frontend/src/widgets/ for the matching component.
   widgets: [{ id: "recent", width: 2, height: 3, label: "Recent" }],
+  // Home feed cards (the remote entry's `views` export - same components as
+  // the widgets above) and what the home screen's "+" can create here.
+  views: [{ id: "recent", label: "Recent items" }],
+  exhibitTypes: [{ type: "item", label: "Item", createPath: "/new" }],
   events: [],
 };

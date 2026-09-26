@@ -15,6 +15,10 @@ export const notesManifest: Manifest = {
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
   widgets: [{ id: "pinned", width: 3, height: 2, label: "Pinned" }],
+  // Home feed cards (the remote entry's `views` export) and "+"-creatable
+  // Exhibit types - see shared-types' manifestViewSchema/manifestExhibitTypeSchema.
+  views: [{ id: "pinned", label: "Pinned notes" }],
+  exhibitTypes: [{ type: "note", label: "Note", createPath: "/new" }],
   events: [
     {
       type: "notes.created",

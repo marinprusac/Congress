@@ -15,6 +15,10 @@ export const calendarManifest: Manifest = {
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
   widgets: [{ id: "upcoming", width: 3, height: 2, label: "Upcoming" }],
+  // Home feed cards (the remote entry's `views` export) and "+"-creatable
+  // Exhibit types - see shared-types' manifestViewSchema/manifestExhibitTypeSchema.
+  views: [{ id: "upcoming", label: "Upcoming events", fullPath: "/" }],
+  exhibitTypes: [{ type: "event", label: "Event", createPath: "/new" }],
   events: [
     {
       type: "calendar.event_starting_soon",

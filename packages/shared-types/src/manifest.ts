@@ -31,6 +31,30 @@ export const manifestWidgetSchema = z.object({
 });
 export type ManifestWidget = z.infer<typeof manifestWidgetSchema>;
 
+// One entry per *view* a Chamber contributes to Congress's home feed - a UI
+// built from that Chamber's exhibit data (Upcoming events, Open tasks, a
+// today map). Every view has a compact feed card: the component keyed by
+// `id` in the Chamber's remote-entry `views` export. `fullPath` (relative to
+// the Chamber, e.g. "/" for Calendar's Agenda) is set only for a view that
+// also has a full-screen page to open when the card is tapped.
+export const manifestViewSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().optional(),
+  fullPath: z.string().startsWith("/").optional(),
+});
+export type ManifestView = z.infer<typeof manifestViewSchema>;
+
+// One entry per kind of Exhibit a Chamber lets the owner create - what the
+// home screen's "+" sheet lists. `createPath` (relative to the Chamber) opens
+// that Chamber's own editor on a new, unsaved Exhibit.
+export const manifestExhibitTypeSchema = z.object({
+  type: z.string().min(1),
+  label: z.string().min(1),
+  createPath: z.string().startsWith("/"),
+});
+export type ManifestExhibitType = z.infer<typeof manifestExhibitTypeSchema>;
+
 // Describes one field of a declared event's payload - deliberately the same
 // shape as an MCP tool's own JSON-Schema `properties` entries (see
 // chamber-automation's ArgsEditor.tsx), so both sides of a
@@ -128,6 +152,10 @@ export const manifestSchema = z.object({
   // so a Chamber registering against an old manifest shape (or a chamber with
   // no widgets) never has to think about this field.
   widgets: z.array(manifestWidgetSchema).default([]),
+  // Home feed views and "+"-creatable Exhibit types - see the schemas above.
+  // Defaulted like widgets.
+  views: z.array(manifestViewSchema).default([]),
+  exhibitTypes: z.array(manifestExhibitTypeSchema).default([]),
   // Domain events this Chamber may publish. Defaulted the same way as
   // widgets - most Chambers publish none.
   events: z.array(manifestEventSchema).default([]),

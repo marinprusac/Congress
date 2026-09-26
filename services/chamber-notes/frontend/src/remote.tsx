@@ -48,3 +48,7 @@ export const widgets: Record<string, ComponentType> = Object.fromEntries(
 // so there's nothing left to configure. Congress's unified Settings page
 // already tolerates a Chamber with no `settings` export by simply omitting
 // its tab (see SettingsPage.tsx's useChamberSettingsPanels).
+
+// Home feed cards (see src/manifest.ts's `views`) - the same components the
+// canvas mounts as widgets, until the canvas is removed.
+export const views = widgets;

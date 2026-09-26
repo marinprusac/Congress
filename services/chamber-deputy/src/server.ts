@@ -7,6 +7,7 @@ import {
   mountManualRefsRoutes,
   mountStaticFrontend,
   mountEventReceiveRoute,
+  mountFeedRoute,
 } from "@congress/chamber-kit";
 import { manifest } from "./manifest.js";
 import { env } from "./env.js";
@@ -27,6 +28,7 @@ import {
 } from "./directives.js";
 import { searchDirectiveExhibits, resolveDirectiveExhibits } from "./exhibits.js";
 import { runDirective } from "./engine.js";
+import { deputyFeedCandidates } from "./feedRules.js";
 import { rearmScheduler } from "./checkup.js";
 import { mcpApp } from "./mcp/server.js";
 
@@ -116,6 +118,9 @@ app.post("/api/directives/:id/run", async (c) => {
 });
 
 mountExhibitSearchRoutes(app, { search: searchDirectiveExhibits, resolve: resolveDirectiveExhibits });
+
+// Home feed candidates - see feedRules.ts.
+mountFeedRoute(app, async (now) => deputyFeedCandidates(await listDirectives(), now));
 
 mountManualRefsRoutes(
   app,

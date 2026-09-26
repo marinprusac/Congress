@@ -52,3 +52,7 @@ export const widgets: Record<string, ComponentType> = Object.fromEntries(
 // the tab strip - but every scaffolded Chamber gets a SettingsPage.tsx, so
 // wire it up by default.
 export const settings: ComponentType = withQueryClient(SettingsPage);
+
+// Home feed cards (see src/manifest.ts's `views`) - the same components the
+// canvas mounts as widgets, until the canvas is removed.
+export const views = widgets;

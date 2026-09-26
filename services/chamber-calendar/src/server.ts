@@ -13,8 +13,10 @@ import {
   mountExhibitSearchRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
+  mountFeedRoute,
 } from "@congress/chamber-kit";
 import { calendarManifest } from "./manifest.js";
+import { calendarFeedCandidates, FEED_LOOKAHEAD_MS, FEED_LOOKBEHIND_MS } from "./feedRules.js";
 import { buildAuthUrl, exchangeCodeForTokens, decodeIdToken, createOAuthState, consumeOAuthState } from "./google/oauth.js";
 import {
   listAccounts,
@@ -235,6 +237,12 @@ app.delete("/api/events/:accountId/:calendarId/:eventId", async (c) => {
 });
 
 mountExhibitSearchRoutes(app, { search: searchEventExhibits, resolve: resolveEventExhibits });
+
+// Home feed candidates - see feedRules.ts.
+mountFeedRoute(app, async (now) => {
+  const { events } = await listEvents(new Date(now.getTime() - FEED_LOOKBEHIND_MS).toISOString(), new Date(now.getTime() + FEED_LOOKAHEAD_MS).toISOString());
+  return calendarFeedCandidates(events, now);
+});
 
 mountManualRefsRoutes(app, { list: listManualRefs, add: addManualRef, remove: removeManualRef }, resyncEventExhibit);
 

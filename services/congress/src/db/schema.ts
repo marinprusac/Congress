@@ -7,6 +7,8 @@ export const chambers = sqliteTable("chambers", {
   version: text("version").notNull(),
   routesJson: text("routes_json").notNull(),
   widgetsJson: text("widgets_json").notNull().default("[]"),
+  viewsJson: text("views_json").notNull().default("[]"),
+  exhibitTypesJson: text("exhibit_types_json").notNull().default("[]"),
   eventsJson: text("events_json").notNull().default("[]"),
   // This Chamber's current dynamic event interest list (see shared-types/
   // events.ts's chamberSubscriptionSchema), refreshed on every heartbeat -

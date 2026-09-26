@@ -15,6 +15,10 @@ export const tasksManifest: Manifest = {
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
   widgets: [{ id: "open", width: 3, height: 2, label: "Open" }],
+  // Home feed cards (the remote entry's `views` export) and "+"-creatable
+  // Exhibit types - see shared-types' manifestViewSchema/manifestExhibitTypeSchema.
+  views: [{ id: "open", label: "Open tasks" }],
+  exhibitTypes: [{ type: "task", label: "Task", createPath: "/new" }],
   events: [
     {
       type: "tasks.due_soon",

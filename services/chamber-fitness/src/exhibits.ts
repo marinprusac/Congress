@@ -24,7 +24,7 @@ import { listRoutines, getRoutine, toRoutineExhibitId, parseRoutineExhibitId } f
 const workoutExhibits = createTableBackedExhibits({
   idPrefix: "workout-",
   type: "workout",
-  urlFor: (id: number) => `/fitness/workouts/${id}`,
+  urlFor: (id: number) => `/workouts/${id}`,
   searchRows: (pattern, limit) =>
     db
       .select({
@@ -97,7 +97,7 @@ async function searchRoutineExhibits(query: string, limit = 10): Promise<Exhibit
       id: toRoutineExhibitId(routine.id),
       type: "routine",
       name: routine.title,
-      url: `/fitness/routines/${routine.id}`,
+      url: `/routines/${routine.id}`,
       ...(score !== undefined ? { score } : {}),
     }));
   } catch {
@@ -112,7 +112,7 @@ async function resolveRoutineExhibits(ids: string[]): Promise<ExhibitResolveResu
       if (!hevyId) return { id, deleted: true };
       try {
         const routine = await getRoutine(hevyId);
-        return routine ? { id, name: routine.title, url: `/fitness/routines/${routine.id}` } : { id, deleted: true };
+        return routine ? { id, name: routine.title, url: `/routines/${routine.id}` } : { id, deleted: true };
       } catch {
         // Same "resolve only distinguishes resolved/deleted" tolerance as
         // chamber-calendar's own resolveEventExhibits - covers a real 404

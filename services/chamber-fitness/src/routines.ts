@@ -63,7 +63,7 @@ async function syncRoutineExhibit(routine: RoutineDetail): Promise<void> {
     id: toRoutineExhibitId(routine.id),
     type: "routine",
     name: routine.title,
-    url: `/fitness/routines/${routine.id}`,
+    url: `/routines/${routine.id}`,
     outgoingRefs: [],
   });
 }

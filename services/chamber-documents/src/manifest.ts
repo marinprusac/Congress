@@ -15,6 +15,10 @@ export const documentsManifest: Manifest = {
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
   widgets: [{ id: "recent", width: 3, height: 2, label: "Recent" }],
+  // Home feed cards (the remote entry's `views` export) and "+"-creatable
+  // Exhibit types - see shared-types' manifestViewSchema/manifestExhibitTypeSchema.
+  views: [{ id: "recent", label: "Recent documents" }],
+  exhibitTypes: [{ type: "document", label: "Document", createPath: "/new" }],
   events: [
     {
       type: "documents.created",

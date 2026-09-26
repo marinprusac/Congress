@@ -13,6 +13,8 @@ import type { ComponentType } from "react";
 export interface RemoteModule {
   default: ComponentType;
   widgets?: Record<string, ComponentType>;
+  // Home feed cards, keyed by the view ids the Chamber's manifest declares.
+  views?: Record<string, ComponentType>;
   settings?: ComponentType;
 }
 

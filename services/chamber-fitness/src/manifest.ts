@@ -19,6 +19,14 @@ export const manifest: Manifest = {
     { id: "week-stats", width: 2, height: 1, label: "This Week" },
     { id: "health-snapshot", width: 3, height: 2, label: "Health" },
   ],
+  // Home feed cards (the remote entry's `views` export) and "+"-creatable
+  // Exhibit types - see shared-types' manifestViewSchema/manifestExhibitTypeSchema.
+  views: [
+    { id: "week-stats", label: "This week" },
+    { id: "recent-workouts", label: "Recent workouts" },
+    { id: "health-snapshot", label: "Health", fullPath: "/metrics" },
+  ],
+  exhibitTypes: [{ type: "routine", label: "Routine", createPath: "/routines/new" }],
   events: [
     {
       type: "fitness.workout_synced",

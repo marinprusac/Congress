@@ -148,6 +148,20 @@
       "when": 1790461454318,
       "tag": "0020_ai_core",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1790462948994,
+      "tag": "0021_manifest_views_exhibit_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1790463226855,
+      "tag": "0022_fix_fitness_exhibit_urls",
+      "breakpoints": true
     }
   ]
 }

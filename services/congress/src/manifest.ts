@@ -19,5 +19,7 @@ export const capitolManifest: Manifest = {
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
   widgets: [],
+  views: [],
+  exhibitTypes: [],
   events: [],
 };

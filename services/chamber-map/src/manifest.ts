@@ -20,6 +20,14 @@ export const manifest: Manifest = {
     { id: "recent-visits", width: 2, height: 3, label: "Recent Visits" },
     { id: "today-map", width: 4, height: 3, label: "Today's Map" },
   ],
+  // Home feed cards (the remote entry's `views` export) and "+"-creatable
+  // Exhibit types - see shared-types' manifestViewSchema/manifestExhibitTypeSchema.
+  views: [
+    { id: "today-map", label: "Today's map", fullPath: "/" },
+    { id: "pending", label: "Visits to classify", fullPath: "/pending" },
+    { id: "recent-visits", label: "Recent visits" },
+  ],
+  exhibitTypes: [{ type: "place", label: "Place", createPath: "/places/new" }],
   // Purely a declared catalog for Logs/Automation Chambers' own trigger-event
   // pickers - Congress never enforces or inspects this. Published via
   // events.ts's publishEvent from tracking.ts/poller.ts.

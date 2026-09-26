@@ -10,6 +10,8 @@ export function makeManifest(name: string, origin = "http://127.0.0.1:9", overri
     version: "0.1.0",
     routes: { home: `/${name}`, settings: `/${name}/settings` },
     widgets: [],
+    views: [],
+    exhibitTypes: [],
     events: [],
     apiBase: `${origin}/api`,
     mcpUrl: `${origin}/mcp`,

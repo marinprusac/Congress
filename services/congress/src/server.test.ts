@@ -117,6 +117,7 @@ describe("session-only routes", () => {
     { method: "DELETE", path: "/congress/ai/chat/messages" },
     { method: "PUT", path: "/congress/ai/settings", body: { contextPrompt: "" } },
     { method: "GET", path: "/congress/ai/settings/spend" },
+    { method: "GET", path: "/congress/feed" },
   ];
 
   it.each(cases)("401s $method $path without a session", async ({ method, path, body }) => {

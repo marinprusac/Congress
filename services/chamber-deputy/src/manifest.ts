@@ -17,6 +17,10 @@ export const manifest: Manifest = {
   // The chat moved to Congress's own AI, and with it the old "message
   // Deputy" widget - Deputy is directives only now.
   widgets: [],
+  // Home feed cards (the remote entry's `views` export) and "+"-creatable
+  // Exhibit types - see shared-types' manifestViewSchema/manifestExhibitTypeSchema.
+  views: [],
+  exhibitTypes: [{ type: "directive", label: "Directive", createPath: "/directives/new" }],
   events: [
     {
       type: "deputy.directive_run",

@@ -48,6 +48,7 @@ import { listNotifications, markNotificationRead, markAllNotificationsRead, dism
 import { publicKey, saveSubscription, removeSubscription } from "./pushSubscriptions.js";
 import { mcpApp } from "./mcp/server.js";
 import { aiRoutes } from "./ai/routes.js";
+import { getFeed } from "./feed.js";
 
 // Only Capitol itself validates register/deregister/heartbeat/exhibit-resolve
 // requests - no Chamber ever needs these shapes, so they live here rather
@@ -91,6 +92,10 @@ app.put("/congress/settings", requireSession, async (c) => {
   }
   return c.json(await updateSettings(parsed.data));
 });
+
+// The home "For You" feed - every active Chamber's scored views and
+// exhibits, merged and ranked. See feed.ts.
+app.get("/congress/feed", requireSession, async (c) => c.json({ items: await getFeed() }));
 
 // Congress's own AI: the chat, the shared budget/pause settings, the live
 // run stream, and POST /congress/ai/run for Chambers - see ai/routes.ts.

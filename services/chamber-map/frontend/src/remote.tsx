@@ -49,3 +49,7 @@ export const widgets: Record<string, ComponentType> = Object.fromEntries(
 // (see above) and mounted as one tab of Congress's unified Settings page
 // instead of a route this Chamber hosts itself.
 export const settings: ComponentType = withQueryClient(SettingsPage);
+
+// Home feed cards (see src/manifest.ts's `views`) - the same components the
+// canvas mounts as widgets, until the canvas is removed.
+export const views = widgets;
