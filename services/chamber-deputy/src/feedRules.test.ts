@@ -34,6 +34,13 @@ describe("deputyFeedCandidates", () => {
     expect(items[1]!.reason).toBe("Runs in 5 min");
   });
 
+  it("shows when it runs and its instructions inline", () => {
+    const d = { ...directive(1, 10), body: "Check the **soil** sensors and water if dry." };
+    expect(deputyFeedCandidates([d], now)[0]).toMatchObject({
+      preview: { time: { label: "Runs", start: d.nextRunAt }, body: "Check the soil sensors and water if dry." },
+    });
+  });
+
   it("leaves out disabled, manual-only, overdue and later directives", () => {
     expect(deputyFeedCandidates([directive(1, 5, false), directive(2, null), directive(3, -5), directive(4, 90)], now)).toEqual([]);
   });

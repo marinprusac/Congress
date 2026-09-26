@@ -5,6 +5,7 @@ import type { ChamberRegistryEntry, FeedItem } from "@congress/shared-types";
 import { ChamberHeader, CapitolMark, ChamberMark, fetchRegistry, resolveChamberPath, useAppliedTheme, useCapitolSettings } from "@congress/congress-ui";
 import { ViewSlot, viewHref } from "@/components/ViewSlot";
 import { feedQueryKey, fetchFeed } from "@/lib/feedApi";
+import { formatPreviewTime } from "@/lib/formatPreviewTime";
 
 function findView(registry: ChamberRegistryEntry[] | undefined, chamber: string, viewId: string) {
   const entry = registry?.find((c) => c.name === chamber);
@@ -63,12 +64,19 @@ function FeedEntry({ item, registry }: { item: FeedItem; registry: ChamberRegist
     if (!found) return null;
     return <ViewSlot chamber={found.entry} view={found.view} reason={item.reason} />;
   }
+  // The item's own information, inline - tapping still opens the exhibit.
+  const preview = item.preview;
   return (
     <section className="feed-card">
       <button type="button" className="feed-exhibit" onClick={() => navigate(resolveChamberPath(item.url, item.chamber, true))}>
-        <ChamberMark name={item.chamber} />
-        <span className="feed-exhibit-name">{item.name}</span>
-        {item.reason && <span className="feed-card-reason">{item.reason}</span>}
+        <span className="feed-exhibit-head">
+          <ChamberMark name={item.chamber} />
+          <span className="feed-exhibit-name">{preview?.title ?? item.name}</span>
+          {item.reason && <span className="feed-card-reason">{item.reason}</span>}
+        </span>
+        {preview?.time && <span className="feed-exhibit-time">{formatPreviewTime(preview.time)}</span>}
+        {preview?.fields && preview.fields.length > 0 && <span className="feed-exhibit-fields">{preview.fields.join(" · ")}</span>}
+        {preview?.body && <span className="feed-exhibit-body">{preview.body}</span>}
       </button>
     </section>
   );

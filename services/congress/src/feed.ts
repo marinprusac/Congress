@@ -1,4 +1,4 @@
-import { chamberFeedResponseSchema, type ChamberRegistryEntry, type FeedCandidate, type FeedItem } from "@congress/shared-types";
+import { chamberFeedResponseSchema, type ChamberRegistryEntry, type FeedCandidate, type FeedItem, type FeedPreview } from "@congress/shared-types";
 import { listChambers } from "./registry.js";
 import { resolveExhibits } from "./exhibits.js";
 
@@ -37,18 +37,22 @@ export interface ChamberCandidates {
 
 type Unresolved =
   | Extract<FeedItem, { kind: "view" }>
-  | { kind: "exhibit"; chamber: string; exhibitId: string; score: number; reason?: string };
+  | { kind: "exhibit"; chamber: string; exhibitId: string; score: number; reason?: string; preview?: FeedPreview };
 
 // Pure: merges every Chamber's candidates into one list sorted by score
-// (ties keep registration order). Views a Chamber declares but didn't score
-// get DEFAULT_VIEW_SCORE; candidates naming a view the Chamber never
-// declared are dropped; an exhibit named twice keeps its best score.
+// (ties keep registration order). Only views with a feed card take part -
+// feed items show information inline, and a card-less view would be a bare
+// link (those are reached through Search and the pinned row). Carded views
+// a Chamber didn't score get DEFAULT_VIEW_SCORE; candidates naming a view
+// the Chamber never declared (or one without a card) are dropped; an
+// exhibit named twice keeps its best-scored candidate.
 export function rankFeed(perChamber: ChamberCandidates[]): Unresolved[] {
   const items: Unresolved[] = [];
   const seenExhibits = new Map<string, Unresolved & { kind: "exhibit" }>();
 
   for (const { chamber, candidates } of perChamber) {
-    const viewsById = new Map(chamber.views.map((v) => [v.id, v]));
+    const cardViews = chamber.views.filter((v) => v.card === true);
+    const viewsById = new Map(cardViews.map((v) => [v.id, v]));
     const scoredViews = new Map<string, { score: number; reason?: string }>();
 
     for (const candidate of candidates) {
@@ -59,14 +63,21 @@ export function rankFeed(perChamber: ChamberCandidates[]): Unresolved[] {
       } else {
         const prev = seenExhibits.get(candidate.exhibitId);
         if (prev && prev.score >= candidate.score) continue;
-        const item = { kind: "exhibit" as const, chamber: chamber.name, exhibitId: candidate.exhibitId, score: candidate.score, reason: candidate.reason };
+        const item = {
+          kind: "exhibit" as const,
+          chamber: chamber.name,
+          exhibitId: candidate.exhibitId,
+          score: candidate.score,
+          reason: candidate.reason,
+          preview: candidate.preview,
+        };
         if (prev) items.splice(items.indexOf(prev), 1, item);
         else items.push(item);
         seenExhibits.set(candidate.exhibitId, item);
       }
     }
 
-    for (const view of chamber.views) {
+    for (const view of cardViews) {
       const scored = scoredViews.get(view.id);
       items.push({
         kind: "view",

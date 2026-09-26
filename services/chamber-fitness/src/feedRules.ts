@@ -14,7 +14,16 @@ export function fitnessFeedCandidates(recent: WorkoutSummary[], now: Date): Feed
   const latest = recent[0];
   const sinceLatest = latest ? now.getTime() - new Date(latest.endTime).getTime() : Infinity;
   if (latest !== undefined && sinceLatest >= 0 && sinceLatest <= JUST_FINISHED_MS) {
-    items.push({ kind: "exhibit", exhibitId: `workout-${latest.id}`, score: 50, reason: `Finished ${formatDuration(sinceLatest)} ago` });
+    const fields = [`${latest.exerciseCount} ${latest.exerciseCount === 1 ? "exercise" : "exercises"}`];
+    if (latest.totalVolumeKg) fields.push(`${Math.round(latest.totalVolumeKg).toLocaleString("en")} kg`);
+    items.push({
+      kind: "exhibit",
+      exhibitId: `workout-${latest.id}`,
+      score: 50,
+      reason: `Finished ${formatDuration(sinceLatest)} ago`,
+      // What the feed shows inline: when, and the workout's headline numbers.
+      preview: { title: latest.exhibitTitle, time: { start: latest.startTime, end: latest.endTime }, fields },
+    });
   }
 
   items.push({ kind: "view", viewId: "health", score: 15 });

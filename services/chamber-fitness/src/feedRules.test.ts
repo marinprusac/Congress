@@ -22,7 +22,17 @@ function workout(id: number, endedHoursAgo: number): WorkoutSummary {
 describe("fitnessFeedCandidates", () => {
   it("surfaces a workout finished within half a day", () => {
     const items = fitnessFeedCandidates([workout(4, 2)], now);
-    expect(items).toContainEqual({ kind: "exhibit", exhibitId: "workout-4", score: 50, reason: "Finished 2 h ago" });
+    expect(items).toContainEqual({
+      kind: "exhibit",
+      exhibitId: "workout-4",
+      score: 50,
+      reason: "Finished 2 h ago",
+      preview: {
+        title: "Push · 27 Sep",
+        time: { start: "2026-09-27T15:00:00.000Z", end: "2026-09-27T16:00:00.000Z" },
+        fields: ["5 exercises", "1,000 kg"],
+      },
+    });
   });
 
   it("lets an older workout drop out", () => {

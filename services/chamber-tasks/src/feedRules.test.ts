@@ -20,7 +20,13 @@ function task(id: number, dueInMs: number | null): TaskSummary {
 
 describe("taskFeedCandidates", () => {
   it("puts an overdue task near the top of the feed", () => {
-    expect(taskFeedCandidates([task(1, -2 * HOUR)], now)).toEqual([{ kind: "exhibit", exhibitId: "task-1", score: 90, reason: "Overdue by 2 h" }]);
+    expect(taskFeedCandidates([task(1, -2 * HOUR)], now)).toMatchObject([{ kind: "exhibit", exhibitId: "task-1", score: 90, reason: "Overdue by 2 h" }]);
+  });
+
+  it("shows when the task is due and its description inline", () => {
+    const t = { ...task(1, HOUR), description: "Invoice #42 for [[exhibit:documents:document-3|September hours]]" };
+    const [item] = taskFeedCandidates([t], now);
+    expect(item).toMatchObject({ preview: { time: { label: "Due", start: t.dueDate }, body: "Invoice #42 for September hours" } });
   });
 
   it("ranks a task due sooner above one due later, both within a day", () => {

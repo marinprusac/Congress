@@ -33,7 +33,7 @@ const idOf = (id: string) => toExhibitId(1, "primary", id);
 describe("calendarFeedCandidates", () => {
   it("surfaces an event in progress", () => {
     const items = calendarFeedCandidates([event("a", -10, 60)], now);
-    expect(items).toContainEqual({ kind: "exhibit", exhibitId: idOf("a"), score: 85, reason: "Happening now" });
+    expect(items).toMatchObject([{ kind: "exhibit", exhibitId: idOf("a"), score: 85, reason: "Happening now" }]);
   });
 
   it("ranks an event starting soon above one starting later", () => {
@@ -58,11 +58,23 @@ describe("calendarFeedCandidates", () => {
       ],
       now
     );
-    expect(items.filter((i) => i.kind === "exhibit")).toEqual([{ kind: "exhibit", exhibitId: idOf("today"), score: 40, reason: "Today" }]);
+    expect(items).toMatchObject([{ kind: "exhibit", exhibitId: idOf("today"), score: 40, reason: "Today" }]);
+    expect(items).toHaveLength(1);
   });
 
-  it("bumps the Agenda view first thing in the morning", () => {
-    expect(calendarFeedCandidates([], now, 8)).toEqual([{ kind: "view", viewId: "agenda", score: 50, reason: "Your day" }]);
-    expect(calendarFeedCandidates([], now, 15)).toEqual([{ kind: "view", viewId: "agenda", score: 20 }]);
+  it("shows the event's time, place, calendar and description inline", () => {
+    const e = event("a", 20, 60, { location: "Dental clinic, Ilica 5", description: "Bring the **X-ray** from [[exhibit:documents:document-2|March]]" });
+    const [item] = calendarFeedCandidates([e], now);
+    expect(item).toMatchObject({
+      preview: {
+        time: { start: e.start, end: e.end, allDay: false },
+        fields: ["Dental clinic, Ilica 5", "Me"],
+        body: "Bring the X-ray from March",
+      },
+    });
+  });
+
+  it("never offers the Agenda view - it has no feed card", () => {
+    expect(calendarFeedCandidates([], now)).toEqual([]);
   });
 });

@@ -180,8 +180,7 @@ mountExhibitSearchRoutes(app, { search: searchPlaceExhibits, resolve: resolvePla
 // Home feed candidates - see feedRules.ts.
 mountFeedRoute(app, async (now) => {
   const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const [pending, today] = await Promise.all([listVisits({ status: "pending" }), listVisits({ from: midnight })]);
-  return mapFeedCandidates({ pending, today });
+  return mapFeedCandidates({ today: await listVisits({ from: midnight }) });
 });
 
 mountManualRefsRoutes(

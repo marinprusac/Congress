@@ -1,4 +1,4 @@
-import { closeness, formatDuration } from "@congress/chamber-kit";
+import { closeness, formatDuration, plainTextPreview } from "@congress/chamber-kit";
 import type { FeedCandidate } from "@congress/shared-types";
 import type { DirectiveSummary } from "./types.js";
 
@@ -18,6 +18,8 @@ export function deputyFeedCandidates(directives: DirectiveSummary[], now: Date):
       exhibitId: `directive-${directive.id}`,
       score: Math.round(30 + 20 * closeness(ms, SOON_WINDOW_MS)),
       reason: `Runs in ${formatDuration(ms)}`,
+      // What the feed shows inline: when it runs, and what it's going to do.
+      preview: { time: { label: "Runs", start: directive.nextRunAt }, body: plainTextPreview(directive.body) },
     });
   }
   return items;

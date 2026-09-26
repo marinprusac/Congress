@@ -75,9 +75,8 @@ export function viewHref(chamber: string, view: Pick<ManifestView, "id" | "fullP
 }
 
 // Congress's frame around one Chamber view: the Chamber's mark, the view's
-// label, why it's in the feed right now, and a way into the full view. A
-// view with a card (manifest `card: true`) shows the Chamber's own card
-// component as its body; one without is just a row that opens it.
+// label, why it's in the feed right now, and a way into the full view. The
+// body is the Chamber's own card component (manifest `card: true`).
 export function ViewSlot({
   chamber,
   view,
@@ -92,17 +91,9 @@ export function ViewSlot({
 }) {
   const active = chamber.status === "active";
 
-  if (!view.card) {
-    return (
-      <section className="feed-card">
-        <Link to={viewHref(chamber.name, view)} className="feed-exhibit">
-          <ChamberMark name={chamber.name} />
-          <span className="feed-exhibit-name">{view.label}</span>
-          {reason && <span className="feed-card-reason">{reason}</span>}
-        </Link>
-      </section>
-    );
-  }
+  // A view with nothing to show inline has no place in the feed (it's
+  // reached through Search and the pinned row) - see rankFeed.
+  if (!view.card) return null;
 
   const View = active ? getViewComponent(chamber.name, view.id) : null;
 
