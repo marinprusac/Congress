@@ -14,8 +14,9 @@ export const manifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  // Home feed cards (the remote entry's `views` export) and "+"-creatable
-  // Exhibit types - see shared-types' manifestViewSchema/manifestExhibitTypeSchema.
+  // Views are only genuine screens (see shared-types' manifestViewSchema) -
+  // this Chamber's exhibits reach the home feed and Search on their own.
+  // exhibitTypes is what the home screen's "+" can create here.
   views: [],
   exhibitTypes: [{ type: "directive", label: "Directive", createPath: "/directives/new" }],
   events: [

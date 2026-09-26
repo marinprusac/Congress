@@ -31,7 +31,6 @@ describe("mapFeedCandidates", () => {
     expect(items).toEqual([
       { kind: "view", viewId: "pending", score: 5 },
       { kind: "view", viewId: "today-map", score: 15 },
-      { kind: "view", viewId: "recent-visits", score: 8 },
     ]);
   });
 

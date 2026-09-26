@@ -1,8 +1,5 @@
-import type { ComponentType } from "react";
-import { QueryClientProvider } from "@tanstack/react-query";
 import { createQueryClient, PersistedQueryProvider } from "@congress/congress-ui";
 import { App } from "@/App";
-import { widgets as rawWidgets } from "@/widgets";
 import "./index.css";
 
 const queryClient = createQueryClient();
@@ -24,25 +21,8 @@ export default function Remote() {
   );
 }
 
-// Congress's home feed resolves a view card straight out of this same remote
-// entry (via the shared loadRemoteModule) rather than navigating to a URL -
-// see src/manifest.ts's `views` array for the id -> entry mapping. Wrapped
-// in this Chamber's own QueryClientProvider here, same reason Remote() wraps
-// App above - the feed mounts these bare, with no idea which Chamber's query
-// cache each one needs.
-function withQueryClient(Widget: ComponentType): ComponentType {
-  return function WrappedWidget() {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <Widget />
-      </QueryClientProvider>
-    );
-  };
-}
-
-export const views: Record<string, ComponentType> = Object.fromEntries(
-  Object.entries(rawWidgets).map(([id, Widget]) => [id, withQueryClient(Widget)])
-);
+// No `views` export: this Chamber has no views - its exhibits reach the
+// home feed and Search on their own.
 
 // No `settings` export: everything here now autosaves (see NoteEditorPage),
 // so there's nothing left to configure. Congress's unified Settings page

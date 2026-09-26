@@ -20,9 +20,7 @@ function task(id: number, dueInMs: number | null): TaskSummary {
 
 describe("taskFeedCandidates", () => {
   it("puts an overdue task near the top of the feed", () => {
-    const items = taskFeedCandidates([task(1, -2 * HOUR)], now);
-    expect(items).toContainEqual({ kind: "exhibit", exhibitId: "task-1", score: 90, reason: "Overdue by 2 h" });
-    expect(items).toContainEqual({ kind: "view", viewId: "open", score: 70, reason: "1 overdue" });
+    expect(taskFeedCandidates([task(1, -2 * HOUR)], now)).toEqual([{ kind: "exhibit", exhibitId: "task-1", score: 90, reason: "Overdue by 2 h" }]);
   });
 
   it("ranks a task due sooner above one due later, both within a day", () => {
@@ -33,12 +31,10 @@ describe("taskFeedCandidates", () => {
   });
 
   it("leaves tasks due later than a day, or with no due date, out of the feed", () => {
-    const items = taskFeedCandidates([task(1, 3 * 24 * HOUR), task(2, null)], now);
-    expect(items.filter((i) => i.kind === "exhibit")).toEqual([]);
-    expect(items).toContainEqual({ kind: "view", viewId: "open", score: 20, reason: undefined });
+    expect(taskFeedCandidates([task(1, 3 * 24 * HOUR), task(2, null)], now)).toEqual([]);
   });
 
-  it("sinks the Open card when there's nothing open", () => {
-    expect(taskFeedCandidates([], now)).toEqual([{ kind: "view", viewId: "open", score: 5, reason: undefined }]);
+  it("offers no views - Tasks' only feed items are tasks", () => {
+    expect(taskFeedCandidates([task(1, -HOUR), task(2, HOUR)], now).every((i) => i.kind === "exhibit")).toBe(true);
   });
 });

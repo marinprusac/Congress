@@ -36,11 +36,10 @@ describe("calendarFeedCandidates", () => {
     expect(items).toContainEqual({ kind: "exhibit", exhibitId: idOf("a"), score: 85, reason: "Happening now" });
   });
 
-  it("ranks an event starting soon above one starting later, and raises the Upcoming card", () => {
+  it("ranks an event starting soon above one starting later", () => {
     const items = calendarFeedCandidates([event("later", 150, 30), event("soon", 25, 30)], now);
     const score = (id: string) => items.find((i) => i.kind === "exhibit" && i.exhibitId === idOf(id))!.score;
     expect(score("soon")).toBeGreaterThan(score("later"));
-    expect(items).toContainEqual({ kind: "view", viewId: "upcoming", score: 75, reason: "Event soon in 25 min" });
   });
 
   it("leaves out events far off, already over, or ones the owner isn't attending", () => {
@@ -62,8 +61,8 @@ describe("calendarFeedCandidates", () => {
     expect(items.filter((i) => i.kind === "exhibit")).toEqual([{ kind: "exhibit", exhibitId: idOf("today"), score: 40, reason: "Today" }]);
   });
 
-  it("bumps the Upcoming card in the morning when nothing is imminent", () => {
-    expect(calendarFeedCandidates([], now, 8)).toEqual([{ kind: "view", viewId: "upcoming", score: 50, reason: "Your day" }]);
-    expect(calendarFeedCandidates([], now, 15)).toEqual([{ kind: "view", viewId: "upcoming", score: 25 }]);
+  it("bumps the Agenda view first thing in the morning", () => {
+    expect(calendarFeedCandidates([], now, 8)).toEqual([{ kind: "view", viewId: "agenda", score: 50, reason: "Your day" }]);
+    expect(calendarFeedCandidates([], now, 15)).toEqual([{ kind: "view", viewId: "agenda", score: 20 }]);
   });
 });

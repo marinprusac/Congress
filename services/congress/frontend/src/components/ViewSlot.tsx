@@ -74,9 +74,10 @@ export function viewHref(chamber: string, view: Pick<ManifestView, "id" | "fullP
   return view.fullPath ? resolveChamberPath(view.fullPath, chamber, true) : `/view/${chamber}/${view.id}`;
 }
 
-// Congress's frame around one Chamber view card: the Chamber's mark, the
-// view's label, why it's in the feed right now, and a way into the full
-// view. The card body itself is the Chamber's own component.
+// Congress's frame around one Chamber view: the Chamber's mark, the view's
+// label, why it's in the feed right now, and a way into the full view. A
+// view with a card (manifest `card: true`) shows the Chamber's own card
+// component as its body; one without is just a row that opens it.
 export function ViewSlot({
   chamber,
   view,
@@ -90,6 +91,19 @@ export function ViewSlot({
   full?: boolean;
 }) {
   const active = chamber.status === "active";
+
+  if (!view.card) {
+    return (
+      <section className="feed-card">
+        <Link to={viewHref(chamber.name, view)} className="feed-exhibit">
+          <ChamberMark name={chamber.name} />
+          <span className="feed-exhibit-name">{view.label}</span>
+          {reason && <span className="feed-card-reason">{reason}</span>}
+        </Link>
+      </section>
+    );
+  }
+
   const View = active ? getViewComponent(chamber.name, view.id) : null;
 
   return (

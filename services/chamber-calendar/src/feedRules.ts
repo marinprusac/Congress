@@ -12,13 +12,12 @@ export const FEED_LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
 
 // Calendar's home-feed candidates: an event in progress, or starting within
 // a few hours (climbing as it nears), shows up on its own; an all-day event
-// today sits lower; the Upcoming card rises when something is imminent and
-// again first thing in the morning. Events the owner isn't attending never
+// today sits lower; the Agenda view rises first thing in the morning.
+// Events the owner isn't attending never
 // show. Pure - `events` is listEvents()'s output around `now`, and `hour` is
 // the local hour the morning bump keys off.
 export function calendarFeedCandidates(events: CalendarEvent[], now: Date, hour = now.getHours()): FeedCandidate[] {
   const items: FeedCandidate[] = [];
-  let next: { title: string; ms: number } | null = null;
   const nowMs = now.getTime();
   // All-day events carry plain "YYYY-MM-DD" dates (end exclusive), in the
   // server's local calendar day.
@@ -42,16 +41,16 @@ export function calendarFeedCandidates(events: CalendarEvent[], now: Date, hour 
     } else if (startMs > nowMs && startMs - nowMs <= SOON_WINDOW_MS) {
       const ms = startMs - nowMs;
       items.push({ kind: "exhibit", exhibitId, score: Math.round(60 + 35 * closeness(ms, SOON_WINDOW_MS)), reason: `Starts in ${formatDuration(ms)}` });
-      if (!next || ms < next.ms) next = { title: event.title, ms };
     }
   }
 
-  if (next && next.ms <= 2 * 60 * 60 * 1000) {
-    items.push({ kind: "view", viewId: "upcoming", score: 75, reason: `${next.title} in ${formatDuration(next.ms)}` });
-  } else if (hour >= 5 && hour < 11) {
-    items.push({ kind: "view", viewId: "upcoming", score: 50, reason: "Your day" });
+  // The Agenda itself: first thing in the morning it's the day at a glance;
+  // otherwise it sits low - the events that matter right now are already in
+  // the feed on their own.
+  if (hour >= 5 && hour < 11) {
+    items.push({ kind: "view", viewId: "agenda", score: 50, reason: "Your day" });
   } else {
-    items.push({ kind: "view", viewId: "upcoming", score: 25 });
+    items.push({ kind: "view", viewId: "agenda", score: 20 });
   }
   return items;
 }

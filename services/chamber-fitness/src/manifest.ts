@@ -14,13 +14,10 @@ export const manifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  // Home feed cards (the remote entry's `views` export) and "+"-creatable
-  // Exhibit types - see shared-types' manifestViewSchema/manifestExhibitTypeSchema.
-  views: [
-    { id: "week-stats", label: "This week" },
-    { id: "recent-workouts", label: "Recent workouts" },
-    { id: "health-snapshot", label: "Health", fullPath: "/metrics" },
-  ],
+  // Views are only genuine screens (see shared-types' manifestViewSchema) -
+  // this Chamber's exhibits reach the home feed and Search on their own.
+  // exhibitTypes is what the home screen's "+" can create here.
+  views: [{ id: "health", label: "Health", fullPath: "/metrics", card: true }],
   exhibitTypes: [{ type: "routine", label: "Routine", createPath: "/routines/new" }],
   events: [
     {

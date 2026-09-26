@@ -19,7 +19,6 @@ export function mapFeedCandidates(input: { pending: Visit[]; today: Visit[] }): 
       ? { kind: "view", viewId: "today-map", score: 35, reason: `${known.length} ${known.length === 1 ? "place" : "places"} today` }
       : { kind: "view", viewId: "today-map", score: 15 }
   );
-  items.push({ kind: "view", viewId: "recent-visits", score: known.length > 0 ? 20 : 8 });
 
   const current = known.find((v) => v.departedAt === null && v.placeId !== null);
   if (current) items.push({ kind: "exhibit", exhibitId: `place-${current.placeId}`, score: 45, reason: "You're here" });

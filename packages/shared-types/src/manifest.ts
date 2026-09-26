@@ -15,18 +15,24 @@ export const manifestRoutesSchema = z.object({
 });
 export type ManifestRoutes = z.infer<typeof manifestRoutesSchema>;
 
-// One entry per *view* a Chamber contributes to Congress's home feed - a UI
-// built from that Chamber's exhibit data (Upcoming events, Open tasks, a
-// today map). Every view has a compact feed card: the component keyed by
-// `id` in the Chamber's remote-entry `views` export. `fullPath` (relative to
-// the Chamber, e.g. "/" for Calendar's Agenda) is set only for a view that
-// also has a full-screen page to open when the card is tapped.
-export const manifestViewSchema = z.object({
-  id: z.string().min(1),
-  label: z.string().min(1),
-  description: z.string().optional(),
-  fullPath: z.string().startsWith("/").optional(),
-});
+// One entry per *view* a Chamber offers - a screen that genuinely can't be
+// expressed as a list of exhibits (Calendar's Agenda, the Map, Fitness's
+// Health charts). A plain list of exhibits (open tasks, upcoming events) is
+// deliberately NOT a view: those exhibits reach the home feed and Search on
+// their own. `fullPath` (relative to the Chamber, e.g. "/" for the Agenda)
+// is the full-screen page. `card` says the Chamber also exports a compact
+// feed card for it (the component keyed by `id` in its remote-entry `views`
+// export, e.g. a map preview); without one the feed shows the view as a
+// single row that opens it. A view needs at least one of the two.
+export const manifestViewSchema = z
+  .object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    description: z.string().optional(),
+    fullPath: z.string().startsWith("/").optional(),
+    card: z.boolean().optional(),
+  })
+  .refine((v) => v.card === true || v.fullPath !== undefined, { message: "A view needs a feed card, a fullPath, or both." });
 export type ManifestView = z.infer<typeof manifestViewSchema>;
 
 // One entry per kind of Exhibit a Chamber lets the owner create - what the

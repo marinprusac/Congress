@@ -171,7 +171,7 @@ app.get("/api/health/latest", async (c) => {
 mountExhibitSearchRoutes(app, { search: searchExhibits, resolve: resolveExhibits });
 
 // Home feed candidates - see feedRules.ts.
-mountFeedRoute(app, async (now) => fitnessFeedCandidates({ recent: await listRecentWorkouts(1), week: await getWeekStats() }, now));
+mountFeedRoute(app, async (now) => fitnessFeedCandidates(await listRecentWorkouts(1), now));
 
 mountManualRefsRoutes(
   app,

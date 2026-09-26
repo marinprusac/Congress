@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createQueryClient, PersistedQueryProvider } from "@congress/congress-ui";
 import { App } from "@/App";
-import { widgets as rawWidgets } from "@/widgets";
+import { cards } from "@/views";
 import { SettingsPage } from "@/pages/SettingsPage";
 import "./index.css";
 
@@ -42,7 +42,7 @@ function withQueryClient(Widget: ComponentType): ComponentType {
 }
 
 export const views: Record<string, ComponentType> = Object.fromEntries(
-  Object.entries(rawWidgets).map(([id, Widget]) => [id, withQueryClient(Widget)])
+  Object.entries(cards).map(([id, Widget]) => [id, withQueryClient(Widget)])
 );
 
 // This Chamber's own settings content, resolved the same way as a widget
