@@ -43,6 +43,13 @@
       "when": 1787966066493,
       "tag": "0005_smart_darkhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790461880464,
+      "tag": "0006_drop_chat_moved_to_congress",
+      "breakpoints": true
     }
   ]
 }

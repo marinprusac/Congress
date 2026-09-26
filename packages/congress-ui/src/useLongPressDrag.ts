@@ -79,7 +79,7 @@ export interface UseLongPressDragResult {
   // long-press this hook is trying to claim - iOS Safari's link-preview
   // popup (-webkit-touch-callout), the browser's native "drag this link out"
   // ghost/affordance (-webkit-user-drag), and incidental text selection
-  // (userSelect) - same fix already proven for NavPanel's own draggable
+  // (userSelect) - same fix already proven for the old nav's draggable
   // links, see shared.css's .nav-panel-link.
   style: React.CSSProperties;
 }

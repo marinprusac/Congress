@@ -14,7 +14,11 @@ export const tasksManifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  widgets: [{ id: "open", width: 3, height: 2, label: "Open" }],
+  // Views are only genuine screens (see shared-types' manifestViewSchema) -
+  // this Chamber's exhibits reach the home feed and Search on their own.
+  // exhibitTypes is what the home screen's "+" can create here.
+  views: [],
+  exhibitTypes: [{ type: "task", label: "Task", createPath: "/new" }],
   events: [
     {
       type: "tasks.due_soon",

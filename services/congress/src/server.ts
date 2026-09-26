@@ -4,8 +4,6 @@ import type { HttpBindings } from "@hono/node-server";
 import { z } from "zod";
 import { mountManifestAndHealth, mountStaticFrontend } from "@congress/chamber-kit";
 import {
-  canvasScopeSchema,
-  upsertPlacementRequestSchema,
   updateEventSettingsRequestSchema,
   pushSubscriptionRequestSchema,
   pushUnsubscribeRequestSchema,
@@ -15,6 +13,7 @@ import {
   eventPublishRequestSchema,
   chamberSubscriptionSchema,
   manualRefRequestSchema,
+  RESERVED_CHAMBER_NAMES,
 } from "@congress/shared-types";
 import { env } from "./env.js";
 import { requireInternalToken, requireSessionOrInternalToken } from "./auth.js";
@@ -40,13 +39,14 @@ import {
 } from "./exhibits.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { publishEvent } from "./events.js";
-import { listPlacements, upsertPlacement, deletePlacement } from "./layout.js";
 import { listEventSettings, getEventSettingsByType, updateEventSettings } from "./eventSettings.js";
 import { syncEventCatalog } from "./eventCatalogSync.js";
 import { listHistory } from "./eventHistory.js";
 import { listNotifications, markNotificationRead, markAllNotificationsRead, dismissNotification } from "./notifications.js";
 import { publicKey, saveSubscription, removeSubscription } from "./pushSubscriptions.js";
 import { mcpApp } from "./mcp/server.js";
+import { aiRoutes } from "./ai/routes.js";
+import { getFeed } from "./feed.js";
 
 // Only Capitol itself validates register/deregister/heartbeat/exhibit-resolve
 // requests - no Chamber ever needs these shapes, so they live here rather
@@ -91,32 +91,13 @@ app.put("/congress/settings", requireSession, async (c) => {
   return c.json(await updateSettings(parsed.data));
 });
 
-// Homepage canvas layout - where each registered widget sits per viewport
-// class. See layout.ts / db/schema.ts's widgetLayouts.
-app.get("/congress/layout/:scope", requireSession, (c) => {
-  const scope = canvasScopeSchema.safeParse(c.req.param("scope"));
-  if (!scope.success) return c.json({ error: "invalid_scope" }, 400);
-  return c.json(listPlacements(scope.data));
-});
+// The home "For You" feed - every active Chamber's scored views and
+// exhibits, merged and ranked. See feed.ts.
+app.get("/congress/feed", requireSession, async (c) => c.json({ items: await getFeed() }));
 
-app.put("/congress/layout/:scope/:chamber/:widgetId", requireSession, async (c) => {
-  const scope = canvasScopeSchema.safeParse(c.req.param("scope"));
-  if (!scope.success) return c.json({ error: "invalid_scope" }, 400);
-  const body = await c.req.json().catch(() => null);
-  const parsed = upsertPlacementRequestSchema.safeParse(body);
-  if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-
-  const placement = upsertPlacement(scope.data, c.req.param("chamber"), c.req.param("widgetId"), parsed.data.x, parsed.data.y);
-  if (!placement) return c.json({ error: "cell_occupied" }, 409);
-  return c.json(placement);
-});
-
-app.delete("/congress/layout/:scope/:chamber/:widgetId", requireSession, (c) => {
-  const scope = canvasScopeSchema.safeParse(c.req.param("scope"));
-  if (!scope.success) return c.json({ error: "invalid_scope" }, 400);
-  deletePlacement(scope.data, c.req.param("chamber"), c.req.param("widgetId"));
-  return c.body(null, 204);
-});
+// Congress's own AI: the chat, the shared budget/pause settings, the live
+// run stream, and POST /congress/ai/run for Chambers - see ai/routes.ts.
+app.route("/congress/ai", aiRoutes);
 
 // One row per known event type, auto-derived from the live registry - no
 // create/delete route exists, see eventSettings.ts. Synced before listing so
@@ -190,6 +171,11 @@ app.post("/congress/register", requireInternalToken, async (c) => {
   const parsed = registerRequestSchema.safeParse(body);
   if (!parsed.success) {
     return c.json({ error: "invalid_manifest", issues: parsed.error.flatten() }, 400);
+  }
+  // A Chamber is served at "/<name>/*" - one named after a shell route
+  // would be unreachable (see RESERVED_CHAMBER_NAMES).
+  if ((RESERVED_CHAMBER_NAMES as readonly string[]).includes(parsed.data.name)) {
+    return c.json({ error: "reserved_name" }, 400);
   }
   const entry = registerChamber(parsed.data, parsed.data.subscriptions);
   return c.json(entry, 201);

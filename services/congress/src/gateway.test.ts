@@ -53,35 +53,22 @@ describe("rewriteChamberPath", () => {
 });
 
 describe("timeoutFor", () => {
-  it("gives Deputy's chat POST minutes, because it blocks on a full headless run", () => {
-    expect(timeoutFor("deputy", "POST", "/chat/messages")).toBe(5 * 60 * 1000);
-  });
-
-  it("gives Deputy's 'Run now' directive POST minutes too, for the same reason", () => {
+  it("gives Deputy's 'Run now' directive POST minutes, because it blocks on a full headless run", () => {
     expect(timeoutFor("deputy", "POST", "/directives/42/run")).toBe(5 * 60 * 1000);
     expect(timeoutFor("deputy", "POST", "/directives/7/run")).toBe(5 * 60 * 1000);
   });
 
   it("gives every other Deputy route the ordinary timeout", () => {
-    expect(timeoutFor("deputy", "GET", "/chat/messages")).toBe(10_000);
     expect(timeoutFor("deputy", "POST", "/directives")).toBe(10_000);
-    // Not a run - creating/listing directives answers in milliseconds like
-    // any other CRUD route, and GET never blocks on a claude invocation.
     expect(timeoutFor("deputy", "GET", "/directives/42/run")).toBe(10_000);
     expect(timeoutFor("deputy", "POST", "/directives/42")).toBe(10_000);
+    // The chat moved to Congress's own /congress/ai/* - no longer a Deputy
+    // route, so no longer exempt.
+    expect(timeoutFor("deputy", "POST", "/chat/messages")).toBe(10_000);
   });
 
   it("gives another chamber's identically-named route the ordinary timeout", () => {
-    expect(timeoutFor("notes", "POST", "/chat/messages")).toBe(10_000);
     expect(timeoutFor("notes", "POST", "/directives/42/run")).toBe(10_000);
-  });
-
-  it("never times out Deputy's run-progress SSE stream, since it's meant to stay open indefinitely", () => {
-    expect(timeoutFor("deputy", "GET", "/runs/stream")).toBe(Infinity);
-  });
-
-  it("gives another chamber's identically-named route the ordinary timeout, not the no-timeout exemption", () => {
-    expect(timeoutFor("notes", "GET", "/runs/stream")).toBe(10_000);
   });
 });
 

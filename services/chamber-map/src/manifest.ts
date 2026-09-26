@@ -14,12 +14,14 @@ export const manifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  // width/height are in canvas cells, fixed by this Chamber, not
-  // user-resizable. See frontend/src/widgets/ for the matching components.
-  widgets: [
-    { id: "recent-visits", width: 2, height: 3, label: "Recent Visits" },
-    { id: "today-map", width: 4, height: 3, label: "Today's Map" },
+  // Views are only genuine screens (see shared-types' manifestViewSchema) -
+  // this Chamber's exhibits reach the home feed and Search on their own.
+  // exhibitTypes is what the home screen's "+" can create here.
+  views: [
+    { id: "today-map", label: "Today's map", fullPath: "/", card: true },
+    { id: "pending", label: "Visits to classify", fullPath: "/pending" },
   ],
+  exhibitTypes: [{ type: "place", label: "Place", createPath: "/places/new" }],
   // Purely a declared catalog for Logs/Automation Chambers' own trigger-event
   // pickers - Congress never enforces or inspects this. Published via
   // events.ts's publishEvent from tracking.ts/poller.ts.

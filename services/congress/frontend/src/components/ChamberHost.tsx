@@ -7,8 +7,8 @@ import { fetchRegistry, loadRemoteModule, evictRemoteModule } from "@congress/co
 // has been visited once, switching back to it is instant (no re-fetch of
 // its JS or CSS), which is the whole point of hosting it in this shell
 // instead of a full navigation. The underlying module+stylesheet fetch
-// itself is cached in congress-ui's loadRemoteModule (shared with Capitol's
-// canvas, which resolves the same remote-entry.js's `widgets` export) -
+// itself is cached in congress-ui's loadRemoteModule (shared with the home
+// feed, which resolves the same remote-entry.js's `views` export) -
 // this cache is just this file's own lazy()-wrapper layer on top. A Chamber
 // is deliberately never fetched before this - no eager warmup of every
 // registered Chamber on boot, since that was proactively racing 9 unwanted

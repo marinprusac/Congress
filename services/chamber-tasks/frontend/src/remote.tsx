@@ -2,7 +2,6 @@ import type { ComponentType } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createQueryClient, PersistedQueryProvider } from "@congress/congress-ui";
 import { App } from "@/App";
-import { widgets as rawWidgets } from "@/widgets";
 import { SettingsPage } from "@/pages/SettingsPage";
 import "./index.css";
 
@@ -25,12 +24,10 @@ export default function Remote() {
   );
 }
 
-// Capitol's canvas resolves a widget component straight out of this same
-// remote entry (via the shared loadRemoteModule) rather than navigating to a
-// URL - see src/manifest.ts's `widgets` array for the id -> entry mapping.
-// Wrapped in this Chamber's own QueryClientProvider here, same reason
-// Remote() wraps App above - Capitol's canvas mounts these bare, with no
-// idea which Chamber's query cache each one needs.
+// Wrapped in this Chamber's own QueryClientProvider - Congress's Settings
+// page mounts the panel bare, with no idea which Chamber's query cache it
+// needs. No `views` export: this Chamber has no views (its exhibits reach
+// the home feed and Search on their own).
 function withQueryClient(Widget: ComponentType): ComponentType {
   return function WrappedWidget() {
     return (
@@ -41,11 +38,8 @@ function withQueryClient(Widget: ComponentType): ComponentType {
   };
 }
 
-export const widgets: Record<string, ComponentType> = Object.fromEntries(
-  Object.entries(rawWidgets).map(([id, Widget]) => [id, withQueryClient(Widget)])
-);
-
 // This Chamber's own settings content, resolved the same way as a widget
 // (see above) and mounted as one tab of Congress's unified Settings page
 // instead of a route this Chamber hosts itself.
 export const settings: ComponentType = withQueryClient(SettingsPage);
+

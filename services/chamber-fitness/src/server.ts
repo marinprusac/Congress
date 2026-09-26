@@ -8,9 +8,11 @@ import {
   mountSettingsRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
+  mountFeedRoute,
 } from "@congress/chamber-kit";
 import { manifest } from "./manifest.js";
 import { listWorkouts, listRecentWorkouts, getWorkout, getWeekStats, resyncWorkoutExhibitByExhibitId } from "./workouts.js";
+import { fitnessFeedCandidates } from "./feedRules.js";
 import { listManualRefsByExhibitId, addManualRefByExhibitId, removeManualRefByExhibitId } from "./refs.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { search as searchExhibits, resolve as resolveExhibits } from "./exhibits.js";
@@ -167,6 +169,9 @@ app.get("/api/health/latest", async (c) => {
 });
 
 mountExhibitSearchRoutes(app, { search: searchExhibits, resolve: resolveExhibits });
+
+// Home feed candidates - see feedRules.ts.
+mountFeedRoute(app, async (now) => fitnessFeedCandidates(await listRecentWorkouts(1), now));
 
 mountManualRefsRoutes(
   app,

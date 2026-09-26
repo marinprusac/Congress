@@ -1,41 +1,7 @@
-import { Link, useLocation } from "react-router-dom";
-import { ChamberLayout, ChamberMark, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
+import { ChamberLayout, ChamberMark } from "@congress/congress-ui";
 
-// Workouts is the index route; Routines and Health are further,
-// equally-weighted sections with no "default page" to collapse into - same
-// reasoning as Map's own Places/Pending header links.
-function FitnessHeaderLinks() {
-  const { pathname } = useLocation();
-  const shellHosted = useShellHosted();
-  const links = [
-    { to: "/routines", label: "Routines" },
-    { to: "/metrics", label: "Health" },
-  ];
-  return (
-    <>
-      {links.map((link) => {
-        const to = resolveChamberPath(link.to, "fitness", shellHosted);
-        return (
-          <Link
-            key={link.to}
-            to={to}
-            className={pathname.startsWith(to) ? "chamber-header-link active" : "chamber-header-link"}
-          >
-            {link.label}
-          </Link>
-        );
-      })}
-    </>
-  );
-}
-
+// No header links: Health is a view (Search, the pinned row, its feed card),
+// workouts and routines are exhibits (the feed, Search, "+").
 export function Layout() {
-  return (
-    <ChamberLayout
-      icon={<ChamberMark name="fitness" className="h-8 w-8 text-ink" />}
-      title="Fitness"
-      ownChamber="fitness"
-      extraActions={<FitnessHeaderLinks />}
-    />
-  );
+  return <ChamberLayout icon={<ChamberMark name="fitness" className="h-8 w-8 text-ink" />} title="Fitness" ownChamber="fitness" />;
 }

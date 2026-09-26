@@ -4,29 +4,16 @@ import { getChamber } from "./registry.js";
 
 const FORWARD_TIMEOUT_MS = 10_000;
 
-// Both Deputy's chat POST (chat.ts) and its "Run now" directive POST
-// (server.ts's POST /api/directives/:id/run) block on a full headless
-// `claude` run before responding - unlike every other Chamber route, which
-// answers in milliseconds, either of these can legitimately take minutes
-// (multiple cross-Chamber MCP tool calls). The default FORWARD_TIMEOUT_MS
-// would abort the proxy well before that run finishes, surfacing a false
-// "chamber unreachable" (or, for the directive route, silently eating the
-// response so the Play button's mutation just errors out) to the owner even
-// though the run itself completes fine and gets persisted - the
-// reload-and-it's-there symptom this constant fixes.
+// Deputy's "Run now" POST (POST /api/directives/:id/run) blocks on a full
+// headless run in Congress's own AI before responding - unlike every other
+// Chamber route, which answers in milliseconds, it can legitimately take
+// minutes (multiple cross-Chamber MCP tool calls, or queued behind another
+// run). The default FORWARD_TIMEOUT_MS would abort the proxy well before the
+// run finishes, eating the response even though the run itself completes.
+// (The chat and the run stream used to be Deputy routes too; they're
+// Congress's own now, under /congress/ai/*, and never pass through here.)
 const DEPUTY_BLOCKING_RUN_TIMEOUT_MS = 5 * 60 * 1000;
-
-// Matches "/directives/<id>/run" - the one dynamic-segment route among
-// Deputy's blocking routes, so it needs a pattern rather than the other two's
-// plain string equality.
 const DEPUTY_DIRECTIVE_RUN_PATH = /^\/directives\/\d+\/run$/;
-
-// Deputy's own run-progress SSE stream (see chamber-deputy/src/server.ts's
-// GET /api/runs/stream) is meant to stay open indefinitely, not just longer
-// than the default - AbortSignal.timeout(Infinity) itself throws, so
-// timeoutFor returns Infinity here and proxyRequest below skips
-// constructing a timeout signal at all for it.
-const DEPUTY_STREAM_NO_TIMEOUT = Infinity;
 
 // A Chamber's registered apiBase is its origin plus "/api"; its frontend and
 // its public assets are served from the origin itself. Named rather than
@@ -47,14 +34,9 @@ export function rewriteChamberPath(path: string, prefix: string, base: string, s
   return `${base}${remainder}${search}`;
 }
 
-// Deputy's chat and "Run now" POSTs both block on a full headless `claude`
-// run before responding; every other Chamber route answers in milliseconds.
 // See DEPUTY_BLOCKING_RUN_TIMEOUT_MS above.
 export function timeoutFor(chamberName: string, method: string, remainder: string): number {
-  if (chamberName !== "deputy") return FORWARD_TIMEOUT_MS;
-  if (method === "POST" && remainder === "/chat/messages") return DEPUTY_BLOCKING_RUN_TIMEOUT_MS;
-  if (method === "POST" && DEPUTY_DIRECTIVE_RUN_PATH.test(remainder)) return DEPUTY_BLOCKING_RUN_TIMEOUT_MS;
-  if (method === "GET" && remainder === "/runs/stream") return DEPUTY_STREAM_NO_TIMEOUT;
+  if (chamberName === "deputy" && method === "POST" && DEPUTY_DIRECTIVE_RUN_PATH.test(remainder)) return DEPUTY_BLOCKING_RUN_TIMEOUT_MS;
   return FORWARD_TIMEOUT_MS;
 }
 
@@ -101,10 +83,7 @@ async function proxyRequest(
     // fetch() would otherwise silently resolve the redirect target itself
     // and hand back that page's body under this request's original status.
     redirect: "manual",
-    // AbortSignal.timeout(Infinity) itself throws - a stream meant to stay
-    // open indefinitely (see DEPUTY_STREAM_NO_TIMEOUT above) passes no
-    // signal at all rather than an unreachable one.
-    signal: Number.isFinite(timeoutMs) ? AbortSignal.timeout(timeoutMs) : undefined,
+    signal: AbortSignal.timeout(timeoutMs),
   });
 
   const responseHeaders = new Headers();

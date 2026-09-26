@@ -14,7 +14,11 @@ export const documentsManifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  widgets: [{ id: "recent", width: 3, height: 2, label: "Recent" }],
+  // Views are only genuine screens (see shared-types' manifestViewSchema) -
+  // this Chamber's exhibits reach the home feed and Search on their own.
+  // exhibitTypes is what the home screen's "+" can create here.
+  views: [],
+  exhibitTypes: [{ type: "document", label: "Document", createPath: "/new" }],
   events: [
     {
       type: "documents.created",

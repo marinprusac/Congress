@@ -14,9 +14,10 @@ If you just want to start: skip to [Quickstart](#quickstart).
 
 Every Chamber implements the same small contract:
 
-- `GET /manifest` — self-description (name, routes, apiBase, mcpUrl, healthUrl, widgets).
+- `GET /manifest` — self-description (name, routes, apiBase, mcpUrl, healthUrl, views, exhibitTypes, events).
 - `GET /health` — liveness.
-- Home / settings frontend routes, plus one or more homepage widgets.
+- Exhibit editor routes, an optional settings panel, and zero or more *views* (genuine screens — see §5.1).
+- `GET /api/feed` — what of yours belongs on Congress's home feed right now (§5.1).
 - A REST API under `/api/*`.
 - An MCP server at `/mcp`.
 
@@ -34,13 +35,14 @@ hand:
   the registration/heartbeat/shutdown lifecycle, MCP transport, the Exhibit
   content contract, settings, manual references, wikilink parsing.
 - **`@congress/congress-ui`** — the shared frontend surface: page layout,
-  Exhibit chips/picker/annotated text, dark mode, global
-  search, the Chamber icon set, list/form primitives.
+  Exhibit chips/picker/annotated text, dark mode, the Chamber icon set,
+  form primitives, the view-card body.
 
 A handful of frontend files (`Layout.tsx`, `main.tsx`, `App.tsx`,
-`remote.tsx`, `frontend/src/widgets/*.tsx`) are *deliberately* kept as small,
-per-Chamber files rather than further abstracted — routing, nav copy, and
-widget content are genuinely Chamber-specific. Everything that was ever
+`remote.tsx`, `src/feedRules.ts`, `frontend/src/views/*.tsx`) are
+*deliberately* kept as small, per-Chamber files rather than further
+abstracted — routing, copy, and what counts as urgent are genuinely
+Chamber-specific. Everything that was ever
 pure copy-paste boilerplate (icons, DB/env/MCP/registration wiring, the
 exhibits/settings/route-mounting pattern) has already been factored into
 the two packages above.
@@ -56,8 +58,8 @@ pnpm install
 
 This generates `services/chamber-budget/` — a complete, working Chamber
 with a generic single-entity example ("Items": a name + a body, searchable,
-cross-referenceable via `[[...]]`, with list/view/new/settings pages and one
-example homepage widget), its own placeholder icon
+cross-referenceable via `[[...]]`, with view/new/settings pages, an example
+home-feed rule in `src/feedRules.ts`, and no views), its own placeholder icon
 (`frontend/public/icons/mark.svg`, ready to swap for real artwork whenever
 you like — see §5) — plus `infra/systemd/congress-chamber-budget.service`
 for later production rollout. It also seeds `services/chamber-budget/.env`
@@ -93,8 +95,10 @@ actually edit to turn "Budget" into your real domain:
 | `src/exhibits.ts` | Update `idPrefix`, `type`, `urlFor`, and the search/resolve/toContent callbacks for your real table/columns. |
 | `src/mcp/tools.ts` | Your entity's MCP tools — usually a thin wrapper around the same functions the REST routes call. |
 | `frontend/src/pages/*.tsx` | The actual UI. Keep using the shared primitives (see the table below) rather than hand-rolling list/form chrome. |
-| `frontend/src/widgets/*.tsx` + `frontend/src/widgets/index.ts` | Your homepage widget(s) for Congress's canvas — see §5.1. Add a new file + a `widgets` map entry per widget; each one needs a matching entry in `src/manifest.ts`'s `widgets` array (`id`/`width`/`height`/`label`). |
-| `frontend/src/components/Layout.tsx` | Nav links specific to your Chamber. |
+| `src/feedRules.ts` | What of yours belongs on Congress's home feed right now, scored with a reason and an inline preview — see §5.1. Pure, so unit-test it against a fixed `now`. |
+| `src/manifest.ts`'s `exhibitTypes` | What the home screen's "+" can create here (`type`/`label`/`createPath`). |
+| `src/manifest.ts`'s `views` + `frontend/src/views/` | Only if your Chamber has a *genuine screen* (a map, an agenda, charts) — see §5.1. Most Chambers have none. |
+| `frontend/src/components/Layout.tsx` | Title/icon only — Chambers have no navigation of their own. |
 | `frontend/public/icons/mark.svg` | Optional — swap the placeholder diamond for real artwork whenever you like. Not required for anything else to work; see §5. |
 
 After any `db/schema.ts` change: `pnpm --filter chamber-<name> db:generate`
@@ -119,26 +123,29 @@ don't reimplement them:
 | `createSingleRowSettings(config)` | The "id is always 1, select-then-upsert" settings pattern every Chamber uses. |
 | `createManualRefs`/`createManualRefsByExhibitId` | CRUD for the "Connections" side-panel's manually-added refs, separate from wikilinks parsed out of body text. |
 | `extractOutgoingExhibitRefs(text)` | Parses `[[...]]` tokens out of body text into an exhibit-id list. |
+| `mountFeedRoute(app, getCandidates)`, `formatDuration`, `closeness`, `plainTextPreview` | `GET /api/feed` for Congress's home feed, plus helpers for phrasing a candidate's reason and flattening a body into its inline preview — see §5.1. |
+| `runCongressAi(capitolUrl, internalToken, { prompt, actor, meta })`, `fetchCongressAiSettings` | Run a prompt through Congress's own AI (queued, budget/pause-guarded, MCP access to every Chamber) and read its pause switch — what Deputy's directives use. Never spawn `claude` yourself. |
 | `mountManifestAndHealth`, `mountExhibitSearchRoutes`, `mountSettingsRoutes`, `mountManualRefsRoutes`, `mountStaticFrontend` | One-line Hono route mounting for each of the above. Mount `mountStaticFrontend` last — it's the SPA fallback; it also serves `frontend/public/*` directly (falling through from `frontend/dist`) so assets like your icon resolve even before `build:web` has run. |
 
 And `congress-ui`'s frontend surface:
 
 | Export | What it's for |
 |---|---|
-| `ChamberLayout`, `ChamberHeader`, `ChamberMark`, `getChamberIcon` | Page shell + the Chamber icon system (see §5 for the fallback behavior). |
+| `ChamberLayout`, `ChamberHeader`, `ChamberMark`, `getChamberIcon` | Page shell (header with a back button) + the Chamber icon system (see §5 for the fallback behavior). |
+| `ChamberIndexRedirect`, `useBackNavigation` | Your index route when your Chamber has no view at its root (sends the owner home), and "back" for anything custom. |
 | `useAppliedTheme` | Applies Congress's dark-mode setting; call once in `App()`. |
 | `useShellHosted`, `resolveChamberPath`, `navigateToExhibit` | Tell whether you're rendered standalone or shell-hosted inside Congress, and build correct links either way — use these instead of hand-writing absolute paths. |
 | `ExhibitTextarea`, `ExhibitAnnotatedText`, `ExhibitChip`, `ExhibitMarkdown` | The `[[` picker/autocomplete, rendering body text with resolved exhibit chips, and (optionally) Markdown rendering. |
 | `ExhibitActionBar`, `ExhibitLinksLayout` | Detail-page chrome: edit/delete actions, undirected Connections panel. |
-| `useSearchableList`, `useListRowPrefetch`, `ListSearchInput`, `ListLoadingState`, `ListErrorState`, `ListEmptyState` | List-page search + loading/error/empty states + hover-prefetch. |
+| `useSearchableList`, `useListRowPrefetch`, `ListSearchInput`, `ListLoadingState`, `ListErrorState`, `ListEmptyState` | Search + loading/error/empty states + hover-prefetch, for a view that genuinely needs a list. |
 | `PageHeader`, `FormLabel`, `FormTextInput`, `FormErrorMessage`, `FormSubmitButton` | Generic page/form chrome. |
-| `WidgetPreviewShell` | Shared chrome (label, "+ New" link, loading/error/empty states) for a homepage widget's own content — see §5.1. |
+| `ViewCard` | Loading/error/empty body for a view's feed card — see §5.1. |
 | `createQueryClient`, `resolveApiBase`, `parseJsonResponse`, `assertDeleteOk`, `confirmDelete` | Per-Chamber isolated TanStack Query client, dev/prod API base resolution, fetch helpers. |
 
 ## 4. The Exhibit contract (cross-Chamber search & linking)
 
 If your Chamber's content is worth referencing from notes, other Chambers,
-or the global search bar, wire `createTableBackedExhibits` (§3) — the
+or Congress's Search, wire `createTableBackedExhibits` (§3) — the
 generated scaffold already does this for the generic "Items" entity, so in
 most cases you're just updating the callbacks to match your real schema,
 not writing this from scratch. Every create/update/delete should call
@@ -155,45 +162,65 @@ hand instead of using the factory.
 ## 5. Plugging into Congress
 
 This is automatic. `gateway.ts`'s `/api/:chamber/*` and `/<chamberName>/*`
-proxying, the chamber registry, Congress's homepage canvas, the nav picker,
+proxying, the chamber registry, Congress's home feed, Search, the "+" sheet,
 and Congress's shell-hosting (`ChamberHost` dynamically `import()`ing your
 Chamber's `remote-entry.js`) are all driven by the `/congress/registry` API
 — they pick up a new Chamber the moment it successfully registers and
 heartbeats. **There is no Congress-side code to edit** to make a new Chamber
 appear.
 
-### 5.1 Homepage widgets
+### 5.1 The home screen: feed, "+", Search and views
 
-Congress's homepage is a cell-based canvas the owner can edit to place and
-move widgets (see `services/congress/frontend/src/components/Canvas.tsx`). A Chamber can register any number of widgets, each with a
-fixed footprint in canvas cells declared in `src/manifest.ts`:
+Congress's home screen is a ranked "For You" feed; the owner gets around
+with a tab bar (Home · Search · + · Notifications · Settings). **Your
+Chamber has no navigation and no list pages of its own** — its exhibits
+reach the owner three ways, all driven by what you declare:
+
+**The feed.** Mount `mountFeedRoute` and return candidates from a pure rule
+module (`src/feedRules.ts` in the scaffold):
 
 ```ts
-widgets: [{ id: "recent", width: 2, height: 2, label: "Recent" }],
+mountFeedRoute(app, async (now) => itemFeedCandidates(await listRecentItems(20), now));
 ```
 
-`id` is a stable, never-shown identifier — it's the key into
-`frontend/src/widgets/index.ts`'s `widgets` map, and part of how Congress
-stores this widget's canvas position. `width`/`height` are fixed by you, not
-user-resizable; the owner can only place and move whole widgets on the
-canvas, never resize them. `label` is what the owner sees in the edit-mode
-overlay and the "add widget" tray — the *only* place a widget's identity is
-ever shown, since the canvas itself draws no per-widget header (see below).
+Each candidate is an exhibit (or one of your views, below) with a 0-100
+`score`, a short `reason` ("Due in 40 min"), and — for an exhibit — a
+`preview`: `title?`, `time?` (`{ label?, start, end?, allDay? }`, ISO — the
+browser formats it in the owner's own zone), `fields?` (a few short facts)
+and `body?` (`plainTextPreview(yourBody)`). **Feed items show their
+information inline** — a candidate with no preview is just a link, and the
+owner learns nothing without tapping. Only return what's genuinely time-
+relevant; Congress merges every Chamber's candidates and ranks them.
 
-A widget's content is an ordinary React component — `frontend/src/widgets/
-RecentItemsWidget.tsx` in the scaffold — exported from `frontend/src/
-widgets/index.ts` and re-exported (wrapped in this Chamber's own
-`QueryClientProvider`) from `frontend/src/remote.tsx`. Congress's canvas
-resolves it directly out of your already-built `remote-entry.js` (the same
-artifact `build:remote` produces for full shell-hosted navigation — no
-separate build step, no URL, no iframe) via `loadRemoteModule` from
-`@congress/congress-ui`. Wrap your widget's content in `WidgetPreviewShell`
-for the standard label/"+ New"/loading/empty chrome, but beyond that its
-content is entirely your own discretion — Congress only ever draws a plain
-border around it, never a chamber name/icon header. Any in-widget links
-should go through `resolveChamberPath`/`useShellHosted` (the widget is
-mounted directly into Congress's own React tree, not an isolated document),
-same as any other Chamber-owned link.
+**"+".** Declare what the owner can create here, and where your editor for a
+new one lives:
+
+```ts
+exhibitTypes: [{ type: "item", label: "Item", createPath: "/new" }],
+```
+
+**Search** finds your exhibits through the Exhibit contract (§4) — nothing
+extra to do.
+
+**Views** are for *genuine screens* only — a map, an agenda, charts —
+never a list of your exhibits (those already reach the feed and Search).
+Most Chambers have none. A view has a `fullPath` (its full-screen page in
+your app) and/or a feed card:
+
+```ts
+views: [{ id: "today-map", label: "Today's map", fullPath: "/", card: true }],
+```
+
+With `card: true`, export the card component from `frontend/src/remote.tsx`'s
+`views` map (keyed by `id`, wrapped in your `QueryClientProvider`), built on
+`congress-ui`'s `ViewCard` for loading/error/empty states. Congress draws the
+frame (your icon, the label, the feed reason, an "Open" link) and resolves
+the component straight out of your already-built `remote-entry.js` — no
+separate build, no iframe. A view without a card never appears in the feed;
+it's reached through Search and the owner's pinned row. Any links inside a
+card go through `resolveChamberPath`/`useShellHosted`, same as any other
+Chamber-owned link. Your index route is your main view if you have one (Map,
+Calendar's Agenda) and `ChamberIndexRedirect` otherwise.
 
 Icons work the same way: your Chamber serves its own, Congress fetches it —
 **nothing about creating or icon-branding a Chamber ever means editing a
@@ -231,8 +258,8 @@ automatically — as long as `frontend/src/remote.tsx` exports it:
 export const settings: ComponentType = withQueryClient(SettingsPage);
 ```
 
-wrapping your `frontend/src/pages/SettingsPage.tsx` the same way `widgets`
-wraps each widget component above. **This is not automatic just because
+wrapping your `frontend/src/pages/SettingsPage.tsx` in your own
+`QueryClientProvider`, the same way a view card is. **This is not automatic just because
 `SettingsPage.tsx` exists** — the scaffold generates that file for you, but
 Congress's Settings hub only shows a tab for a Chamber whose remote entry
 actually exports `settings`; a Chamber with nothing configurable is meant to
@@ -280,8 +307,7 @@ rather than storing anything durably. Publishing works the same whether or
 not anything happens to be subscribed, or even registered.
 
 Optionally declare the event types you may publish in your manifest's
-`events` array (mirrors `widgets`, but keyed by `type`/`label`/
-`description?` rather than `id`/`width`/`height`/`label`):
+`events` array (`type`/`label`/`description?`):
 
 ```ts
 events: [
@@ -297,7 +323,7 @@ This is purely a declared catalog — it's what populates the trigger-event
 picker on Congress's Logs settings and Deputy's directive editor (read live off
 `GET /congress/registry`, never hardcoded to a specific chamber name), not a
 subscription or a requirement to actually fire that event. Defaulted to
-`[]` like `widgets`, so most Chambers never touch this field at all.
+`[]`, so most Chambers never touch this field at all.
 
 **Receiving events** is symmetric, and just as generic — every Chamber gets
 it via `chamber-kit`, whether or not it ever ends up used. There are two
@@ -421,7 +447,7 @@ deploy.
 
 | Symptom | Likely cause |
 |---|---|
-| New Chamber never appears in the nav or on Congress's homepage | Check its process logs for registration errors — usually a wrong `CAPITOL_URL` or mismatched `CONGRESS_INTERNAL_TOKEN` between the Chamber's `.env` and Congress's. |
+| New Chamber never appears in Search, the "+" sheet or the home feed | Check its process logs for registration errors — usually a wrong `CAPITOL_URL` or mismatched `CONGRESS_INTERNAL_TOKEN` between the Chamber's `.env` and Congress's. |
 | Chamber shows as `offline` in the registry | Missed heartbeats — check the process is actually still running and `HEARTBEAT_INTERVAL_MS` vs. Congress's sweep timeout haven't drifted apart. |
 | `chamber_unreachable` 503 from Congress's gateway | The registered `apiBase` in the manifest doesn't actually resolve (typo, wrong port, or the Chamber crashed after registering but before deregistering). |
 | Exhibit chips render as a generic diamond icon everywhere | That Chamber hasn't shipped `frontend/public/icons/mark.svg` yet, is offline, or the fetch to `/congress/chambers/<name>/icon` failed — see §5. Not a bug, just unbranded. |

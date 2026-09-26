@@ -14,19 +14,18 @@ export const manifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  // §12: a quick "message Deputy" box. Deputy keeps no run-history page or
-  // widget of its own any more - see deputy.directive_run below, which the
-  // Logs Chamber's own "recent-logs" widget can surface instead once the
-  // owner sets up a rule for it.
-  widgets: [{ id: "message", width: 2, height: 1, label: "Message Deputy" }],
+  // Views are only genuine screens (see shared-types' manifestViewSchema) -
+  // this Chamber's exhibits reach the home feed and Search on their own.
+  // exhibitTypes is what the home screen's "+" can create here.
+  views: [],
+  exhibitTypes: [{ type: "directive", label: "Directive", createPath: "/directives/new" }],
   events: [
     {
       type: "deputy.directive_run",
       label: "Directive run",
-      description:
-        "Published with a run's full transcript every time a directive's own scheduled or manual run completes, or when a bundled chat run takes a real action (calls a tool) worth surfacing to the owner.",
+      description: "Published with a run's full transcript every time a directive's scheduled, event-triggered or manual run completes.",
       payloadFields: {
-        trigger: { type: "string", description: "chat | scheduled | manual" },
+        trigger: { type: "string", description: "scheduled | event | manual" },
         directiveId: { type: "number" },
         directiveTitle: { type: "string" },
         ok: { type: "boolean" },

@@ -105,12 +105,17 @@ describe("session-only routes", () => {
     { method: "GET", path: "/congress/exhibits/search?q=x" },
     { method: "GET", path: "/congress/exhibits/note-1/connections" },
     // Core features folded in from the retired Capitol/Logs Chambers.
-    { method: "GET", path: "/congress/layout/desktop" },
-    { method: "PUT", path: "/congress/layout/desktop/notes/recent", body: { x: 0, y: 0 } },
     { method: "GET", path: "/congress/event-settings" },
     { method: "GET", path: "/congress/history" },
     { method: "GET", path: "/congress/notifications" },
     { method: "GET", path: "/congress/push/config" },
+    // AI (moved in from Deputy). POST /chat/messages is left out on purpose:
+    // an accepted one would spawn a real `claude` run.
+    { method: "GET", path: "/congress/ai/chat/messages" },
+    { method: "DELETE", path: "/congress/ai/chat/messages" },
+    { method: "PUT", path: "/congress/ai/settings", body: { contextPrompt: "" } },
+    { method: "GET", path: "/congress/ai/settings/spend" },
+    { method: "GET", path: "/congress/feed" },
   ];
 
   it.each(cases)("401s $method $path without a session", async ({ method, path, body }) => {
@@ -146,6 +151,50 @@ describe("/congress/registry", () => {
   });
 });
 
+describe("/congress/ai", () => {
+  it("GET /settings accepts either a session or the internal token", async () => {
+    // Deputy's backend reads the shared pause switch before draining its
+    // event buffer; the browser reads it for Settings -> AI.
+    expect((await app.request("/congress/ai/settings", { headers: internal })).status).toBe(200);
+    expect((await app.request("/congress/ai/settings", { headers: session() }, bindings())).status).toBe(200);
+    expect((await app.request("/congress/ai/settings")).status).toBe(401);
+  });
+
+  it("POST /run is internal-token only", async () => {
+    const body = JSON.stringify({ prompt: "x", actor: "deputy" });
+    expect((await app.request("/congress/ai/run", { method: "POST", headers: json, body })).status).toBe(401);
+    expect((await app.request("/congress/ai/run", { method: "POST", headers: { ...json, ...session() }, body }, bindings())).status).toBe(401);
+  });
+
+  it("POST /run rejects a malformed request", async () => {
+    const res = await app.request("/congress/ai/run", { method: "POST", headers: { ...internal, ...json }, body: JSON.stringify({ actor: "deputy" }) });
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /run comes back refused, not spawned, while AI is paused", async () => {
+    await app.request(
+      "/congress/ai/settings",
+      { method: "PUT", headers: { ...json, ...session() }, body: JSON.stringify({ paused: true, pausedReason: "test" }) },
+      bindings()
+    );
+    try {
+      const res = await app.request("/congress/ai/run", {
+        method: "POST",
+        headers: { ...internal, ...json },
+        body: JSON.stringify({ prompt: "x", actor: "deputy", meta: { chamber: "deputy", directiveId: 1 } }),
+      });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ ok: false, refused: true, errorMessage: "AI is paused: test" });
+    } finally {
+      await app.request(
+        "/congress/ai/settings",
+        { method: "PUT", headers: { ...json, ...session() }, body: JSON.stringify({ paused: false, pausedReason: null }) },
+        bindings()
+      );
+    }
+  });
+});
+
 describe("POST /congress/exhibits/resolve", () => {
   it("accepts either a session or the internal token", async () => {
     // A Chamber's own backend resolves tokens too now (e.g. chamber-calendar
@@ -174,6 +223,42 @@ describe("request validation", () => {
     });
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({ error: "invalid_manifest" });
+  });
+
+  it("refuses a Chamber named after one of the shell's own routes", async () => {
+    // "/search" is Congress's Search tab - a Chamber there would be unreachable.
+    const res = await app.request("/congress/register", {
+      method: "POST",
+      headers: { ...internal, ...json },
+      body: JSON.stringify(makeManifest("search", chamber.origin)),
+    });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "reserved_name" });
+  });
+
+  it("round-trips the home screen's pinned views, in order, without touching dark mode", async () => {
+    const pinnedViews = [
+      { chamber: "calendar", viewId: "upcoming" },
+      { chamber: "tasks", viewId: "open" },
+    ];
+    const put = await app.request(
+      "/congress/settings",
+      { method: "PUT", headers: { ...json, ...session() }, body: JSON.stringify({ pinnedViews }) },
+      bindings()
+    );
+    expect(put.status).toBe(200);
+    const got = (await (await app.request("/congress/settings", { headers: session() }, bindings())).json()) as { pinnedViews: unknown; darkMode: unknown };
+    expect(got.pinnedViews).toEqual(pinnedViews);
+    expect(typeof got.darkMode).toBe("boolean");
+  });
+
+  it("400s a malformed pinned view", async () => {
+    const res = await app.request(
+      "/congress/settings",
+      { method: "PUT", headers: { ...json, ...session() }, body: JSON.stringify({ pinnedViews: [{ chamber: "tasks" }] }) },
+      bindings()
+    );
+    expect(res.status).toBe(400);
   });
 
   it("400s a heartbeat with no name", async () => {

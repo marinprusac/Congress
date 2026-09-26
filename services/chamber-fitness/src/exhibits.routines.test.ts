@@ -86,7 +86,7 @@ describe("resolve (workout + routine dispatcher)", () => {
     const results = await resolve(["routine-r1", toExhibitId(workout.id), "workout-999999"]);
 
     expect(results).toEqual([
-      { id: "routine-r1", name: "Push Day", url: "/fitness/routines/r1" },
+      { id: "routine-r1", name: "Push Day", url: "/routines/r1" },
       expect.objectContaining({ id: toExhibitId(workout.id) }),
       { id: "workout-999999", deleted: true },
     ]);

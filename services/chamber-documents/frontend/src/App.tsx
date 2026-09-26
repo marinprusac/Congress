@@ -1,7 +1,6 @@
 import { Route, Routes } from "react-router-dom";
-import { useAppliedTheme } from "@congress/congress-ui";
+import { ChamberIndexRedirect, useAppliedTheme } from "@congress/congress-ui";
 import { Layout } from "@/components/Layout";
-import { DocumentsListPage } from "@/pages/DocumentsListPage";
 import { DocumentEditorPage } from "@/pages/DocumentEditorPage";
 
 export function App() {
@@ -10,7 +9,9 @@ export function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<DocumentsListPage />} />
+        {/* No list page at the root any more - this Chamber's exhibits live in
+            the home feed and Search - so "/<chamber>" goes home. */}
+        <Route index element={<ChamberIndexRedirect />} />
         <Route path="d/:id" element={<DocumentEditorPage />} />
         <Route path="new" element={<DocumentEditorPage />} />
       </Route>

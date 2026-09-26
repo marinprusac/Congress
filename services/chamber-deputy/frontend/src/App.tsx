@@ -1,8 +1,6 @@
 import { Route, Routes } from "react-router-dom";
-import { useAppliedTheme } from "@congress/congress-ui";
+import { ChamberIndexRedirect, useAppliedTheme } from "@congress/congress-ui";
 import { Layout } from "@/components/Layout";
-import { ChatPage } from "@/pages/ChatPage";
-import { DirectivesListPage } from "@/pages/DirectivesListPage";
 import { DirectiveEditorPage } from "@/pages/DirectiveEditorPage";
 
 export function App() {
@@ -11,10 +9,11 @@ export function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<DirectivesListPage />} />
+        {/* No list page at the root any more - this Chamber's exhibits live in
+            the home feed and Search - so "/<chamber>" goes home. */}
+        <Route index element={<ChamberIndexRedirect />} />
         <Route path="directives/new" element={<DirectiveEditorPage />} />
         <Route path="d/:id" element={<DirectiveEditorPage />} />
-        <Route path="chat" element={<ChatPage />} />
       </Route>
     </Routes>
   );

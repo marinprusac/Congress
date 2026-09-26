@@ -1,147 +1,531 @@
 @import "@congress/congress-ui/styles.css";
 
-/* Top-right anchor for the notification bell, above every route's content
-   (NavPanel's own layers sit below the panel's z-index 50). */
-.shell-bell {
+/* ---- Shell navigation: bottom tab bar (mobile) / left rail (desktop) ----
+
+   Home · Search · + · Notifications · Settings. Mobile-first: a fixed bottom
+   bar whose height is published as --mobile-nav-height, which every fixed
+   bottom-docked element in congress-ui (pickers, popovers, confirm sheet,
+   toasts) already offsets itself by. On desktop the same five items become
+   a slim left rail, and --chamber-picker-width (the old sidebar's reserved
+   strip on .chamber-shell) shrinks to the rail's width. */
+:root {
+  --shell-tabbar-height: 3.5rem;
+  --mobile-nav-height: calc(var(--shell-tabbar-height) + env(safe-area-inset-bottom, 0px));
+}
+
+.shell-tabbar {
   position: fixed;
   z-index: 40;
-  top: calc(env(safe-area-inset-top, 0px) + 0.25rem);
-  right: 0.25rem;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  height: var(--mobile-nav-height);
+  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  border-top: 1px solid var(--color-dust);
+  background-color: var(--color-parchment);
 }
 
-@media (min-width: 641px) {
-  .shell-bell {
-    top: 0.75rem;
-    right: 0.75rem;
-  }
-}
-
-
-/* NotificationBell - Congress's own bell+panel, fixed top-right chrome of the
-   shell on every route (see App.tsx's .shell-bell). */
-.notification-bell {
+.shell-tab {
   position: relative;
-  flex-shrink: 0;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-dust);
 }
 
-.notification-bell-trigger {
-  position: relative;
+.shell-tab svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+.shell-tab:hover,
+.shell-tab.active {
+  color: var(--color-ink);
+}
+
+.shell-tab-label {
+  display: none;
+}
+
+/* The central "+" - the one filled control in the bar. */
+.shell-tab--create span.shell-tab-create-mark {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Apple's ~44pt tap-target guidance, in absolute px so it holds regardless
-     of root font-size - this is a hit-area size, not a type size. */
-  width: 44px;
-  height: 44px;
-  color: var(--color-slate);
+  width: 2.5rem;
+  height: 2rem;
+  background-color: var(--color-accent);
+  color: var(--color-parchment);
 }
 
-.notification-bell-trigger:hover {
-  color: var(--color-accent);
-}
-
-.notification-bell-trigger svg {
-  width: 1.3rem;
-  height: 1.3rem;
-}
-
-.notification-bell-badge {
+.shell-tab-badge {
   position: absolute;
-  top: -0.15rem;
-  right: -0.15rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.1rem;
-  height: 1.1rem;
+  top: 0.55rem;
+  left: calc(50% + 0.35rem);
+  min-width: 1.05rem;
+  height: 1.05rem;
   padding: 0 0.25rem;
   border-radius: 999px;
-  background: var(--color-alert);
+  background-color: var(--color-alert);
   color: var(--color-parchment);
   font-family: var(--font-mono);
   font-size: 0.65rem;
-  line-height: 1;
+  line-height: 1.05rem;
+  text-align: center;
 }
 
-/* Mobile-first, same idiom as .exhibit-picker-dropdown/.exhibit-ref-add-popover:
-   fixed to the viewport (a small button's own position is a bad anchor for a
-   panel that can be taller/wider than the space near it on a phone screen),
-   hanging below the top-right bell at every width. The min-width: 641px
-   override only narrows/positions it. */
-.notification-panel {
+/* Content clears the fixed bar; full-height pages (.chamber-shell--canvas,
+   e.g. the chat) shrink to the space above it instead. */
+@media (max-width: 640px) {
+  .chamber-shell,
+  .chamber-host-unavailable {
+    padding-bottom: var(--mobile-nav-height);
+  }
+
+  /* min-height: 0 too - .chamber-shell's own min-height: 100vh would
+     otherwise win over the shorter height and push the chat's input under
+     the bar. */
+  .chamber-shell--canvas {
+    height: calc(100dvh - var(--mobile-nav-height));
+    min-height: 0;
+    padding-bottom: 0;
+  }
+}
+
+@media (min-width: 641px) {
+  :root {
+    --chamber-picker-width: 5rem;
+    --mobile-nav-height: 0px;
+  }
+
+  .shell-tabbar {
+    top: 0;
+    right: auto;
+    width: var(--chamber-picker-width);
+    height: auto;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    padding: calc(1rem + env(safe-area-inset-top, 0px)) 0 1rem env(safe-area-inset-left, 0px);
+    border-top: none;
+    border-right: 1px solid var(--color-dust);
+  }
+
+  .shell-tab {
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.6rem 0;
+  }
+
+  .shell-tab-label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* Settings sits at the bottom of the rail. */
+  .shell-tab--settings {
+    margin-top: auto;
+  }
+
+  .shell-tab-badge {
+    top: 0.35rem;
+  }
+}
+
+/* ---- Home: composer, pinned "stories" row, feed ---- */
+
+.home-main {
+  padding-top: 0.5rem;
+}
+
+@media (min-width: 641px) {
+  .home-main {
+    padding-top: 1.5rem;
+  }
+}
+
+.home-composer {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.home-composer input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--color-dust);
+  background: var(--color-parchment);
+  padding: 0.6rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--color-ink);
+}
+
+.home-composer input::placeholder {
+  color: var(--color-dust);
+}
+
+.home-composer input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.home-stories {
+  display: flex;
+  gap: 1rem;
+  margin: 0 -1.25rem 1.5rem;
+  padding: 0 1.25rem 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.home-stories::-webkit-scrollbar {
+  display: none;
+}
+
+.home-story {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: 4.25rem;
+  color: var(--color-ink);
+}
+
+.home-story-bubble {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border: 2px solid var(--color-accent);
+  border-radius: 999px;
+}
+
+.home-story-bubble svg {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.home-story--add .home-story-bubble {
+  border-style: dashed;
+  border-color: var(--color-dust);
+  color: var(--color-dust);
+}
+
+.home-story-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--color-slate);
+}
+
+.home-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* One feed card - a Chamber's view (its own component inside Congress's
+   frame) or a single exhibit. */
+.feed-card {
+  border: 1px solid var(--color-dust);
+  background: var(--color-parchment);
+}
+
+.feed-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-dust) 50%, transparent);
+}
+
+.feed-card-header svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: var(--color-slate);
+}
+
+.feed-card-title {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-slate);
+}
+
+/* The reason gives way (truncates) before the view's own title does. */
+.feed-card-reason {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--color-accent);
+}
+
+.feed-card-open {
+  flex-shrink: 0;
+  padding-left: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-accent);
+}
+
+/* A view card's body has a fixed height: the Chamber's own component was
+   built for a fixed-size cell and scrolls internally (ViewCard). */
+.feed-card-body {
+  position: relative;
+  height: 15rem;
+  padding: 0.75rem;
+  overflow: hidden;
+}
+
+.feed-card-body--full {
+  height: calc(100dvh - var(--mobile-nav-height) - 9rem);
+  min-height: 20rem;
+}
+
+/* A single exhibit: its own information inline (time, facts, an excerpt),
+   the whole card tappable. */
+.feed-exhibit {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+  padding: 0.85rem 0.75rem;
+  text-align: left;
+}
+
+.feed-exhibit-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.feed-exhibit-time,
+.feed-exhibit-fields {
+  padding-left: 2.05rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-slate);
+}
+
+.feed-exhibit-body {
+  padding-left: 2.05rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--color-ink);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.feed-exhibit-head svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  flex-shrink: 0;
+  color: var(--color-slate);
+}
+
+.feed-exhibit-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--color-ink);
+}
+
+/* In a single-exhibit row the reason is short and the point of the row -
+   it keeps its width and the name truncates instead. */
+.feed-exhibit .feed-card-reason {
+  flex: 0 0 auto;
+}
+
+.feed-exhibit:hover .feed-exhibit-name {
+  color: var(--color-accent);
+}
+
+/* ---- Search ---- */
+
+.search-input {
+  width: 100%;
+  border: 1px solid var(--color-dust);
+  background: var(--color-parchment);
+  padding: 0.65rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--color-ink);
+}
+
+.search-input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.search-section-title {
+  margin: 1.5rem 0 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-dust);
+}
+
+.search-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.25rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-dust) 50%, transparent);
+  text-align: left;
+  color: var(--color-ink);
+}
+
+.search-row svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+  color: var(--color-slate);
+}
+
+.search-row-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-row-meta {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--color-dust);
+}
+
+.search-row:hover .search-row-name {
+  color: var(--color-accent);
+}
+
+/* ---- "+" create sheet ----
+   Same mobile-first fixed idiom as congress-ui's .confirm-sheet: docked to
+   the bottom above the tab bar on mobile, a small panel beside the rail on
+   desktop. */
+.create-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background-color: color-mix(in srgb, black 35%, transparent);
+}
+
+.create-sheet {
   position: fixed;
   z-index: 50;
   left: 0.5rem;
   right: 0.5rem;
-  top: calc(env(safe-area-inset-top, 0px) + 3.5rem);
-  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - var(--mobile-nav-height, 0px) - 4.5rem);
+  bottom: calc(var(--mobile-nav-height) + 0.5rem);
+  max-height: 60vh;
   overflow-y: auto;
   border: 1px solid var(--color-dust);
-  background: var(--color-parchment);
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 20%, transparent);
+  background-color: var(--color-parchment);
+  box-shadow: 0 -2px 16px color-mix(in srgb, black 25%, transparent);
 }
 
 @media (min-width: 641px) {
-  .notification-panel {
-    left: auto;
-    right: 1rem;
-    width: 20rem;
-    max-width: calc(100vw - 2rem);
-    max-height: 24rem;
-    box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 15%, transparent);
+  .create-sheet {
+    left: calc(var(--chamber-picker-width) + 0.75rem);
+    right: auto;
+    bottom: auto;
+    top: 5rem;
+    width: 18rem;
   }
 }
 
-.notification-panel[hidden] {
-  display: none;
-}
-
-.notification-panel-header {
-  position: sticky;
-  top: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.6rem 0.85rem;
+.create-sheet-title {
+  padding: 0.7rem 0.9rem;
   border-bottom: 1px solid var(--color-dust);
-  background: var(--color-parchment);
   font-family: var(--font-mono);
-  font-size: 0.7em;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   color: var(--color-dust);
 }
 
-.notification-panel-mark-all {
+.create-sheet-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem 0.9rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-dust) 50%, transparent);
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--color-ink);
+}
+
+.create-sheet-option:last-child {
+  border-bottom: none;
+}
+
+.create-sheet-option svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  color: var(--color-slate);
+}
+
+.create-sheet-option:hover {
   color: var(--color-accent);
-  text-transform: none;
-  letter-spacing: normal;
 }
 
-.notification-panel-mark-all:hover {
-  text-decoration: underline;
-}
+/* ---- Notifications page ---- */
 
-.notification-empty {
-  padding: 1.5rem 0.85rem;
-  text-align: center;
-  color: var(--color-dust);
-  font-size: 0.85em;
+.notification-list {
+  border-top: 1px solid var(--color-dust);
 }
 
 .notification-item {
   display: flex;
   align-items: flex-start;
   gap: 0.6rem;
-  padding: 0.6rem 0.85rem;
+  padding: 0.75rem 0.25rem;
   border-bottom: 1px solid var(--color-dust);
   cursor: pointer;
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
 }
 
-.notification-item:last-child {
-  border-bottom: none;
+.notification-item--unread {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
 }
 
 .notification-item:hover {
@@ -167,13 +551,13 @@
 }
 
 .notification-item-title {
-  font-size: 0.9em;
+  font-size: 0.95em;
   color: var(--color-ink);
 }
 
 .notification-item-text {
   margin-top: 0.15rem;
-  font-size: 0.8em;
+  font-size: 0.85em;
   color: var(--color-slate);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -189,32 +573,11 @@
   color: var(--color-dust);
 }
 
-/* Edit-mode "add widget" tray - lists registered widgets not currently
-   placed on this scope's canvas. Same mobile-first fixed-viewport idiom as
-   congress-ui's .exhibit-picker-dropdown: docked to the bottom on mobile
-   (clearing the fixed bottom nav via --mobile-nav-height), a fixed
-   bottom-right panel on desktop instead of an anchored dropdown, since
-   there's no single trigger element to anchor to here. */
-.capitol-add-widget-tray {
-  position: fixed;
-  left: 0.5rem;
-  right: 0.5rem;
-  bottom: calc(var(--mobile-nav-height, 0px) + 0.5rem);
-  z-index: 50;
-  max-height: 40vh;
-  overflow-y: auto;
-  border: 1px solid var(--color-dust);
-  background-color: var(--color-parchment);
-  box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
+.notification-item-dismiss {
+  flex-shrink: 0;
+  color: var(--color-dust);
 }
 
-@media (min-width: 641px) {
-  .capitol-add-widget-tray {
-    left: auto;
-    width: 20rem;
-    bottom: 1rem;
-    right: 1rem;
-    max-height: 24rem;
-    box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 15%, transparent);
-  }
+.notification-item-dismiss:hover {
+  color: var(--color-alert);
 }

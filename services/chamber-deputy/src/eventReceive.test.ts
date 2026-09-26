@@ -2,15 +2,17 @@ import { sql } from "drizzle-orm";
 import { migrationsDir, waitFor } from "@congress/test-support";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-// runDeputy shells out to the `claude` CLI - stubbed so these stay off the
+// runDirective calls Congress's AI over HTTP - stubbed so these stay off the
 // network/process spawn and can assert on exactly what it would have been
 // called with.
-vi.mock("./engine.js", () => ({ runDeputy: vi.fn().mockResolvedValue({ ok: true, response: "done", sessionId: null, errorMessage: null, costUsd: 0 }) }));
+vi.mock("./engine.js", () => ({
+  runDirective: vi.fn().mockResolvedValue({ ok: true, refused: false, response: "done", errorMessage: null, transcript: [], costUsd: 0, inputTokens: null, outputTokens: null, durationMs: 0 }),
+  isAiPaused: vi.fn().mockResolvedValue(false),
+}));
 
-import { runDeputy } from "./engine.js";
+import { isAiPaused, runDirective } from "./engine.js";
 import { db, runMigrations } from "./db/client.js";
 import { directives, pendingCheckupEvents } from "./db/schema.js";
-import { updateSettings } from "./settings.js";
 import { handleReceivedEvent } from "./eventReceive.js";
 import { drainPendingCheckupEvents } from "./pendingEvents.js";
 
@@ -19,8 +21,8 @@ beforeAll(() => runMigrations(migrationsDir("chamber-deputy")));
 beforeEach(async () => {
   db.run(sql`delete from directives`);
   db.run(sql`delete from pending_checkup_events`);
-  vi.mocked(runDeputy).mockClear();
-  await updateSettings({ paused: false, pausedReason: null });
+  vi.mocked(runDirective).mockClear();
+  vi.mocked(isAiPaused).mockResolvedValue(false);
 });
 
 function eventDirective(overrides: Partial<typeof directives.$inferInsert> = {}) {
@@ -50,8 +52,8 @@ describe("handleReceivedEvent", () => {
     const d = eventDirective();
     await deliver("tasks.overdue", { taskId: 42 });
 
-    await waitFor(() => vi.mocked(runDeputy).mock.calls.length > 0, 2_000, "runDeputy to be called");
-    expect(runDeputy).toHaveBeenCalledWith(
+    await waitFor(() => vi.mocked(runDirective).mock.calls.length > 0, 2_000, "runDirective to be called");
+    expect(runDirective).toHaveBeenCalledWith(
       expect.objectContaining({
         trigger: "event",
         directive: expect.objectContaining({ id: d.id }),
@@ -66,7 +68,7 @@ describe("handleReceivedEvent", () => {
 
     // Give the queue a beat to have run if it was (wrongly) going to.
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(runDeputy).not.toHaveBeenCalled();
+    expect(runDirective).not.toHaveBeenCalled();
   });
 
   it("ignores a disabled event-triggered directive", async () => {
@@ -74,7 +76,7 @@ describe("handleReceivedEvent", () => {
     await deliver("tasks.overdue");
 
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(runDeputy).not.toHaveBeenCalled();
+    expect(runDirective).not.toHaveBeenCalled();
   });
 
   it("ignores a directive scheduled some other way even if it shares a triggerEventType value", async () => {
@@ -82,7 +84,7 @@ describe("handleReceivedEvent", () => {
     await deliver("tasks.overdue");
 
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(runDeputy).not.toHaveBeenCalled();
+    expect(runDirective).not.toHaveBeenCalled();
   });
 
   it("fires every matching enabled directive for one event", async () => {
@@ -90,8 +92,8 @@ describe("handleReceivedEvent", () => {
     eventDirective({ title: "B" });
     await deliver("tasks.overdue");
 
-    await waitFor(() => vi.mocked(runDeputy).mock.calls.length >= 2, 2_000, "both directives to run");
-    expect(runDeputy).toHaveBeenCalledTimes(2);
+    await waitFor(() => vi.mocked(runDirective).mock.calls.length >= 2, 2_000, "both directives to run");
+    expect(runDirective).toHaveBeenCalledTimes(2);
   });
 
   it("stamps lastRunAt on the fired directive", async () => {
@@ -113,13 +115,13 @@ describe("handleReceivedEvent", () => {
     expect(buffered[0]).toMatchObject({ chamber: "tasks", type: "tasks.overdue", payload: { taskId: 7 } });
   });
 
-  it("does nothing at all while Deputy is paused", async () => {
+  it("does nothing at all while Congress's AI is paused", async () => {
     eventDirective();
-    await updateSettings({ paused: true, pausedReason: "testing" });
+    vi.mocked(isAiPaused).mockResolvedValue(true);
     await deliver("tasks.overdue");
 
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(runDeputy).not.toHaveBeenCalled();
+    expect(runDirective).not.toHaveBeenCalled();
     expect(db.select().from(pendingCheckupEvents).all()).toHaveLength(0);
   });
 });

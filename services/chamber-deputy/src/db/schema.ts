@@ -18,7 +18,7 @@ export const directives = sqliteTable("directives", {
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   // Own schedule, separate from the free-text body (still not structurally
   // parsed - see the comment above): null means this directive only ever
-  // runs on demand (play button) or as part of a chat bundle, never on its
+  // runs on demand (play button), never on its
   // own timer or an event. "interval"/"daily"/"weekly" all still go through
   // checkup.ts's single self-rescheduling timer, armed for whichever
   // enabled+scheduled directive's own scheduling.ts#nextRunAt() is soonest -
@@ -76,55 +76,13 @@ export const directiveRefs = sqliteTable(
   (table) => [uniqueIndex("directive_refs_directive_target_idx").on(table.directiveId, table.targetExhibitId)]
 );
 
-// Chat log: functional command traffic, not reference material - deliberately
-// not an Exhibit (see docs/deputy-chamber-plan.md §9). `sessionId` is the
-// `claude` CLI's own session id (see engine.ts) - messages sharing one are
-// one resumed conversation; a gap of more than the configured idle window
-// starts a fresh id, see chat.ts's session-resolution logic.
-export const messages = sqliteTable(
-  "messages",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    sessionId: text("session_id").notNull(),
-    role: text("role", { enum: ["user", "assistant"] }).notNull(),
-    text: text("text").notNull(),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-  },
-  (table) => [index("messages_session_id_idx").on(table.sessionId), index("messages_created_at_idx").on(table.createdAt)]
-);
+// Chat, spend and the AI settings row moved to Congress with the AI engine
+// (services/congress/src/ai/). The old `messages`/`deputy_spend` tables are
+// dropped by migration; the old `settings` table is deliberately left in
+// place (no longer in this schema) so Congress's one-time import
+// (ai/legacyImport.ts) can still read it on first boot regardless of which
+// service restarts first. Drop it in a later migration.
 
-// Just enough to enforce settings.budgetCapUsd (engine.ts's runDeputy checks
-// todaySpendUsd before spawning another `claude` process) - no transcript,
-// prompt, or response text. Full context for a completed run is published
-// live to Congress's event relay instead (events.ts's deputy.directive_run)
-// for the Logs Chamber to durably keep if the owner sets up a rule; Deputy
-// itself keeps no run history of its own.
-export const deputySpend = sqliteTable(
-  "deputy_spend",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    costUsd: real("cost_usd"),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-  },
-  (table) => [index("deputy_spend_created_at_idx").on(table.createdAt)]
-);
-
-// Single-row table (id is always 1) - unlike most Chambers' placeholder
-// settings row, Deputy has real owner-tunable knobs from day one (see
-// docs/deputy-chamber-plan.md §12): background context, chat behavior, the
-// budget cap, model choice, retention, and the pause/kill switch. Scheduling
-// is no longer a single global knob here - see each directive's own
-// scheduleType/intervalMs/etc above.
-export const settings = sqliteTable("settings", {
-  id: integer("id").primaryKey().default(1),
-  contextPrompt: text("context_prompt").notNull().default(""),
-  chatIdleWindowMs: integer("chat_idle_window_ms").notNull().default(30 * 60 * 1000),
-  budgetCapUsd: real("budget_cap_usd").notNull().default(10),
-  model: text("model").notNull().default("claude-sonnet-5"),
-  retentionDays: integer("retention_days").notNull().default(30),
-  paused: integer("paused", { mode: "boolean" }).notNull().default(false),
-  pausedReason: text("paused_reason"),
-});
 
 // This Chamber's own short-lived buffer of events received since a
 // directive last ran (see checkup.ts) - deliberately separate from

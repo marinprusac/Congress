@@ -66,7 +66,7 @@ describe("resolveWorkoutExhibits", () => {
     expect(result).toMatchObject({
       id: toExhibitId(row.id),
       name: formatWorkoutExhibitTitle("Push Day", row.startTime, 1),
-      url: `/fitness/workouts/${row.id}`,
+      url: `/workouts/${row.id}`,
     });
   });
 

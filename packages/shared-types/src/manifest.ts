@@ -15,21 +15,35 @@ export const manifestRoutesSchema = z.object({
 });
 export type ManifestRoutes = z.infer<typeof manifestRoutesSchema>;
 
-// One entry per homepage widget a Chamber contributes to Capitol's cell-based
-// canvas. `id` is a stable identifier - the key into that Chamber's
-// remote-entry `widgets` export (see ChamberHost/remoteModule.ts) and part
-// of its canvas placement key - never shown to the user, unlike `label`.
-// `width`/`height` are the widget's fixed footprint in canvas cells,
-// declared by the Chamber and not user-resizable. No route: a widget isn't
-// a navigable URL, it's a component resolved out of the Chamber's own
-// already-built remote-entry.js.
-export const manifestWidgetSchema = z.object({
-  id: z.string().min(1),
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
+// One entry per *view* a Chamber offers - a screen that genuinely can't be
+// expressed as a list of exhibits (Calendar's Agenda, the Map, Fitness's
+// Health charts). A plain list of exhibits (open tasks, upcoming events) is
+// deliberately NOT a view: those exhibits reach the home feed and Search on
+// their own. `fullPath` (relative to the Chamber, e.g. "/" for the Agenda)
+// is the full-screen page. `card` says the Chamber also exports a compact
+// feed card for it (the component keyed by `id` in its remote-entry `views`
+// export, e.g. a map preview); without one the feed shows the view as a
+// single row that opens it. A view needs at least one of the two.
+export const manifestViewSchema = z
+  .object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    description: z.string().optional(),
+    fullPath: z.string().startsWith("/").optional(),
+    card: z.boolean().optional(),
+  })
+  .refine((v) => v.card === true || v.fullPath !== undefined, { message: "A view needs a feed card, a fullPath, or both." });
+export type ManifestView = z.infer<typeof manifestViewSchema>;
+
+// One entry per kind of Exhibit a Chamber lets the owner create - what the
+// home screen's "+" sheet lists. `createPath` (relative to the Chamber) opens
+// that Chamber's own editor on a new, unsaved Exhibit.
+export const manifestExhibitTypeSchema = z.object({
+  type: z.string().min(1),
   label: z.string().min(1),
+  createPath: z.string().startsWith("/"),
 });
-export type ManifestWidget = z.infer<typeof manifestWidgetSchema>;
+export type ManifestExhibitType = z.infer<typeof manifestExhibitTypeSchema>;
 
 // Describes one field of a declared event's payload - deliberately the same
 // shape as an MCP tool's own JSON-Schema `properties` entries (see
@@ -103,7 +117,24 @@ export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
     description: "The owner changed a per-event-type record/notify setting - useful for spotting why an expected notification went quiet.",
     payloadFields: { eventType: { type: "string" }, label: { type: "string" } },
   },
+  {
+    type: "congress.ai_chat_run",
+    label: "AI chat took action",
+    description: "A chat message made the assistant call one or more tools.",
+    payloadFields: {
+      message: { type: "string" },
+      summary: { type: "string" },
+      toolCallCount: { type: "number" },
+      costUsd: { type: "number" },
+    },
+  },
 ];
+
+// Top-level paths Congress's own shell owns (services/congress/frontend's
+// App.tsx routes, and the service worker's shell-route allowlist). A Chamber
+// is served at "/<name>/*", so one named any of these would be unreachable -
+// Congress refuses to register it.
+export const RESERVED_CHAMBER_NAMES = ["congress", "search", "notifications", "settings", "chat", "view", "vendor", "auth", "api", "mcp"] as const;
 
 export const manifestSchema = z.object({
   name: z.string().min(1),
@@ -113,12 +144,13 @@ export const manifestSchema = z.object({
   apiBase: z.string().url(),
   mcpUrl: z.string().url().optional(),
   healthUrl: z.string().url(),
-  // Homepage widgets this Chamber contributes to Congress's canvas. Defaulted
-  // so a Chamber registering against an old manifest shape (or a chamber with
-  // no widgets) never has to think about this field.
-  widgets: z.array(manifestWidgetSchema).default([]),
+  // Home feed views and "+"-creatable Exhibit types - see the schemas above.
+  // Defaulted so a Chamber registering an older manifest shape (or one with
+  // neither) never has to think about these fields.
+  views: z.array(manifestViewSchema).default([]),
+  exhibitTypes: z.array(manifestExhibitTypeSchema).default([]),
   // Domain events this Chamber may publish. Defaulted the same way as
-  // widgets - most Chambers publish none.
+  // views - most Chambers publish none.
   events: z.array(manifestEventSchema).default([]),
 });
 export type Manifest = z.infer<typeof manifestSchema>;

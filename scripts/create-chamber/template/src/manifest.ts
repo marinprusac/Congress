@@ -14,10 +14,11 @@ export const manifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  // One example widget for Capitol's homepage canvas - add more entries here
-  // (each with its own id/width/height/label) as this Chamber grows more
-  // than one. width/height are in canvas cells, fixed by this Chamber, not
-  // user-resizable. See frontend/src/widgets/ for the matching component.
-  widgets: [{ id: "recent", width: 2, height: 3, label: "Recent" }],
+  // Views are only genuine screens that can't be expressed as a list of
+  // exhibits (a map, an agenda) - most Chambers have none; their exhibits
+  // reach the home feed (src/feedRules.ts) and Search on their own.
+  // exhibitTypes is what the home screen's "+" can create here.
+  views: [],
+  exhibitTypes: [{ type: "item", label: "Item", createPath: "/new" }],
   events: [],
 };

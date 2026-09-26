@@ -5,7 +5,7 @@ import { z } from "zod";
 // scheduleTimeZone), "weekly" additionally pinned to scheduleDayOfWeek (0
 // Sunday - 6 Saturday). "event": fires immediately when triggerEventType is
 // received (eventReceive.ts), never off the periodic timer at all. null:
-// manual/chat only. See scheduling.ts for the daily/weekly math and
+// manual only. See scheduling.ts for the daily/weekly math and
 // db/schema.ts for which columns back which type.
 export const directiveScheduleTypeSchema = z.enum(["interval", "daily", "weekly", "event"]);
 export type DirectiveScheduleType = z.infer<typeof directiveScheduleTypeSchema>;
@@ -114,63 +114,9 @@ export const updateDirectiveRequestSchema = z
   });
 export type UpdateDirectiveRequest = z.infer<typeof updateDirectiveRequestSchema>;
 
-export const messageSchema = z.object({
-  id: z.number().int(),
-  sessionId: z.string(),
-  role: z.enum(["user", "assistant"]),
-  text: z.string(),
-  createdAt: z.string(),
-});
-export type Message = z.infer<typeof messageSchema>;
-
-export const postChatMessageRequestSchema = z.object({
-  text: z.string().min(1),
-});
-export type PostChatMessageRequest = z.infer<typeof postChatMessageRequestSchema>;
-
-export const postChatMessageResponseSchema = z.object({
-  userMessage: messageSchema,
-  assistantMessage: messageSchema,
-});
-export type PostChatMessageResponse = z.infer<typeof postChatMessageResponseSchema>;
-
-// One tool call parsed out of a run's stream-json transcript - see
-// engine.ts's spawnClaude for how tool_use/tool_result blocks are paired up.
-export const deputyTranscriptEntrySchema = z.object({
-  toolName: z.string(),
-  input: z.unknown(),
-  output: z.unknown().nullable(),
-  error: z.string().nullable(),
-});
-export type DeputyTranscriptEntry = z.infer<typeof deputyTranscriptEntrySchema>;
-
 // "scheduled" - this directive's own interval/daily/weekly timer came due
 // (checkup.ts). "event" - this directive's own triggerEventType was just
-// received (eventReceive.ts), running immediately rather than waiting for
-// the next periodic checkup. "manual" - the owner hit the play button on
-// one directive. "chat" bundles every enabled directive into one prompt
-// instead of targeting a single one.
-export const deputyRunTriggerSchema = z.enum(["chat", "scheduled", "event", "manual"]);
+// received (eventReceive.ts). "manual" - the owner hit the play button.
+// (Chat moved to Congress's own AI - see services/congress/src/ai/.)
+export const deputyRunTriggerSchema = z.enum(["scheduled", "event", "manual"]);
 export type DeputyRunTrigger = z.infer<typeof deputyRunTriggerSchema>;
-
-export const settingsSchema = z.object({
-  contextPrompt: z.string(),
-  chatIdleWindowMs: z.number().int().positive(),
-  budgetCapUsd: z.number().positive(),
-  model: z.string().min(1),
-  retentionDays: z.number().int().positive(),
-  paused: z.boolean(),
-  pausedReason: z.string().nullable(),
-});
-export type Settings = z.infer<typeof settingsSchema>;
-
-export const updateSettingsRequestSchema = z.object({
-  contextPrompt: z.string().optional(),
-  chatIdleWindowMs: z.number().int().positive().optional(),
-  budgetCapUsd: z.number().positive().optional(),
-  model: z.string().min(1).optional(),
-  retentionDays: z.number().int().positive().optional(),
-  paused: z.boolean().optional(),
-  pausedReason: z.string().nullable().optional(),
-});
-export type UpdateSettingsRequest = z.infer<typeof updateSettingsRequestSchema>;

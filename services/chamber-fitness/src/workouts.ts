@@ -104,7 +104,7 @@ async function syncWorkoutExhibit(id: number, title: string, startTime: Date): P
     id: toExhibitId(id),
     type: "workout",
     name: composeExhibitTitle(id, title, startTime),
-    url: `/fitness/workouts/${id}`,
+    url: `/workouts/${id}`,
     outgoingRefs: manual,
     manualRefs: manual,
   });
@@ -205,7 +205,7 @@ export async function deleteWorkoutByHevyId(hevyId: string): Promise<boolean> {
     id: toExhibitId(existing.id),
     type: "workout",
     name: existing.title,
-    url: `/fitness/workouts/${existing.id}`,
+    url: `/workouts/${existing.id}`,
     outgoingRefs: [],
     deleted: true,
   });

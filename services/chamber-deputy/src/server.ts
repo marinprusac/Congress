@@ -1,14 +1,13 @@
 import { Hono } from "hono";
-import { streamSSE } from "hono/streaming";
 import type { HttpBindings } from "@hono/node-server";
-import { createDirectiveRequestSchema, updateDirectiveRequestSchema, updateSettingsRequestSchema, postChatMessageRequestSchema } from "./types.js";
+import { createDirectiveRequestSchema, updateDirectiveRequestSchema } from "./types.js";
 import {
   mountManifestAndHealth,
   mountExhibitSearchRoutes,
-  mountSettingsRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
   mountEventReceiveRoute,
+  mountFeedRoute,
 } from "@congress/chamber-kit";
 import { manifest } from "./manifest.js";
 import { env } from "./env.js";
@@ -27,14 +26,10 @@ import {
   removeManualRefByExhibitId,
   resyncDirectiveExhibitByExhibitId,
 } from "./directives.js";
-import { getSettings, updateSettings } from "./settings.js";
 import { searchDirectiveExhibits, resolveDirectiveExhibits } from "./exhibits.js";
-import { listMessages, postChatMessage, clearThread } from "./chat.js";
-import { todaySpendUsd } from "./spend.js";
-import { enqueue } from "./jobQueue.js";
-import { runDeputy } from "./engine.js";
+import { runDirective } from "./engine.js";
+import { deputyFeedCandidates } from "./feedRules.js";
 import { rearmScheduler } from "./checkup.js";
-import { getSnapshot, onProgress, type RunProgressEvent } from "./runStream.js";
 import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
@@ -98,11 +93,9 @@ app.delete("/api/directives/:id", async (c) => {
   return c.body(null, 204);
 });
 
-// Play button (list row or directive page) - runs this one directive right
-// now, outside its normal schedule. Blocking on the queued run itself, same
-// "acceptable for a functional/transactional exchange" call chat.ts already
-// makes (concurrency-1 job queue, so this queues behind anything already
-// running).
+// Play button (directive page) - runs this one directive right now, outside
+// its normal schedule. Blocks on the run itself, which Congress queues
+// behind anything already running (its AI job queue is concurrency-1).
 app.post("/api/directives/:id/run", async (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
@@ -112,13 +105,12 @@ app.post("/api/directives/:id/run", async (c) => {
   await markDirectiveRunNow(id);
   rearmScheduler();
   try {
-    const result = await enqueue(() => runDeputy({ trigger: "manual", directive }));
+    const result = await runDirective({ trigger: "manual", directive });
     return c.json({ ok: result.ok, response: result.response, errorMessage: result.errorMessage });
   } catch (err) {
-    // runDeputy can throw before ever reaching the CLI (e.g. it couldn't
-    // reach Congress to build the MCP config) - report that the same way as
-    // every other failure this endpoint can return (paused, budget cap,
-    // the CLI itself failing): a 200 with ok:false, so parseJsonResponse
+    // runDirective throws when Congress itself couldn't be reached - report
+    // that the same way as every other failure this endpoint can return
+    // (paused, budget cap, the CLI itself failing): a 200 with ok:false, so parseJsonResponse
     // (congress-ui) doesn't throw away this body and swallow errorMessage
     // behind a generic "Request failed: <status>".
     return c.json({ ok: false, response: null, errorMessage: (err as Error).message });
@@ -127,75 +119,14 @@ app.post("/api/directives/:id/run", async (c) => {
 
 mountExhibitSearchRoutes(app, { search: searchDirectiveExhibits, resolve: resolveDirectiveExhibits });
 
+// Home feed candidates - see feedRules.ts.
+mountFeedRoute(app, async (now) => deputyFeedCandidates(await listDirectives(), now));
+
 mountManualRefsRoutes(
   app,
   { list: listManualRefsByExhibitId, add: addManualRefByExhibitId, remove: removeManualRefByExhibitId },
   resyncDirectiveExhibitByExhibitId
 );
-
-mountSettingsRoutes(app, { getSettings, updateSettings }, updateSettingsRequestSchema);
-
-app.get("/api/settings/spend", async (c) => {
-  return c.json({ spentTodayUsd: await todaySpendUsd() });
-});
-
-// Chat - blocking on the queued headless run itself (see chat.ts/jobQueue.ts:
-// concurrency 1, so a message arriving mid-checkup queues behind it), not a
-// fire-and-forget + poll shape. Acceptable for a functional/transactional
-// exchange rather than a live-streaming one (docs/deputy-chamber-plan.md §1).
-app.get("/api/chat/messages", async (c) => {
-  return c.json(await listMessages());
-});
-
-app.post("/api/chat/messages", async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = postChatMessageRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  return c.json(await postChatMessage(parsed.data));
-});
-
-// The Clear button (ChatPage, shown in place of Send when the input is
-// empty) - Deputy keeps no history beyond the current thread.
-app.delete("/api/chat/messages", async (c) => {
-  clearThread();
-  return c.body(null, 204);
-});
-
-// Live progress for whichever run (chat or directive) is currently in
-// flight - see runStream.ts. jobQueue.ts is concurrency-1, so there's at
-// most one run to report on at a time; a client connecting mid-run (or
-// right after one finishes) is replayed its full event log first via
-// getSnapshot() rather than only seeing events from here on. Congress's own
-// gateway.ts special-cases this route to skip its usual forwarding timeout,
-// since this connection is meant to stay open indefinitely.
-app.get("/api/runs/stream", (c) => {
-  return streamSSE(c, async (stream) => {
-    async function send(event: RunProgressEvent) {
-      await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
-    }
-
-    const snapshot = getSnapshot();
-    if (snapshot) {
-      for (const event of snapshot.events) await send(event);
-    } else {
-      await stream.writeSSE({ event: "idle", data: "{}" });
-    }
-
-    const unsubscribe = onProgress((event) => void send(event));
-    stream.onAbort(unsubscribe);
-
-    // Keeps the connection alive through any idle-timeout proxy/middleware
-    // sitting in front of it - stream.aborted flips once the client
-    // disconnects (see StreamingApi's own readable.cancel -> abort wiring),
-    // which is also what ends this loop.
-    while (!stream.aborted) {
-      await stream.sleep(25_000);
-      if (!stream.aborted) await stream.writeSSE({ event: "ping", data: "" });
-    }
-  });
-});
 
 app.route("/mcp", mcpApp);
 

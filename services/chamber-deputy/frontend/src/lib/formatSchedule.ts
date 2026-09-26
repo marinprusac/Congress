@@ -26,7 +26,7 @@ type ScheduleFields = Pick<DirectiveSummary, "scheduleType" | "intervalMs" | "sc
 
 // A short, scannable label for a directive's own schedule - shared by the
 // list page (one line per row) and the view page's non-edit summary. null
-// for manual/chat-only (nothing to show).
+// for manual-only (nothing to show).
 export function formatSchedule(directive: ScheduleFields): string | null {
   switch (directive.scheduleType) {
     case "interval":

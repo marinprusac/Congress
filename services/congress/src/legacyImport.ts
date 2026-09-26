@@ -7,13 +7,7 @@ import { env } from "./env.js";
 
 type AppDb = typeof defaultDb;
 
-// Widgets from Chambers that no longer exist. "logs" contributed the old
-// recent-logs/bell widgets, which were removed rather than carried over (the
-// bell is Congress chrome now); "capitol" never had widgets of its own.
-const RETIRED_WIDGET_CHAMBERS = new Set(["logs", "capitol"]);
-
 interface ImportResult {
-  layouts: number;
   eventSettings: number;
   eventHistory: number;
   notifications: number;
@@ -56,41 +50,31 @@ function copyRows(
   return inserted;
 }
 
-// One-time import of the retired Capitol and Logs Chambers' own SQLite files
-// (widget placements; event settings/history, notifications, push
-// subscriptions) into Congress's own DB, now that both are core Congress
-// features. Idempotent and self-disabling: settings.legacyImportedAt is set
+// One-time import of the retired Logs Chamber's own SQLite file (event
+// settings/history, notifications, push subscriptions) into Congress's own
+// DB, now that Logs is a core Congress feature. (It used to import the
+// retired Capitol Chamber's widget placements too; the widget canvas itself
+// is gone.) Idempotent and self-disabling: settings.legacyImportedAt is set
 // once it has run (whether or not the files existed), so it never fires
 // again. The old files are opened read-only and never modified. A failure
 // partway leaves the flag unset so the next boot retries - safe because
 // every insert is INSERT OR IGNORE.
 export function importLegacyChamberData(
-  opts: { db?: AppDb; capitolDbPath?: string; logsDbPath?: string } = {}
+  opts: { db?: AppDb; logsDbPath?: string } = {}
 ): ImportResult | null {
   const db = opts.db ?? defaultDb;
   const target = db.$client;
-  const capitolPath = opts.capitolDbPath ?? env.LEGACY_CAPITOL_DB_PATH;
   const logsPath = opts.logsDbPath ?? env.LEGACY_LOGS_DB_PATH;
 
   const row = db.select().from(settings).where(eq(settings.id, 1)).get();
   if (row?.legacyImportedAt) return null;
 
-  const result: ImportResult = { layouts: 0, eventSettings: 0, eventHistory: 0, notifications: 0, pushSubscriptions: 0 };
+  const result: ImportResult = { eventSettings: 0, eventHistory: 0, notifications: 0, pushSubscriptions: 0 };
 
   try {
-    const capitol = openLegacy(capitolPath);
     const logs = openLegacy(logsPath);
     try {
       target.transaction(() => {
-        if (capitol) {
-          result.layouts = copyRows(
-            capitol,
-            target,
-            "widget_layouts",
-            ["scope", "chamber", "widget_id", "x", "y", "updated_at"],
-            (r) => !RETIRED_WIDGET_CHAMBERS.has(String(r.chamber))
-          );
-        }
         if (logs) {
           result.eventSettings = copyRows(logs, target, "event_settings", [
             "event_type",
@@ -130,11 +114,10 @@ export function importLegacyChamberData(
         }
       })();
     } finally {
-      capitol?.close();
       logs?.close();
     }
   } catch (err) {
-    console.warn(`Legacy Capitol/Logs import failed, will retry next boot: ${(err as Error).message}`);
+    console.warn(`Legacy Logs import failed, will retry next boot: ${(err as Error).message}`);
     return null;
   }
 
@@ -143,6 +126,6 @@ export function importLegacyChamberData(
     .values({ id: 1, legacyImportedAt: now })
     .onConflictDoUpdate({ target: settings.id, set: { legacyImportedAt: now } })
     .run();
-  console.log(`Legacy Capitol/Logs import: ${JSON.stringify(result)}`);
+  console.log(`Legacy Logs import: ${JSON.stringify(result)}`);
   return result;
 }

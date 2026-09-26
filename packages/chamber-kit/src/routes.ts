@@ -7,6 +7,7 @@ import {
   type ExhibitSearchResult,
   type ExhibitResolveResult,
   type Manifest,
+  type FeedCandidate,
 } from "@congress/shared-types";
 
 import { actorMiddleware } from "./actorContext.js";
@@ -34,6 +35,24 @@ export interface ExhibitSearchApi {
 // The cross-Chamber "[[" picker and Capitol's global search both hit these -
 // an empty query is expected to return the most-recently-updated items
 // rather than nothing, which is each Chamber's own search()'s job to honor.
+// GET /api/feed - this Chamber's candidates for Congress's home feed: its
+// own views and exhibits that matter right now, each scored 0-100 with a
+// short reason (see shared-types/feed.ts). Congress fans out to every active
+// Chamber, merges, and ranks. A handler that throws answers with no items
+// rather than an error - one Chamber's bad day shouldn't blank the feed.
+// Keep the scoring rules themselves in a pure leaf module (feedRules.ts) so
+// they can be unit-tested against a fixed "now".
+export function mountFeedRoute(app: ChamberApp, getCandidates: (now: Date) => Promise<FeedCandidate[]> | FeedCandidate[]): void {
+  app.get("/api/feed", async (c) => {
+    try {
+      return c.json({ items: await getCandidates(new Date()) });
+    } catch (err) {
+      console.warn(`Feed candidates failed: ${(err as Error).message}`);
+      return c.json({ items: [] });
+    }
+  });
+}
+
 export function mountExhibitSearchRoutes(app: ChamberApp, exhibits: ExhibitSearchApi): void {
   app.get("/api/exhibits/search", async (c) => {
     const query = c.req.query("q") ?? "";

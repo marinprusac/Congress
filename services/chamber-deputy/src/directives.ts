@@ -132,7 +132,7 @@ async function listEnabledScheduledDirectives(): Promise<DirectiveSummary[]> {
 }
 
 // checkup.ts's tick() runs everything this returns, each as its own
-// runDeputy call.
+// runDirective call.
 export async function listDueScheduledDirectives(): Promise<DirectiveSummary[]> {
   const now = Date.now();
   const rows = await listEnabledScheduledDirectives();

@@ -1,14 +1,4 @@
-import type {
-  DirectiveSummary,
-  DirectiveDetail,
-  CreateDirectiveRequest,
-  UpdateDirectiveRequest,
-  Message,
-  PostChatMessageRequest,
-  PostChatMessageResponse,
-  Settings,
-  UpdateSettingsRequest,
-} from "../../../src/types";
+import type { DirectiveSummary, DirectiveDetail, CreateDirectiveRequest, UpdateDirectiveRequest } from "../../../src/types";
 import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
 export const API_BASE = resolveApiBase("deputy", import.meta.env.PROD);
@@ -52,37 +42,4 @@ export async function deleteDirective(id: number): Promise<void> {
 
 export function runDirective(id: number): Promise<{ ok: boolean; response: string | null; errorMessage: string | null }> {
   return fetch(`${API_BASE}/directives/${id}/run`, { method: "POST" }).then((res) => json(res));
-}
-
-export function fetchMessages(): Promise<Message[]> {
-  return fetch(`${API_BASE}/chat/messages`).then((res) => json(res));
-}
-
-export function postChatMessage(input: PostChatMessageRequest): Promise<PostChatMessageResponse> {
-  return fetch(`${API_BASE}/chat/messages`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  }).then((res) => json(res));
-}
-
-export async function clearChatThread(): Promise<void> {
-  const res = await fetch(`${API_BASE}/chat/messages`, { method: "DELETE" });
-  assertDeleteOk(res, "clear chat thread");
-}
-
-export function fetchSettings(): Promise<Settings> {
-  return fetch(`${API_BASE}/settings`).then((res) => json(res));
-}
-
-export function updateSettings(input: UpdateSettingsRequest): Promise<Settings> {
-  return fetch(`${API_BASE}/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  }).then((res) => json(res));
-}
-
-export function fetchSpend(): Promise<{ spentTodayUsd: number }> {
-  return fetch(`${API_BASE}/settings/spend`).then((res) => json(res));
 }

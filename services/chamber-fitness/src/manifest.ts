@@ -14,11 +14,11 @@ export const manifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  widgets: [
-    { id: "recent-workouts", width: 3, height: 2, label: "Recent Workouts" },
-    { id: "week-stats", width: 2, height: 1, label: "This Week" },
-    { id: "health-snapshot", width: 3, height: 2, label: "Health" },
-  ],
+  // Views are only genuine screens (see shared-types' manifestViewSchema) -
+  // this Chamber's exhibits reach the home feed and Search on their own.
+  // exhibitTypes is what the home screen's "+" can create here.
+  views: [{ id: "health", label: "Health", fullPath: "/metrics", card: true }],
+  exhibitTypes: [{ type: "routine", label: "Routine", createPath: "/routines/new" }],
   events: [
     {
       type: "fitness.workout_synced",

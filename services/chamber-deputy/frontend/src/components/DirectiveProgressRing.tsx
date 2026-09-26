@@ -1,11 +1,11 @@
-// Sits behind a directive row's play button: an arc that fills clockwise
+// Sits beside a directive's "Run now": an arc that fills clockwise
 // from nothing (just ran) to a full circle (due now) as a scheduled
 // directive approaches its next trigger - no track drawn behind the
 // unfilled portion, so an on-demand-only directive's plain play button and
 // a scheduled one just past its own run look identical. Swaps to a spinning
 // indeterminate arc the moment a run is actually in flight - see
-// DirectivesListPage.tsx for where `fraction` (directiveProgressFraction)
-// and `running` (the polled runningDirectiveId) come from.
+// DirectiveEditorPage.tsx for where `fraction` (directiveProgressFraction)
+// and `running` (Congress's AI run stream, via useDeputyRunStream) come from.
 const SIZE = 28;
 const STROKE_WIDTH = 2;
 const RADIUS = (SIZE - STROKE_WIDTH) / 2;

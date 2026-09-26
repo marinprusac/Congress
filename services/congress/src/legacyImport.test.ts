@@ -6,13 +6,12 @@ import { sql } from "drizzle-orm";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { migrationsDir } from "@congress/test-support";
 import { db, runMigrations } from "./db/client.js";
-import { eventSettings, notifications, pushSubscriptions, settings, widgetLayouts } from "./db/schema.js";
+import { eventSettings, notifications, pushSubscriptions, settings } from "./db/schema.js";
 import { importLegacyChamberData } from "./legacyImport.js";
 
 beforeAll(() => runMigrations(migrationsDir("congress")));
 
 beforeEach(() => {
-  db.run(sql`delete from widget_layouts`);
   db.run(sql`delete from event_settings`);
   db.run(sql`delete from event_history`);
   db.run(sql`delete from notifications`);
@@ -24,17 +23,7 @@ beforeEach(() => {
 // legacyImport.ts copies, in the shapes those Chambers' schemas had.
 function makeLegacyFiles() {
   const dir = mkdtempSync(join(tmpdir(), "legacy-import-"));
-  const capitolPath = join(dir, "capitol.sqlite3");
   const logsPath = join(dir, "logs.sqlite3");
-
-  const capitol = new Database(capitolPath);
-  capitol.exec(`create table widget_layouts (scope text, chamber text, widget_id text, x integer, y integer, updated_at integer)`);
-  const placement = capitol.prepare("insert into widget_layouts values (?, ?, ?, ?, ?, ?)");
-  placement.run("desktop", "tasks", "due", 0, 0, 1);
-  placement.run("mobile", "tasks", "due", 1, 2, 1);
-  placement.run("desktop", "logs", "bell", 3, 0, 1);
-  placement.run("desktop", "logs", "recent-logs", 0, 1, 1);
-  capitol.close();
 
   const logs = new Database(logsPath);
   logs.exec(`
@@ -52,17 +41,16 @@ function makeLegacyFiles() {
   `);
   logs.close();
 
-  return { capitolPath, logsPath };
+  return { logsPath };
 }
 
 describe("importLegacyChamberData", () => {
-  it("copies layout (minus retired Logs widgets), event settings, history, notifications and push subscriptions", () => {
-    const { capitolPath, logsPath } = makeLegacyFiles();
+  it("copies event settings, history, notifications and push subscriptions", () => {
+    const { logsPath } = makeLegacyFiles();
 
-    const result = importLegacyChamberData({ capitolDbPath: capitolPath, logsDbPath: logsPath });
+    const result = importLegacyChamberData({ logsDbPath: logsPath });
 
-    expect(result).toEqual({ layouts: 2, eventSettings: 1, eventHistory: 1, notifications: 1, pushSubscriptions: 1 });
-    expect(db.select().from(widgetLayouts).all().map((r) => r.chamber)).toEqual(["tasks", "tasks"]);
+    expect(result).toEqual({ eventSettings: 1, eventHistory: 1, notifications: 1, pushSubscriptions: 1 });
     expect(db.select().from(eventSettings).get()).toMatchObject({
       eventType: "tasks.overdue",
       recordToHistory: true,
@@ -75,19 +63,19 @@ describe("importLegacyChamberData", () => {
   });
 
   it("runs once: a second call is a no-op even if the files changed", () => {
-    const { capitolPath, logsPath } = makeLegacyFiles();
-    importLegacyChamberData({ capitolDbPath: capitolPath, logsDbPath: logsPath });
-    db.run(sql`delete from widget_layouts`);
+    const { logsPath } = makeLegacyFiles();
+    importLegacyChamberData({ logsDbPath: logsPath });
+    db.run(sql`delete from notifications`);
 
-    expect(importLegacyChamberData({ capitolDbPath: capitolPath, logsDbPath: logsPath })).toBeNull();
-    expect(db.select().from(widgetLayouts).all()).toHaveLength(0);
+    expect(importLegacyChamberData({ logsDbPath: logsPath })).toBeNull();
+    expect(db.select().from(notifications).all()).toHaveLength(0);
     expect(db.select().from(settings).get()?.legacyImportedAt).toBeInstanceOf(Date);
   });
 
   it("missing files are a no-op that still marks the import done", () => {
-    const result = importLegacyChamberData({ capitolDbPath: "/nonexistent/a.sqlite3", logsDbPath: "/nonexistent/b.sqlite3" });
+    const result = importLegacyChamberData({ logsDbPath: "/nonexistent/b.sqlite3" });
 
-    expect(result).toEqual({ layouts: 0, eventSettings: 0, eventHistory: 0, notifications: 0, pushSubscriptions: 0 });
+    expect(result).toEqual({ eventSettings: 0, eventHistory: 0, notifications: 0, pushSubscriptions: 0 });
     expect(db.select().from(settings).get()?.legacyImportedAt).toBeInstanceOf(Date);
   });
 });

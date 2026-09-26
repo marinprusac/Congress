@@ -7,8 +7,10 @@ import {
   mountSettingsRoutes,
   mountManualRefsRoutes,
   mountStaticFrontend,
+  mountFeedRoute,
 } from "@congress/chamber-kit";
 import { manifest } from "./manifest.js";
+import { itemFeedCandidates } from "./feedRules.js";
 import {
   listItems,
   listRecentItems,
@@ -84,6 +86,9 @@ app.delete("/api/items/:id", async (c) => {
 });
 
 mountExhibitSearchRoutes(app, { search: searchItemExhibits, resolve: resolveItemExhibits });
+
+// Home feed candidates - see feedRules.ts.
+mountFeedRoute(app, async (now) => itemFeedCandidates(await listRecentItems(20), now));
 
 mountManualRefsRoutes(
   app,

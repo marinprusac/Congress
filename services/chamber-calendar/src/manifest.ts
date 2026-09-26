@@ -14,7 +14,11 @@ export const calendarManifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  widgets: [{ id: "upcoming", width: 3, height: 2, label: "Upcoming" }],
+  // Views are only genuine screens (see shared-types' manifestViewSchema) -
+  // this Chamber's exhibits reach the home feed and Search on their own.
+  // exhibitTypes is what the home screen's "+" can create here.
+  views: [{ id: "agenda", label: "Agenda", fullPath: "/" }],
+  exhibitTypes: [{ type: "event", label: "Event", createPath: "/new" }],
   events: [
     {
       type: "calendar.event_starting_soon",
