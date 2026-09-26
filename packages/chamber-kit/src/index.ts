@@ -14,3 +14,4 @@ export * from "./routes.js";
 export * from "./wikilinks.js";
 export * from "./manualRefs.js";
 export * from "./bootstrap.js";
+export * from "./ai.js";

@@ -17,9 +17,11 @@ import {
   useDraftCreate,
   resolveEditorIdentity,
   useSelfNavigateGuard,
+  fetchAiSettings,
+  aiSettingsQueryKey,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
-import { createDirective, fetchDirective, updateDirective, deleteDirective, runDirective, fetchSettings } from "@/lib/api";
+import { createDirective, fetchDirective, updateDirective, deleteDirective, runDirective } from "@/lib/api";
 import { useDeputyRunStream } from "@/lib/useDeputyRunStream";
 import type { UpdateDirectiveRequest } from "../../../src/types";
 import { ScheduleEditor, EMPTY_SCHEDULE, type ScheduleDraft } from "@/components/ScheduleEditor";
@@ -54,7 +56,7 @@ export function DirectiveEditorPage() {
   // Deputy (budget cap or owner-paused) makes "Run now" return instantly
   // with ok:false, which without this reads as the button just doing
   // nothing rather than Deputy having declined to run.
-  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
+  const settingsQuery = useQuery({ queryKey: aiSettingsQueryKey, queryFn: fetchAiSettings });
   const paused = settingsQuery.data?.paused ?? false;
 
   const directiveQuery = useQuery({
@@ -195,7 +197,7 @@ export function DirectiveEditorPage() {
     return <p className="font-mono text-sm text-alert">Directive not found.</p>;
 
   const directive = isDraft ? null : directiveQuery.data ?? null;
-  const isThisRunning = !isDraft && runStream.active && runStream.kind === "directive" && runStream.directiveId === directiveId;
+  const isThisRunning = !isDraft && runStream.active && runStream.directiveId === directiveId;
   const enabledForStyle = isDraft ? true : (directive?.enabled ?? true);
 
   // Bypasses the debounce for an instant flip (the button's label/strike-
@@ -235,8 +237,8 @@ export function DirectiveEditorPage() {
 
       {paused && (
         <div className="mb-4 border border-alert px-3 py-2 font-mono text-sm text-alert">
-          Deputy is paused{settingsQuery.data?.pausedReason ? ` — ${settingsQuery.data.pausedReason}` : "."}{" "}
-          <Link to="/settings?from=deputy" className="underline">
+          AI is paused{settingsQuery.data?.pausedReason ? ` — ${settingsQuery.data.pausedReason}` : "."}{" "}
+          <Link to="/settings?from=ai" className="underline">
             Resume in Settings
           </Link>
         </div>
@@ -280,7 +282,7 @@ export function DirectiveEditorPage() {
                 <button
                   onClick={() => runMutation.mutate()}
                   disabled={runMutation.isPending || paused}
-                  title={paused ? "Deputy is paused" : undefined}
+                  title={paused ? "AI is paused" : undefined}
                   className="tap-target text-accent hover:underline disabled:opacity-50"
                 >
                   {runMutation.isPending ? "Running —" : "Run now"}

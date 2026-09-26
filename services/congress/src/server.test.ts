@@ -111,6 +111,12 @@ describe("session-only routes", () => {
     { method: "GET", path: "/congress/history" },
     { method: "GET", path: "/congress/notifications" },
     { method: "GET", path: "/congress/push/config" },
+    // AI (moved in from Deputy). POST /chat/messages is left out on purpose:
+    // an accepted one would spawn a real `claude` run.
+    { method: "GET", path: "/congress/ai/chat/messages" },
+    { method: "DELETE", path: "/congress/ai/chat/messages" },
+    { method: "PUT", path: "/congress/ai/settings", body: { contextPrompt: "" } },
+    { method: "GET", path: "/congress/ai/settings/spend" },
   ];
 
   it.each(cases)("401s $method $path without a session", async ({ method, path, body }) => {
@@ -143,6 +149,50 @@ describe("/congress/registry", () => {
 
   it("401s with neither", async () => {
     expect((await app.request("/congress/registry")).status).toBe(401);
+  });
+});
+
+describe("/congress/ai", () => {
+  it("GET /settings accepts either a session or the internal token", async () => {
+    // Deputy's backend reads the shared pause switch before draining its
+    // event buffer; the browser reads it for Settings -> AI.
+    expect((await app.request("/congress/ai/settings", { headers: internal })).status).toBe(200);
+    expect((await app.request("/congress/ai/settings", { headers: session() }, bindings())).status).toBe(200);
+    expect((await app.request("/congress/ai/settings")).status).toBe(401);
+  });
+
+  it("POST /run is internal-token only", async () => {
+    const body = JSON.stringify({ prompt: "x", actor: "deputy" });
+    expect((await app.request("/congress/ai/run", { method: "POST", headers: json, body })).status).toBe(401);
+    expect((await app.request("/congress/ai/run", { method: "POST", headers: { ...json, ...session() }, body }, bindings())).status).toBe(401);
+  });
+
+  it("POST /run rejects a malformed request", async () => {
+    const res = await app.request("/congress/ai/run", { method: "POST", headers: { ...internal, ...json }, body: JSON.stringify({ actor: "deputy" }) });
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /run comes back refused, not spawned, while AI is paused", async () => {
+    await app.request(
+      "/congress/ai/settings",
+      { method: "PUT", headers: { ...json, ...session() }, body: JSON.stringify({ paused: true, pausedReason: "test" }) },
+      bindings()
+    );
+    try {
+      const res = await app.request("/congress/ai/run", {
+        method: "POST",
+        headers: { ...internal, ...json },
+        body: JSON.stringify({ prompt: "x", actor: "deputy", meta: { chamber: "deputy", directiveId: 1 } }),
+      });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ ok: false, refused: true, errorMessage: "AI is paused: test" });
+    } finally {
+      await app.request(
+        "/congress/ai/settings",
+        { method: "PUT", headers: { ...json, ...session() }, body: JSON.stringify({ paused: false, pausedReason: null }) },
+        bindings()
+      );
+    }
   });
 });
 

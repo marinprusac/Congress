@@ -25,6 +25,16 @@ const envSchema = z.object({
   // see legacyImport.ts. Unset/missing files are simply skipped.
   LEGACY_CAPITOL_DB_PATH: z.string().default("../chamber-capitol/data/capitol.sqlite3"),
   LEGACY_LOGS_DB_PATH: z.string().default("../chamber-logs/data/logs.sqlite3"),
+  // Claude credentials for the AI engine (ai/engine.ts). Both optional, and
+  // an empty string counts as unset: without either, `claude` falls back to
+  // whatever `claude auth login` left for this OS user. CLAUDE_CODE_OAUTH_TOKEN
+  // (from `claude setup-token`) bills the owner's subscription;
+  // ANTHROPIC_API_KEY bills metered Console usage instead.
+  ANTHROPIC_API_KEY: z.string().optional(),
+  CLAUDE_CODE_OAUTH_TOKEN: z.string().optional(),
+  // One-time import of Deputy's AI settings row (context prompt, model,
+  // budget) from before the engine moved here - see ai/legacyImport.ts.
+  LEGACY_DEPUTY_DB_PATH: z.string().default("../chamber-deputy/data/deputy.sqlite3"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 

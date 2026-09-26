@@ -103,6 +103,17 @@ export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
     description: "The owner changed a per-event-type record/notify setting - useful for spotting why an expected notification went quiet.",
     payloadFields: { eventType: { type: "string" }, label: { type: "string" } },
   },
+  {
+    type: "congress.ai_chat_run",
+    label: "AI chat took action",
+    description: "A chat message made the assistant call one or more tools.",
+    payloadFields: {
+      message: { type: "string" },
+      summary: { type: "string" },
+      toolCallCount: { type: "number" },
+      costUsd: { type: "number" },
+    },
+  },
 ];
 
 export const manifestSchema = z.object({

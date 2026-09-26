@@ -11,8 +11,10 @@ import {
   ListErrorState,
   ListEmptyState,
   showToast,
+  fetchAiSettings,
+  aiSettingsQueryKey,
 } from "@congress/congress-ui";
-import { fetchDirectives, fetchDirective, searchDirectives, runDirective, fetchSettings } from "@/lib/api";
+import { fetchDirectives, fetchDirective, searchDirectives, runDirective } from "@/lib/api";
 import { useDeputyRunStream } from "@/lib/useDeputyRunStream";
 import { DirectiveProgressRing } from "@/components/DirectiveProgressRing";
 import { directiveProgressFraction } from "@/lib/directiveProgress";
@@ -35,14 +37,6 @@ function useNowTick(periodMs: number): number {
     return () => clearInterval(id);
   }, [periodMs]);
   return now;
-}
-
-function ChatIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" width="1.1em" height="1.1em">
-      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-    </svg>
-  );
 }
 
 function PlayIcon({ className }: { className?: string }) {
@@ -71,7 +65,7 @@ export function DirectivesListPage() {
   // tab, or checkup.ts's own scheduler on the backend), not just this one,
   // pushed live over SSE rather than polled.
   const runStream = useDeputyRunStream();
-  const runningDirectiveId = runStream.active && runStream.kind === "directive" ? runStream.directiveId : null;
+  const runningDirectiveId = runStream.active ? runStream.directiveId : null;
 
   // A paused Deputy (the daily budget cap auto-pauses it, or the owner
   // paused it by hand in Settings) returns instantly, without ever spawning
@@ -81,7 +75,7 @@ export function DirectivesListPage() {
   // fraction of a second, reading as "the button did nothing" rather than
   // "Deputy declined to run". Surfaced here as a standing banner instead so
   // it isn't a one-shot toast the owner has to catch mid-tap.
-  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
+  const settingsQuery = useQuery({ queryKey: aiSettingsQueryKey, queryFn: fetchAiSettings });
   const paused = settingsQuery.data?.paused ?? false;
 
   const now = useNowTick(TICK_MS);
@@ -105,17 +99,12 @@ export function DirectivesListPage() {
         onChange={setQuery}
         placeholder="Search directives —"
         newHref={resolveChamberPath("/directives/new", "deputy", shellHosted)}
-        leading={
-          <Link to={resolveChamberPath("/chat", "deputy", shellHosted)} className="list-search-new" aria-label="Chat" title="Chat">
-            <ChatIcon />
-          </Link>
-        }
       />
 
       {paused && (
         <div className="mb-4 border border-alert px-3 py-2 font-mono text-sm text-alert">
-          Deputy is paused{settingsQuery.data?.pausedReason ? ` — ${settingsQuery.data.pausedReason}` : "."}{" "}
-          <Link to="/settings?from=deputy" className="underline">
+          AI is paused{settingsQuery.data?.pausedReason ? ` — ${settingsQuery.data.pausedReason}` : "."}{" "}
+          <Link to="/settings?from=ai" className="underline">
             Resume in Settings
           </Link>
         </div>
@@ -157,7 +146,7 @@ export function DirectivesListPage() {
                   onClick={() => runMutation.mutate(directive.id)}
                   disabled={running || paused}
                   aria-label={`Run "${directive.title}" now`}
-                  title={paused ? "Deputy is paused" : "Run now"}
+                  title={paused ? "AI is paused" : "Run now"}
                   className="tap-target flex shrink-0 items-center px-3 text-slate hover:text-accent disabled:opacity-50"
                 >
                   <span className="directive-progress-ring-wrap">

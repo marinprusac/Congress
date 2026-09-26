@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, uniqueIndex, primaryKey } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, index, uniqueIndex, primaryKey } from "drizzle-orm/sqlite-core";
 
 export const chambers = sqliteTable("chambers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -234,3 +234,48 @@ export const pushSubscriptions = sqliteTable("push_subscriptions", {
   auth: text("auth").notNull(),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
+
+// ---- AI (formerly Deputy's engine + chat) ----
+
+// Single-row table (id is always 1), kept apart from `settings` above so the
+// /congress/settings contract (dark mode) stays untouched. Shared by the
+// owner's chat and every Chamber's remote runs - one budget, one pause
+// switch. See ai/settings.ts.
+export const aiSettings = sqliteTable("ai_settings", {
+  id: integer("id").primaryKey().default(1),
+  contextPrompt: text("context_prompt").notNull().default(""),
+  chatIdleWindowMs: integer("chat_idle_window_ms").notNull().default(30 * 60 * 1000),
+  budgetCapUsd: real("budget_cap_usd").notNull().default(10),
+  model: text("model").notNull().default("claude-sonnet-5"),
+  retentionDays: integer("retention_days").notNull().default(30),
+  paused: integer("paused", { mode: "boolean" }).notNull().default(false),
+  pausedReason: text("paused_reason"),
+});
+
+// The chat thread. sessionId is the `claude` CLI's own session id - rows
+// sharing one are one resumed conversation (see ai/chat.ts).
+export const aiMessages = sqliteTable(
+  "ai_messages",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    sessionId: text("session_id").notNull(),
+    role: text("role", { enum: ["user", "assistant"] }).notNull(),
+    text: text("text").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("ai_messages_session_id_idx").on(table.sessionId), index("ai_messages_created_at_idx").on(table.createdAt)]
+);
+
+// One row per `claude` invocation, cost only - just enough to enforce
+// aiSettings.budgetCapUsd. `actor` records who asked (congress for chat,
+// the calling Chamber otherwise).
+export const aiSpend = sqliteTable(
+  "ai_spend",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    actor: text("actor").notNull(),
+    costUsd: real("cost_usd"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("ai_spend_created_at_idx").on(table.createdAt)]
+);

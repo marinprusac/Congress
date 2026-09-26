@@ -12,7 +12,7 @@
 // schedule *is* defined relative to the last run (nextRunAt is literally
 // `lastRunAt + intervalMs`, scheduling.ts), so anchoring anywhere else would
 // contradict the schedule itself, not just visually diverge from it. null
-// for a directive with no periodic schedule of its own at all (manual/chat-
+// for a directive with no periodic schedule of its own at all (manual-
 // only, or "event" - nextRunAt is null for both, see directives.ts) - there's
 // no "next trigger" to show progress toward.
 export function directiveProgressFraction(

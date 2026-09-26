@@ -22,6 +22,7 @@ import {
 } from "@congress/congress-ui";
 import { SignOutControl } from "@/components/LoginGate";
 import { LogsTab } from "@/pages/LogsTab";
+import { AiSettingsTab } from "@/pages/AiSettingsTab";
 
 function SettingsGearIcon() {
   return (
@@ -198,7 +199,7 @@ export function SettingsPage() {
   // will never appear (see the fallback render below for the loading gap
   // in between).
   useEffect(() => {
-    if (!panels || tab === "general" || tab === "logs") return;
+    if (!panels || tab === "general" || tab === "logs" || tab === "ai") return;
     if (!panels.some((panel) => panel.name === tab)) setTab("general");
   }, [panels, tab]);
 
@@ -228,6 +229,15 @@ export function SettingsPage() {
           >
             Logs
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "ai"}
+            className={tab === "ai" ? "settings-tab active" : "settings-tab"}
+            onClick={() => setTab("ai")}
+          >
+            AI
+          </button>
           {(panels ?? []).map((panel) => (
             <button
               key={panel.name}
@@ -247,6 +257,8 @@ export function SettingsPage() {
             <GeneralTab />
           ) : tab === "logs" ? (
             <LogsTab />
+          ) : tab === "ai" ? (
+            <AiSettingsTab />
           ) : ActivePanelComponent && activePanel ? (
             <SettingsPanelErrorBoundary key={activePanel.name} chamberName={activePanel.displayName}>
               <Suspense fallback={<p className="font-mono text-sm text-dust">Loading —</p>}>

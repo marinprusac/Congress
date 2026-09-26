@@ -5,6 +5,7 @@ import { LoginGate } from "@/components/LoginGate";
 import { ChamberHost } from "@/components/ChamberHost";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { HomePage } from "@/pages/HomePage";
+import { ChatPage } from "@/pages/ChatPage";
 import { NotificationBell } from "@/components/NotificationBell";
 
 export function App() {
@@ -24,7 +25,10 @@ export function App() {
   // canvas, not a Chamber - NavPanel knows it as "home".
   const location = useLocation();
   const navigate = useNavigate();
-  const currentChamberName = location.pathname === "/" ? "home" : (location.pathname.split("/")[1] ?? "home");
+  // /chat is Congress's own page reached from Home, not a Chamber - NavPanel
+  // would otherwise try to fetch a Chamber icon for "chat".
+  const currentChamberName =
+    location.pathname === "/" || location.pathname === "/chat" ? "home" : (location.pathname.split("/")[1] ?? "home");
 
   return (
     // One LoginGate around everything, not one per route (each used to wrap
@@ -71,6 +75,8 @@ export function App() {
             own static-over-dynamic ranking would already prefer it either
             way. */}
         <Route path="/settings" element={<SettingsPage />} />
+        {/* Congress's own AI chat (moved in from Deputy). */}
+        <Route path="/chat" element={<ChatPage />} />
         {/* Every Chamber renders here, hosted directly
             in this shell instead of navigating away to it. See ChamberHost's
             own comment for how that works. */}

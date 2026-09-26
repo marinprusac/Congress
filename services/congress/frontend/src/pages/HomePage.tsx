@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { ChamberHeader, CapitolMark, useAppliedTheme } from "@congress/congress-ui";
 import { Canvas } from "@/components/Canvas";
 
@@ -13,7 +14,16 @@ export function HomePage() {
 
   return (
     <div className="chamber-shell chamber-shell--canvas">
-      <ChamberHeader icon={<CapitolMark className="h-6 w-6 text-ink" />} title="Home" titleHref="" />
+      <ChamberHeader
+        icon={<CapitolMark className="h-6 w-6 text-ink" />}
+        title="Home"
+        titleHref=""
+        extraActions={
+          <Link to="/chat" className="chamber-header-link">
+            Chat
+          </Link>
+        }
+      />
       <main className="chamber-main chamber-main--canvas">
         <Canvas editing={editing} onToggleEditing={() => setEditing((e) => !e)} />
       </main>

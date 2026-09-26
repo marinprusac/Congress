@@ -99,7 +99,7 @@ export function ScheduleEditor({ value, onChange, eventCatalog, eventCatalogLoad
           className={selectClass}
           style={inlineSelectStyle}
         >
-          <option value="">manual / chat only</option>
+          <option value="">manual only</option>
           <option value="interval">every —</option>
           <option value="daily">daily at —</option>
           <option value="weekly">weekly on —</option>

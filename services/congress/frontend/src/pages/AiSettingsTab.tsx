@@ -1,25 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FormLabel, useAutosave } from "@congress/congress-ui";
-import { fetchSettings, updateSettings, fetchSpend } from "@/lib/api";
-import type { UpdateSettingsRequest } from "../../../src/types";
+import type { UpdateAiSettingsRequest } from "@congress/shared-types";
+import { FormLabel, useAutosave, fetchAiSettings, aiSettingsQueryKey } from "@congress/congress-ui";
+import { aiSpendQueryKey, fetchAiSpend, updateAiSettings } from "@/lib/aiApi";
 
-const inputClass = "w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
+const inputClass =
+  "w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
 
-export function SettingsPage() {
+// Settings -> AI: the one pause switch and daily budget shared by the chat
+// and every Chamber's remote runs (e.g. Deputy's directives), plus the
+// context handed to every run. Moved in from Deputy's own Settings tab.
+export function AiSettingsTab() {
   const queryClient = useQueryClient();
-  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
-  const spendQuery = useQuery({ queryKey: ["settings", "spend"], queryFn: fetchSpend, refetchInterval: 60_000 });
+  const settingsQuery = useQuery({ queryKey: aiSettingsQueryKey, queryFn: fetchAiSettings });
+  const spendQuery = useQuery({ queryKey: aiSpendQueryKey, queryFn: fetchAiSpend, refetchInterval: 60_000 });
 
-  const [draft, setDraft] = useState<UpdateSettingsRequest>({});
+  const [draft, setDraft] = useState<UpdateAiSettingsRequest>({});
 
   const mutation = useMutation({
-    mutationFn: (input: UpdateSettingsRequest) => updateSettings(input),
-    onSuccess: (updated) => queryClient.setQueryData(["settings"], updated),
+    mutationFn: (input: UpdateAiSettingsRequest) => updateAiSettings(input),
+    onSuccess: (updated) => queryClient.setQueryData(aiSettingsQueryKey, updated),
   });
 
   // Loads the draft exactly once - a background refetch (e.g. the spend
-  // panel's own poll) must never stomp an in-progress edit.
+  // poll) must never stomp an in-progress edit.
   const initializedRef = useRef(false);
   const { markSaved } = useAutosave({
     value: draft,
@@ -29,7 +33,7 @@ export function SettingsPage() {
   useEffect(() => {
     if (settingsQuery.data && !initializedRef.current) {
       const s = settingsQuery.data;
-      const loaded: UpdateSettingsRequest = {
+      const loaded: UpdateAiSettingsRequest = {
         contextPrompt: s.contextPrompt,
         chatIdleWindowMs: s.chatIdleWindowMs,
         budgetCapUsd: s.budgetCapUsd,
@@ -43,12 +47,12 @@ export function SettingsPage() {
   }, [settingsQuery.data, markSaved]);
 
   const pauseMutation = useMutation({
-    mutationFn: (paused: boolean) => updateSettings({ paused, pausedReason: paused ? "Paused by owner." : null }),
-    onSuccess: (updated) => queryClient.setQueryData(["settings"], updated),
+    mutationFn: (paused: boolean) => updateAiSettings({ paused, pausedReason: paused ? "Paused by owner." : null }),
+    onSuccess: (updated) => queryClient.setQueryData(aiSettingsQueryKey, updated),
   });
 
   if (settingsQuery.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
-  if (settingsQuery.isError || !settingsQuery.data) return <p className="font-mono text-sm text-alert">Failed to reach the settings API.</p>;
+  if (settingsQuery.isError || !settingsQuery.data) return <p className="font-mono text-sm text-alert">Failed to reach the AI settings API.</p>;
 
   const settings = settingsQuery.data;
 
@@ -59,7 +63,11 @@ export function SettingsPage() {
           <div>
             <p className="font-display text-lg text-ink">{settings.paused ? "Paused" : "Active"}</p>
             {settings.paused && settings.pausedReason && <p className="mt-1 font-mono text-xs text-alert">{settings.pausedReason}</p>}
-            {spendQuery.data && <p className="mt-1 font-mono text-xs text-dust">Spent today: ${spendQuery.data.spentTodayUsd.toFixed(2)} of ${settings.budgetCapUsd.toFixed(2)}</p>}
+            {spendQuery.data && (
+              <p className="mt-1 font-mono text-xs text-dust">
+                Spent today: ${spendQuery.data.spentTodayUsd.toFixed(2)} of ${settings.budgetCapUsd.toFixed(2)}
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -80,7 +88,7 @@ export function SettingsPage() {
           value={draft.contextPrompt ?? ""}
           onChange={(e) => setDraft((d) => ({ ...d, contextPrompt: e.target.value }))}
           rows={3}
-          placeholder="e.g. [[note:42]] is the gate to your notes database. Be terse. Always double-check before anything irreversible."
+          placeholder="Handed to every run, chat or Deputy. e.g. Be terse. Always double-check before anything irreversible."
           className={`${inputClass} mb-4`}
         />
 
@@ -111,7 +119,7 @@ export function SettingsPage() {
             <input value={draft.model ?? ""} onChange={(e) => setDraft((d) => ({ ...d, model: e.target.value }))} className={inputClass} />
           </div>
           <div>
-            <FormLabel>Run/message retention (days)</FormLabel>
+            <FormLabel>Chat/spend retention (days)</FormLabel>
             <input
               type="number"
               min={1}
