@@ -2,7 +2,6 @@ import { Route, Routes } from "react-router-dom";
 import { useAppliedTheme } from "@congress/congress-ui";
 import { Layout } from "@/components/Layout";
 import { MapPage } from "@/pages/MapPage";
-import { PlacesListPage } from "@/pages/PlacesListPage";
 import { PlaceEditorPage } from "@/pages/PlaceEditorPage";
 import { PendingVisitsPage } from "@/pages/PendingVisitsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
@@ -14,7 +13,6 @@ export function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<MapPage />} />
-        <Route path="places" element={<PlacesListPage />} />
         <Route path="places/new" element={<PlaceEditorPage />} />
         {/* Matches exhibits.ts's urlFor("/p/:id") - the same path an Exhibit
             chip/global-search result navigates to, not "places/:id". */}

@@ -1,39 +1,30 @@
 import type { ReactNode } from "react";
 import { Outlet } from "react-router-dom";
 import { ChamberHeader } from "./ChamberHeader.js";
-import { NavPanel } from "./NavPanel.js";
-import { useShellHosted } from "./ShellHostContext.js";
+import { useBackNavigation } from "./chamberNav.js";
 
 interface ChamberLayoutProps {
   icon: ReactNode;
   title: string;
-  // Identifies this Chamber to titleHref's own resolution (see ChamberHeader).
+  // Identifies this Chamber (kept for callers; the header no longer links
+  // anywhere Chamber-relative).
   ownChamber: string;
-  // Extra header chrome beyond title - passed straight through to
-  // ChamberHeader's own prop of the same name (e.g. Deputy's Directives/
-  // History links). Most Chambers don't need this.
+  // Extra header chrome beyond the title - passed straight through to
+  // ChamberHeader. Not for navigation: Chambers have no nav of their own.
   extraActions?: ReactNode;
 }
 
-// Shared shell for every Chamber's own frontend (Notes/Calendar/Documents) -
-// NavPanel (cross-Chamber nav, plus the one unified Settings entry point)
-// plus this Chamber's own header and content. A Chamber's home route is
-// always its default landing page (e.g. Notes' "All Notes" list) - there's
-// no separate "home" nav link to it.
-//
-// NavPanel only renders here when NOT shell-hosted (standalone dev boot, or
-// a direct full-page load through Congress's gateway proxy at
-// "/<chamber>/*") - shell-hosted, Congress's own App.tsx already mounts one
-// persistent NavPanel outside ChamberHost, so it survives this Chamber
-// failing to load instead of unmounting along with it. Rendering it again
-// here too would just double it up.
+// Shared shell for every Chamber's own frontend: a header with a back
+// button, then the page. There is no Chamber-level navigation any more -
+// Congress's tab bar (Home · Search · + · Notifications · Settings) is the
+// one way around, and a Chamber's pages are reached from the home feed,
+// Search and the "+" sheet.
 export function ChamberLayout({ icon, title, ownChamber, extraActions }: ChamberLayoutProps) {
-  const shellHosted = useShellHosted();
+  const back = useBackNavigation();
 
   return (
     <div className="chamber-shell">
-      {!shellHosted && <NavPanel current={ownChamber} currentLabel={title} />}
-      <ChamberHeader icon={icon} title={title} ownChamber={ownChamber} extraActions={extraActions} />
+      <ChamberHeader icon={icon} title={title} ownChamber={ownChamber} titleHref="" onBack={back} extraActions={extraActions} />
       <main className="chamber-main">
         <Outlet />
       </main>

@@ -79,6 +79,35 @@ a[download] {
   gap: 0.75rem;
 }
 
+/* Back button + eyebrow/title, side by side. */
+.chamber-header-lead {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* A real ~44pt tap target around a small chevron - the only way back from a
+   Chamber page besides the tab bar. */
+.chamber-header-back {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-left: -0.75rem;
+  color: var(--color-slate);
+}
+
+.chamber-header-back:hover {
+  color: var(--color-accent);
+}
+
+.chamber-header-back svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
 @media (min-width: 641px) {
   .chamber-header-row {
     flex-direction: row;
@@ -192,256 +221,15 @@ a[download] {
   overflow: hidden;
 }
 
-/* NavPanel - persistent cross-Chamber nav, the one global search bar
-   (GlobalExhibitSearch, see .nav-panel-search below), and the one Settings
-   entry point. Shell-hosted, Congress's own App.tsx mounts exactly one, as a
-   sibling of ChamberHost rather than nested inside it, so it survives a
-   Chamber failing to load instead of unmounting along with that Chamber's
-   own subtree. Standalone (a Chamber's own dev boot, or a direct full-page
-   load through Congress's gateway proxy), there's no Congress shell to
-   supply that one - each Chamber's own Layout (via ChamberLayout, or
-   Capitol/Deputy's own hand-composed Layout) mounts its own instead, gated
-   on useShellHosted() being false so the two never double up. Desktop: an
-   always-visible fixed sidebar on the left. Mobile: off-canvas by default,
-   slid in from the left edge only by swiping right (useNavPanelSwipe) -
-   there's no persistent trigger button, which is also why
-   .nav-panel-mobile-chambers below anchors the Chambers list to the panel's
-   own bottom edge rather than its top, for one-handed thumb reach the
-   instant it opens. Search sits above that anchored list on both variants
-   (top of the desktop sidebar, just under the Settings/close row on
-   mobile) instead - it's reached for far less often than switching
-   Chambers, so it doesn't compete for the same thumb-reach real estate. */
-.nav-panel-link {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem;
-  color: var(--color-dust);
-  font-family: var(--font-mono);
-  font-size: 0.8em;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  /* Long-press-and-drag (useReorderableList) tracks the pointer itself once
-     a press is held long enough - without this, touch's own native
-     scroll/pan takes over the gesture partway through a drag on mobile. */
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-  /* Anchors are natively draggable in the browser (link/image drag-out) -
-     without this, that native drag competes with useReorderableList's own
-     pointer-based drag and pops up the browser's "drop to open/copy link"
-     affordance instead of reordering. */
-  -webkit-user-drag: none;
-  /* iOS Safari's own long-press affordance on an <a> - a link-preview popup
-     with Open/Copy/Share actions - fires on the same long-press
-     useReorderableList is trying to claim for drag, and touch-action/
-     user-select above don't suppress it. Without this, holding a row shows
-     that preview instead of picking it up to reorder. */
-  -webkit-touch-callout: none;
-}
-
-.nav-panel-link:hover,
-.nav-panel-link.active {
-  color: var(--color-accent);
-}
-
-/* Picked up by useReorderableList's long-press - a light lift so the row
-   being dragged visibly separates from the rest of the list. */
-.nav-panel-link--dragging {
-  color: var(--color-accent);
-  background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
-}
-
-/* Icon-only, deliberately understated (plain dust, no accent-toned label) -
-   Settings is a utility destination, not one more entry in the Chambers
-   list it sits apart from (bottom of the sidebar on desktop, top of the
-   panel on mobile - see NavPanel's own comment). */
-.nav-panel-link--settings {
-  flex: none;
-  width: 2.25rem;
-  height: 2.25rem;
-  justify-content: center;
-  padding: 0;
-}
-
-.nav-panel-icon {
-  width: 1.25rem;
-  height: 1.25rem;
-  flex-shrink: 0;
-}
-
-.nav-panel-icon-settings {
-  width: 1.05rem;
-  height: 1.05rem;
-  flex-shrink: 0;
-}
-
-.nav-panel-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.nav-panel-chambers,
-.nav-panel-mobile-chambers {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-/* Wraps .global-search (see below) for its one placement now, inside
-   NavPanel rather than a Chamber's own header - full sidebar width on
-   desktop, full panel width on mobile, with room below it before the
-   Chambers list starts. */
-.nav-panel-search {
-  flex-shrink: 0;
-  margin-bottom: 1rem;
-}
-
-.nav-panel-desktop {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 30;
-  display: none;
-  flex-direction: column;
-  gap: 0.15rem;
-  width: var(--chamber-picker-width, 16rem);
-  overflow-y: auto;
-  padding: calc(1rem + env(safe-area-inset-top)) 0.75rem 1rem calc(0.75rem + env(safe-area-inset-left));
-  border-right: 1px solid var(--color-dust);
-  background-color: var(--color-parchment);
-}
-
-.nav-panel-backdrop {
-  display: none;
-}
-
-.nav-panel-mobile {
-  display: none;
-}
-
+/* Desktop: every page's outermost container leaves room on the left for
+   Congress's navigation rail (services/congress/frontend's .shell-tabbar,
+   which sets --chamber-picker-width to the rail's width). A Chamber booted
+   standalone on its own dev server has no rail and no variable set, so it
+   gets no padding. */
 @media (min-width: 641px) {
-  .nav-panel-desktop {
-    display: flex;
-  }
-
-  /* Reserves room for the desktop sidebar on whichever element is each
-     host page's own outermost container. .chamber-host-unavailable is
-     Congress's own shell chrome (ChamberHost's offline/not-found state),
-     not a Chamber's own content - included here too since NavPanel (now
-     mounted as its sibling, not nested inside it) still reserves the same
-     strip of the viewport while it's on screen. 16rem (not the 12rem this
-     sidebar carried before it grew a search box) is the narrowest width
-     that still fits .global-search-input's own "Search Congress —"
-     placeholder in full at this font/padding - matches the fixed 16rem
-     .global-search used to get back when it only ever sat in a Chamber's
-     own (much wider) header. */
-  :root {
-    --chamber-picker-width: 16rem;
-  }
-
   .chamber-shell,
-  .capitol-shell,
   .chamber-host-unavailable {
-    padding-left: calc(var(--chamber-picker-width, 16rem) + env(safe-area-inset-left));
-  }
-
-  /* Pins Settings to the bottom of the sidebar without a divider line -
-     margin-top: auto consumes the remaining space in .nav-panel-desktop's
-     own flex column, same effect the old .nav-panel-divider's own
-     margin: auto had, just without a visible rule between it and the
-     Chambers list above. */
-  .nav-panel-desktop .nav-panel-link--settings {
-    margin-top: auto;
-  }
-}
-
-@media (max-width: 640px) {
-  .nav-panel-backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 39;
-    /* Deliberately not `--color-ink`-based: that token flips light in dark
-       mode (it's the *foreground* color there), which would turn this
-       scrim into a white wash over the screen instead of a dark one. A
-       backdrop should read as dark in both themes, same as any modal
-       scrim. */
-    background-color: color-mix(in srgb, black 45%, transparent);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 200ms ease-out;
-  }
-
-  .nav-panel-backdrop[data-open="true"] {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .nav-panel-mobile {
-    display: flex;
-    flex-direction: column;
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 40;
-    width: min(80vw, 18rem);
-    padding: calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom))
-      calc(1rem + env(safe-area-inset-left));
-    border-right: 1px solid var(--color-dust);
-    background-color: var(--color-parchment);
-    transform: translateX(-100%);
-    transition: transform 220ms ease-out;
-  }
-
-  /* Scoped to open/dragging rather than the base rule above - box-shadow
-     paints outside the element's own box, so applied unconditionally it
-     bled a faint glow past the left screen edge even while the panel sat
-     fully off-canvas at rest. `data-dragging` (set from useNavPanelSwipe's
-     `dragOffsetPx`/`dragProgress`, not just `data-open`) keeps the shadow
-     present through an in-progress drag too, not just once it settles. */
-  .nav-panel-mobile[data-open="true"],
-  .nav-panel-mobile[data-dragging="true"] {
-    box-shadow: 4px 0 20px color-mix(in srgb, var(--color-ink) 20%, transparent);
-  }
-
-  .nav-panel-mobile[data-open="true"] {
-    transform: translateX(0);
-  }
-
-  /* Fills the panel above the bottom row below, so that row (Settings +
-     search) stays pinned to the panel's own bottom edge - see this block's
-     own top comment - regardless of how long the Chambers list is. */
-  .nav-panel-mobile-chambers {
-    flex: 1 1 auto;
-    overflow-y: auto;
-  }
-
-  .nav-panel-mobile .nav-panel-link {
-    font-size: 0.95rem;
-    padding: 0.65rem 0.5rem;
-  }
-
-  /* Settings + search share one row at the very bottom of the panel, both
-     within one-handed thumb reach the instant it opens - no divider line
-     against the Chambers list above, just the gap this row's own
-     margin-top contributes once the Chambers list stops growing. */
-  .nav-panel-mobile-bottom {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-shrink: 0;
-    margin-top: 0.75rem;
-  }
-
-  .nav-panel-mobile-bottom .nav-panel-search {
-    flex: 1 1 auto;
-    min-width: 0;
-    margin-bottom: 0;
+    padding-left: calc(var(--chamber-picker-width, 0px) + env(safe-area-inset-left));
   }
 }
 
@@ -1066,82 +854,6 @@ a[download] {
   color: var(--color-alert);
 }
 
-.global-search {
-  position: relative;
-  width: 100%;
-}
-
-.global-search-input {
-  width: 100%;
-  border: 1px solid var(--color-dust);
-  background: var(--color-parchment);
-  color: var(--color-ink);
-  font-family: var(--font-mono);
-  /* Never below 16px: iOS Safari zooms the whole page in on focus of any
-     input/textarea whose computed font-size is smaller than that,
-     regardless of touch-action/gesturestart zoom prevention elsewhere. This
-     is also the exact input MobileSearchReveal auto-focuses on release. */
-  font-size: max(16px, 0.85em);
-  /* Extra right padding clears the "/" hint badge, which sits inside the
-     field rather than beside it so the input doesn't shift width when the
-     hint disappears on focus. */
-  padding: 0.5em 2.2em 0.5em 0.7em;
-}
-
-.global-search-input:focus {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
-}
-
-.global-search-hint {
-  position: absolute;
-  top: 50%;
-  right: 0.5em;
-  transform: translateY(-50%);
-  pointer-events: none;
-  font-family: var(--font-mono);
-  font-size: 0.7em;
-  color: var(--color-dust);
-  border: 1px solid var(--color-dust);
-  line-height: 1.4;
-  padding: 0 0.4em;
-}
-
-/* Mobile: this search bar sits in NavPanel's own bottom row, so anchoring
-   the dropdown to the panel's bottom edge (like .exhibit-picker-dropdown
-   does) would sit it right on top of the input instead of clear of it.
-   Anchored to .global-search itself and opened upward instead - safe here
-   since a fixed-height dropdown always has the whole rest of the panel to
-   open into above a bottom-row input. */
-.global-search-dropdown {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + 0.375rem);
-  z-index: 50;
-  max-height: 40vh;
-  overflow-y: auto;
-  border: 1px solid var(--color-dust);
-  background: var(--color-parchment);
-  box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
-}
-
-@media (min-width: 641px) {
-  .global-search-dropdown {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: calc(100% + 0.375rem);
-    bottom: auto;
-    max-height: 20rem;
-    box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 15%, transparent);
-  }
-}
-
-.global-search-dropdown[hidden] {
-  display: none;
-}
-
 
 .notification-item-dismiss {
   flex-shrink: 0;
@@ -1216,10 +928,9 @@ a[download] {
   position: fixed;
   inset: 0;
   z-index: 70;
-  /* Deliberately not `--color-ink`-based - see .nav-panel-backdrop's own
-     comment: that token flips light in dark mode (it's the *foreground*
-     color there), which turned this into a white wash over the screen
-     instead of a dark one. */
+  /* Deliberately not `--color-ink`-based: that token flips light in dark
+     mode (it's the *foreground* color there), which turned this into a
+     white wash over the screen instead of a dark one. */
   background-color: color-mix(in srgb, black 45%, transparent);
 }
 
@@ -1360,10 +1071,8 @@ a[download] {
    would on an absolutely-positioned one). */
 .list-search-row {
   position: fixed;
-  /* Below .nav-panel-backdrop/.nav-panel-mobile (39/40) on purpose - this is
-     ordinary persistent page chrome, not a popover, so the nav drawer must
-     be able to cover it when open. It tied with .nav-panel-mobile's own 40
-     before, and same z-index + later DOM order meant this always won. */
+  /* Below Congress's tab bar (40) on purpose - this is ordinary persistent
+     page chrome, not a popover. */
   z-index: 20;
   left: 0.5rem;
   right: 0.5rem;
@@ -1411,9 +1120,8 @@ a[download] {
 
 @media (min-width: 641px) {
   .list-search-row {
-    /* Fallback matches .nav-panel-desktop's own (line ~287) - if the var is
-       ever unset, both need to agree or this row renders under the sidebar. */
-    left: calc(var(--chamber-picker-width, 16rem) + 1.5rem);
+    /* Clears Congress's desktop rail (its width, or nothing standalone). */
+    left: calc(var(--chamber-picker-width, 0px) + 1.5rem);
     right: 1.5rem;
     bottom: 1.5rem;
     max-width: 26rem;

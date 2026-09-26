@@ -1,5 +1,5 @@
 // Builds the one shared copy of @congress/congress-ui - 4,800+ lines of
-// exhibit chip/picker/NavPanel/ChamberLayout components that every Chamber
+// exhibit chip/picker/ChamberLayout components that every Chamber
 // (and this shell's own bundle) imports, so it stops getting recompiled
 // into all nine remote entries plus this app's own bundle. Unlike react.ts,
 // congress-ui is a real ESM source package (not CJS), so a plain star

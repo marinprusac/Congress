@@ -150,7 +150,7 @@ export function PlaceEditorPage() {
     mutationFn: () => deletePlace(placeId as number),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["places"] });
-      navigate(resolveChamberPath("/places", "map", shellHosted));
+      navigate(resolveChamberPath("/", "map", shellHosted));
       showToast("Place deleted");
     },
     onError: () => showToast("Failed to delete place.", "error"),
@@ -250,7 +250,7 @@ export function PlaceEditorPage() {
           <ExhibitActionBar>
             {isDraft ? (
               <button
-                onClick={() => navigate(resolveChamberPath("/places", "map", shellHosted))}
+                onClick={() => navigate(resolveChamberPath("/", "map", shellHosted))}
                 className="tap-target text-slate hover:underline"
               >
                 Cancel

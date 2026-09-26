@@ -170,17 +170,12 @@ function GeneralTab() {
 // /settings page) is mounted here as one tab-category, resolved from that
 // Chamber's own remote entry the same way the home feed resolves view cards
 // - see useChamberSettingsPanels above and RemoteModule's `settings` field.
-// NavPanel itself isn't mounted here anymore - App.tsx now mounts one
-// persistent NavPanel outside this route's own tree (see App.tsx's own
-// comment), covering Settings the same as every Chamber route.
 export function SettingsPage() {
   useAppliedTheme();
 
-  // NavPanel's Settings entry carries whichever Chamber it was clicked from
-  // as "?from=" (see NavPanel's own settingsTo) - opening straight to that
-  // Chamber's own tab is much more useful than always landing on General,
-  // which is what a bare "/settings" (already on Settings, or a stale/typed
-  // link with no "from") still falls back to.
+  // A link can open Settings straight to a tab with "?from=<tab>" (e.g. the
+  // AI-paused banners' "?from=ai", Home's pin bubble "?from=home") - a bare
+  // "/settings" (the tab bar) falls back to General.
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get("from");
 

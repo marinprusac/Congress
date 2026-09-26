@@ -23,6 +23,9 @@ import {
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createDirective, fetchDirective, updateDirective, deleteDirective, runDirective } from "@/lib/api";
 import { useDeputyRunStream } from "@/lib/useDeputyRunStream";
+import { useNowTick } from "@/lib/useNowTick";
+import { DirectiveProgressRing } from "@/components/DirectiveProgressRing";
+import { directiveProgressFraction } from "@/lib/directiveProgress";
 import type { UpdateDirectiveRequest } from "../../../src/types";
 import { ScheduleEditor, EMPTY_SCHEDULE, type ScheduleDraft } from "@/components/ScheduleEditor";
 
@@ -43,6 +46,7 @@ export function DirectiveEditorPage() {
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const runStream = useDeputyRunStream();
+  const now = useNowTick(1_000);
 
   const [directiveId, setDirectiveId] = useState<number | null>(() => parseDirectiveId(idParam));
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -279,14 +283,27 @@ export function DirectiveEditorPage() {
               </button>
             ) : (
               <>
-                <button
-                  onClick={() => runMutation.mutate()}
-                  disabled={runMutation.isPending || paused}
-                  title={paused ? "AI is paused" : undefined}
-                  className="tap-target text-accent hover:underline disabled:opacity-50"
-                >
-                  {runMutation.isPending ? "Running —" : "Run now"}
-                </button>
+                <span className="inline-flex items-center gap-1.5 text-accent">
+                  {/* How close this directive's own schedule is to its next
+                      run (spinning while a run is in flight) - moved here
+                      from the directives list page, which no longer exists. */}
+                  <DirectiveProgressRing
+                    fraction={
+                      directive
+                        ? directiveProgressFraction(directive.lastRunAt, directive.nextRunAt, directive.createdAt, directive.scheduleCycleStart, now)
+                        : null
+                    }
+                    running={isThisRunning}
+                  />
+                  <button
+                    onClick={() => runMutation.mutate()}
+                    disabled={runMutation.isPending || paused}
+                    title={paused ? "AI is paused" : undefined}
+                    className="tap-target text-accent hover:underline disabled:opacity-50"
+                  >
+                    {runMutation.isPending ? "Running —" : "Run now"}
+                  </button>
+                </span>
                 <button onClick={toggleEnabled} className="tap-target text-accent hover:underline">
                   {directive?.enabled ? "Disable" : "Enable"}
                 </button>
