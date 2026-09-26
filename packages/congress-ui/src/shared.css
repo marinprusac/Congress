@@ -73,13 +73,10 @@ a[download] {
 /* Mobile default: title row, then actions (search + nav) stacked below it
    full-width - there's no room to fit a search field beside a 2.25rem
    title on a phone screen. */
-/* padding-right keeps header content clear of Congress's fixed top-right
-   notification bell (.shell-bell, services/congress/frontend). */
 .chamber-header-row {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding-right: 3rem;
 }
 
 @media (min-width: 641px) {

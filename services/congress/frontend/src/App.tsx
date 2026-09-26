@@ -1,85 +1,46 @@
-import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { fetchRegistry, NavPanel } from "@congress/congress-ui";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { LoginGate } from "@/components/LoginGate";
 import { ChamberHost } from "@/components/ChamberHost";
+import { TabBar } from "@/components/TabBar";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { HomePage } from "@/pages/HomePage";
 import { ChatPage } from "@/pages/ChatPage";
-import { NotificationBell } from "@/components/NotificationBell";
+import { SearchPage } from "@/pages/SearchPage";
+import { NotificationsPage } from "@/pages/NotificationsPage";
+import { ViewPage } from "@/pages/ViewPage";
 
+// Every top-level path below other than "/:chamber/*" is reserved: Congress
+// refuses to register a Chamber by any of these names (shared-types'
+// RESERVED_CHAMBER_NAMES), and the service worker serves them from the
+// cached shell (sw.ts) - keep the three in step.
 export function App() {
-  // The registry changes when a Chamber (re)starts or goes stale, not on any
-  // predictable cadence - this interval exists only as a safety net between
-  // registrations/heartbeats, not as the primary way this data stays fresh
-  // (refetchOnWindowFocus, on by default, covers the common case of coming
-  // back to a backgrounded tab).
-  const { data: registry } = useQuery({
-    queryKey: ["congress", "registry"],
-    queryFn: fetchRegistry,
-    refetchInterval: 5 * 60_000,
-  });
-
-  // Every chamber-shaped route is "/:chamber/*", so the current Chamber's own
-  // name is just the URL's first segment. "/" is Congress's own homepage
-  // canvas, not a Chamber - NavPanel knows it as "home".
-  const location = useLocation();
-  const navigate = useNavigate();
-  // /chat is Congress's own page reached from Home, not a Chamber - NavPanel
-  // would otherwise try to fetch a Chamber icon for "chat".
-  const currentChamberName =
-    location.pathname === "/" || location.pathname === "/chat" ? "home" : (location.pathname.split("/")[1] ?? "home");
-
   return (
-    // One LoginGate around everything, not one per route (each used to wrap
-    // its own <Route> individually) - NavPanel needs the same gate every
-    // route already had, and duplicating LoginGate a fourth time just for it
-    // would be redundant given LoginGate's own auth check is global state,
-    // not per-route data.
+    // One LoginGate around everything - the tab bar needs the same gate
+    // every route already has.
     <LoginGate>
-      {/* Congress's own persistent nav, mounted once here rather than
-          inside each Chamber's own Layout (see ChamberLayout's own comment
-          in congress-ui) - a sibling of ChamberHost/Routes below, not
-          nested inside either, so a Chamber that fails to load
-          (ChamberErrorBoundary, a stale heartbeat) only loses its own
-          content, never the ability to navigate elsewhere. currentLabel is
-          only needed to avoid a flicker before the registry query above
-          resolves - same reasoning each Chamber's own Layout passed its own
-          hardcoded title for. */}
-      <NavPanel
-        current={currentChamberName}
-        currentLabel={
-          currentChamberName === "settings" ? "Settings" : registry?.find((c) => c.name === currentChamberName)?.displayName
-        }
-      />
-      {/* Notification bell - fixed top-right chrome on every route, homepage
-          and Chambers alike (see NotificationBell). A sibling of Routes for
-          the same reason NavPanel is. */}
-      <div className="shell-bell">
-        <NotificationBell navigate={(path) => navigate(path)} />
-      </div>
+      {/* The shell's one navigation (Home · Search · + · Notifications ·
+          Settings), a sibling of Routes rather than nested in any page, so a
+          Chamber that fails to load only loses its own content, never the
+          way back out. */}
+      <TabBar />
       <Routes>
-        {/* Congress's own homepage: the widget canvas. Not a Chamber - it
-            works with none registered. */}
+        {/* Congress's own home: the AI composer, pinned views and the "For
+            You" feed. Works with no Chamber registered. */}
         <Route path="/" element={<HomePage />} />
-        {/* Capitol used to be a Chamber at /capitol - old bookmarks and the
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        {/* Congress's own AI chat. */}
+        <Route path="/chat" element={<ChatPage />} />
+        {/* A view card with no full-screen page of its own, given the whole
+            screen. */}
+        <Route path="/view/:chamber/:viewId" element={<ViewPage />} />
+        {/* Old URLs of Chambers folded into Congress - bookmarks and the
             installed PWA's saved URL land here. */}
         <Route path="/capitol/*" element={<Navigate to="/" replace />} />
-        {/* Same for the old Logs Chamber - its config lives in Settings now. */}
         <Route path="/logs/*" element={<Navigate to="/settings?from=logs" replace />} />
-        {/* Congress's own unified Settings - every Chamber's own settings
-            content mounted as one tab-category each (see SettingsPage),
-            reached through NavPanel's single Settings entry point instead
-            of a per-Chamber route. Declared ahead of "/:chamber/*" below so
-            it never gets swallowed by that pattern, though React Router's
-            own static-over-dynamic ranking would already prefer it either
-            way. */}
-        <Route path="/settings" element={<SettingsPage />} />
-        {/* Congress's own AI chat (moved in from Deputy). */}
-        <Route path="/chat" element={<ChatPage />} />
-        {/* Every Chamber renders here, hosted directly
-            in this shell instead of navigating away to it. See ChamberHost's
-            own comment for how that works. */}
+        {/* Every Chamber renders here, hosted directly in this shell instead
+            of navigating away to it. See ChamberHost's own comment. */}
         <Route path="/:chamber/*" element={<ChamberHost />} />
       </Routes>
     </LoginGate>

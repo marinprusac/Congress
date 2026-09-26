@@ -14,12 +14,6 @@ export const manifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  // width/height are in canvas cells, fixed by this Chamber, not
-  // user-resizable. See frontend/src/widgets/ for the matching components.
-  widgets: [
-    { id: "recent-visits", width: 2, height: 3, label: "Recent Visits" },
-    { id: "today-map", width: 4, height: 3, label: "Today's Map" },
-  ],
   // Home feed cards (the remote entry's `views` export) and "+"-creatable
   // Exhibit types - see shared-types' manifestViewSchema/manifestExhibitTypeSchema.
   views: [

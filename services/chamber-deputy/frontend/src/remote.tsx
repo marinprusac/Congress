@@ -24,12 +24,12 @@ export default function Remote() {
   );
 }
 
-// Capitol's canvas resolves a widget component straight out of this same
-// remote entry (via the shared loadRemoteModule) rather than navigating to a
-// URL - see src/manifest.ts's `widgets` array for the id -> entry mapping.
-// Wrapped in this Chamber's own QueryClientProvider here, same reason
-// Remote() wraps App above - Capitol's canvas mounts these bare, with no
-// idea which Chamber's query cache each one needs.
+// Congress's home feed resolves a view card straight out of this same remote
+// entry (via the shared loadRemoteModule) rather than navigating to a URL -
+// see src/manifest.ts's `views` array for the id -> entry mapping. Wrapped
+// in this Chamber's own QueryClientProvider here, same reason Remote() wraps
+// App above - the feed mounts these bare, with no idea which Chamber's query
+// cache each one needs.
 function withQueryClient(Widget: ComponentType): ComponentType {
   return function WrappedWidget() {
     return (
@@ -40,13 +40,10 @@ function withQueryClient(Widget: ComponentType): ComponentType {
   };
 }
 
-export const widgets: Record<string, ComponentType> = Object.fromEntries(
+export const views: Record<string, ComponentType> = Object.fromEntries(
   Object.entries(rawWidgets).map(([id, Widget]) => [id, withQueryClient(Widget)])
 );
 
 // No `settings` export: every knob Deputy had (context, budget, model,
 // pause) was the AI engine's, and lives under Congress's Settings -> AI now.
 
-// Home feed cards (see src/manifest.ts's `views`) - the same components the
-// canvas mounts as widgets, until the canvas is removed.
-export const views = widgets;

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { WidgetPreviewShell } from "@congress/congress-ui";
+import { ViewCard } from "@congress/congress-ui";
 import { fetchVisits } from "@/lib/api";
 
 // Home feed card for the "Visits to classify" view - stays that the owner
@@ -13,11 +13,7 @@ export function PendingVisitsWidget() {
   const visits = data ?? [];
 
   return (
-    <WidgetPreviewShell
-      label="Visits to classify"
-      addHref="/pending"
-      addLabel="Review"
-      ownChamber="map"
+    <ViewCard
       isLoading={isLoading}
       isError={isError}
       errorLabel="Map unavailable."
@@ -32,6 +28,6 @@ export function PendingVisitsWidget() {
           </span>
         </div>
       ))}
-    </WidgetPreviewShell>
+    </ViewCard>
   );
 }

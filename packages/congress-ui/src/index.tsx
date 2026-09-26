@@ -24,7 +24,7 @@ export {
 } from "./useAppliedTheme.js";
 export { GlobalExhibitSearch } from "./GlobalExhibitSearch.js";
 export { ChamberMark, CapitolMark, getChamberIcon } from "./ChamberMarks.js";
-export { WidgetPreviewShell } from "./WidgetPreviewShell.js";
+export { ViewCard } from "./ViewCard.js";
 export { fetchRegistry } from "./registry.js";
 export { useAiRunStream, fetchAiSettings, aiSettingsQueryKey, type AiRunStreamState, type AiToolCall } from "./useAiRunStream.js";
 export { fetchEventCatalog } from "./eventCatalog.js";

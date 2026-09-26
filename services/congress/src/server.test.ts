@@ -105,8 +105,6 @@ describe("session-only routes", () => {
     { method: "GET", path: "/congress/exhibits/search?q=x" },
     { method: "GET", path: "/congress/exhibits/note-1/connections" },
     // Core features folded in from the retired Capitol/Logs Chambers.
-    { method: "GET", path: "/congress/layout/desktop" },
-    { method: "PUT", path: "/congress/layout/desktop/notes/recent", body: { x: 0, y: 0 } },
     { method: "GET", path: "/congress/event-settings" },
     { method: "GET", path: "/congress/history" },
     { method: "GET", path: "/congress/notifications" },
@@ -225,6 +223,42 @@ describe("request validation", () => {
     });
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({ error: "invalid_manifest" });
+  });
+
+  it("refuses a Chamber named after one of the shell's own routes", async () => {
+    // "/search" is Congress's Search tab - a Chamber there would be unreachable.
+    const res = await app.request("/congress/register", {
+      method: "POST",
+      headers: { ...internal, ...json },
+      body: JSON.stringify(makeManifest("search", chamber.origin)),
+    });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: "reserved_name" });
+  });
+
+  it("round-trips the home screen's pinned views, in order, without touching dark mode", async () => {
+    const pinnedViews = [
+      { chamber: "calendar", viewId: "upcoming" },
+      { chamber: "tasks", viewId: "open" },
+    ];
+    const put = await app.request(
+      "/congress/settings",
+      { method: "PUT", headers: { ...json, ...session() }, body: JSON.stringify({ pinnedViews }) },
+      bindings()
+    );
+    expect(put.status).toBe(200);
+    const got = (await (await app.request("/congress/settings", { headers: session() }, bindings())).json()) as { pinnedViews: unknown; darkMode: unknown };
+    expect(got.pinnedViews).toEqual(pinnedViews);
+    expect(typeof got.darkMode).toBe("boolean");
+  });
+
+  it("400s a malformed pinned view", async () => {
+    const res = await app.request(
+      "/congress/settings",
+      { method: "PUT", headers: { ...json, ...session() }, body: JSON.stringify({ pinnedViews: [{ chamber: "tasks" }] }) },
+      bindings()
+    );
+    expect(res.status).toBe(400);
   });
 
   it("400s a heartbeat with no name", async () => {

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
-import { WidgetPreviewShell } from "@congress/congress-ui";
+import { ViewCard } from "@congress/congress-ui";
 import { fetchVisits, fetchTrips } from "@/lib/api";
 import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
 import { InvalidateSizeOnResize } from "@/components/InvalidateSizeOnResize";
@@ -45,11 +45,7 @@ export function TodayMapWidget() {
   }, [visits]);
 
   return (
-    <WidgetPreviewShell
-      label="Today's Map"
-      addHref="/"
-      addLabel="Open"
-      ownChamber="map"
+    <ViewCard
       isLoading={visitsQuery.isLoading}
       isError={visitsQuery.isError}
       errorLabel="Map unavailable."
@@ -80,6 +76,6 @@ export function TodayMapWidget() {
           </MapContainer>
         </div>
       )}
-    </WidgetPreviewShell>
+    </ViewCard>
   );
 }

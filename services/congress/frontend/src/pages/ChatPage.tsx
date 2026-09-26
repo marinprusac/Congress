@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AiMessage } from "@congress/shared-types";
 import { ChamberHeader, CapitolMark, FormSubmitButton, useAiRunStream, fetchAiSettings, aiSettingsQueryKey, useAppliedTheme } from "@congress/congress-ui";
@@ -59,6 +59,20 @@ export function ChatPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
   }, [messagesQuery.data]);
+
+  // A message typed into Home's "Ask Congress" composer arrives as
+  // navigation state - send it once, then drop the state so a refresh or a
+  // back/forward visit doesn't send it again.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const sentFromHomeRef = useRef(false);
+  useEffect(() => {
+    const send = (location.state as { send?: string } | null)?.send;
+    if (!send || sentFromHomeRef.current) return;
+    sentFromHomeRef.current = true;
+    navigate(location.pathname, { replace: true, state: null });
+    mutation.mutate({ text: send });
+  }, [location.state, location.pathname, navigate, mutation]);
 
   function send() {
     const trimmed = text.trim();

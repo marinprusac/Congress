@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { WidgetPreviewShell } from "@congress/congress-ui";
+import { ViewCard } from "@congress/congress-ui";
 import { fetchWeekStats } from "@/lib/api";
 
 export function WeekStatsWidget() {
@@ -9,11 +9,7 @@ export function WeekStatsWidget() {
   });
 
   return (
-    <WidgetPreviewShell
-      label="This Week"
-      addHref="/"
-      addLabel="View all"
-      ownChamber="fitness"
+    <ViewCard
       isLoading={isLoading}
       isError={isError}
       errorLabel="Fitness unavailable."
@@ -28,6 +24,6 @@ export function WeekStatsWidget() {
           <p className="font-mono text-xs text-dust">{Math.round(data.totalVolumeKg).toLocaleString()} kg total volume</p>
         </div>
       )}
-    </WidgetPreviewShell>
+    </ViewCard>
   );
 }

@@ -21,9 +21,8 @@ const envSchema = z.object({
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default("mailto:congress@example.com"),
-  // One-time import of the retired Capitol/Logs Chambers' own SQLite files -
+  // One-time import of the retired Logs Chamber's own SQLite file -
   // see legacyImport.ts. Unset/missing files are simply skipped.
-  LEGACY_CAPITOL_DB_PATH: z.string().default("../chamber-capitol/data/capitol.sqlite3"),
   LEGACY_LOGS_DB_PATH: z.string().default("../chamber-logs/data/logs.sqlite3"),
   // Claude credentials for the AI engine (ai/engine.ts). Both optional, and
   // an empty string counts as unset: without either, `claude` falls back to

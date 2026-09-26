@@ -27,15 +27,16 @@ declare let self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Array<{ url: strin
 
 precacheAndRoute(self.__WB_MANIFEST);
 
-// Same rule generateSW's own navigateFallbackDenylist used to encode via
-// config alone - only "/" is a genuine Capitol route; every other
-// top-level path ("/notes", "/tasks", ...) is a Chamber proxied through
-// server.ts's chamberFrontendProxy, which this worker must never shadow
-// with the cached Capitol app shell (curl bypasses the service worker,
-// which is why a regression here only ever shows up in a real browser).
+// Only Congress's own shell routes ("/", /search, /notifications,
+// /settings, /chat, /view/...) are served from the cached app shell; every
+// other top-level path ("/notes", "/tasks", ...) is a Chamber proxied
+// through server.ts's chamberFrontendProxy, which this worker must never
+// shadow with the cached shell (curl bypasses the service worker, which is
+// why a regression here only ever shows up in a real browser). Keep this in
+// step with App.tsx's SHELL_ROUTES.
 registerRoute(
   new NavigationRoute(createHandlerBoundToURL("index.html"), {
-    denylist: [/^\/(?!$)/],
+    denylist: [/^\/(?!$|search$|notifications$|settings$|chat$|view\/)/],
   })
 );
 
@@ -135,8 +136,9 @@ self.addEventListener("push", (event) => {
   // pushNotification, notificationPushRequestSchema in shared-types) -
   // resolved into an absolute path here since a notification click always
   // opens a fresh tab/window, never a same-document SPA navigation the way
-  // NotificationBell's own click handler can.
-  const url = payload.chamberUrl ? `/${payload.chamber}${payload.chamberUrl}` : "/";
+  // the Notifications page can. Congress's own events are already
+  // root-relative.
+  const url = !payload.chamberUrl ? "/" : payload.chamber === "congress" ? payload.chamberUrl : `/${payload.chamber}${payload.chamberUrl}`;
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body ?? undefined,

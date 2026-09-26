@@ -18,7 +18,6 @@ export const capitolManifest: Manifest = {
   apiBase: `${base}/api`,
   mcpUrl: `${base}/mcp`,
   healthUrl: `${base}/health`,
-  widgets: [],
   views: [],
   exhibitTypes: [],
   events: [],

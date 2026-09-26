@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { WidgetPreviewShell, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
+import { ViewCard, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchDocuments } from "@/lib/api";
 
 const WIDGET_LIMIT = 6;
@@ -15,11 +15,7 @@ export function RecentDocumentsWidget() {
   const recent = data?.slice(0, WIDGET_LIMIT);
 
   return (
-    <WidgetPreviewShell
-      label="Recent"
-      addHref="/new"
-      addLabel="+ Upload"
-      ownChamber="documents"
+    <ViewCard
       isLoading={isLoading}
       isError={isError}
       errorLabel="Documents unavailable."
@@ -35,6 +31,6 @@ export function RecentDocumentsWidget() {
           {doc.title}
         </Link>
       ))}
-    </WidgetPreviewShell>
+    </ViewCard>
   );
 }

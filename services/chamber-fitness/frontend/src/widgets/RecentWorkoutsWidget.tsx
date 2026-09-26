@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { WidgetPreviewShell, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
+import { ViewCard, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchRecentWorkouts } from "@/lib/api";
 
 export function RecentWorkoutsWidget() {
@@ -11,14 +11,10 @@ export function RecentWorkoutsWidget() {
   });
 
   return (
-    <WidgetPreviewShell
-      label="Recent Workouts"
+    <ViewCard
       // No "new workout" flow in this Chamber (Hevy is the sole source of
       // truth) - repurposes the shell's "+ New" slot to link to the full
       // list instead.
-      addHref="/"
-      addLabel="View all"
-      ownChamber="fitness"
       isLoading={isLoading}
       isError={isError}
       errorLabel="Fitness unavailable."
@@ -34,6 +30,6 @@ export function RecentWorkoutsWidget() {
           {workout.exhibitTitle}
         </Link>
       ))}
-    </WidgetPreviewShell>
+    </ViewCard>
   );
 }

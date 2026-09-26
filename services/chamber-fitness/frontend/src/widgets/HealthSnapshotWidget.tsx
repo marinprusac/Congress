@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { WidgetPreviewShell } from "@congress/congress-ui";
+import { ViewCard } from "@congress/congress-ui";
 import { fetchHealthLatest } from "@/lib/api";
 
 export function HealthSnapshotWidget() {
@@ -9,11 +9,7 @@ export function HealthSnapshotWidget() {
     data?.activeEnergy && data?.restingEnergy ? data.activeEnergy.value + data.restingEnergy.value : null;
 
   return (
-    <WidgetPreviewShell
-      label="Health"
-      addHref="/metrics"
-      addLabel="View all"
-      ownChamber="fitness"
+    <ViewCard
       isLoading={isLoading}
       isError={isError}
       errorLabel="Fitness unavailable."
@@ -50,6 +46,6 @@ export function HealthSnapshotWidget() {
           </>
         )}
       </dl>
-    </WidgetPreviewShell>
+    </ViewCard>
   );
 }

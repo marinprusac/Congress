@@ -23,6 +23,7 @@ import {
 import { SignOutControl } from "@/components/LoginGate";
 import { LogsTab } from "@/pages/LogsTab";
 import { AiSettingsTab } from "@/pages/AiSettingsTab";
+import { HomeSettingsTab } from "@/pages/HomeSettingsTab";
 
 function SettingsGearIcon() {
   return (
@@ -58,9 +59,8 @@ interface ChamberSettingsPanel {
 // through IndexedDB via JSON, and a live component reference doesn't survive
 // that (silently becomes undefined on rehydrate, so a tab could crash the
 // whole shell days after this query last actually ran). The Component itself
-// is resolved separately below, the same in-memory-only way Capitol's canvas
-// resolves a widget (see getWidgetComponent in that Chamber's own
-// widgetComponent.ts).
+// is resolved separately below, the same in-memory-only way the home feed
+// resolves a view card (see getViewComponent in components/ViewSlot.tsx).
 function useChamberSettingsPanels(chambers: { name: string; displayName: string }[]) {
   const key = chambers.map((c) => c.name).join(",");
   return useQuery({
@@ -82,8 +82,8 @@ function useChamberSettingsPanels(chambers: { name: string; displayName: string 
   });
 }
 
-// Mirrors getWidgetComponent's own pattern (components/canvas/
-// widgetComponent.ts) - a plain in-memory Map, never react-query, so the
+// Mirrors getViewComponent's own pattern (components/ViewSlot.tsx) - a
+// plain in-memory Map, never react-query, so the
 // resolved component itself never touches the persisted cache above.
 const settingsComponentCache = new Map<string, LazyExoticComponent<ComponentType>>();
 
@@ -164,11 +164,11 @@ function GeneralTab() {
   );
 }
 
-// Unified Settings - one page, reached from NavPanel's single Settings
-// entry point instead of a gear icon on every Chamber's own header. Every
+// Unified Settings - one page, reached from the tab bar's Settings entry
+// instead of a gear icon on every Chamber's own header. Every
 // Chamber's own settings content (previously each Chamber's own routed
 // /settings page) is mounted here as one tab-category, resolved from that
-// Chamber's own remote entry the same way Capitol's canvas resolves widgets
+// Chamber's own remote entry the same way the home feed resolves view cards
 // - see useChamberSettingsPanels above and RemoteModule's `settings` field.
 // NavPanel itself isn't mounted here anymore - App.tsx now mounts one
 // persistent NavPanel outside this route's own tree (see App.tsx's own
@@ -199,7 +199,7 @@ export function SettingsPage() {
   // will never appear (see the fallback render below for the loading gap
   // in between).
   useEffect(() => {
-    if (!panels || tab === "general" || tab === "logs" || tab === "ai") return;
+    if (!panels || tab === "general" || tab === "home" || tab === "logs" || tab === "ai") return;
     if (!panels.some((panel) => panel.name === tab)) setTab("general");
   }, [panels, tab]);
 
@@ -219,6 +219,15 @@ export function SettingsPage() {
             onClick={() => setTab("general")}
           >
             General
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "home"}
+            className={tab === "home" ? "settings-tab active" : "settings-tab"}
+            onClick={() => setTab("home")}
+          >
+            Home
           </button>
           <button
             type="button"
@@ -255,6 +264,8 @@ export function SettingsPage() {
         <section className="settings-tab-panel">
           {tab === "general" ? (
             <GeneralTab />
+          ) : tab === "home" ? (
+            <HomeSettingsTab />
           ) : tab === "logs" ? (
             <LogsTab />
           ) : tab === "ai" ? (

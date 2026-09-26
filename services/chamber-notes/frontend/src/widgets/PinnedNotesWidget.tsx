@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { WidgetPreviewShell, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
+import { ViewCard, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchPinnedNotes } from "@/lib/api";
 
 export function PinnedNotesWidget() {
@@ -11,10 +11,7 @@ export function PinnedNotesWidget() {
   });
 
   return (
-    <WidgetPreviewShell
-      label="Pinned"
-      addHref="/new"
-      ownChamber="notes"
+    <ViewCard
       isLoading={isLoading}
       isError={isError}
       errorLabel="Notes unavailable."
@@ -32,6 +29,6 @@ export function PinnedNotesWidget() {
           </Link>
         ))}
       </div>
-    </WidgetPreviewShell>
+    </ViewCard>
   );
 }

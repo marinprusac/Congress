@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { WidgetPreviewShell, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
+import { ViewCard, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchRecentItems } from "@/lib/api";
 
 export function RecentItemsWidget() {
@@ -11,10 +11,7 @@ export function RecentItemsWidget() {
   });
 
   return (
-    <WidgetPreviewShell
-      label="Recent"
-      addHref="/new"
-      ownChamber="__CHAMBER_NAME__"
+    <ViewCard
       isLoading={isLoading}
       isError={isError}
       errorLabel="__CHAMBER_DISPLAY__ unavailable."
@@ -30,6 +27,6 @@ export function RecentItemsWidget() {
           <span className="min-w-0 truncate">{item.name}</span>
         </Link>
       ))}
-    </WidgetPreviewShell>
+    </ViewCard>
   );
 }

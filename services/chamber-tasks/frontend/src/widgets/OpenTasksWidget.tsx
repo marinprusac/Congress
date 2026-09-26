@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { WidgetPreviewShell, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
+import { ViewCard, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchOpenTasks } from "@/lib/api";
 
 function formatDueDate(value: string | null): string | null {
@@ -16,10 +16,7 @@ export function OpenTasksWidget() {
   });
 
   return (
-    <WidgetPreviewShell
-      label="Open"
-      addHref="/new"
-      ownChamber="tasks"
+    <ViewCard
       isLoading={isLoading}
       isError={isError}
       errorLabel="Tasks unavailable."
@@ -38,6 +35,6 @@ export function OpenTasksWidget() {
           </span>
         </Link>
       ))}
-    </WidgetPreviewShell>
+    </ViewCard>
   );
 }

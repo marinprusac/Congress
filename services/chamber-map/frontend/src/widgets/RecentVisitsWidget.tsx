@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { WidgetPreviewShell } from "@congress/congress-ui";
+import { ViewCard } from "@congress/congress-ui";
 import { fetchVisits } from "@/lib/api";
 
 function todayIso(): string {
@@ -16,10 +16,7 @@ export function RecentVisitsWidget() {
   const visits = (data ?? []).filter((v) => v.status === "confirmed" || v.status === "adhoc");
 
   return (
-    <WidgetPreviewShell
-      label="Recent Visits"
-      addHref="/places/new"
-      ownChamber="map"
+    <ViewCard
       isLoading={isLoading}
       isError={isError}
       errorLabel="Map unavailable."
@@ -34,6 +31,6 @@ export function RecentVisitsWidget() {
           </span>
         </div>
       ))}
-    </WidgetPreviewShell>
+    </ViewCard>
   );
 }

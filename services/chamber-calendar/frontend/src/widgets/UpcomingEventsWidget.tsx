@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { WidgetPreviewShell, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
+import { ViewCard, useShellHosted, resolveChamberPath } from "@congress/congress-ui";
 import { fetchEvents } from "@/lib/api";
 import { formatWidgetEventTime } from "@/lib/datetime";
 
@@ -27,10 +27,7 @@ export function UpcomingEventsWidget() {
   const events = data?.events.slice(0, MAX_EVENTS) ?? [];
 
   return (
-    <WidgetPreviewShell
-      label="Upcoming"
-      addHref="/new"
-      ownChamber="calendar"
+    <ViewCard
       isLoading={isLoading}
       isError={isError}
       errorLabel="Calendar unavailable."
@@ -51,6 +48,6 @@ export function UpcomingEventsWidget() {
           <div className="font-mono text-[10px] text-dust">{formatWidgetEventTime(event)}</div>
         </Link>
       ))}
-    </WidgetPreviewShell>
+    </ViewCard>
   );
 }

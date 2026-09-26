@@ -9,7 +9,6 @@ export function makeManifest(name: string, origin = "http://127.0.0.1:9", overri
     displayName: `${name[0]?.toUpperCase()}${name.slice(1)} Chamber`,
     version: "0.1.0",
     routes: { home: `/${name}`, settings: `/${name}/settings` },
-    widgets: [],
     views: [],
     exhibitTypes: [],
     events: [],
