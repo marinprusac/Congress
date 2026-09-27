@@ -8,6 +8,7 @@ import { startHistoryPruneSweep, stopHistoryPruneSweep } from "./eventHistory.js
 import { importLegacyDeputySettings } from "./ai/legacyImport.js";
 import { startAiRetentionSweep, stopAiRetentionSweep } from "./ai/retention.js";
 import { recoverInterruptedThreads } from "./ai/chat.js";
+import { startAskTimer, stopAskTimer } from "./ai/asks.js";
 
 runMigrations();
 importLegacyChamberData();
@@ -22,6 +23,7 @@ startHeartbeatSweep();
 startEventCatalogSync();
 startHistoryPruneSweep();
 startAiRetentionSweep();
+startAskTimer();
 
 function shutdown() {
   console.log("Shutting down Congress...");
@@ -29,6 +31,7 @@ function shutdown() {
   stopEventCatalogSync();
   stopHistoryPruneSweep();
   stopAiRetentionSweep();
+  stopAskTimer();
   server.close(() => {
     closeDb();
     process.exit(0);

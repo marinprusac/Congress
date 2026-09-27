@@ -299,7 +299,7 @@ export async function runAi(ctx: RunContext): Promise<RunOutcome> {
   }
 
   const prompt = buildPrompt(settings, ctx.body);
-  const mcpConfig = ctx.jsonSchema ? null : await writeMcpConfigFile(ctx.actor);
+  const mcpConfig = ctx.jsonSchema ? null : await writeMcpConfigFile(ctx.actor, { runId, threadId });
   insertRunRow({ id: runId, ...base, status: "running" });
   startRun(runId, ctx.kind, ctx.meta ?? {}, threadId);
 

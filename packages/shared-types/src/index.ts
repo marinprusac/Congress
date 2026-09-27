@@ -8,3 +8,4 @@ export * from "./events.js";
 export * from "./logs.js";
 export * from "./ai.js";
 export * from "./feed.js";
+export * from "./aiAsks.js";

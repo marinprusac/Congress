@@ -10,6 +10,10 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
   retentionDays: 30,
   paused: false,
   pausedReason: null,
+  maxPushesPerDay: 3,
+  quietHoursStart: 22,
+  quietHoursEnd: 7,
+  timeZone: null,
 };
 
 export const { getSettings: getAiSettings, updateSettings: updateAiSettings } = createSingleRowSettings<
@@ -25,6 +29,10 @@ export const { getSettings: getAiSettings, updateSettings: updateAiSettings } = 
     retentionDays: row.retentionDays,
     paused: row.paused,
     pausedReason: row.pausedReason,
+    maxPushesPerDay: row.maxPushesPerDay,
+    quietHoursStart: row.quietHoursStart,
+    quietHoursEnd: row.quietHoursEnd,
+    timeZone: row.timeZone,
   }),
   defaults: DEFAULT_AI_SETTINGS,
 });

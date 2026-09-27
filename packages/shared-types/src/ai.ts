@@ -164,6 +164,11 @@ export const aiSettingsSchema = z.object({
   retentionDays: z.number().int().positive(),
   paused: z.boolean(),
   pausedReason: z.string().nullable(),
+  // Asks: at most this many pushes a day; none during quiet hours (local).
+  maxPushesPerDay: z.number().int().min(0).max(50),
+  quietHoursStart: z.number().int().min(0).max(23).nullable(),
+  quietHoursEnd: z.number().int().min(0).max(23).nullable(),
+  timeZone: z.string().max(64).nullable(),
 });
 export type AiSettings = z.infer<typeof aiSettingsSchema>;
 

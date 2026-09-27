@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { HttpBindings } from "@hono/node-server";
 import {
+  answerAskRequestSchema,
+  decideAskRequestSchema,
   aiRunRequestSchema,
   createAiThreadRequestSchema,
   postAiThreadMessageRequestSchema,
@@ -20,6 +22,7 @@ import { runAi } from "./engine.js";
 import { broadcast, onStreamEvent, replayEvents } from "./runStream.js";
 import { deleteThreadRow, getThread, getThreadRow, listThreadMessages, listThreads, markThreadRead, updateThreadRow } from "./threads.js";
 import { getRunDetail, listRecentRuns } from "./runs.js";
+import { AskClosedError, AskInvalidError, AskNotFoundError, answerQuestion, decideProposal, listOpenAsks } from "./asks.js";
 import { randomUUID } from "node:crypto";
 
 // Mounted at /congress/ai (server.ts), ahead of the /api/:chamber/*
@@ -126,6 +129,39 @@ aiRoutes.post("/threads/:id/retry", requireSession, (c) => {
     return c.json(retryLast(id));
   } catch (err) {
     const { body, status } = threadErrorResponse(err);
+    return c.json(body, status);
+  }
+});
+
+// ---- Asks (the owner's side) ----
+
+function askErrorResponse(err: unknown) {
+  if (err instanceof AskNotFoundError) return { body: { error: "not_found" }, status: 404 as const };
+  if (err instanceof AskClosedError) return { body: { error: "closed", message: err.message }, status: 409 as const };
+  if (err instanceof AskInvalidError) return { body: { error: "invalid", message: err.message, fieldErrors: err.fieldErrors }, status: 400 as const };
+  throw err;
+}
+
+aiRoutes.get("/asks", requireSession, (c) => c.json(listOpenAsks()));
+
+aiRoutes.post("/messages/:id/answer", requireSession, async (c) => {
+  const parsed = answerAskRequestSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  try {
+    return c.json(answerQuestion(Number(c.req.param("id")), parsed.data.values));
+  } catch (err) {
+    const { body, status } = askErrorResponse(err);
+    return c.json(body, status);
+  }
+});
+
+aiRoutes.post("/messages/:id/decide", requireSession, async (c) => {
+  const parsed = decideAskRequestSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  try {
+    return c.json(decideProposal(Number(c.req.param("id")), parsed.data.approve, parsed.data.note || undefined));
+  } catch (err) {
+    const { body, status } = askErrorResponse(err);
     return c.json(body, status);
   }
 });

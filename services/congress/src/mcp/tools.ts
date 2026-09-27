@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult } from "@congress/chamber-kit";
 import { buildChipToken } from "@congress/shared-types";
+import { registerAskTools } from "./askTools.js";
 import { listChambers, getChamber, detachChamber, attachChamber } from "../registry.js";
 import {
   searchExhibits,
@@ -249,4 +250,6 @@ export function registerTools(server: McpServer) {
       return mcpTextResult({ ok: true, id });
     }
   );
+
+  registerAskTools(server);
 }

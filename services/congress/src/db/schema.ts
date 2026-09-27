@@ -227,6 +227,12 @@ export const aiSettings = sqliteTable("ai_settings", {
   retentionDays: integer("retention_days").notNull().default(30),
   paused: integer("paused", { mode: "boolean" }).notNull().default(false),
   pausedReason: text("paused_reason"),
+  maxPushesPerDay: integer("max_pushes_per_day").notNull().default(3),
+  // Local hours [start, end) when asks never push; null = no quiet hours.
+  quietHoursStart: integer("quiet_hours_start").default(22),
+  quietHoursEnd: integer("quiet_hours_end").default(7),
+  // IANA zone for quiet hours and the daily push count; null = server zone.
+  timeZone: text("time_zone"),
 });
 
 // One conversation. sessionId is the `claude` CLI session every run in it
@@ -270,6 +276,9 @@ export const aiMessages = sqliteTable(
     urgency: text("urgency", { enum: ["quiet", "push"] }),
     deliverAt: integer("deliver_at", { mode: "timestamp_ms" }),
     expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+    // When a (possibly delayed) ask actually reached the owner, and pushed.
+    deliveredAt: integer("delivered_at", { mode: "timestamp_ms" }),
+    pushedAt: integer("pushed_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [
