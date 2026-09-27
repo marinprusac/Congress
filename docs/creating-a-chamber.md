@@ -220,7 +220,7 @@ separate build, no iframe. A view without a card never appears in the feed;
 it's reached through Search and the owner's pinned row. Any links inside a
 card go through `resolveChamberPath`/`useShellHosted`, same as any other
 Chamber-owned link. Your index route is your main view if you have one (Map,
-Calendar's Agenda) and `ChamberIndexRedirect` otherwise.
+Calendar's Timeline) and `ChamberIndexRedirect` otherwise.
 
 Icons work the same way: your Chamber serves its own, Congress fetches it —
 **nothing about creating or icon-branding a Chamber ever means editing a

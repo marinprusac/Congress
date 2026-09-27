@@ -74,7 +74,7 @@ describe("calendarFeedCandidates", () => {
     });
   });
 
-  it("never offers the Agenda view - it has no feed card", () => {
+  it("never offers the Timeline/Week views - it has no feed card", () => {
     expect(calendarFeedCandidates([], now)).toEqual([]);
   });
 });

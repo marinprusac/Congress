@@ -24,9 +24,9 @@ export const FEED_LOOKAHEAD_MS = 24 * 60 * 60 * 1000;
 // Calendar's home-feed candidates: an event in progress, or starting within
 // a few hours (climbing as it nears), shows up on its own; an all-day event
 // today sits lower. Each carries its time, place and description inline.
-// Events the owner isn't attending never show. The Agenda view has no feed
-// card, so it isn't a feed candidate - it's reached through Search and the
-// pinned row. Pure - `events` is listEvents()'s output around `now`.
+// Events the owner isn't attending never show. The Timeline and Week views have
+// no feed card, so they aren't feed candidates - they're reached through
+// Search and the pinned row. Pure - `events` is listEvents()'s output around `now`.
 export function calendarFeedCandidates(events: CalendarEvent[], now: Date): FeedCandidate[] {
   const items: FeedCandidate[] = [];
   const nowMs = now.getTime();

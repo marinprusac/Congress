@@ -17,7 +17,10 @@ export const calendarManifest: Manifest = {
   // Views are only genuine screens (see shared-types' manifestViewSchema) -
   // this Chamber's exhibits reach the home feed and Search on their own.
   // exhibitTypes is what the home screen's "+" can create here.
-  views: [{ id: "agenda", label: "Agenda", fullPath: "/" }],
+  views: [
+    { id: "timeline", label: "Timeline", description: "The coming days, as a list", fullPath: "/" },
+    { id: "week", label: "Week", description: "This week on an hour grid", fullPath: "/week" },
+  ],
   exhibitTypes: [{ type: "event", label: "Event", createPath: "/new" }],
   events: [
     {
