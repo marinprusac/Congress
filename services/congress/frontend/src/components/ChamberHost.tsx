@@ -62,9 +62,8 @@ interface ChamberErrorBoundaryState {
   failed: boolean;
 }
 
-// A registered "active" Chamber can still fail to actually load (a stale
-// heartbeat the sweep hasn't caught yet, a network blip, a genuine bug in
-// that Chamber's own code) - without this, a rejected dynamic import or any
+// A registered "active" Chamber can still fail to actually load (a network
+// blip, a missing build artifact, a genuine bug in that Chamber's own code) - without this, a rejected dynamic import or any
 // render error thrown by the mounted Chamber propagates uncaught and blanks
 // Capitol's entire shell, not just the one Chamber (confirmed by testing).
 // Keyed by chamberName at the call site so switching to a *different*

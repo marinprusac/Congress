@@ -2,7 +2,6 @@ import { createPublishEvent } from "@congress/chamber-kit";
 import { listCachedEvents } from "./google/cache.js";
 import { listLocalEvents } from "./localEvents.js";
 import { eventUrl } from "./google/eventId.js";
-import { env } from "./env.js";
 
 // Publishes to Congress's push relay rather than pushing a notification
 // directly - this Chamber only knows an event is starting soon, not
@@ -11,8 +10,6 @@ import { env } from "./env.js";
 // createPublishEvent and this Chamber's manifest.ts for the event catalog.
 const publishEvent = createPublishEvent({
   chamber: "calendar",
-  capitolUrl: env.CAPITOL_URL,
-  internalToken: env.CONGRESS_INTERNAL_TOKEN,
 });
 
 // Only timed events within this window get a "starting soon" event - an

@@ -1,7 +1,9 @@
 # Deployment
 
-Congress runs on a single Hetzner VPS (`178.105.180.7`), one plain `systemd`
-unit per service bound to `127.0.0.1`, no Docker.
+Congress runs on a single Hetzner VPS (`178.105.180.7`) as **one** plain
+`systemd` unit (`congress-core`) bound to `127.0.0.1`, no Docker. Every
+Chamber is a module loaded into that one process - there are no Chamber
+units or ports.
 
 This deviates from the project brief's original access model (Tailscale-only,
 no public listener, network membership as the sole access control — brief
@@ -16,44 +18,29 @@ decision. See "Access control" below for what that means in practice.
   clone — deploys are push-based (see "Deploy: GitHub Actions → server"
   below), so the server only ever receives a tree of files over rsync and
   never runs `git` itself.
-- Ports: this VPS already runs other services on `3000` and `4000`, so
-  Congress's production port differs from its dev default: **Congress
-  `8000`**, **Notes Chamber `8011`**, **Calendar Chamber `8012`**, **Documents
-  Chamber `8013`**, **Tasks Chamber `8014`**, **Map Chamber `8019`**,
-  **Fitness Chamber `8020`** (each Chamber
-  matches its dev default). All bind `127.0.0.1` only — the only thing
-  reachable from outside the box at all is Caddy, on 80/443.
-- Each service's `.env` (untracked, created by hand on the server) sets
-  `NODE_ENV=production` and a shared `CONGRESS_INTERNAL_TOKEN`. Congress's
-  `.env` additionally sets `CONGRESS_MASTER_PASSWORD_HASH` and
-  `SESSION_SECRET` (see `services/congress/.env.example` for how to generate
-  each).
+- Port: this VPS already runs other services on `3000` and `4000`, so
+  Congress's production port differs from its dev default: **`8000`**,
+  bound to `127.0.0.1`. The only thing reachable from outside the box at all
+  is Caddy, on 80/443. Chambers have no ports.
+- `services/congress/.env` (untracked, created by hand on the server) sets
+  `NODE_ENV=production`, `PORT=8000`, `CONGRESS_INTERNAL_TOKEN` (now only
+  gating the MCP endpoints the AI's `claude` subprocess calls),
+  `CONGRESS_MASTER_PASSWORD_HASH` and `SESSION_SECRET` (see
+  `services/congress/.env.example`).
+- Each Chamber keeps its own config in `services/chamber-<name>/.env`
+  (Traccar, Google OAuth, ...), read by Congress for that Chamber only.
+  Leftover keys from the process era (`PORT`, `HOST`, `CAPITOL_URL`, ...)
+  are simply ignored. Each Chamber's SQLite file stays in its own
+  `services/chamber-<name>/data/`.
 
 ## Process management
 
-Every service (`congress-core`, `congress-chamber-notes`,
-`congress-chamber-calendar`, `congress-chamber-documents`,
-`congress-chamber-tasks`,
-`congress-chamber-map`, `congress-chamber-fitness`) has its own discrete unit
-under `infra/systemd/`, installed at `/etc/systemd/system/` and enabled
-(`systemctl enable --now`). All share the same body: `User=marin`,
-`WorkingDirectory=` the service dir, `ExecStart=/usr/bin/pnpm run start`,
-`Restart=on-failure`.
-
-Running `pnpm create-chamber <name> "<Display Name>" <port>` (see
-`docs/creating-a-chamber.md`) generates a new Chamber's unit file
-automatically, following this same pattern — copy it to the server the same
-way as any other and `systemctl enable --now` it (see "Adding a new
-Chamber's infra" below).
-
-`infra/systemd/congress-chamber@.service` is an optional systemd
-*instance*-unit template (`%i` = the chamber directory suffix, e.g.
-`systemctl enable --now congress-chamber@notes.service`) if you'd rather
-manage one templated unit than N discrete files. Adopting it on an
-already-running server is a manual, one-time migration (stop/disable each
-discrete unit, enable the corresponding `congress-chamber@<name>` instance
-instead) — not something to mix with the discrete units, since
-`infra/deploy/remote-apply.sh` restarts services by exact unit name.
+`congress-core` (`infra/systemd/congress-core.service`) is the only unit:
+`User=marin`, `WorkingDirectory=/srv/congress/services/congress`,
+`ExecStart=/usr/bin/pnpm run start`, `Restart=on-failure`. It starts every
+Chamber in-process (`services/congress/src/chambers/loader.ts`); a Chamber
+that fails to start (bad config, a crash in its `start()`) is logged, marked
+offline, and skipped rather than taking Congress down.
 
 `remote-apply.sh`'s restart step requires **passwordless `sudo` for
 `systemctl restart` and `systemctl reload`** for the `marin` user (it calls
@@ -67,32 +54,30 @@ marin ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart congress-*, /usr/bin/system
 
 ## Adding a new Chamber's infra
 
-Registering a new Chamber with Congress itself is automatic and requires no
-code change on Congress's side at all — see `docs/creating-a-chamber.md`. The
-only genuinely manual, per-Chamber steps are on the infra side, and running
-`pnpm create-chamber` already does the first of them for you:
+Nothing per-Chamber on the infra side. `pnpm create-chamber` adds the new
+Chamber to Congress's module list, `build-artifacts.sh` discovers it by
+globbing `services/chamber-*/`, and Caddy only ever points at Congress. The
+one manual step: if the Chamber needs config, create
+`services/chamber-<name>/.env` on the server (untracked) from its
+`.env.example`, then deploy.
 
-1. **Systemd unit** — generated for you at `infra/systemd/congress-chamber-<name>.service`
-   by the scaffold script. On the server: `sudo cp infra/systemd/congress-chamber-<name>.service /etc/systemd/system/ && sudo systemctl daemon-reload`.
-2. **`infra/deploy/build-artifacts.sh`/`remote-apply.sh`** — nothing to
-   edit. Both discover Chambers by globbing `services/chamber-*/`, so a new
-   Chamber directory is picked up on the very next deploy with zero changes
-   to either script.
-3. **Caddy** — nothing to edit. Caddy only ever proxies to Congress
-   (`127.0.0.1:8000`); Chamber ports are never referenced there, since
-   path-based routing to each Chamber happens inside Congress's own gateway.
-4. **On the server, by hand:**
-   - Pick a port that doesn't collide with an existing Chamber (`pnpm
-     create-chamber` already checks this locally against every
-     `.env.example` in the repo, but a port only reserved on the server —
-     e.g. by another, unrelated project — won't be caught).
-   - Create `services/chamber-<name>/.env` on the server (untracked, same
-     as every other service) from the generated `.env.example`, with
-     `NODE_ENV=production`, the real production `PORT`, the shared
-     `CONGRESS_INTERNAL_TOKEN`, and — important, easy to miss — `CAPITOL_URL`
-     corrected to `http://127.0.0.1:8000` (every `.env.example` defaults to
-     the dev value `:3000`, which is wrong in production).
-   - `sudo systemctl enable --now congress-chamber-<name>`.
+## Chambers moved into Congress (one-time)
+
+Chambers used to run as their own `congress-chamber-*` units. The deploy that
+moved them in-process can't `stop`/`disable` those units (the sudoers entry
+only allows `restart`), so `remote-apply.sh` restarts each old unit once
+instead: that stops the old process, and each Chamber's `start` script is
+now a no-op that exits 0, so the unit stays inactive. To remove them for
+good, once, on the server:
+
+```
+sudo systemctl disable --now congress-chamber-notes congress-chamber-calendar congress-chamber-documents congress-chamber-tasks congress-chamber-map congress-chamber-fitness
+sudo rm /etc/systemd/system/congress-chamber-*.service
+sudo systemctl daemon-reload
+```
+
+After that, remove the matching loop from `remote-apply.sh` and the no-op
+`start` scripts from each Chamber's `package.json`.
 
 ## Access control
 
@@ -158,7 +143,7 @@ on a GitHub-hosted runner, which:
    only thing that still runs *on* the VPS: `pnpm install --frozen-lockfile`
    (native modules like `better-sqlite3` must be compiled against this
    machine's own libc/Node ABI — that's the one thing CI genuinely can't do
-   for the server) and `sudo systemctl restart` on every affected unit.
+   for the server) and `sudo systemctl restart congress-core`.
 
 The server needs no build toolchain beyond what `remote-apply.sh` itself
 requires (`pnpm`, and whatever `better-sqlite3` needs to compile — see
@@ -214,21 +199,16 @@ sudo apt-get install -y rsync                     # if not already present
 # step (restarting services) will fail on this very first run - there's
 # nothing to restart yet - that's expected; continue below.
 
-# Create every service's .env by hand (untracked) from the .env.example
-# rsync just delivered: services/congress/.env, services/chamber-notes/.env,
-# .../chamber-calendar/.env, .../chamber-documents/.env,
-# .../chamber-tasks/.env, and so on for every
-# chamber-*/ directory present. Set NODE_ENV=production, the real
-# production PORT (8000/8011/8012/...), one shared CONGRESS_INTERNAL_TOKEN
-# across every file, and - for every Chamber - CAPITOL_URL=http://127.0.0.1:8000
-# (the .env.example default of :3000 is the dev value and is wrong here).
-# Congress's own .env additionally needs CONGRESS_MASTER_PASSWORD_HASH and
-# SESSION_SECRET (see .env.example).
+# Create services/congress/.env by hand (untracked) from its .env.example:
+# NODE_ENV=production, PORT=8000, CONGRESS_INTERNAL_TOKEN,
+# CONGRESS_MASTER_PASSWORD_HASH and SESSION_SECRET. Then each Chamber's own
+# services/chamber-<name>/.env from its .env.example, for the ones that
+# need config (calendar's Google OAuth, map's Traccar, ...).
 
 cd /srv/congress
-sudo cp infra/systemd/congress-*.service /etc/systemd/system/
+sudo cp infra/systemd/congress-core.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now $(for d in services/chamber-*/; do echo "congress-$(basename "$d")"; done) congress-core
+sudo systemctl enable --now congress-core
 
 # Passwordless sudo for the deploy workflow's restarts - see "Process
 # management" above for the exact sudoers line; remote-apply.sh will fail

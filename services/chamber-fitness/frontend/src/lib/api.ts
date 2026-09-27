@@ -15,7 +15,7 @@ import type {
 } from "../../../src/types";
 import { resolveApiBase, parseJsonResponse as json } from "@congress/congress-ui";
 
-const API_BASE = resolveApiBase("fitness", import.meta.env.PROD);
+const API_BASE = resolveApiBase("fitness");
 
 export function fetchWorkouts(): Promise<WorkoutSummary[]> {
   return fetch(`${API_BASE}/workouts`).then((res) => json(res));

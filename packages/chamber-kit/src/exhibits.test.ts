@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createPushExhibitSync, createTableBackedExhibits, scoreExhibitMatch } from "./exhibits.js";
+import { setCongressHost } from "./host.js";
+import type { ExhibitSyncRequest } from "@congress/shared-types";
 
 interface Row {
   id: number;
@@ -245,66 +247,32 @@ describe("chip", () => {
 });
 
 describe("createPushExhibitSync", () => {
-  const realFetch = globalThis.fetch;
-  afterEach(() => {
-    globalThis.fetch = realFetch;
-  });
+  afterEach(() => setCongressHost(null));
 
-  function stubFetch(handler: () => Response | never) {
-    const calls: { url: string; init: { headers?: Record<string, string>; body?: string } }[] = [];
-    globalThis.fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      calls.push({ url: String(input), init: (init ?? {}) as { headers?: Record<string, string>; body?: string } });
-      return handler();
-    }) as unknown as typeof fetch;
-    return calls;
+  function installHost(syncExhibit: (push: ExhibitSyncRequest) => void) {
+    setCongressHost({ publishEvent: () => {}, syncExhibit, resolveExhibits: async () => [] });
   }
 
-  it("posts chamber + the push payload to Capitol's exhibits sync endpoint with the internal token header", async () => {
-    const calls = stubFetch(() => new Response(null, { status: 200 }));
-    const pushExhibitSync = createPushExhibitSync({
-      chamber: "notes",
-      capitolUrl: "http://127.0.0.1:19999",
-      internalToken: "test-token",
-    });
+  it("hands chamber + the push payload to Congress's host", async () => {
+    const pushes: ExhibitSyncRequest[] = [];
+    installHost((push) => pushes.push(push));
+    const pushExhibitSync = createPushExhibitSync({ chamber: "notes" });
 
     await pushExhibitSync({ id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: [] });
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0]!.url).toBe("http://127.0.0.1:19999/congress/exhibits/sync");
-    expect(calls[0]!.init.headers).toMatchObject({ "X-Congress-Internal-Token": "test-token" });
-    expect(JSON.parse(calls[0]!.init.body!)).toEqual({
-      chamber: "notes",
-      id: "note-1",
-      type: "note",
-      name: "One",
-      url: "/n/1",
-      outgoingRefs: [],
-    });
+    expect(pushes).toEqual([{ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: [] }]);
   });
 
-  it("resolves without throwing when Capitol responds non-ok", async () => {
-    stubFetch(() => new Response(null, { status: 500 }));
-    const pushExhibitSync = createPushExhibitSync({
-      chamber: "notes",
-      capitolUrl: "http://127.0.0.1:19999",
-      internalToken: "test-token",
-    });
-    await expect(
-      pushExhibitSync({ id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: [] })
-    ).resolves.toBeUndefined();
+  it("is a no-op without a host (a Chamber's own tests)", async () => {
+    const pushExhibitSync = createPushExhibitSync({ chamber: "notes" });
+    await expect(pushExhibitSync({ id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: [] })).resolves.toBeUndefined();
   });
 
-  it("resolves without throwing when fetch itself throws", async () => {
-    stubFetch(() => {
-      throw new Error("ECONNREFUSED");
+  it("swallows a host that throws", async () => {
+    installHost(() => {
+      throw new Error("boom");
     });
-    const pushExhibitSync = createPushExhibitSync({
-      chamber: "notes",
-      capitolUrl: "http://127.0.0.1:19999",
-      internalToken: "test-token",
-    });
-    await expect(
-      pushExhibitSync({ id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: [] })
-    ).resolves.toBeUndefined();
+    const pushExhibitSync = createPushExhibitSync({ chamber: "notes" });
+    await expect(pushExhibitSync({ id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: [] })).resolves.toBeUndefined();
   });
 });

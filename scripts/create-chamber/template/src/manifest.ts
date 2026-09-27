@@ -1,7 +1,4 @@
 import type { Manifest } from "@congress/shared-types";
-import { env } from "./env.js";
-
-const base = `http://${env.HOST}:${env.PORT}`;
 
 export const manifest: Manifest = {
   name: "__CHAMBER_NAME__",
@@ -11,9 +8,6 @@ export const manifest: Manifest = {
     home: "/__CHAMBER_NAME__",
     settings: "/__CHAMBER_NAME__/settings",
   },
-  apiBase: `${base}/api`,
-  mcpUrl: `${base}/mcp`,
-  healthUrl: `${base}/health`,
   // Views are only genuine screens that can't be expressed as a list of
   // exhibits (a map, an agenda) - most Chambers have none; their exhibits
   // reach the home feed (src/feedRules.ts) and Search on their own.

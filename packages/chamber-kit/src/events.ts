@@ -1,32 +1,20 @@
 import type { EventPublishRequest } from "@congress/shared-types";
 import { currentActor } from "./actorContext.js";
+import { getCongressHost } from "./host.js";
 
-// Publishes a domain event to Congress's generic event log
-// (POST /congress/events/publish) - same "best-effort, never blocks the
-// caller" shape as createPushExhibitSync. The publishing Chamber doesn't
-// know or care whether anything is listening;
-// Congress just appends the row. See packages/shared-types/src/events.ts
-// for the request shape and manifestEventSchema (shared-types/manifest.ts)
-// for how a Chamber declares its own catalog of event types it may publish.
-export function createPublishEvent(opts: { chamber: string; capitolUrl: string; internalToken: string }) {
+// Publishes a domain event to Congress's event relay. Best-effort and never
+// blocks the caller: the publishing Chamber doesn't know whether anything is
+// listening. See shared-types' manifestEventSchema for the catalog.
+export function createPublishEvent(opts: { chamber: string }) {
   return async function publishEvent(event: Omit<EventPublishRequest, "chamber">): Promise<void> {
+    const host = getCongressHost();
+    if (!host) return;
     try {
-      const res = await fetch(`${opts.capitolUrl}/congress/events/publish`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Congress-Internal-Token": opts.internalToken,
-        },
-        // Explicit actor wins; otherwise whoever's request we're handling
-        // (or "system" from a timer/poller with no request context).
-        body: JSON.stringify({ chamber: opts.chamber, ...event, actor: event.actor ?? currentActor() }),
-        signal: AbortSignal.timeout(5_000),
-      });
-      if (!res.ok) {
-        console.warn(`Event publish rejected by Congress: ${res.status}`);
-      }
+      // Explicit actor wins; otherwise whoever's request we're handling
+      // (or "system" from a timer/poller with no request context).
+      host.publishEvent({ chamber: opts.chamber, ...event, actor: event.actor ?? currentActor() });
     } catch (err) {
-      console.warn(`Event publish failed: ${(err as Error).message}`);
+      console.warn(`[${opts.chamber}] event publish failed: ${(err as Error).message}`);
     }
   };
 }

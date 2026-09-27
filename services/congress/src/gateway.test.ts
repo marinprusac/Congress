@@ -1,121 +1,68 @@
-import { gzipSync } from "node:zlib";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { makeManifest, migrationsDir, startFakeChamber, type FakeChamber } from "@congress/test-support";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import { makeFakeChamberModule, migrationsDir, type FakeChamberModule } from "@congress/test-support";
+
+vi.mock("./sessionAuth.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./sessionAuth.js")>()),
+  hasValidSession: async () => true,
+}));
+
 import { runMigrations } from "./db/client.js";
-import { detachChamber, registerChamber } from "./registry.js";
-import {
-  forwardToChamber,
-  forwardToChamberFrontend,
-  frontendBaseOf,
-  proxyToChamberPath,
-  proxyToChamberIcon,
-  rewriteChamberPath,
-  timeoutFor,
-} from "./gateway.js";
-import { getChamber } from "./registry.js";
+import { detachChamber } from "./registry.js";
+import { loadChamber } from "./chambers/loader.js";
+import { dispatchToChamber, forwardToChamber, serveChamberAssets, serveChamberIcon, stripPrefix } from "./gateway.js";
 
-describe("frontendBaseOf", () => {
-  it("strips the trailing /api a manifest's apiBase always carries", () => {
-    expect(frontendBaseOf("http://127.0.0.1:8011/api")).toBe("http://127.0.0.1:8011");
-  });
-
-  it("only strips a trailing /api, not one in the middle of the path", () => {
-    expect(frontendBaseOf("http://host/api/v2")).toBe("http://host/api/v2");
-  });
-
-  it("leaves a base with no /api suffix alone", () => {
-    expect(frontendBaseOf("http://127.0.0.1:8011")).toBe("http://127.0.0.1:8011");
+describe("stripPrefix", () => {
+  it("keeps the remainder after a fixed prefix", () => {
+    expect(stripPrefix("/api/notes/notes/3", "/api/notes")).toBe("/notes/3");
+    expect(stripPrefix("/api/notes", "/api/notes")).toBe("");
   });
 });
 
-describe("rewriteChamberPath", () => {
-  it("strips the route prefix and re-attaches the query string", () => {
-    expect(rewriteChamberPath("/api/notes/notes/3", "/api/notes", "http://up/api", "?q=1")).toBe("http://up/api/notes/3?q=1");
-  });
-
-  it("produces an empty remainder for a bare prefix by default", () => {
-    expect(rewriteChamberPath("/api/notes", "/api/notes", "http://up/api", "")).toBe("http://up/api");
-  });
-
-  it("uses the fallback for a bare prefix when one is given, as the frontend proxy needs", () => {
-    // "/notes" has to reach the Chamber as "/", not as the empty path, or
-    // its SPA shell is never served.
-    expect(rewriteChamberPath("/notes", "/notes", "http://up", "", "/")).toBe("http://up/");
-  });
-
-  it("keeps a nested asset path intact", () => {
-    expect(rewriteChamberPath("/notes/assets/app-abc.js", "/notes", "http://up", "", "/")).toBe(
-      "http://up/assets/app-abc.js"
-    );
-  });
-});
-
-describe("timeoutFor", () => {
-  it("gives every Chamber route the ordinary timeout", () => {
-    expect(timeoutFor("notes", "POST", "/directives/42/run")).toBe(10_000);
-    expect(timeoutFor("tasks", "GET", "/tasks")).toBe(10_000);
-  });
-});
-
-describe("proxying", () => {
-  let upstream: FakeChamber;
+describe("gateway", () => {
+  let upstream: FakeChamberModule;
   const app = new Hono<{ Bindings: HttpBindings }>();
 
   beforeAll(async () => {
     runMigrations(migrationsDir("congress"));
 
-    upstream = await startFakeChamber((chamber) => {
-      chamber.get("/api/echo", (c) => c.json({ path: c.req.path, query: c.req.query("q") ?? null }));
-      chamber.post("/api/echo", async (c) => c.json({ body: await c.req.json() }));
-      chamber.get("/api/gzipped", (c) => {
-        // A Chamber's own static serving returns pre-compressed responses
-        // (see chamber-kit routes.ts's `precompressed: true`), which is what
-        // made the header handling below matter.
-        const body = gzipSync(Buffer.from("compressible ".repeat(50)));
-        return new Response(body, {
-          headers: { "content-encoding": "gzip", "content-length": String(body.length), "content-type": "text/plain" },
-        });
-      });
-      chamber.get("/icons/mark.svg", (c) => c.body("<svg/>", 200, { "content-type": "image/svg+xml" }));
-      chamber.get("/", (c) => c.html("<html>shell</html>"));
-      chamber.get("/assets/app.js", (c) => c.body("console.log(1)", 200, { "content-type": "text/javascript" }));
-    });
+    const dir = mkdtempSync(join(tmpdir(), "congress-gateway-"));
+    mkdirSync(join(dir, "frontend/dist/icons"), { recursive: true });
+    mkdirSync(join(dir, "frontend/dist/assets"), { recursive: true });
+    writeFileSync(join(dir, "frontend/dist/icons/mark.svg"), "<svg/>");
+    writeFileSync(join(dir, "frontend/dist/remote-entry.js"), "export default 1;");
+    writeFileSync(join(dir, "frontend/dist/assets/app-abc.js"), "console.log(1)");
+    writeFileSync(join(dir, "frontend/dist/index.html"), "<html>standalone</html>");
 
-    registerChamber(makeManifest("upstream", upstream.origin));
-    registerChamber(makeManifest("gone", "http://127.0.0.1:19099"));
-    registerChamber(makeManifest("parked", upstream.origin));
+    upstream = makeFakeChamberModule("upstream", {
+      dir,
+      configure: (chamber) => {
+        chamber.get("/api/echo", (c) => c.json({ path: c.req.path, query: c.req.query("q") ?? null }));
+        chamber.post("/api/echo", async (c) => c.json({ body: await c.req.json() }));
+        chamber.get("/api/redirect", (c) => c.redirect("https://accounts.example.com/auth"));
+      },
+    });
+    await loadChamber(upstream, { envFor: () => ({}) });
+    await loadChamber(makeFakeChamberModule("parked", { dir }), { envFor: () => ({}) });
     detachChamber("parked");
+    await loadChamber(
+      makeFakeChamberModule("broken", {
+        start: () => {
+          throw new Error("no config");
+        },
+      }),
+      { envFor: () => ({}) }
+    );
 
     app.all("/api/:chamber/*", forwardToChamber);
-    app.post("/device/:chamber", (c) => proxyToChamberPath(c, c.req.param("chamber"), "/echo", "system"));
-    app.get("/congress/chambers/:name/icon", (c) => proxyToChamberIcon(c, c.req.param("name")));
-    app.all("/:chamberName/*", (c) => {
-      const chamber = getChamber(c.req.param("chamberName") ?? "");
-      if (!chamber) return c.json({ error: "chamber_not_found" }, 503);
-      return forwardToChamberFrontend(c, chamber);
-    });
-    app.all("/:chamberName", (c) => {
-      const chamber = getChamber(c.req.param("chamberName") ?? "");
-      if (!chamber) return c.json({ error: "chamber_not_found" }, 503);
-      return forwardToChamberFrontend(c, chamber);
-    });
-  });
-
-  afterAll(async () => {
-    await upstream.close();
-  });
-
-  describe("proxyToChamberPath", () => {
-    it("attributes an unauthenticated caller to the actor it is given, not the client's claim", async () => {
-      await app.request("/device/upstream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-congress-actor": "me" },
-        body: "{}",
-      });
-      expect(upstream.received.at(-1)!.headers["x-congress-actor"]).toBe("system");
-    });
+    app.post("/device/:chamber", (c) => dispatchToChamber(c, c.req.param("chamber"), "/echo", "system"));
+    app.get("/congress/chambers/:name/icon", (c) => serveChamberIcon(c, c.req.param("name")));
+    app.get("/:chamberName/*", serveChamberAssets);
+    app.get("*", (c) => c.text("congress shell"));
   });
 
   describe("forwardToChamber", () => {
@@ -134,24 +81,7 @@ describe("proxying", () => {
       await expect(res.json()).resolves.toEqual({ body: { hello: "world" } });
     });
 
-    it("does not forward hop-by-hop headers, including the caller's Host", async () => {
-      // The Chamber has to be addressed by its own host, not the public one
-      // the browser used, and a proxy-scoped credential must not leak past
-      // the hop it was meant for. (`connection` is not asserted on: the
-      // caller's is dropped, but undici sets its own on the outgoing
-      // request, so the upstream legitimately still sees one.)
-      await app.request("/api/upstream/echo", {
-        headers: { host: "congress.example.com", "proxy-authorization": "Bearer leaked", te: "trailers" },
-      });
-      const seen = upstream.received.at(-1)!.headers;
-      expect(seen.host).not.toBe("congress.example.com");
-      expect(seen["proxy-authorization"]).toBeUndefined();
-      expect(seen.te).toBeUndefined();
-    });
-
     it("attributes the request to the owner, discarding any actor the client claimed", async () => {
-      // Only the session-gated gateway may vouch for who is acting - a browser
-      // (or anything else) must not be able to sign as "deputy".
       await app.request("/api/upstream/echo", { headers: { "x-congress-actor": "deputy" } });
       expect(upstream.received.at(-1)!.headers["x-congress-actor"]).toBe("me");
     });
@@ -161,73 +91,77 @@ describe("proxying", () => {
       expect(upstream.received.at(-1)!.headers["x-custom"]).toBe("kept");
     });
 
-    it("hands back a decoded body without the stale content-encoding and content-length", async () => {
-      // fetch() decompresses transparently but leaves those two headers
-      // describing the wire response. Relaying them alongside the decoded
-      // body is what produced ERR_CONTENT_DECODING_FAILED in the browser.
-      const res = await app.request("/api/upstream/gzipped");
-      expect(res.status).toBe(200);
-      expect(res.headers.get("content-encoding")).toBeNull();
-      expect(res.headers.get("content-length")).toBeNull();
-      expect(await res.text()).toBe("compressible ".repeat(50));
+    it("relays a Chamber's redirect as-is instead of following it", async () => {
+      const res = await app.request("/api/upstream/redirect");
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe("https://accounts.example.com/auth");
     });
 
-    it("503s an unregistered chamber", async () => {
+    it("404s an unknown chamber", async () => {
       const res = await app.request("/api/nosuch/echo");
-      expect(res.status).toBe(503);
+      expect(res.status).toBe(404);
       await expect(res.json()).resolves.toEqual({ error: "chamber_not_found", chamber: "nosuch" });
     });
 
-    it("503s a chamber the owner has detached, even though it is registered", async () => {
+    it("503s a chamber the owner has detached", async () => {
       const res = await app.request("/api/parked/echo");
       expect(res.status).toBe(503);
       await expect(res.json()).resolves.toEqual({ error: "chamber_offline", chamber: "parked" });
     });
 
-    it("503s a registered chamber whose process is not answering", async () => {
-      const res = await app.request("/api/gone/echo");
+    it("503s a chamber that failed to start", async () => {
+      const res = await app.request("/api/broken/echo");
       expect(res.status).toBe(503);
-      await expect(res.json()).resolves.toEqual({ error: "chamber_unreachable", chamber: "gone" });
+      await expect(res.json()).resolves.toEqual({ error: "chamber_offline", chamber: "broken" });
     });
   });
 
-  describe("forwardToChamberFrontend", () => {
-    it("serves the chamber's SPA shell at its bare path", async () => {
-      const res = await app.request("/upstream");
-      expect(res.status).toBe(200);
-      expect(await res.text()).toContain("shell");
-    });
-
-    it("proxies a nested asset off the origin, not off /api", async () => {
-      const res = await app.request("/upstream/assets/app.js");
-      expect(res.status).toBe(200);
-      expect(await res.text()).toBe("console.log(1)");
-    });
-
-    it("503s a detached chamber", async () => {
-      const res = await app.request("/parked/assets/app.js");
-      expect(res.status).toBe(503);
-      await expect(res.json()).resolves.toEqual({ error: "chamber_offline", chamber: "parked" });
+  describe("dispatchToChamber", () => {
+    it("attributes an unauthenticated caller to the actor it is given, not the client's claim", async () => {
+      await app.request("/device/upstream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-congress-actor": "me" },
+        body: "{}",
+      });
+      expect(upstream.received.at(-1)!.headers["x-congress-actor"]).toBe("system");
     });
   });
 
-  describe("proxyToChamberIcon", () => {
-    it("serves the chamber's own mark from its public assets", async () => {
+  describe("serveChamberAssets", () => {
+    it("serves a built asset from the chamber's own dist, with a short cache on the unhashed entry", async () => {
+      const res = await app.request("/upstream/remote-entry.js");
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe("export default 1;");
+      expect(res.headers.get("cache-control")).toBe("public, max-age=60, must-revalidate");
+    });
+
+    it("caches content-hashed assets for a year", async () => {
+      const res = await app.request("/upstream/assets/app-abc.js");
+      expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    });
+
+    it("leaves navigation paths and the standalone index.html to Congress's shell", async () => {
+      expect(await (await app.request("/upstream/n/3")).text()).toBe("congress shell");
+      expect(await (await app.request("/upstream/index.html")).text()).toBe("congress shell");
+    });
+
+    it("does not serve a detached chamber's assets", async () => {
+      expect(await (await app.request("/parked/remote-entry.js")).text()).toBe("congress shell");
+    });
+  });
+
+  describe("serveChamberIcon", () => {
+    it("serves the chamber's own mark", async () => {
       const res = await app.request("/congress/chambers/upstream/icon");
       expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("image/svg+xml");
       expect(await res.text()).toBe("<svg/>");
     });
 
-    it("404s rather than 503s for an unknown chamber, so callers fall back to a generic mark", async () => {
+    it("404s for an unknown, detached or failed chamber, so callers fall back to a generic mark", async () => {
       expect((await app.request("/congress/chambers/nosuch/icon")).status).toBe(404);
-    });
-
-    it("404s for a detached chamber", async () => {
       expect((await app.request("/congress/chambers/parked/icon")).status).toBe(404);
-    });
-
-    it("404s when the chamber's process is unreachable", async () => {
-      expect((await app.request("/congress/chambers/gone/icon")).status).toBe(404);
+      expect((await app.request("/congress/chambers/broken/icon")).status).toBe(404);
     });
   });
 });

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setCongressHost } from "@congress/chamber-kit";
 import type { CalendarEvent } from "./types.js";
 
 vi.mock("./google/cache.js", () => ({
@@ -34,19 +35,18 @@ function fakeEvent(startMs: number, overrides: Partial<CalendarEvent> = {}): Cal
 }
 
 describe("upcoming event notifications", () => {
+  const publish = vi.fn();
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T10:00:00.000Z"));
     vi.mocked(listCachedEvents).mockReset();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({ ok: true, status: 200 } as Response)
-    );
+    publish.mockReset();
+    setCongressHost({ publishEvent: publish, syncExhibit: () => {}, resolveExhibits: async () => [] });
   });
 
   afterEach(() => {
     stopUpcomingEventNotifications();
-    vi.unstubAllGlobals();
+    setCongressHost(null);
     vi.useRealTimers();
   });
 
@@ -67,13 +67,13 @@ describe("upcoming event notifications", () => {
     startUpcomingEventNotifications();
     vi.advanceTimersByTime(0);
 
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledTimes(1);
 
     // Three more 5-minute polls tick by; listCachedEvents keeps returning
     // the same event (its start hasn't actually passed yet).
     vi.advanceTimersByTime(3 * 5 * 60 * 1000);
 
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledTimes(1);
   });
 
   it("fires again if the event's start time is rescheduled after it already fired", () => {
@@ -82,7 +82,7 @@ describe("upcoming event notifications", () => {
 
     startUpcomingEventNotifications();
     vi.advanceTimersByTime(0);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledTimes(1);
 
     // Pushed back by 20 minutes - its own fire instant (start - 30min) is
     // now 10 minutes past the poll that discovers the change.
@@ -90,10 +90,10 @@ describe("upcoming event notifications", () => {
     vi.mocked(listCachedEvents).mockReturnValue([fakeEvent(rescheduledStartMs)]);
 
     vi.advanceTimersByTime(5 * 60 * 1000); // the next poll tick, sees the new start time
-    expect(fetch).toHaveBeenCalledTimes(1); // not due yet - still 10 minutes out
+    expect(publish).toHaveBeenCalledTimes(1); // not due yet - still 10 minutes out
 
     vi.advanceTimersByTime(10 * 60 * 1000); // reaches the rescheduled fire instant
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(publish).toHaveBeenCalledTimes(2);
   });
 
   it("does not fire before an event's own precise instant, for an event discovered ahead of its lookahead threshold", () => {
@@ -108,10 +108,10 @@ describe("upcoming event notifications", () => {
     // pollUpcomingEvents runs synchronously inside start - only a 5-minute
     // setTimeout should be armed at this point, nothing fired yet.
     startUpcomingEventNotifications();
-    expect(fetch).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(5 * 60 * 1000);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledTimes(1);
   });
 
   it("stops re-arming once an event drops out of the polled window", () => {
@@ -120,13 +120,13 @@ describe("upcoming event notifications", () => {
 
     startUpcomingEventNotifications();
     vi.advanceTimersByTime(0);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledTimes(1);
 
     // The event's start has now passed - a real listCachedEvents call would
     // no longer return it.
     vi.mocked(listCachedEvents).mockReturnValue([]);
     vi.advanceTimersByTime(5 * 60 * 1000);
 
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledTimes(1);
   });
 });

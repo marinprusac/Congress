@@ -1,26 +1,15 @@
-import { eq } from "drizzle-orm";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { makeManifest, migrationsDir } from "@congress/test-support";
+import { makeFakeChamberModule, makeManifest, migrationsDir } from "@congress/test-support";
 
 // The registry publishes chamber_online/chamber_offline as a side effect;
-// mocking the relay keeps these tests off the network and lets them assert
-// on the publishes directly. (registry.ts and events.ts import each other,
-// so this also keeps that cycle out of the picture.)
+// mocking the relay lets these tests assert on the publishes directly.
 vi.mock("./events.js", () => ({ publishEvent: vi.fn() }));
 
 import { publishEvent } from "./events.js";
 import { db, runMigrations } from "./db/client.js";
 import { chambers } from "./db/schema.js";
-import {
-  attachChamber,
-  deregisterChamber,
-  detachChamber,
-  getChamber,
-  listChambers,
-  recordHeartbeat,
-  registerChamber,
-  sweepStaleChambers,
-} from "./registry.js";
+import { addModule } from "./chambers/runtime.js";
+import { attachChamber, detachChamber, getChamber, listChambers, markChamberOffline, registerChamber } from "./registry.js";
 
 beforeAll(() => runMigrations(migrationsDir("congress")));
 
@@ -28,13 +17,9 @@ beforeEach(() => {
   vi.mocked(publishEvent).mockClear();
 });
 
-// registry.ts keeps an in-process Map cache that every mutator has to write
-// through by hand - nothing ever invalidates it, and Congress is the only
-// writer of this table. That makes a missed write-through invisible until a
-// proxied request reads a stale status, which is the single most likely way
-// a change here breaks the gateway. Every test below therefore asserts
-// through getChamber()/listChambers() (the cached reads the gateway itself
-// uses) rather than by re-querying the table.
+// registry.ts keeps an in-process cache every mutator writes through by
+// hand, so every test asserts through getChamber()/listChambers() - the
+// cached reads the gateway uses - and, where it matters, the table too.
 function statusInDb(name: string): string | undefined {
   return db.select().from(chambers).all().find((row) => row.name === name)?.status;
 }
@@ -48,15 +33,13 @@ describe("registerChamber", () => {
 
   it("updates an existing chamber in place rather than inserting a duplicate", () => {
     registerChamber(makeManifest("bravo"));
-    registerChamber(makeManifest("bravo", "http://127.0.0.1:9", { displayName: "Renamed", version: "0.2.0" }));
+    registerChamber(makeManifest("bravo", { displayName: "Renamed", version: "0.2.0" }));
 
     expect(db.select().from(chambers).all().filter((r) => r.name === "bravo")).toHaveLength(1);
     expect(getChamber("bravo")).toMatchObject({ displayName: "Renamed", version: "0.2.0" });
   });
 
-  it("does not clear a manual detach when the chamber restarts and re-registers", () => {
-    // A redeploy restarts every service; that must not silently undo an
-    // owner's decision to take one out of rotation.
+  it("does not clear a manual detach when Congress restarts and loads the chamber again", () => {
     registerChamber(makeManifest("charlie"));
     detachChamber("charlie");
     registerChamber(makeManifest("charlie"));
@@ -65,84 +48,56 @@ describe("registerChamber", () => {
     expect(statusInDb("charlie")).toBe("detached");
   });
 
-  it("announces a chamber coming back from offline, but not an ordinary re-register", () => {
+  it("announces a chamber coming back from offline, but not an ordinary restart", () => {
     registerChamber(makeManifest("delta"));
     registerChamber(makeManifest("delta"));
     expect(publishEvent).not.toHaveBeenCalled();
 
-    deregisterChamber("delta");
+    markChamberOffline(makeManifest("delta"));
+    vi.mocked(publishEvent).mockClear();
     registerChamber(makeManifest("delta"));
     expect(publishEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: "congress.chamber_online", payload: { chamberName: "delta" } })
     );
   });
 
-  it("stores the subscriptions sent with the registration", () => {
-    registerChamber(makeManifest("echo"), [{ type: "tasks.due_soon" }]);
-    expect(getChamber("echo")?.subscriptions).toEqual([{ type: "tasks.due_soon" }]);
+  it("stores the subscriptions and mcpUrl it was given", () => {
+    registerChamber(makeManifest("echo", { mcpUrl: "http://127.0.0.1:3000/mcp/echo" }), [{ type: "tasks.due_soon" }]);
+    expect(getChamber("echo")).toMatchObject({ subscriptions: [{ type: "tasks.due_soon" }], mcpUrl: "http://127.0.0.1:3000/mcp/echo" });
   });
 });
 
-describe("recordHeartbeat", () => {
-  it("returns null for a chamber that was never registered", () => {
-    expect(recordHeartbeat("never-seen")).toBeNull();
+describe("markChamberOffline", () => {
+  it("lists a chamber that failed to start as offline and announces it once", () => {
+    markChamberOffline(makeManifest("foxtrot"));
+    markChamberOffline(makeManifest("foxtrot"));
+    expect(getChamber("foxtrot")?.status).toBe("offline");
+    expect(statusInDb("foxtrot")).toBe("offline");
+    expect(vi.mocked(publishEvent).mock.calls.filter(([e]) => e.type === "congress.chamber_offline")).toHaveLength(1);
   });
 
-  it("records freshness and keeps the chamber active", () => {
-    registerChamber(makeManifest("foxtrot"));
-    const entry = recordHeartbeat("foxtrot");
-    expect(entry?.status).toBe("active");
-    expect(entry?.lastHeartbeatAt).not.toBeNull();
-    expect(getChamber("foxtrot")?.lastHeartbeatAt).toBe(entry?.lastHeartbeatAt);
-  });
-
-  it("does not let a live heartbeat clear a manual detach", () => {
+  it("keeps a manual detach", () => {
     registerChamber(makeManifest("golf"));
     detachChamber("golf");
-    recordHeartbeat("golf");
+    markChamberOffline(makeManifest("golf"));
     expect(getChamber("golf")?.status).toBe("detached");
-  });
-
-  it("brings an offline chamber back and announces it", () => {
-    registerChamber(makeManifest("hotel"));
-    deregisterChamber("hotel");
-    recordHeartbeat("hotel");
-
-    expect(getChamber("hotel")?.status).toBe("active");
-    expect(publishEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "congress.chamber_online", payload: { chamberName: "hotel" } })
-    );
-  });
-
-  it("replaces the subscription list wholesale, including with an empty one", () => {
-    // A still-true empty subscription genuinely means "nothing to relay
-    // right now" - keeping the previous list would keep relaying events the
-    // Chamber has since stopped caring about.
-    registerChamber(makeManifest("india"), [{ type: "tasks.due_soon" }]);
-    recordHeartbeat("india", []);
-    expect(getChamber("india")?.subscriptions).toEqual([]);
-  });
-});
-
-describe("deregisterChamber", () => {
-  it("marks the chamber offline and updates the cached read", () => {
-    registerChamber(makeManifest("juliet"));
-    expect(deregisterChamber("juliet")?.status).toBe("offline");
-    expect(getChamber("juliet")?.status).toBe("offline");
-  });
-
-  it("returns null for an unknown chamber", () => {
-    expect(deregisterChamber("never-seen-either")).toBeNull();
   });
 });
 
 describe("detachChamber / attachChamber", () => {
-  it("round-trips through the cache", () => {
+  it("round-trips through the cache for a loaded chamber", () => {
+    addModule(makeFakeChamberModule("kilo"));
     registerChamber(makeManifest("kilo"));
     expect(detachChamber("kilo")?.status).toBe("detached");
     expect(getChamber("kilo")?.status).toBe("detached");
     expect(attachChamber("kilo")?.status).toBe("active");
     expect(getChamber("kilo")?.status).toBe("active");
+  });
+
+  it("attaches a chamber whose module never loaded as offline, not active", () => {
+    markChamberOffline(makeManifest("lima"));
+    detachChamber("lima");
+    expect(attachChamber("lima")?.status).toBe("offline");
   });
 
   it("returns null for an unknown chamber", () => {
@@ -151,62 +106,13 @@ describe("detachChamber / attachChamber", () => {
   });
 });
 
-describe("sweepStaleChambers", () => {
-  it("marks a chamber that has never heartbeated offline, falling back to its registration time", () => {
-    // coalesce(lastHeartbeatAt, registeredAt): a chamber that registered and
-    // then died before its first beat has a null lastHeartbeatAt, and must
-    // still be swept rather than staying active forever.
-    registerChamber(makeManifest("lima"));
-    db.update(chambers)
-      .set({ registeredAt: new Date(Date.now() - 60_000), lastHeartbeatAt: null })
-      .where(eq(chambers.name, "lima"))
-      .run();
-    // The cache still holds the pre-update row; the sweep re-reads the table
-    // itself, which is what makes this an honest test of the write-through.
-    expect(sweepStaleChambers(30_000)).toContain("lima");
-    expect(getChamber("lima")?.status).toBe("offline");
-  });
-
-  it("leaves a recently-heartbeated chamber alone", () => {
-    registerChamber(makeManifest("mike"));
-    recordHeartbeat("mike");
-    expect(sweepStaleChambers(30_000)).not.toContain("mike");
-    expect(getChamber("mike")?.status).toBe("active");
-  });
-
-  it("does not sweep a detached chamber, since the sweep only ever considers active ones", () => {
-    registerChamber(makeManifest("november"));
-    detachChamber("november");
-    db.update(chambers).set({ registeredAt: new Date(0), lastHeartbeatAt: null }).where(eq(chambers.name, "november")).run();
-    expect(sweepStaleChambers(30_000)).not.toContain("november");
-    expect(getChamber("november")?.status).toBe("detached");
-  });
-
-  it("announces each swept chamber", () => {
-    registerChamber(makeManifest("oscar"));
-    db.update(chambers).set({ registeredAt: new Date(0), lastHeartbeatAt: null }).where(eq(chambers.name, "oscar")).run();
-    sweepStaleChambers(30_000);
-    expect(publishEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "congress.chamber_offline",
-        payload: { chamberName: "oscar" },
-      })
-    );
-  });
-
-  it("returns an empty list and publishes nothing when everything is fresh", () => {
-    expect(sweepStaleChambers(10 * 60 * 1000)).toEqual([]);
-    expect(publishEvent).not.toHaveBeenCalled();
-  });
-});
-
 describe("listChambers", () => {
-  it("returns every registered chamber, including offline and detached ones", () => {
+  it("returns every chamber, including offline and detached ones", () => {
     registerChamber(makeManifest("papa"));
     registerChamber(makeManifest("quebec"));
     detachChamber("quebec");
+    markChamberOffline(makeManifest("romeo"));
     const names = listChambers().map((c) => c.name);
-    expect(names).toContain("papa");
-    expect(names).toContain("quebec");
+    expect(names).toEqual(expect.arrayContaining(["papa", "quebec", "romeo"]));
   });
 });

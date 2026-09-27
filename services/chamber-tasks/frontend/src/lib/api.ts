@@ -2,7 +2,7 @@ import type { TaskSummary, TaskDetail, CreateTaskRequest, UpdateTaskRequest, Tas
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
-const API_BASE = resolveApiBase("tasks", import.meta.env.PROD);
+const API_BASE = resolveApiBase("tasks");
 
 export function fetchTasks(): Promise<TaskSummary[]> {
   return fetch(`${API_BASE}/tasks`).then((res) => json(res));

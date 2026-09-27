@@ -5,12 +5,10 @@ import type { HttpBindings } from "@hono/node-server";
 import { createStreamBody } from "@hono/node-server/utils/stream";
 import { updateDocumentRequestSchema } from "./types.js";
 import {
-  mountManifestAndHealth,
+  actorMiddleware,
   mountExhibitSearchRoutes,
   mountManualRefsRoutes,
-  mountStaticFrontend,
 } from "@congress/chamber-kit";
-import { documentsManifest } from "./manifest.js";
 import {
   listDocuments,
   getDocument,
@@ -26,11 +24,11 @@ import {
   resyncDocumentExhibitByExhibitId,
 } from "./documents.js";
 import { searchDocumentExhibits, resolveDocumentExhibits, chipDocumentExhibit } from "./exhibits.js";
-import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
 
-mountManifestAndHealth(app, documentsManifest);
+// Stamps who made each request - see actorContext.ts.
+app.use("/api/*", actorMiddleware);
 
 app.get("/api/documents", async (c) => {
   return c.json(await listDocuments());
@@ -181,7 +179,3 @@ mountManualRefsRoutes(
   { list: listManualRefsByExhibitId, add: addManualRefByExhibitId, remove: removeManualRefByExhibitId },
   resyncDocumentExhibitByExhibitId
 );
-
-app.route("/mcp", mcpApp);
-
-mountStaticFrontend(app);

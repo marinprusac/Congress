@@ -18,5 +18,13 @@
     "hono": "^4.13.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"
-  }
+  },
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "keywords": []
 }

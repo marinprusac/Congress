@@ -1,7 +1,9 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { makeManifest, migrationsDir, startFakeChamber, type FakeChamber, waitFor, TEST_INTERNAL_TOKEN } from "@congress/test-support";
+import { beforeAll, describe, expect, it } from "vitest";
+import type { ChamberSubscription, EventDelivery } from "@congress/shared-types";
+import { makeFakeChamberModule, migrationsDir, waitFor } from "@congress/test-support";
 import { runMigrations } from "./db/client.js";
-import { deregisterChamber, registerChamber } from "./registry.js";
+import { detachChamber } from "./registry.js";
+import { loadChamber } from "./chambers/loader.js";
 import { publishEvent, subscriptionMatches } from "./events.js";
 
 beforeAll(() => runMigrations(migrationsDir("congress")));
@@ -29,153 +31,78 @@ describe("subscriptionMatches", () => {
 });
 
 describe("publishEvent fan-out", () => {
-  const chambers: FakeChamber[] = [];
-
-  async function subscriber(name: string, subscriptions: Parameters<typeof registerChamber>[1]) {
-    const fake = await startFakeChamber((app) => app.post("/api/events/receive", (c) => c.json({ ok: true })));
-    chambers.push(fake);
-    registerChamber(makeManifest(name, fake.origin), subscriptions);
-    return fake;
+  // A loaded, subscribed Chamber module that records every event it's handed.
+  async function subscriber(name: string, subscriptions: ChamberSubscription[], onEvent?: (e: EventDelivery) => void) {
+    const received: EventDelivery[] = [];
+    const fake = makeFakeChamberModule(name, {
+      subscriptions: () => subscriptions,
+      onEvent: (e) => {
+        received.push(e);
+        onEvent?.(e);
+      },
+    });
+    await loadChamber(fake, { envFor: () => ({}) });
+    return received;
   }
 
-  afterAll(async () => {
-    await Promise.all(chambers.map((c) => c.close()));
-  });
-
-  it("delivers to a subscribed chamber, authenticated with the internal token", async () => {
-    const fake = await subscriber("relay-a", [{ type: "tasks.due_soon" }]);
-
+  it("hands the event to a subscribed chamber's onEvent", async () => {
+    const received = await subscriber("relay-a", [{ type: "tasks.due_soon" }]);
     publishEvent({ chamber: "tasks", type: "tasks.due_soon", payload: { taskId: 1 } });
-
-    await waitFor(() => fake.received.length > 0, 2_000, "delivery to relay-a");
-    const delivery = fake.received[0]!;
-    expect(delivery.method).toBe("POST");
-    expect(delivery.url).toBe("/api/events/receive");
-    expect(delivery.headers["x-congress-internal-token"]).toBe(TEST_INTERNAL_TOKEN);
-    expect(JSON.parse(delivery.body)).toMatchObject({ chamber: "tasks", type: "tasks.due_soon", payload: { taskId: 1 } });
+    await waitFor(() => received.length > 0, 2_000, "delivery to relay-a");
+    expect(received[0]).toMatchObject({ chamber: "tasks", type: "tasks.due_soon", payload: { taskId: 1 } });
   });
 
   it("relays who performed the action", async () => {
-    const fake = await subscriber("relay-actor", [{ type: "*" }]);
+    const received = await subscriber("relay-actor", [{ type: "*" }]);
     publishEvent({ chamber: "tasks", type: "tasks.created", payload: {}, actor: "deputy" });
-    await waitFor(() => fake.received.length > 0, 2_000, "delivery to relay-actor");
-    expect(JSON.parse(fake.received[0]!.body).actor).toBe("deputy");
+    await waitFor(() => received.length > 0, 2_000, "delivery to relay-actor");
+    expect(received[0]!.actor).toBe("deputy");
   });
 
-  it("stamps occurredAt when the publisher did not supply one", async () => {
-    const fake = await subscriber("relay-b", [{ type: "*" }]);
+  it("stamps occurredAt when the publisher did not supply one, and keeps one it did", async () => {
+    const received = await subscriber("relay-b", [{ type: "*" }]);
     publishEvent({ chamber: "tasks", type: "anything", payload: {} });
-    await waitFor(() => fake.received.length > 0, 2_000, "delivery to relay-b");
-    expect(() => new Date(JSON.parse(fake.received[0]!.body).occurredAt).toISOString()).not.toThrow();
-  });
-
-  it("preserves an occurredAt the publisher did supply", async () => {
-    const fake = await subscriber("relay-c", [{ type: "*" }]);
     publishEvent({ chamber: "tasks", type: "x", payload: {}, occurredAt: "2026-01-01T00:00:00.000Z" });
-    await waitFor(() => fake.received.length > 0, 2_000, "delivery to relay-c");
-    expect(JSON.parse(fake.received[0]!.body).occurredAt).toBe("2026-01-01T00:00:00.000Z");
+    await waitFor(() => received.length > 1, 2_000, "delivery to relay-b");
+    expect(() => new Date(received[0]!.occurredAt).toISOString()).not.toThrow();
+    expect(received[1]!.occurredAt).toBe("2026-01-01T00:00:00.000Z");
   });
 
-  it("skips a chamber whose subscriptions do not match", async () => {
+  it("reads subscriptions live, so a changed list takes effect without a restart", async () => {
+    let subs: ChamberSubscription[] = [];
+    const received: EventDelivery[] = [];
+    await loadChamber(
+      makeFakeChamberModule("relay-live", { subscriptions: () => subs, onEvent: (e) => void received.push(e) }),
+      { envFor: () => ({}) }
+    );
+    publishEvent({ chamber: "notes", type: "notes.created", payload: {} });
+    subs = [{ type: "notes.created" }];
+    publishEvent({ chamber: "notes", type: "notes.created", payload: { second: true } });
+    await waitFor(() => received.length > 0, 2_000, "delivery to relay-live");
+    expect(received).toHaveLength(1);
+    expect(received[0]!.payload).toEqual({ second: true });
+  });
+
+  it("skips a chamber whose subscriptions do not match, or that is detached", async () => {
     const wanted = await subscriber("relay-wanted", [{ type: "notes.created" }]);
     const ignored = await subscriber("relay-ignored", [{ type: "tasks.due_soon" }]);
+    const detached = await subscriber("relay-detached", [{ type: "*" }]);
+    detachChamber("relay-detached");
 
     publishEvent({ chamber: "notes", type: "notes.created", payload: {} });
 
-    await waitFor(() => wanted.received.length > 0, 2_000, "delivery to relay-wanted");
-    expect(ignored.received).toHaveLength(0);
+    await waitFor(() => wanted.length > 0, 2_000, "delivery to relay-wanted");
+    expect(ignored).toHaveLength(0);
+    expect(detached.filter((e) => e.type === "notes.created")).toHaveLength(0);
   });
 
-  it("skips a chamber that is registered but offline", async () => {
-    const fake = await subscriber("relay-offline", [{ type: "*" }]);
-    deregisterChamber("relay-offline");
-
-    publishEvent({ chamber: "x", type: "y", payload: {} });
-
-    await new Promise((r) => setTimeout(r, 100));
-    expect(fake.received).toHaveLength(0);
-  });
-});
-
-describe("publishEvent delivery retries", () => {
-  // Retries wait seconds to minutes, so this half stubs fetch and drives
-  // fake timers rather than doing real I/O.
-  const realFetch = globalThis.fetch;
-
-  afterEach(() => {
-    vi.useRealTimers();
-    globalThis.fetch = realFetch;
-  });
-
-  // A publish fans out to every subscribed chamber, and earlier tests in
-  // this file leave several registered - so the stub has to answer for all
-  // of them while only *counting* the one under test.
-  function stubFetch(targetOrigin: string, handler: (attempt: number) => Response) {
-    const calls: string[] = [];
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
-      const url = String(input);
-      if (!url.startsWith(targetOrigin)) return new Response(null, { status: 204 });
-      calls.push(url);
-      return handler(calls.length);
-    }) as unknown as typeof fetch;
-    return calls;
-  }
-
-  it("retries a rejected delivery on the documented delay schedule and stops once it succeeds", async () => {
-    const origin = "http://127.0.0.1:19001";
-    registerChamber(makeManifest("retry-a", origin), [{ type: "*" }]);
-    const calls = stubFetch(origin, (attempt) => new Response(null, { status: attempt < 3 ? 500 : 204 }));
-    vi.useFakeTimers();
-
-    publishEvent({ chamber: "x", type: "y", payload: {} });
-
-    // First attempt has no delay at all.
-    await vi.advanceTimersByTimeAsync(0);
-    expect(calls).toHaveLength(1);
-
-    // Nothing more until the 5s mark.
-    await vi.advanceTimersByTimeAsync(4_999);
-    expect(calls).toHaveLength(1);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(calls).toHaveLength(2);
-
-    // Third attempt at +15s succeeds, so the chain stops there.
-    await vi.advanceTimersByTimeAsync(15_000);
-    expect(calls).toHaveLength(3);
-    await vi.advanceTimersByTimeAsync(120_000);
-    expect(calls).toHaveLength(3);
-  });
-
-  it("gives up after the last delay rather than retrying forever", async () => {
-    const origin = "http://127.0.0.1:19002";
-    registerChamber(makeManifest("retry-b", origin), [{ type: "*" }]);
-    const calls = stubFetch(origin, () => {
-      throw new Error("ECONNREFUSED");
+  it("keeps delivering to the others when one chamber's handler throws", async () => {
+    await subscriber("relay-throws", [{ type: "boom.test" }], () => {
+      throw new Error("handler bug");
     });
-    vi.useFakeTimers();
-
-    publishEvent({ chamber: "x", type: "y", payload: {} });
-
-    // 0 + 5s + 15s + 30s + 90s = five attempts, then done.
-    await vi.advanceTimersByTimeAsync(200_000);
-    expect(calls).toHaveLength(5);
-  });
-
-  it("skips an attempt against a chamber the sweep has since marked offline", async () => {
-    const origin = "http://127.0.0.1:19003";
-    registerChamber(makeManifest("retry-c", origin), [{ type: "*" }]);
-    const calls = stubFetch(origin, () => new Response(null, { status: 500 }));
-    vi.useFakeTimers();
-
-    publishEvent({ chamber: "x", type: "y", payload: {} });
-    await vi.advanceTimersByTimeAsync(0);
-    expect(calls).toHaveLength(1);
-
-    // The registry is re-read on every attempt precisely so a delivery to a
-    // chamber that is now known-down doesn't burn the full timeout.
-    deregisterChamber("retry-c");
-    await vi.advanceTimersByTimeAsync(200_000);
-    expect(calls).toHaveLength(1);
+    const healthy = await subscriber("relay-healthy", [{ type: "boom.test" }]);
+    publishEvent({ chamber: "x", type: "boom.test", payload: {} });
+    await waitFor(() => healthy.length > 0, 2_000, "delivery to relay-healthy");
   });
 });
 

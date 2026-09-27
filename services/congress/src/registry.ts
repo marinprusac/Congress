@@ -1,8 +1,9 @@
-import { eq, and, lt, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Manifest, ChamberRegistryEntry, ChamberStatus, ChamberSubscription } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { chambers } from "./db/schema.js";
 import { publishEvent } from "./events.js";
+import { getModule } from "./chambers/runtime.js";
 
 function toEntry(row: typeof chambers.$inferSelect): ChamberRegistryEntry {
   return {
@@ -14,25 +15,15 @@ function toEntry(row: typeof chambers.$inferSelect): ChamberRegistryEntry {
     exhibitTypes: JSON.parse(row.exhibitTypesJson),
     events: JSON.parse(row.eventsJson),
     subscriptions: JSON.parse(row.subscriptionsJson),
-    apiBase: row.apiBase,
     mcpUrl: row.mcpUrl ?? undefined,
-    healthUrl: row.healthUrl,
     status: row.status as ChamberStatus,
     registeredAt: row.registeredAt.toISOString(),
-    lastHeartbeatAt: row.lastHeartbeatAt ? row.lastHeartbeatAt.toISOString() : null,
   };
 }
 
-// The registry is a handful of rows that change only on registration,
-// heartbeat, detach/attach and the stale-sweep - but getChamber() sits on
-// every single proxied request (every static asset, every /api/:chamber/*
-// call), each of which used to cost a SELECT plus four JSON.parse calls for
-// a table that's essentially never written. Cached in-process and kept in
-// sync by every function below that mutates a row, rather than invalidated
-// and re-read - Congress is the only process that ever writes this table,
-// so there's no other writer to miss. Insertion order is preserved on
-// `Map.set()` of an existing key, so listChambers() below stays consistent
-// with the old `orderBy(chambers.id)` without needing to track it separately.
+// getChamber() sits on every /api/:chamber/* request, so the handful of rows
+// is cached in-process. Congress is the only writer, so every mutation below
+// just updates the cache.
 let cache: Map<string, ChamberRegistryEntry> | null = null;
 
 function ensureCache(): Map<string, ChamberRegistryEntry> {
@@ -42,142 +33,68 @@ function ensureCache(): Map<string, ChamberRegistryEntry> {
   return cache;
 }
 
-export function registerChamber(manifest: Manifest, subscriptions: ChamberSubscription[] = []): ChamberRegistryEntry {
-  const now = new Date();
+function upsert(manifest: Manifest, status: "active" | "offline", subscriptions: ChamberSubscription[]): ChamberRegistryEntry {
   const existing = db.select().from(chambers).where(eq(chambers.name, manifest.name)).get();
+  const values = {
+    displayName: manifest.displayName,
+    version: manifest.version,
+    routesJson: JSON.stringify(manifest.routes),
+    viewsJson: JSON.stringify(manifest.views ?? []),
+    exhibitTypesJson: JSON.stringify(manifest.exhibitTypes ?? []),
+    eventsJson: JSON.stringify(manifest.events),
+    subscriptionsJson: JSON.stringify(subscriptions),
+    // Legacy columns from when Chambers were separate processes.
+    apiBase: "",
+    healthUrl: "",
+    mcpUrl: manifest.mcpUrl ?? null,
+    // A manual detach survives restarts - only attachChamber clears it.
+    status: existing?.status === "detached" ? ("detached" as const) : status,
+  };
 
-  if (existing) {
-    db.update(chambers)
-      .set({
-        displayName: manifest.displayName,
-        version: manifest.version,
-        routesJson: JSON.stringify(manifest.routes),
-        viewsJson: JSON.stringify(manifest.views ?? []),
-        exhibitTypesJson: JSON.stringify(manifest.exhibitTypes ?? []),
-        eventsJson: JSON.stringify(manifest.events),
-        subscriptionsJson: JSON.stringify(subscriptions),
-        apiBase: manifest.apiBase,
-        mcpUrl: manifest.mcpUrl ?? null,
-        healthUrl: manifest.healthUrl,
-        // A re-registering Chamber (e.g. restarting) shouldn't silently
-        // undo a manual detach - only attachChamber clears it.
-        status: existing.status === "detached" ? "detached" : "active",
-      })
-      .where(eq(chambers.name, manifest.name))
-      .run();
-  } else {
-    db.insert(chambers)
-      .values({
-        name: manifest.name,
-        displayName: manifest.displayName,
-        version: manifest.version,
-        routesJson: JSON.stringify(manifest.routes),
-        viewsJson: JSON.stringify(manifest.views ?? []),
-        exhibitTypesJson: JSON.stringify(manifest.exhibitTypes ?? []),
-        eventsJson: JSON.stringify(manifest.events),
-        subscriptionsJson: JSON.stringify(subscriptions),
-        apiBase: manifest.apiBase,
-        mcpUrl: manifest.mcpUrl ?? null,
-        healthUrl: manifest.healthUrl,
-        status: "active",
-        registeredAt: now,
-      })
-      .run();
+  const row = existing
+    ? db.update(chambers).set(values).where(eq(chambers.name, manifest.name)).returning().get()
+    : db.insert(chambers).values({ name: manifest.name, registeredAt: new Date(), ...values }).returning().get();
+  if (!row) throw new Error("Failed to write chamber registry row");
+
+  if (existing?.status === "offline" && status === "active") {
+    publishEvent({ chamber: "congress", type: "congress.chamber_online", payload: { chamberName: manifest.name } });
+  }
+  if (existing?.status !== "offline" && status === "offline") {
+    publishEvent({ chamber: "congress", type: "congress.chamber_offline", payload: { chamberName: manifest.name } });
   }
 
-  const row = db.select().from(chambers).where(eq(chambers.name, manifest.name)).get();
-  if (!row) throw new Error("Failed to read back registered chamber");
-  if (existing && existing.status === "offline") {
-    publishEvent({
-      chamber: "congress",
-      type: "congress.chamber_online",
-      payload: { chamberName: manifest.name },
-    });
-  }
   const entry = toEntry(row);
   ensureCache().set(entry.name, entry);
   return entry;
 }
 
-export function deregisterChamber(name: string): ChamberRegistryEntry | null {
-  const existing = db.select().from(chambers).where(eq(chambers.name, name)).get();
-  if (!existing) return null;
+// A Chamber module that started successfully inside Congress.
+export function registerChamber(manifest: Manifest, subscriptions: ChamberSubscription[] = []): ChamberRegistryEntry {
+  return upsert(manifest, "active", subscriptions);
+}
 
-  db.update(chambers).set({ status: "offline" }).where(eq(chambers.name, name)).run();
+// A Chamber module whose start() threw - kept listed so the owner sees it.
+export function markChamberOffline(manifest: Manifest): ChamberRegistryEntry {
+  return upsert(manifest, "offline", []);
+}
 
-  const row = db.select().from(chambers).where(eq(chambers.name, name)).get();
-  const entry = row ? toEntry(row) : null;
-  if (entry) ensureCache().set(entry.name, entry);
+function setStatus(name: string, status: ChamberStatus): ChamberRegistryEntry | null {
+  const row = db.update(chambers).set({ status }).where(eq(chambers.name, name)).returning().get();
+  if (!row) return null;
+  const entry = toEntry(row);
+  ensureCache().set(entry.name, entry);
   return entry;
 }
 
-// Fires on every Chamber's heartbeat interval, forever - down from three
-// statements (a SELECT to check existence, the UPDATE, a second SELECT to
-// read the row back) to one. The existence/status pre-check now reads the
-// in-memory registry cache instead of a DB round trip (see ensureCache
-// above), and `.returning()` collapses the write and the read-back into a
-// single UPDATE.
-export function recordHeartbeat(name: string, subscriptions?: ChamberSubscription[]): ChamberRegistryEntry | null {
-  const existing = ensureCache().get(name);
-  if (!existing) return null;
-
-  const row = db
-    .update(chambers)
-    .set({
-      lastHeartbeatAt: new Date(),
-      // Still record freshness while detached, but a live heartbeat must
-      // not itself clear a manual detach - only attachChamber does.
-      status: existing.status === "detached" ? "detached" : "active",
-      // Always refreshed on a heartbeat that provides it (even to an empty
-      // list) - a still-true empty subscription genuinely means "nothing
-      // to relay right now", not "leave the old list alone".
-      ...(subscriptions !== undefined ? { subscriptionsJson: JSON.stringify(subscriptions) } : {}),
-    })
-    .where(eq(chambers.name, name))
-    .returning()
-    .get();
-
-  if (existing.status === "offline") {
-    publishEvent({
-      chamber: "congress",
-      type: "congress.chamber_online",
-      payload: { chamberName: name },
-    });
-  }
-  const entry = row ? toEntry(row) : null;
-  if (entry) ensureCache().set(entry.name, entry);
-  return entry;
-}
-
-// Manual owner override: take a Chamber out of gateway rotation (frontend
-// routing, /api/:chamber/* proxying) without deregistering it - distinct
-// from the heartbeat-driven "offline" status so it sticks even while the
-// Chamber's own process keeps heartbeating. Only attachChamber clears it.
+// Manual owner override: takes a Chamber out of rotation (routing, API,
+// feed, search, MCP) while its module stays loaded. Survives restarts.
 export function detachChamber(name: string): ChamberRegistryEntry | null {
-  const existing = db.select().from(chambers).where(eq(chambers.name, name)).get();
-  if (!existing) return null;
-
-  db.update(chambers).set({ status: "detached" }).where(eq(chambers.name, name)).run();
-
-  const row = db.select().from(chambers).where(eq(chambers.name, name)).get();
-  const entry = row ? toEntry(row) : null;
-  if (entry) ensureCache().set(entry.name, entry);
-  return entry;
+  return setStatus(name, "detached");
 }
 
-// Clears a manual detach, immediately marking the Chamber active again. If
-// it isn't actually reachable, the next heartbeat sweep will flip it back
-// to "offline" same as any other Chamber.
+// Back to "active" only if its module actually loaded this boot.
 export function attachChamber(name: string): ChamberRegistryEntry | null {
-  const existing = db.select().from(chambers).where(eq(chambers.name, name)).get();
-  if (!existing) return null;
-
-  db.update(chambers).set({ status: "active" }).where(eq(chambers.name, name)).run();
-
-  const row = db.select().from(chambers).where(eq(chambers.name, name)).get();
-  const entry = row ? toEntry(row) : null;
-  if (entry) ensureCache().set(entry.name, entry);
-  return entry;
+  return setStatus(name, getModule(name) ? "active" : "offline");
 }
 
 export function listChambers(): ChamberRegistryEntry[] {
@@ -186,32 +103,4 @@ export function listChambers(): ChamberRegistryEntry[] {
 
 export function getChamber(name: string): ChamberRegistryEntry | null {
   return ensureCache().get(name) ?? null;
-}
-
-export function sweepStaleChambers(timeoutMs: number): string[] {
-  const cutoffMs = Date.now() - timeoutMs;
-  const stale = db
-    .select()
-    .from(chambers)
-    .where(
-      and(
-        eq(chambers.status, "active"),
-        lt(sql`coalesce(${chambers.lastHeartbeatAt}, ${chambers.registeredAt})`, cutoffMs)
-      )
-    )
-    .all();
-
-  if (stale.length === 0) return [];
-
-  for (const row of stale) {
-    db.update(chambers).set({ status: "offline" }).where(eq(chambers.name, row.name)).run();
-    ensureCache().set(row.name, toEntry({ ...row, status: "offline" }));
-    publishEvent({
-      chamber: "congress",
-      type: "congress.chamber_offline",
-      payload: { chamberName: row.name },
-    });
-  }
-
-  return stale.map((row) => row.name);
 }

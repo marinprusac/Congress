@@ -1,8 +1,8 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { makeManifest, migrationsDir, startFakeChamber, type FakeChamber } from "@congress/test-support";
+import { beforeAll, describe, expect, it } from "vitest";
+import { makeFakeChamberModule, makeManifest, migrationsDir, type FakeChamberModule } from "@congress/test-support";
 import type { ChamberRegistryEntry } from "@congress/shared-types";
 import { runMigrations } from "./db/client.js";
-import { registerChamber } from "./registry.js";
+import { loadChamber } from "./chambers/loader.js";
 import { DEFAULT_VIEW_SCORE, getFeed, rankFeed } from "./feed.js";
 
 function entry(name: string, views: ChamberRegistryEntry["views"]): ChamberRegistryEntry {
@@ -11,7 +11,6 @@ function entry(name: string, views: ChamberRegistryEntry["views"]): ChamberRegis
     views,
     status: "active",
     registeredAt: new Date().toISOString(),
-    lastHeartbeatAt: null,
     subscriptions: [],
   };
 }
@@ -65,14 +64,14 @@ describe("rankFeed", () => {
 });
 
 describe("getFeed", () => {
-  let tasks: FakeChamber;
-  let slow: FakeChamber;
-  let broken: FakeChamber;
+  async function load(name: string, views: ChamberRegistryEntry["views"], configure: (app: FakeChamberModule["app"]) => void) {
+    await loadChamber(makeFakeChamberModule(name, { manifest: { views }, configure }), { envFor: () => ({}) });
+  }
 
   beforeAll(async () => {
     runMigrations(migrationsDir("congress"));
 
-    tasks = await startFakeChamber((app) => {
+    await load("tasks", [{ id: "open", label: "Open tasks", card: true }], (app) => {
       app.get("/api/feed", (c) =>
         c.json({
           items: [
@@ -89,23 +88,15 @@ describe("getFeed", () => {
         });
       });
     });
-    slow = await startFakeChamber((app) => {
+    await load("slow", [{ id: "late", label: "Late", card: true }], (app) => {
       app.get("/api/feed", async (c) => {
         await new Promise((resolve) => setTimeout(resolve, 500));
         return c.json({ items: [{ kind: "view", viewId: "late", score: 99 }] });
       });
     });
-    broken = await startFakeChamber((app) => {
+    await load("broken", [{ id: "b", label: "Broken view", card: true }], (app) => {
       app.get("/api/feed", (c) => c.json({ nonsense: true }));
     });
-
-    registerChamber(makeManifest("tasks", tasks.origin, { views: [{ id: "open", label: "Open tasks", card: true }] }));
-    registerChamber(makeManifest("slow", slow.origin, { views: [{ id: "late", label: "Late", card: true }] }));
-    registerChamber(makeManifest("broken", broken.origin, { views: [{ id: "b", label: "Broken view", card: true }] }));
-  });
-
-  afterAll(async () => {
-    await Promise.all([tasks.close(), slow.close(), broken.close()]);
   });
 
   it("merges live candidates, resolves exhibits, and drops ones that no longer resolve", async () => {

@@ -9,13 +9,11 @@ import {
   setEventAttendanceRequestSchema,
 } from "./types.js";
 import {
-  mountManifestAndHealth,
+  actorMiddleware,
   mountExhibitSearchRoutes,
   mountManualRefsRoutes,
-  mountStaticFrontend,
   mountFeedRoute,
 } from "@congress/chamber-kit";
-import { calendarManifest } from "./manifest.js";
 import { calendarFeedCandidates, FEED_LOOKAHEAD_MS, FEED_LOOKBEHIND_MS } from "./feedRules.js";
 import { buildAuthUrl, exchangeCodeForTokens, decodeIdToken, createOAuthState, consumeOAuthState } from "./google/oauth.js";
 import {
@@ -43,7 +41,6 @@ import {
 import { GoogleApiError } from "./google/client.js";
 import { searchEventExhibits, resolveEventExhibits } from "./exhibits.js";
 import { listManualRefs, addManualRef, removeManualRef } from "./refs.js";
-import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -66,7 +63,8 @@ function mapError(c: Context, err: unknown): Response {
   throw err;
 }
 
-mountManifestAndHealth(app, calendarManifest);
+// Stamps who made each request - see actorContext.ts.
+app.use("/api/*", actorMiddleware);
 
 app.get("/api/accounts", (c) => c.json(listAccounts()));
 
@@ -245,7 +243,3 @@ mountFeedRoute(app, async (now) => {
 });
 
 mountManualRefsRoutes(app, { list: listManualRefs, add: addManualRef, remove: removeManualRef }, resyncEventExhibit);
-
-app.route("/mcp", mcpApp);
-
-mountStaticFrontend(app);

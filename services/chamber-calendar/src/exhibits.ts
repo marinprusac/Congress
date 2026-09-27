@@ -1,6 +1,5 @@
 import type { ExhibitSearchResult, ExhibitResolveResult } from "@congress/shared-types";
 import { createPushExhibitSync, scoreExhibitMatch } from "@congress/chamber-kit";
-import { env } from "./env.js";
 import { toExhibitId, parseExhibitId, eventUrl, isLocalEventKey } from "./google/eventId.js";
 import { searchCachedEvents, getCachedEvent, upsertCachedEventFromGoogle, type RawGoogleEvent } from "./google/cache.js";
 import { googleCalendarFetch } from "./google/client.js";
@@ -79,6 +78,4 @@ export async function resolveEventExhibits(ids: string[]): Promise<ExhibitResolv
 
 export const pushExhibitSync = createPushExhibitSync({
   chamber: "calendar",
-  capitolUrl: env.CAPITOL_URL,
-  internalToken: env.CONGRESS_INTERNAL_TOKEN,
 });

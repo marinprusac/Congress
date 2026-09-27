@@ -855,6 +855,24 @@ importers:
       better-sqlite3:
         specifier: ^13.0.3
         version: 13.0.3
+      chamber-calendar:
+        specifier: workspace:*
+        version: link:../chamber-calendar
+      chamber-documents:
+        specifier: workspace:*
+        version: link:../chamber-documents
+      chamber-fitness:
+        specifier: workspace:*
+        version: link:../chamber-fitness
+      chamber-map:
+        specifier: workspace:*
+        version: link:../chamber-map
+      chamber-notes:
+        specifier: workspace:*
+        version: link:../chamber-notes
+      chamber-tasks:
+        specifier: workspace:*
+        version: link:../chamber-tasks
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1

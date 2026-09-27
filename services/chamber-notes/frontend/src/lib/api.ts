@@ -2,7 +2,7 @@ import type { NoteSummary, NoteDetail, CreateNoteRequest, UpdateNoteRequest } fr
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
-const API_BASE = resolveApiBase("notes", import.meta.env.PROD);
+const API_BASE = resolveApiBase("notes");
 
 export function fetchNotes(): Promise<NoteSummary[]> {
   return fetch(`${API_BASE}/notes`).then((res) => json(res));

@@ -1,9 +1,10 @@
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { makeManifest, migrationsDir, startFakeChamber, type FakeChamber } from "@congress/test-support";
+import { makeFakeChamberModule, makeManifest, migrationsDir, type FakeChamberModule } from "@congress/test-support";
 import { db, runMigrations } from "./db/client.js";
 import { exhibitCache, exhibitRefs } from "./db/schema.js";
-import { deregisterChamber, registerChamber } from "./registry.js";
+import { detachChamber, markChamberOffline, registerChamber } from "./registry.js";
+import { loadChamber } from "./chambers/loader.js";
 import {
   getCachedChamber,
   getConnections,
@@ -14,14 +15,17 @@ import {
   syncExhibit,
 } from "./exhibits.js";
 
-let notes: FakeChamber;
-let tasks: FakeChamber;
-let broken: FakeChamber;
+// In-process Chambers, loaded the way Congress loads real ones.
+async function load(name: string, configure: (app: FakeChamberModule["app"]) => void): Promise<FakeChamberModule> {
+  const fake = makeFakeChamberModule(name, { configure });
+  await loadChamber(fake, { envFor: () => ({}) });
+  return fake;
+}
 
 beforeAll(async () => {
   runMigrations(migrationsDir("congress"));
 
-  notes = await startFakeChamber((app) => {
+  await load("notes", (app) => {
     app.get("/api/exhibits/search", (c) =>
       c.json({ results: [{ id: "note-1", type: "note", name: `Note for ${c.req.query("q")}`, url: "/n/1" }] })
     );
@@ -38,7 +42,7 @@ beforeAll(async () => {
     });
   });
 
-  tasks = await startFakeChamber((app) => {
+  await load("tasks", (app) => {
     app.get("/api/exhibits/search", (c) => c.json({ results: [{ id: "task-1", type: "task", name: "A task", url: "/t/1" }] }));
     app.post("/api/exhibits/resolve", async (c) => {
       const { ids } = (await c.req.json()) as { ids: string[] };
@@ -46,18 +50,10 @@ beforeAll(async () => {
     });
   });
 
-  broken = await startFakeChamber((app) => {
+  await load("broken", (app) => {
     app.get("/api/exhibits/search", (c) => c.json({ error: "boom" }, 500));
     app.post("/api/exhibits/resolve", (c) => c.json({ error: "boom" }, 500));
   });
-
-  registerChamber(makeManifest("notes", notes.origin));
-  registerChamber(makeManifest("tasks", tasks.origin));
-  registerChamber(makeManifest("broken", broken.origin));
-});
-
-afterAll(async () => {
-  await Promise.all([notes.close(), tasks.close(), broken.close()]);
 });
 
 beforeEach(() => {
@@ -184,8 +180,7 @@ describe("resolveExhibits", () => {
 
   it("marks an exhibit unavailable when its chamber is offline, without failing the whole batch", async () => {
     cached("note-1", "notes", "One");
-    registerChamber(makeManifest("temp", "http://127.0.0.1:19098"));
-    deregisterChamber("temp");
+    markChamberOffline(makeManifest("temp"));
 
     const results = await resolveExhibits([
       { id: "note-1", chamber: "notes" },
@@ -343,9 +338,6 @@ describe("searchExhibits", () => {
   });
 
   describe("cross-chamber score merge", () => {
-    let low: FakeChamber;
-    let high: FakeChamber;
-
     beforeAll(async () => {
       // "low" registers before "high" - a merge that just concatenated
       // per-chamber results in registration order (the pre-fix behaviour)
@@ -353,26 +345,23 @@ describe("searchExhibits", () => {
       // Mirrors a real Chamber's own contract: score is present only for a
       // non-empty query (see createTableBackedExhibits.search), so the
       // empty-query test below can assert every result is unscored.
-      low = await startFakeChamber((app) => {
+      await load("low", (app) => {
         app.get("/api/exhibits/search", (c) => {
           const score = c.req.query("q") ? 1 : undefined;
           return c.json({ results: [{ id: "low-1", type: "note", name: "Low score match", url: "/l/1", score }] });
         });
       });
-      high = await startFakeChamber((app) => {
+      await load("high", (app) => {
         app.get("/api/exhibits/search", (c) => {
           const score = c.req.query("q") ? 6 : undefined;
           return c.json({ results: [{ id: "high-1", type: "note", name: "High score match", url: "/h/1", score }] });
         });
       });
-      registerChamber(makeManifest("low", low.origin));
-      registerChamber(makeManifest("high", high.origin));
     });
 
     afterAll(async () => {
-      deregisterChamber("low");
-      deregisterChamber("high");
-      await Promise.all([low.close(), high.close()]);
+      detachChamber("low");
+      detachChamber("high");
     });
 
     it("ranks a higher-scoring result first regardless of chamber registration order", async () => {
@@ -417,8 +406,8 @@ describe("getExhibitChip", () => {
     await expect(getExhibitChip("notes", "404")).resolves.toEqual({ error: "not_found" });
   });
 
-  it("reports a chamber that cannot be reached", async () => {
-    registerChamber(makeManifest("dead", "http://127.0.0.1:19097"));
+  it("reports a chamber whose module is not loaded", async () => {
+    registerChamber(makeManifest("dead"));
     await expect(getExhibitChip("dead", "1")).resolves.toEqual({ error: "chamber_unavailable" });
   });
 });

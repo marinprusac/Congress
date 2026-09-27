@@ -1,7 +1,13 @@
+import type { AddressInfo } from "node:net";
+import { serve, type ServerType } from "@hono/node-server";
 import type { HttpBindings } from "@hono/node-server";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { makeManifest, migrationsDir, startFakeChamber, type FakeChamber, TEST_INTERNAL_TOKEN, TEST_MASTER_PASSWORD } from "@congress/test-support";
+import { listChamberTools, mcpTextResult } from "@congress/chamber-kit";
+import { makeFakeChamberModule, migrationsDir, TEST_INTERNAL_TOKEN, TEST_MASTER_PASSWORD } from "@congress/test-support";
 import { runMigrations } from "./db/client.js";
+import { loadChamber } from "./chambers/loader.js";
+import { detachChamber } from "./registry.js";
 import { app } from "./server.js";
 
 const internal = { "X-Congress-Internal-Token": TEST_INTERNAL_TOKEN };
@@ -12,7 +18,6 @@ function bindings() {
 }
 
 let sessionCookie: string;
-let chamber: FakeChamber;
 
 beforeAll(async () => {
   runMigrations(migrationsDir("congress"));
@@ -24,17 +29,20 @@ beforeAll(async () => {
   );
   sessionCookie = res.headers.get("set-cookie")!.split(";")[0]!;
 
-  chamber = await startFakeChamber((c) => {
+  const configure = (c: ReturnType<typeof makeFakeChamberModule>["app"]) => {
     c.get("/api/notes", (ctx) => ctx.json([{ id: 1, title: "One" }]));
-    c.get("/icons/mark.svg", (ctx) => ctx.body("<svg/>", 200, { "content-type": "image/svg+xml" }));
     c.post("/api/health/ingest", async (ctx) =>
       ctx.json({ receivedToken: ctx.req.header("x-health-ingest-token") ?? null, body: await ctx.req.json() })
     );
-  });
-});
-
-afterAll(async () => {
-  await chamber.close();
+  };
+  await loadChamber(makeFakeChamberModule("e2e", { configure }), { envFor: () => ({}) });
+  await loadChamber(
+    makeFakeChamberModule("tooled", {
+      registerTools: (server) =>
+        (server as McpServer).registerTool("ping", { title: "Ping", description: "Answers pong." }, async () => mcpTextResult("pong")),
+    }),
+    { envFor: () => ({}) }
+  );
 });
 
 function session() {
@@ -54,69 +62,44 @@ describe("public routes", () => {
     expect((await app.request("/health")).status).toBe(200);
   });
 
-  it("serves a chamber icon without any credential", async () => {
-    // Deliberately open: an icon carries nothing sensitive, and callers fall
-    // back to a generic mark rather than treating a failure as an error.
-    await app.request("/congress/register", { method: "POST", headers: { ...internal, ...json }, body: JSON.stringify(makeManifest("iconic", chamber.origin)) });
-    const res = await app.request("/congress/chambers/iconic/icon");
-    expect(res.status).toBe(200);
-    expect(await res.text()).toBe("<svg/>");
-  });
-
   it("reports auth status without a credential", async () => {
     expect((await app.request("/auth/status", {}, bindings())).status).toBe(200);
   });
 });
 
-describe("internal-token-only routes", () => {
-  const cases: { method: string; path: string; body: unknown }[] = [
-    { method: "POST", path: "/congress/register", body: makeManifest("gate-a") },
-    { method: "POST", path: "/congress/deregister", body: { name: "gate-a" } },
-    { method: "POST", path: "/congress/heartbeat", body: { name: "gate-a" } },
-    {
-      method: "POST",
-      path: "/congress/exhibits/sync",
-      body: { chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: [] },
-    },
-    { method: "POST", path: "/congress/events/publish", body: { chamber: "notes", type: "notes.created", payload: {} } },
-  ];
-
-  it.each(cases)("401s $method $path without the token", async ({ method, path, body }) => {
-    const res = await app.request(path, { method, headers: json, body: JSON.stringify(body) });
-    expect(res.status).toBe(401);
-  });
-
-  it.each(cases)("401s $method $path when offered only a session cookie", async ({ method, path, body }) => {
-    // A browser session must not be able to impersonate a Chamber.
-    const res = await app.request(path, { method, headers: { ...json, ...session() }, body: JSON.stringify(body) }, bindings());
-    expect(res.status).toBe(401);
-  });
-
-  it.each(cases)("accepts $method $path with the token", async ({ method, path, body }) => {
-    const res = await app.request(path, { method, headers: { ...internal, ...json }, body: JSON.stringify(body) });
-    expect(res.status).toBeLessThan(400);
-  });
+describe("routes that went away with Chamber processes", () => {
+  it.each(["/congress/register", "/congress/deregister", "/congress/heartbeat", "/congress/exhibits/sync", "/congress/events/publish", "/congress/ai/run"])(
+    "no longer answers POST %s, even with the internal token",
+    async (path) => {
+      const res = await app.request(path, { method: "POST", headers: { ...internal, ...json }, body: "{}" }, bindings());
+      expect(res.status).not.toBeLessThan(400);
+    }
+  );
 });
 
 describe("session-only routes", () => {
   const cases: { method: string; path: string; body?: unknown }[] = [
+    { method: "GET", path: "/congress/registry" },
     { method: "GET", path: "/congress/settings" },
     { method: "PUT", path: "/congress/settings", body: { darkMode: true } },
     { method: "GET", path: "/congress/exhibits/search?q=x" },
+    { method: "POST", path: "/congress/exhibits/resolve", body: { refs: [] } },
     { method: "GET", path: "/congress/exhibits/note-1/connections" },
     // Core features folded in from the retired Capitol/Logs Chambers.
     { method: "GET", path: "/congress/event-settings" },
     { method: "GET", path: "/congress/history" },
     { method: "GET", path: "/congress/notifications" },
     { method: "GET", path: "/congress/push/config" },
-    // AI (moved in from Deputy). POST /chat/messages is left out on purpose:
-    // an accepted one would spawn a real `claude` run.
+    // AI. POST /chat/messages is left out on purpose: an accepted one would
+    // spawn a real `claude` run.
     { method: "GET", path: "/congress/ai/threads" },
     { method: "GET", path: "/congress/ai/queue" },
     { method: "GET", path: "/congress/ai/runs" },
+    { method: "GET", path: "/congress/ai/settings" },
     { method: "PUT", path: "/congress/ai/settings", body: { contextPrompt: "" } },
     { method: "GET", path: "/congress/ai/settings/spend" },
     { method: "GET", path: "/congress/feed" },
+    { method: "GET", path: "/api/e2e/notes" },
   ];
 
   it.each(cases)("401s $method $path without a session", async ({ method, path, body }) => {
@@ -139,104 +122,7 @@ describe("session-only routes", () => {
   });
 });
 
-describe("/congress/registry", () => {
-  it("accepts either a session or the internal token", async () => {
-    // A Chamber's own backend reads this to resolve another Chamber's mcpUrl,
-    // and the browser reads it to build the nav - hence both.
-    expect((await app.request("/congress/registry", { headers: internal })).status).toBe(200);
-    expect((await app.request("/congress/registry", { headers: session() }, bindings())).status).toBe(200);
-  });
-
-  it("401s with neither", async () => {
-    expect((await app.request("/congress/registry")).status).toBe(401);
-  });
-});
-
-describe("/congress/ai", () => {
-  it("GET /settings accepts either a session or the internal token", async () => {
-    // Deputy's backend reads the shared pause switch before draining its
-    // event buffer; the browser reads it for Settings -> AI.
-    expect((await app.request("/congress/ai/settings", { headers: internal })).status).toBe(200);
-    expect((await app.request("/congress/ai/settings", { headers: session() }, bindings())).status).toBe(200);
-    expect((await app.request("/congress/ai/settings")).status).toBe(401);
-  });
-
-  it("POST /run is internal-token only", async () => {
-    const body = JSON.stringify({ prompt: "x", actor: "deputy" });
-    expect((await app.request("/congress/ai/run", { method: "POST", headers: json, body })).status).toBe(401);
-    expect((await app.request("/congress/ai/run", { method: "POST", headers: { ...json, ...session() }, body }, bindings())).status).toBe(401);
-  });
-
-  it("POST /run rejects a malformed request", async () => {
-    const res = await app.request("/congress/ai/run", { method: "POST", headers: { ...internal, ...json }, body: JSON.stringify({ actor: "deputy" }) });
-    expect(res.status).toBe(400);
-  });
-
-  it("POST /run comes back refused, not spawned, while AI is paused", async () => {
-    await app.request(
-      "/congress/ai/settings",
-      { method: "PUT", headers: { ...json, ...session() }, body: JSON.stringify({ paused: true, pausedReason: "test" }) },
-      bindings()
-    );
-    try {
-      const res = await app.request("/congress/ai/run", {
-        method: "POST",
-        headers: { ...internal, ...json },
-        body: JSON.stringify({ prompt: "x", actor: "deputy", meta: { chamber: "deputy", directiveId: 1 } }),
-      });
-      expect(res.status).toBe(200);
-      expect(await res.json()).toMatchObject({ ok: false, refused: true, errorMessage: "AI is paused: test" });
-    } finally {
-      await app.request(
-        "/congress/ai/settings",
-        { method: "PUT", headers: { ...json, ...session() }, body: JSON.stringify({ paused: false, pausedReason: null }) },
-        bindings()
-      );
-    }
-  });
-});
-
-describe("POST /congress/exhibits/resolve", () => {
-  it("accepts either a session or the internal token", async () => {
-    // A Chamber's own backend resolves tokens too now (e.g. chamber-calendar
-    // projecting a rich value's tokens to plain labels before syncing to
-    // Google), and it has no session cookie to present - only the browser
-    // does, for live chip resolution.
-    const body = JSON.stringify({ refs: [] });
-    expect((await app.request("/congress/exhibits/resolve", { method: "POST", headers: { ...internal, ...json }, body })).status).toBe(200);
-    expect(
-      (await app.request("/congress/exhibits/resolve", { method: "POST", headers: { ...json, ...session() }, body }, bindings())).status
-    ).toBe(200);
-  });
-
-  it("401s with neither", async () => {
-    const res = await app.request("/congress/exhibits/resolve", { method: "POST", headers: json, body: JSON.stringify({ refs: [] }) });
-    expect(res.status).toBe(401);
-  });
-});
-
 describe("request validation", () => {
-  it("400s a register call with a malformed manifest", async () => {
-    const res = await app.request("/congress/register", {
-      method: "POST",
-      headers: { ...internal, ...json },
-      body: JSON.stringify({ name: "broken" }),
-    });
-    expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toMatchObject({ error: "invalid_manifest" });
-  });
-
-  it("refuses a Chamber named after one of the shell's own routes", async () => {
-    // "/search" is Congress's Search tab - a Chamber there would be unreachable.
-    const res = await app.request("/congress/register", {
-      method: "POST",
-      headers: { ...internal, ...json },
-      body: JSON.stringify(makeManifest("search", chamber.origin)),
-    });
-    expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toMatchObject({ error: "reserved_name" });
-  });
-
   it("round-trips the home screen's pinned views, in order, without touching dark mode", async () => {
     const pinnedViews = [
       { chamber: "calendar", viewId: "upcoming" },
@@ -262,20 +148,6 @@ describe("request validation", () => {
     expect(res.status).toBe(400);
   });
 
-  it("400s a heartbeat with no name", async () => {
-    const res = await app.request("/congress/heartbeat", { method: "POST", headers: { ...internal, ...json }, body: "{}" });
-    expect(res.status).toBe(400);
-  });
-
-  it("404s a heartbeat for a chamber that never registered", async () => {
-    const res = await app.request("/congress/heartbeat", {
-      method: "POST",
-      headers: { ...internal, ...json },
-      body: JSON.stringify({ name: "never-registered" }),
-    });
-    expect(res.status).toBe(404);
-  });
-
   it("400s a settings update with the wrong shape", async () => {
     const res = await app.request(
       "/congress/settings",
@@ -286,101 +158,97 @@ describe("request validation", () => {
   });
 });
 
-describe("register -> registry -> proxy -> deregister", () => {
-  it("carries a chamber all the way from registration to a proxied API call and back out", async () => {
-    const manifest = makeManifest("e2e", chamber.origin);
+describe("load -> registry -> API -> detach", () => {
+  it("carries a loaded chamber from the registry to an API call and back out", async () => {
+    const registry = (await (await app.request("/congress/registry", { headers: session() }, bindings())).json()) as { name: string; status: string; mcpUrl?: string }[];
+    expect(registry.find((c) => c.name === "e2e")).toMatchObject({ status: "active", mcpUrl: "http://127.0.0.1:3000/mcp/e2e" });
 
-    const registered = await app.request("/congress/register", {
-      method: "POST",
-      headers: { ...internal, ...json },
-      body: JSON.stringify(manifest),
-    });
-    expect(registered.status).toBe(201);
-
-    const registry = (await (await app.request("/congress/registry", { headers: internal })).json()) as { name: string }[];
-    expect(registry.map((c) => c.name)).toContain("e2e");
-
-    const proxied = await app.request("/api/e2e/notes", { headers: session() }, bindings());
-    expect(proxied.status).toBe(200);
-    await expect(proxied.json()).resolves.toEqual([{ id: 1, title: "One" }]);
-
-    await app.request("/congress/deregister", {
-      method: "POST",
-      headers: { ...internal, ...json },
-      body: JSON.stringify({ name: "e2e" }),
-    });
-
-    const afterDeregister = await app.request("/api/e2e/notes", { headers: session() }, bindings());
-    expect(afterDeregister.status).toBe(503);
-    await expect(afterDeregister.json()).resolves.toEqual({ error: "chamber_offline", chamber: "e2e" });
+    const res = await app.request("/api/e2e/notes", { headers: session() }, bindings());
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual([{ id: 1, title: "One" }]);
   });
 
-  it("401s a proxied API call without a session", async () => {
-    expect((await app.request("/api/e2e/notes")).status).toBe(401);
+  it("503s once the owner detaches the chamber", async () => {
+    await loadChamber(makeFakeChamberModule("parked"), { envFor: () => ({}) });
+    detachChamber("parked");
+    const res = await app.request("/api/parked/notes", { headers: session() }, bindings());
+    expect(res.status).toBe(503);
+    await expect(res.json()).resolves.toEqual({ error: "chamber_offline", chamber: "parked" });
   });
 });
 
-describe("chamber frontend proxy", () => {
-  it("does not shadow Congress's own routes for an unregistered first path segment", async () => {
-    // The proxy only intercepts paths whose first segment is an actually
-    // registered chamber; anything else has to fall through to the static
-    // frontend rather than 503ing.
-    const res = await app.request("/some-unregistered-path", {}, bindings());
+describe("chamber paths", () => {
+  it("falls through to Congress's own frontend for a chamber navigation path", async () => {
+    // Hard-loading "/e2e/n/1" must reach the shell, which mounts the Chamber.
+    const res = await app.request("/e2e/n/1", {}, bindings());
+    expect(res.status).not.toBe(401);
     expect(res.status).not.toBe(503);
   });
 
-  it("401s a registered chamber's frontend without a session", async () => {
-    await app.request("/congress/register", {
-      method: "POST",
-      headers: { ...internal, ...json },
-      body: JSON.stringify(makeManifest("fronted", chamber.origin)),
-    });
-    const res = await app.request("/fronted/anything", {}, bindings());
-    expect(res.status).toBe(401);
+  it("does not shadow Congress's own routes for an unknown first path segment", async () => {
+    const res = await app.request("/some-unregistered-path", {}, bindings());
+    expect(res.status).not.toBe(503);
   });
 });
 
 describe("POST /api/fitness/health/ingest", () => {
   // The one deliberate exception to "every /api/:chamber/* request needs a
-  // session" - an iOS Shortcuts automation can't present a session cookie,
-  // so Congress forwards this specific path through unvalidated by design.
-  // The secret check happens entirely inside chamber-fitness's own handler;
-  // Congress's only job is to not 401 it first, and not to touch the
-  // caller's token header on the way through.
-  it("503s if chamber-fitness isn't registered, same as any other proxied path", async () => {
-    const res = await app.request(
-      "/api/fitness/health/ingest",
-      { method: "POST", headers: json, body: "{}" },
-      bindings()
-    );
-    expect(res.status).toBe(503);
+  // session" - an iOS Shortcuts automation can't present a session cookie.
+  // The secret check happens entirely inside chamber-fitness's own handler.
+  it("404s if chamber-fitness isn't loaded", async () => {
+    const res = await app.request("/api/fitness/health/ingest", { method: "POST", headers: json, body: "{}" }, bindings());
+    expect(res.status).toBe(404);
   });
 
-  it("forwards with no session required, passing the caller's token header through unmodified", async () => {
-    await app.request("/congress/register", {
-      method: "POST",
-      headers: { ...internal, ...json },
-      body: JSON.stringify(makeManifest("fitness", chamber.origin)),
-    });
+  it("dispatches with no session required, passing the caller's token header through unmodified", async () => {
+    await loadChamber(
+      makeFakeChamberModule("fitness", {
+        configure: (c) =>
+          c.post("/api/health/ingest", async (ctx) =>
+            ctx.json({ receivedToken: ctx.req.header("x-health-ingest-token") ?? null, actor: ctx.req.header("x-congress-actor") ?? null, body: await ctx.req.json() })
+          ),
+      }),
+      { envFor: () => ({}) }
+    );
 
     const res = await app.request(
       "/api/fitness/health/ingest",
-      {
-        method: "POST",
-        headers: { ...json, "X-Health-Ingest-Token": "owner-secret" },
-        body: JSON.stringify({ samples: [] }),
-      },
+      { method: "POST", headers: { ...json, "X-Health-Ingest-Token": "owner-secret" }, body: JSON.stringify({ samples: [] }) },
       bindings()
     );
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ receivedToken: "owner-secret", body: { samples: [] } });
+    await expect(res.json()).resolves.toEqual({ receivedToken: "owner-secret", actor: "system", body: { samples: [] } });
   });
 });
 
-describe("mcp mount", () => {
-  it("is gated by the same shared secret Chambers use", async () => {
-    const unauth = await app.request("/mcp", { method: "POST", headers: json, body: "{}" });
-    expect(unauth.status).toBe(401);
+describe("mcp mounts", () => {
+  // Real HTTP: the `claude` CLI reaches these as a separate process.
+  let server: ServerType;
+  let origin: string;
+  beforeAll(async () => {
+    server = await new Promise<ServerType>((resolve) => {
+      const s = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: 0 }, () => resolve(s));
+    });
+    origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  });
+  afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  it("gates Congress's own /mcp with the shared secret", async () => {
+    expect((await app.request("/mcp", { method: "POST", headers: json, body: "{}" })).status).toBe(401);
+  });
+
+  it("gates a chamber's /mcp/<name> with the shared secret", async () => {
+    expect((await fetch(`${origin}/mcp/tooled`, { method: "POST", headers: json, body: "{}" })).status).toBe(401);
+  });
+
+  it("serves exactly that chamber's tools at /mcp/<name>", async () => {
+    const tools = await listChamberTools(`${origin}/mcp/tooled`, TEST_INTERNAL_TOKEN);
+    expect(tools.map((t) => t.name)).toEqual(["ping"]);
+  });
+
+  it("404s an unknown chamber's mcp path instead of falling through to Congress's own", async () => {
+    const res = await fetch(`${origin}/mcp/nosuch`, { method: "POST", headers: { ...internal, ...json }, body: "{}" });
+    expect(res.status).toBe(404);
   });
 });

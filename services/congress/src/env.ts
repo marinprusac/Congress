@@ -1,9 +1,8 @@
 import { loadEnv } from "@congress/chamber-kit";
 import { z } from "zod";
 
-// Capitol's own shape - unrelated to chamberEnvSchema (that's for Chambers
-// registering with Capitol; Capitol has no CAPITOL_URL/heartbeat-client
-// fields of its own, and adds auth fields no Chamber needs).
+// Congress's own env. Each Chamber's config comes from its own .env instead
+// (see chambers/loader.ts).
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default("127.0.0.1"),
@@ -13,8 +12,6 @@ const envSchema = z.object({
     .length(64, "CONGRESS_MASTER_PASSWORD_HASH must be a 64-char sha256 hex digest"),
   SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 characters"),
   DB_PATH: z.string().default("./data/capitol.sqlite3"),
-  HEARTBEAT_TIMEOUT_MS: z.coerce.number().int().positive().default(90_000),
-  HEARTBEAT_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(15_000),
   // Web Push is additive (the in-app notification center works without it),
   // so an unset keypair must never crash boot - sendWebPush no-ops with a
   // one-time warning and GET /congress/push/config reports publicKey: null.

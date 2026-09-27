@@ -1,15 +1,12 @@
 import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TEST_INTERNAL_TOKEN, TEST_MASTER_PASSWORD } from "@congress/test-support";
+import { TEST_MASTER_PASSWORD } from "@congress/test-support";
 import { authRoutes, requireSession } from "./sessionAuth.js";
-import { requireInternalToken, requireSessionOrInternalToken } from "./auth.js";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 app.route("/auth", authRoutes);
 app.get("/gated", requireSession, (c) => c.json({ ok: true }));
-app.get("/internal", requireInternalToken, (c) => c.json({ ok: true }));
-app.get("/either", requireSessionOrInternalToken, (c) => c.json({ ok: true }));
 
 // clientIp falls back to the node-server binding when there is no
 // x-forwarded-for, which app.request() does not provide on its own.
@@ -176,38 +173,5 @@ describe("login throttling", () => {
       );
     for (let i = 0; i < 5; i += 1) expect((await attempt()).status).toBe(401);
     expect((await attempt()).status).toBe(429);
-  });
-});
-
-describe("requireInternalToken", () => {
-  it("accepts the shared secret", async () => {
-    const res = await app.request("/internal", { headers: { "X-Congress-Internal-Token": TEST_INTERNAL_TOKEN } });
-    expect(res.status).toBe(200);
-  });
-
-  it("401s a missing or wrong token", async () => {
-    expect((await app.request("/internal")).status).toBe(401);
-    expect((await app.request("/internal", { headers: { "X-Congress-Internal-Token": "nope" } })).status).toBe(401);
-  });
-
-  it("does not accept a session cookie in place of the token", async () => {
-    const cookie = cookieFrom(await login(TEST_MASTER_PASSWORD, "6.6.6.1"));
-    expect((await app.request("/internal", { headers: { cookie } }, bindings())).status).toBe(401);
-  });
-});
-
-describe("requireSessionOrInternalToken", () => {
-  it("accepts the internal token", async () => {
-    const res = await app.request("/either", { headers: { "X-Congress-Internal-Token": TEST_INTERNAL_TOKEN } });
-    expect(res.status).toBe(200);
-  });
-
-  it("accepts a session cookie", async () => {
-    const cookie = cookieFrom(await login(TEST_MASTER_PASSWORD, "6.6.6.2"));
-    expect((await app.request("/either", { headers: { cookie } }, bindings())).status).toBe(200);
-  });
-
-  it("401s with neither", async () => {
-    expect((await app.request("/either", {}, bindings())).status).toBe(401);
   });
 });

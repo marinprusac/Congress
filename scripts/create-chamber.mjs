@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 // Scaffolds a new Chamber from scripts/create-chamber/template/, substituting
-// the chamber's name/port everywhere those need to line up (manifest, env
-// defaults, Vite base paths, the ChamberMark name, resolveApiBase, the
-// systemd unit...) in one pass instead of by hand. See
-// docs/creating-a-chamber.md for the full guide.
+// the chamber's name everywhere it needs to line up (manifest, env defaults,
+// Vite base paths, resolveApiBase...), then adds it to the list of modules
+// Congress loads. See docs/creating-a-chamber.md for the full guide.
 //
-// Usage: pnpm create-chamber <name> "<Display Name>" <port>
-// Example: pnpm create-chamber budget "Budget" 8015
+// Usage: pnpm create-chamber <name> "<Display Name>"
+// Example: pnpm create-chamber budget "Budget"
 
 import { readdirSync, statSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
@@ -15,7 +14,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..");
 const TEMPLATE_DIR = join(__dirname, "create-chamber", "template");
-const SYSTEMD_TEMPLATE = join(__dirname, "create-chamber", "systemd.service.template");
+const CONGRESS_DIR = join(REPO_ROOT, "services", "congress");
 
 // Extensions substituted as UTF-8 text. Everything else (icons, etc.) is
 // copied byte-for-byte.
@@ -27,24 +26,19 @@ function fail(message) {
 }
 
 function usage() {
-  console.error('Usage: pnpm create-chamber <name> "<Display Name>" <port>');
-  console.error('Example: pnpm create-chamber budget "Budget" 8015');
+  console.error('Usage: pnpm create-chamber <name> "<Display Name>"');
+  console.error('Example: pnpm create-chamber budget "Budget"');
 }
 
-const [rawName, displayName, rawPort] = process.argv.slice(2);
+const [rawName, displayName] = process.argv.slice(2);
 
-if (!rawName || !displayName || !rawPort) {
+if (!rawName || !displayName) {
   usage();
   fail("missing arguments");
 }
 
 if (!/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(rawName)) {
   fail(`chamber name "${rawName}" must be lowercase kebab-case (e.g. "budget", "reading-list")`);
-}
-
-const port = Number(rawPort);
-if (!Number.isInteger(port) || port < 1024 || port > 65535) {
-  fail(`port "${rawPort}" must be an integer between 1024 and 65535`);
 }
 
 const chamberDirName = `chamber-${rawName}`;
@@ -55,9 +49,7 @@ if (existsSync(targetDir)) {
   fail(`services/${chamberDirName} already exists`);
 }
 
-// Collision checks: package name and port, scanned across every existing
-// service so a typo'd new Chamber can't silently clash with one that's
-// already running.
+// Collision check: package name, scanned across every existing service.
 const existingServiceDirs = readdirSync(servicesDir).filter((name) => statSync(join(servicesDir, name)).isDirectory());
 
 for (const dir of existingServiceDirs) {
@@ -67,20 +59,12 @@ for (const dir of existingServiceDirs) {
     if (pkg.name === chamberDirName) fail(`package name "${chamberDirName}" is already used by services/${dir}`);
   }
 
-  const envExamplePath = join(servicesDir, dir, ".env.example");
-  if (existsSync(envExamplePath)) {
-    const match = readFileSync(envExamplePath, "utf8").match(/^PORT=(\d+)/m);
-    if (match && Number(match[1]) === port) {
-      fail(`port ${port} is already used by services/${dir} (.env.example)`);
-    }
-  }
 }
 
 function substitute(content) {
   return content
     .replaceAll("__CHAMBER_NAME__", rawName)
-    .replaceAll("__CHAMBER_DISPLAY__", displayName)
-    .replaceAll("__CHAMBER_PORT__", String(port));
+    .replaceAll("__CHAMBER_DISPLAY__", displayName);
 }
 
 function copyTemplateDir(srcDir, destDir) {
@@ -93,10 +77,8 @@ function copyTemplateDir(srcDir, destDir) {
       continue;
     }
     const ext = entry.slice(entry.lastIndexOf("."));
-    // ".env.example" is a dotfile whose "extension" (by lastIndexOf(".")) is
-    // ".example", not in TEXT_EXTENSIONS - special-cased so its
-    // __CHAMBER_PORT__/__CHAMBER_NAME__ placeholders actually get
-    // substituted instead of being copied through verbatim.
+    // ".env.example"'s "extension" is ".example" - special-cased so its
+    // placeholders get substituted too.
     if (TEXT_EXTENSIONS.has(ext) || entry === ".env.example") {
       writeFileSync(destPath, substitute(readFileSync(srcPath, "utf8")));
     } else {
@@ -107,23 +89,35 @@ function copyTemplateDir(srcDir, destDir) {
 
 copyTemplateDir(TEMPLATE_DIR, targetDir);
 
-// .env is untracked everywhere else in the repo (see every other Chamber's
-// .gitignore); seed it from .env.example so `pnpm --filter chamber-<name>
-// dev:server` works immediately without an extra manual copy.
+// .env is untracked everywhere else in the repo; seed it from .env.example so
+// Congress can load the new Chamber immediately.
 copyFileSync(join(targetDir, ".env.example"), join(targetDir, ".env"));
 
-const systemdUnitPath = join(REPO_ROOT, "infra", "systemd", `congress-${chamberDirName}.service`);
-writeFileSync(systemdUnitPath, substitute(readFileSync(SYSTEMD_TEMPLATE, "utf8")));
+// Congress loads every Chamber in its own process: add the workspace
+// dependency and the module import.
+const congressPkgPath = join(CONGRESS_DIR, "package.json");
+const congressPkg = JSON.parse(readFileSync(congressPkgPath, "utf8"));
+congressPkg.dependencies[chamberDirName] = "workspace:*";
+congressPkg.dependencies = Object.fromEntries(Object.entries(congressPkg.dependencies).sort(([a], [b]) => a.localeCompare(b)));
+writeFileSync(congressPkgPath, `${JSON.stringify(congressPkg, null, 2)}\n`);
 
-console.log(`Created services/${chamberDirName} and ${relative(REPO_ROOT, systemdUnitPath)}.\n`);
+const modulesPath = join(CONGRESS_DIR, "src", "chambers", "modules.ts");
+const importName = rawName.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase());
+let modulesSource = readFileSync(modulesPath, "utf8");
+modulesSource = modulesSource.replace(
+  /(\nimport [^\n]+ from "chamber-[^"]+\/module";)(?![\s\S]*import [^\n]+ from "chamber-)/,
+  `$1\nimport ${importName} from "${chamberDirName}/module";`
+);
+modulesSource = modulesSource.replace(/(CHAMBER_MODULES: ChamberModule\[\] = \[[^\]]*)\]/, `$1, ${importName}]`);
+writeFileSync(modulesPath, modulesSource);
+
+console.log(`Created services/${chamberDirName} and added it to ${relative(REPO_ROOT, modulesPath)}.\n`);
 console.log("What's next:");
 console.log(`  1. pnpm install`);
 console.log(`  2. Edit services/${chamberDirName}/src/db/schema.ts, items.ts, types.ts, mcp/tools.ts, and`);
 console.log(`     frontend/src/pages/*.tsx and src/feedRules.ts to replace the generic "item" example`);
 console.log(`     with your real domain.`);
 console.log(`  3. pnpm --filter chamber-${rawName} db:generate   # after any schema.ts change`);
-console.log(`  4. Set a real CONGRESS_INTERNAL_TOKEN in services/${chamberDirName}/.env, matching Capitol's.`);
-console.log(`  5. pnpm --filter chamber-${rawName} dev:server   (and, separately, dev:web)`);
-console.log(`  6. pnpm -r typecheck`);
-console.log(`\nCongress picks this Chamber up automatically once it registers - no Congress-side edit needed.`);
-console.log(`See docs/creating-a-chamber.md for the full walkthrough, including production rollout.`);
+console.log(`  4. pnpm --filter congress dev:server   (loads every Chamber, this one included)`);
+console.log(`  5. pnpm typecheck && pnpm test`);
+console.log(`\nSee docs/creating-a-chamber.md for the full walkthrough, including production rollout.`);

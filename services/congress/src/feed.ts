@@ -1,6 +1,7 @@
 import { chamberFeedResponseSchema, type ChamberRegistryEntry, type FeedCandidate, type FeedItem, type FeedPreview } from "@congress/shared-types";
 import { listChambers } from "./registry.js";
 import { resolveExhibits } from "./exhibits.js";
+import { chamberFetch } from "./chambers/runtime.js";
 
 // The home "For You" feed. Every active Chamber is asked for its own scored
 // candidates (GET /api/feed, chamber-kit's mountFeedRoute) - the domain
@@ -21,7 +22,7 @@ const MAX_ITEMS = 50;
 
 async function fetchChamberCandidates(chamber: ChamberRegistryEntry, timeoutMs: number): Promise<FeedCandidate[]> {
   try {
-    const res = await fetch(`${chamber.apiBase}/feed`, { signal: AbortSignal.timeout(timeoutMs) });
+    const res = await chamberFetch(chamber.name, "/feed", { signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) return [];
     const parsed = chamberFeedResponseSchema.safeParse(await res.json());
     return parsed.success ? parsed.data.items : [];

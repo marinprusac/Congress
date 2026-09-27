@@ -4,11 +4,11 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 
 // Vitest runs this setup file once per test file, *before* that file's own
-// imports are evaluated. That ordering is the whole trick: every service
-// opens its SQLite handle and parses its env at module load (see any
-// service's src/db/client.ts and src/env.ts), so the only way to point them
-// somewhere disposable is to have the environment already in place by the
-// time the first `import` runs.
+// imports are evaluated. That ordering is the whole trick: Congress opens its
+// SQLite handle and parses its env at module load, and a Chamber loaded
+// outside Congress falls back to process.env (defineChamberEnv), so the only
+// way to point them somewhere disposable is to have the environment already
+// in place by the time the first `import` runs.
 //
 // Combined with Vitest's per-file module isolation, each test file therefore
 // gets its own fresh database with no cleanup step and no cross-file bleed.
@@ -37,13 +37,6 @@ process.env.CONGRESS_INTERNAL_TOKEN = TEST_INTERNAL_TOKEN;
 // sessionAuth.ts compares actual digests.
 process.env.CONGRESS_MASTER_PASSWORD_HASH = createHash("sha256").update(TEST_MASTER_PASSWORD).digest("hex");
 process.env.SESSION_SECRET = "test-session-secret-at-least-32-chars-long";
-
-// Pointed at a port nothing listens on: a Chamber's background registration
-// and heartbeat calls are best-effort and swallow their own failures, so
-// leaving this unreachable keeps tests from accidentally talking to a real
-// dev Congress on :3000.
-process.env.CAPITOL_URL = "http://127.0.0.1:9";
-process.env.HEARTBEAT_INTERVAL_MS = "30000";
 
 // Per-service required fields, set unconditionally so importing any service
 // under test never fails env validation on a field that suite doesn't care

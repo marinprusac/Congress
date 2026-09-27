@@ -1,212 +1,92 @@
-import type { Context } from "hono";
-import { ACTOR_HEADER, type ChamberRegistryEntry } from "@congress/shared-types";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import type { Context, MiddlewareHandler } from "hono";
+import { serveStatic } from "@hono/node-server/serve-static";
+import { cacheControlFor } from "@congress/chamber-kit";
+import { ACTOR_HEADER } from "@congress/shared-types";
 import { getChamber } from "./registry.js";
+import { getModule } from "./chambers/runtime.js";
+import { hasValidSession } from "./sessionAuth.js";
 
-const FORWARD_TIMEOUT_MS = 10_000;
-
-// A Chamber's registered apiBase is its origin plus "/api"; its frontend and
-// its public assets are served from the origin itself. Named rather than
-// inlined at each call site both because it is the same rule twice over and
-// because it is the sort of thing that silently keeps "working" against a
-// mis-shaped apiBase.
-export function frontendBaseOf(apiBase: string): string {
-  return apiBase.replace(/\/api$/, "");
+// "/api/<name>/rest" -> "/rest". The routes are registered with that exact
+// prefix, so a plain slice is enough.
+export function stripPrefix(path: string, prefix: string): string {
+  return path.slice(prefix.length);
 }
 
-// Strips a known fixed prefix off the incoming path and re-attaches the
-// query string against a new base. Compiling a RegExp (and treating the
-// chamber name as a pattern) on every proxied request would be needless work
-// - the routes are registered as "/api/:chamber/*" and "/:chamberName/*", so
-// the path is always known to start with exactly this prefix.
-export function rewriteChamberPath(path: string, prefix: string, base: string, search: string, fallback = ""): string {
-  const remainder = path.slice(prefix.length) || fallback;
-  return `${base}${remainder}${search}`;
-}
+// Hands a browser request to a Chamber's own Hono app, in-process. `actor`
+// is who it's attributed to downstream (ACTOR_HEADER); a client-supplied
+// value is always discarded - the gateway is the only thing that vouches
+// for identity.
+export async function dispatchToChamber(c: Context, chamberName: string, path: string, actor?: string): Promise<Response> {
+  const chamber = getChamber(chamberName);
+  if (!chamber) return c.json({ error: "chamber_not_found", chamber: chamberName }, 404);
+  const module = getModule(chamberName);
+  if (chamber.status !== "active" || !module) return c.json({ error: "chamber_offline", chamber: chamberName }, 503);
 
-// The one place a slow Chamber route would get a longer proxy timeout. None
-// needs one today (Deputy's blocking "Run now" was the only one).
-export function timeoutFor(_chamberName: string, _method: string, _remainder: string): number {
-  return FORWARD_TIMEOUT_MS;
-}
-
-const HOP_BY_HOP_HEADERS = new Set([
-  "connection",
-  "keep-alive",
-  "proxy-authenticate",
-  "proxy-authorization",
-  "te",
-  "trailers",
-  "transfer-encoding",
-  "upgrade",
-  "host",
-]);
-
-// `actor` is who this request is attributed to downstream (see ACTOR_HEADER in
-// shared-types). A client-supplied value is always discarded - the gateway is
-// the only thing that vouches for identity - so a request with no `actor`
-// reaches the Chamber unattributed rather than self-declared.
-async function proxyRequest(
-  c: Context,
-  targetUrl: string,
-  timeoutMs: number = FORWARD_TIMEOUT_MS,
-  actor?: string,
-): Promise<Response> {
-  const forwardHeaders = new Headers();
-  for (const [key, value] of c.req.raw.headers.entries()) {
-    if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
-      forwardHeaders.set(key, value);
-    }
-  }
-  forwardHeaders.delete(ACTOR_HEADER);
-  if (actor) forwardHeaders.set(ACTOR_HEADER, actor);
+  const headers = new Headers(c.req.raw.headers);
+  headers.delete(ACTOR_HEADER);
+  if (actor) headers.set(ACTOR_HEADER, actor);
 
   const method = c.req.method;
   const hasBody = method !== "GET" && method !== "HEAD";
-  const response = await fetch(targetUrl, {
+  const search = new URL(c.req.url).search;
+  const request = new Request(`http://${chamberName}.chamber/api${path}${search}`, {
     method,
-    headers: forwardHeaders,
+    headers,
     body: hasBody ? c.req.raw.body : undefined,
     duplex: hasBody ? "half" : undefined,
-    // Relay a Chamber's redirect (e.g. an OAuth "start" route sending the
-    // browser to Google) as-is, rather than following it server-side —
-    // fetch() would otherwise silently resolve the redirect target itself
-    // and hand back that page's body under this request's original status.
-    redirect: "manual",
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-
-  const responseHeaders = new Headers();
-  for (const [key, value] of response.headers.entries()) {
-    if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
-      responseHeaders.set(key, value);
-    }
-  }
-  // fetch() (undici) transparently decompresses a gzip/br/deflate response
-  // before we ever see `response.body` - it does not update `content-encoding`
-  // or `content-length` to match, since those reflect the wire response, not
-  // the decoded body it hands back. Relaying those two headers as-is while
-  // piping the already-decoded body lies to the browser about both the
-  // encoding and the length of what's actually being sent, which fails with
-  // ERR_CONTENT_DECODING_FAILED - this only started biting once a Chamber's
-  // own static serving began returning compressed responses at all (see
-  // chamber-kit routes.ts's `precompressed: true`).
-  responseHeaders.delete("content-encoding");
-  responseHeaders.delete("content-length");
-
-  return new Response(response.body, {
-    status: response.status,
-    headers: responseHeaders,
-  });
+  } as RequestInit);
+  return module.app.fetch(request, c.env);
 }
 
-export async function forwardToChamber(c: Context): Promise<Response> {
+// "/api/:chamber/*", behind requireSession, so the caller is the owner.
+export function forwardToChamber(c: Context): Promise<Response> {
   const chamberName = c.req.param("chamber") ?? "";
-  const chamber = getChamber(chamberName);
-
-  if (!chamber) {
-    return c.json({ error: "chamber_not_found", chamber: chamberName }, 503);
-  }
-
-  if (chamber.status !== "active") {
-    return c.json({ error: "chamber_offline", chamber: chamberName }, 503);
-  }
-
-  const apiPrefix = `/api/${chamberName}`;
-  const remainder = c.req.path.slice(apiPrefix.length);
-  const search = new URL(c.req.url).search;
-  const targetUrl = rewriteChamberPath(c.req.path, apiPrefix, chamber.apiBase, search);
-
-  try {
-    // Only reached behind requireSession (server.ts), so the caller is the owner.
-    return await proxyRequest(c, targetUrl, timeoutFor(chamberName, c.req.method, remainder), "me");
-  } catch {
-    return c.json({ error: "chamber_unreachable", chamber: chamberName }, 503);
-  }
+  return dispatchToChamber(c, chamberName, stripPrefix(c.req.path, `/api/${chamberName}`), "me");
 }
 
-// Proxies to an explicit path on a named Chamber's apiBase, rather than
-// deriving the path by stripping a fixed prefix off the incoming request
-// (as forwardToChamber does for "/api/:chamber/*"). Used by the manual-refs
-// routes, whose own URL shape ("/congress/exhibits/:id/refs") has nothing to
-// do with the target Chamber route ("/exhibits/:id/refs").
-// `actor` defaults to the owner since the session-gated manual-refs routes are
-// the usual caller; the unauthenticated device-token ingest passes "system".
-export async function proxyToChamberPath(
-  c: Context,
-  chamberName: string,
-  path: string,
-  actor: string = "me",
-): Promise<Response> {
-  const chamber = getChamber(chamberName);
-
-  if (!chamber) {
-    return c.json({ error: "chamber_not_found", chamber: chamberName }, 503);
-  }
-
-  if (chamber.status !== "active") {
-    return c.json({ error: "chamber_offline", chamber: chamberName }, 503);
-  }
-
-  const search = new URL(c.req.url).search;
-  const targetUrl = `${chamber.apiBase}${path}${search}`;
-
-  try {
-    return await proxyRequest(c, targetUrl, FORWARD_TIMEOUT_MS, actor);
-  } catch {
-    return c.json({ error: "chamber_unreachable", chamber: chamberName }, 503);
-  }
-}
-
-// Proxies a Chamber's own served icon (frontend/public/icons/mark.svg in
-// that Chamber's own source tree, built into its dist/ root like every
-// other public/ asset regardless of Vite `base`) - the mechanism that lets
-// every Chamber own its icon instead of a shared package hardcoding one SVG
-// per Chamber name. Public/unauthenticated: an icon carries nothing
-// sensitive - same openness as /health and /manifest.
-// A missing/offline Chamber or a Chamber that never shipped an icon both
-// resolve to a non-2xx response; callers fall back to a generic mark
-// locally rather than treating this as an error worth surfacing.
-export async function proxyToChamberIcon(c: Context, chamberName: string): Promise<Response> {
-  const chamber = getChamber(chamberName);
-
-  if (!chamber || chamber.status !== "active") {
+// A Chamber's icon (frontend/public/icons/mark.svg, copied into dist/ by
+// the build). Public: an icon carries nothing sensitive. Any miss is a 404
+// and the caller falls back to a generic mark.
+export async function serveChamberIcon(c: Context, chamberName: string): Promise<Response> {
+  const module = getModule(chamberName);
+  if (!module || getChamber(chamberName)?.status !== "active") {
     return c.json({ error: "chamber_not_found", chamber: chamberName }, 404);
   }
-
-  try {
-    return await proxyRequest(c, `${frontendBaseOf(chamber.apiBase)}/icons/mark.svg`);
-  } catch {
-    return c.json({ error: "chamber_unreachable", chamber: chamberName }, 404);
+  for (const dir of ["frontend/dist", "frontend/public"]) {
+    const svg = await readFile(join(module.dir, dir, "icons/mark.svg")).catch(() => null);
+    if (svg) return c.body(svg, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=3600" });
   }
+  return c.json({ error: "chamber_not_found", chamber: chamberName }, 404);
 }
 
-// Proxies a Chamber's own built frontend (its static assets + SPA shell)
-// through Capitol at "/<chamberName>/*", so each Chamber's UI is reachable
-// without exposing its port directly. The Chamber's frontend build must set
-// its Vite `base` to "/<chamberName>/" so asset URLs round-trip through this
-// same prefix.
-export async function forwardToChamberFrontend(
-  c: Context,
-  chamber: ChamberRegistryEntry
-): Promise<Response> {
-  if (chamber.status !== "active") {
-    return c.json({ error: "chamber_offline", chamber: chamber.name }, 503);
+// A Chamber's built frontend assets (remote-entry.js/css, assets/*,
+// icons/*) at "/<name>/*", read from its own frontend/dist. Anything that
+// isn't a file there falls through to Congress's own SPA shell.
+const assetServers = new Map<string, MiddlewareHandler>();
+
+const ASSET_PATH = /\/[^/]+\.[a-z0-9]+$/i;
+
+export const serveChamberAssets: MiddlewareHandler = async (c, next) => {
+  const chamberName = c.req.param("chamberName") ?? "";
+  const module = getModule(chamberName);
+  if (!module || getChamber(chamberName)?.status !== "active") return next();
+  // Navigation paths (and the Chamber's own standalone index.html) belong
+  // to Congress's shell.
+  if (!ASSET_PATH.test(c.req.path) || c.req.path.endsWith("/index.html")) return next();
+  if (!(await hasValidSession(c))) return c.json({ error: "unauthorized" }, 401);
+
+  let server = assetServers.get(chamberName);
+  if (!server) {
+    const root = join(module.dir, "frontend/dist");
+    if (!existsSync(root)) return next();
+    server = serveStatic({ root, precompressed: true, rewriteRequestPath: (p) => stripPrefix(p, `/${chamberName}`) });
+    assetServers.set(chamberName, server);
   }
 
-  // Same fixed-prefix strip as forwardToChamber above, except that a bare
-  // "/<chamber>" has to become "/" rather than an empty path.
-  const search = new URL(c.req.url).search;
-  const targetUrl = rewriteChamberPath(
-    c.req.path,
-    `/${chamber.name}`,
-    frontendBaseOf(chamber.apiBase),
-    search,
-    "/"
-  );
-
-  try {
-    return await proxyRequest(c, targetUrl);
-  } catch {
-    return c.json({ error: "chamber_unreachable", chamber: chamber.name }, 503);
-  }
-}
+  const cacheControl = cacheControlFor(c.req.path);
+  if (cacheControl) c.header("Cache-Control", cacheControl);
+  return server(c, next);
+};
