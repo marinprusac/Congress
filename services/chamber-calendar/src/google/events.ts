@@ -372,17 +372,11 @@ export async function updateEvent(
   return result;
 }
 
-// notAttending:true on an invitation (this account is a listed attendee who
-// didn't organize the event) declines the real Google invite by patching
-// this account's own attendee entry - visible to the organizer/other guests,
-// exactly like clicking "No" in Google Calendar. On any other event (this
-// account organizes it, or isn't a listed attendee at all - there's no
-// Google RSVP to set), it's just a local, private note. false reverses
-// either one. Re-fetches the raw event first (rather than trusting the
-// cache) since patching attendees requires resending the *entire* list -
-// Google replaces it wholesale, it doesn't merge a partial one - and the
-// cache's own attendee data isn't kept around beyond the derived
-// isInvitation/responseStatus fields.
+// Declining is always local-only (see attendance.ts), even on a real
+// invitation - so the organizer isn't spammed with "No" replies. Accepting an
+// invitation still patches Google (sendUpdates=all), skipped if Google
+// already has it accepted. Re-fetches the raw event since a patch must
+// resend the entire attendee list.
 export async function setEventAttendance(
   accountId: number,
   calendarId: string,
@@ -396,15 +390,13 @@ export async function setEventAttendance(
   )) as GoogleEvent;
   if (raw.status === "cancelled") throw new GoogleApiError(404, "Event not found");
 
-  const { isInvitation } = computeGoogleAttendance(raw);
+  setLocalNotAttending(toExhibitId(accountId, calendarId, eventId), notAttending);
+  const { isInvitation, responseStatus } = computeGoogleAttendance(raw);
   let result: CalendarEvent;
-  if (!isInvitation) {
-    setLocalNotAttending(toExhibitId(accountId, calendarId, eventId), notAttending);
+  if (notAttending || !isInvitation || responseStatus === "accepted") {
     result = await upsertCachedEventFromGoogle(raw, accountId, calendarId);
   } else {
-    const attendees = (raw.attendees ?? []).map((a) =>
-      a.self ? { ...a, responseStatus: notAttending ? "declined" : "accepted" } : a
-    );
+    const attendees = (raw.attendees ?? []).map((a) => (a.self ? { ...a, responseStatus: "accepted" } : a));
     const updated = (await googleCalendarFetch(
       account,
       `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}?sendUpdates=all`,

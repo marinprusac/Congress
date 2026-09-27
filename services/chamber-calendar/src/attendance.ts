@@ -48,22 +48,22 @@ export function deleteLocalAttendance(exhibitId: string): void {
 }
 
 // Carries a "not attending" note over to an event's new exhibit id after a
-// move (see calendar.ts's moveEvent) - a no-op when there was none to begin
-// with, which is the common case for a real Google invitation (its "not
-// attending" comes from responseStatus, not this table - see
-// resolveAttendance above).
+// move (see calendar.ts's moveEvent) - a no-op when there was none.
 export function moveLocalAttendance(fromExhibitId: string, toExhibitId: string): void {
   db.update(eventAttendance).set({ exhibitId: toExhibitId }).where(eq(eventAttendance.exhibitId, fromExhibitId)).run();
 }
 
-// Combines Google's own RSVP (when this event is an invitation) with the
-// local-only note (when it isn't) into the one field CalendarEvent exposes.
+// Combines Google's own RSVP with the local-only note. On an invitation a
+// local note reads as "declined" - declines are never sent to Google (see
+// google/events.ts's setEventAttendance).
 export function resolveAttendance(
   google: { isInvitation: boolean; responseStatus: AttendanceStatus | null },
   exhibitId: string
 ): EventAttendance {
+  const localNotAttending = getLocalNotAttending(exhibitId);
   if (google.isInvitation) {
-    return { isInvitation: true, responseStatus: google.responseStatus, notAttending: google.responseStatus === "declined" };
+    const responseStatus = localNotAttending ? "declined" : google.responseStatus;
+    return { isInvitation: true, responseStatus, notAttending: responseStatus === "declined" };
   }
-  return { isInvitation: false, responseStatus: null, notAttending: getLocalNotAttending(exhibitId) };
+  return { isInvitation: false, responseStatus: null, notAttending: localNotAttending };
 }

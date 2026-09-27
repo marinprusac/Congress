@@ -92,8 +92,8 @@ export const cachedEvents = sqliteTable(
     // attendance.ts's computeGoogleAttendance, which is what actually
     // derives these from the raw event's organizer/attendees. isInvitation
     // false means this account organizes the event (or isn't a listed
-    // attendee), in which case responseStatus is always null and any "not
-    // attending" note lives in eventAttendance below instead.
+    // attendee), in which case responseStatus is always null. Any "not
+    // attending" note lives in eventAttendance below.
     isInvitation: integer("is_invitation", { mode: "boolean" }).notNull().default(false),
     attendeeResponseStatus: text("attendee_response_status"),
     googleUpdatedAt: text("google_updated_at").notNull(),
@@ -143,10 +143,8 @@ export const localEvents = sqliteTable(
 // invite to respond to - this account either organizes it or isn't a listed
 // attendee at all (see attendance.ts's resolveAttendance). Keyed by the same
 // exhibit-id string as eventRefs, for the same reason: an event has no local
-// row of its own to attach this to. Never touches Google - unlike declining
-// a real invitation (handled by patching the event's own attendees via
-// google/events.ts's setEventAttendance instead), nothing here is visible to
-// the organizer or other guests.
+// row of its own to attach this to. Never touches Google - also used for
+// declining a real invitation, so the organizer never sees the decline.
 export const eventAttendance = sqliteTable("event_attendance", {
   exhibitId: text("exhibit_id").primaryKey(),
   notAttending: integer("not_attending", { mode: "boolean" }).notNull(),

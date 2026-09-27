@@ -47,7 +47,8 @@ export type AttendanceStatus = z.infer<typeof attendanceStatusSchema>;
 // true only when this account is a listed Google attendee who didn't
 // organize the event - the case Google Calendar itself treats as something
 // to accept/decline. There, responseStatus mirrors Google's own attendee
-// responseStatus and notAttending is just a read of it. For every other
+// responseStatus, except a local-only decline reads as "declined" (declines
+// are never sent to Google). For every other
 // event (this account organizes it, or isn't a listed attendee at all -
 // there's no Google invite to respond to), responseStatus is always null and
 // notAttending is a purely local, private note this Chamber stores on its
