@@ -1,9 +1,11 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { createQueryClient, PersistedQueryProvider } from "@congress/congress-ui";
+import { createQueryClient, PersistedQueryProvider, preventPinchZoom } from "@congress/congress-ui";
 import { App } from "@/App";
 import "./index.css";
+
+preventPinchZoom();
 
 const queryClient = createQueryClient();
 

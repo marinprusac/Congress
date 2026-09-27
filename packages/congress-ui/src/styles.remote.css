@@ -84,30 +84,19 @@ html[data-theme="dark"] {
        makes text more legible and gives list rows more breathing room
        without touching every page individually. */
     font-size: 18px;
-    /* This is a standalone PWA, not a webpage - double-tap-to-zoom has no
-       affordance here and mostly just fires by accident while tapping fast
-       on a phone. Blocks that (and delays the 300ms click) everywhere;
-       pinch-zoom still needs the `gesturestart` handler in preventZoom.ts,
-       since touch-action can't stop that gesture on iOS Safari. */
-    touch-action: manipulation;
+    /* Scrolling only - no pinch or double-tap zoom (see preventZoom.ts). */
+    touch-action: pan-x pan-y;
     /* Belt-and-suspenders: if some piece of content still overflows
        horizontally despite overflow-wrap below (a wide image, an
        unbreakable table), this stops it from widening the whole document
        and visually shrinking everything else to fit - one runaway element
        can only clip itself, never distort the rest of the page. */
-    overflow-x: hidden;
+    overflow-x: clip;
     /* A standalone PWA should feel rigid, not like a webpage - scrolling to
        the end of the content should just stop there, not rubber-band into
        empty space. */
     overscroll-behavior-y: none;
-    /* Also suppresses iOS's edge-swipe-back gesture in a standalone PWA -
-       that gesture rides the same overscroll/rubber-band mechanism at the
-       document's own left/right edge this disables. That reclaimed
-       left-edge gesture space is what NavPanel's own swipe-to-open now uses
-       instead of browser-history navigation (useNavPanelSwipe); this
-       doesn't touch nested horizontal scrollers like .note-prose pre/
-       .note-table-wrapper, which scroll within their own box, not the
-       document's. */
+    /* No sideways rubber-band (also suppresses iOS edge-swipe-back). */
     overscroll-behavior-x: none;
   }
 
@@ -119,6 +108,8 @@ html[data-theme="dark"] {
        exhibit chip labels, ...): a long unbroken string like a URL with no
        spaces wraps instead of pushing the layout wider than the viewport. */
     overflow-wrap: break-word;
+    /* Never side-scrollable; `clip` keeps position: sticky working. */
+    overflow-x: clip;
   }
 
   :focus-visible {
