@@ -22,6 +22,7 @@ import {
   listAsksForAi,
   listOpenAsks,
   normalizeToolName,
+  unescapeNewlines,
   proposeActions,
   runAskTimerTick,
   sendMessage,
@@ -262,6 +263,11 @@ describe("proposals", () => {
     await eventually(() => expect(runAi).toHaveBeenCalled());
     expect(runAi.mock.calls.at(-1)?.[0].body).toContain("Not now");
     expect(calls).toEqual([]);
+  });
+
+  it("repairs double-escaped newlines but leaves real ones alone", () => {
+    expect(unescapeNewlines("Three tasks:\\n\\n• A")).toBe("Three tasks:\n\n• A");
+    expect(unescapeNewlines("Line\nwith \\n literal")).toBe("Line\nwith \\n literal");
   });
 
   it("strips the CLI's mcp__server__ prefix from tool names", () => {

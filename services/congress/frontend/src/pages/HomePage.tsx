@@ -16,6 +16,7 @@ import {
 } from "@congress/congress-ui";
 import { ViewSlot, viewHref } from "@/components/ViewSlot";
 import { HomeAsks } from "@/components/HomeAsks";
+import { GearIcon } from "@/components/TabBar";
 import { feedQueryKey, fetchFeed } from "@/lib/feedApi";
 import { formatPreviewTime } from "@/lib/formatPreviewTime";
 import { aiThreadQueryKey, aiThreadsQueryKey, createAiThread } from "@/lib/aiApi";
@@ -144,7 +145,16 @@ export function HomePage() {
 
   return (
     <div className="chamber-shell">
-      <ChamberHeader icon={<CapitolMark className="h-6 w-6 text-ink" />} title="Congress" titleHref="" />
+      <ChamberHeader
+        icon={<CapitolMark className="h-6 w-6 text-ink" />}
+        title="Congress"
+        titleHref=""
+        extraActions={
+          <Link to="/settings" className="home-settings-link" aria-label="Settings">
+            <GearIcon />
+          </Link>
+        }
+      />
       <main className="chamber-main home-main">
         <Composer />
         <HomeAsks />

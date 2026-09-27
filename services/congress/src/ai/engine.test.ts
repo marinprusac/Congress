@@ -344,17 +344,27 @@ describe("spawnClaude streaming and activity", () => {
     expect(result.errorMessage).toMatch(/too long/);
   });
 
+  it("isolates every run from the machine's own MCP servers, skills and project files", async () => {
+    queueFakeChild({ lines: [JSON.stringify({ type: "result", is_error: false, result: "ok" })], exitCode: 0 });
+
+    await spawnClaude(opts);
+
+    const [, args, options] = spawnMock.mock.calls[0]! as [string, string[], { cwd: string }];
+    expect(args).toEqual(expect.arrayContaining(["--strict-mcp-config", "--mcp-config", "/tmp/mcp.json", "--disable-slash-commands", "--system-prompt"]));
+    expect(options.cwd).not.toContain("Congress");
+    expect(options.cwd).toMatch(/congress-ai-workspace$/);
+  });
+
   it("runs a structured gate call with no tools and returns its structured output", async () => {
     queueFakeChild({
       lines: [JSON.stringify({ type: "result", is_error: false, result: "", structured_output: { act: false } })],
       exitCode: 0,
     });
 
-    const result = await spawnClaude({ prompt: "p", mcpConfigPath: null, model: "haiku", jsonSchema: { type: "object" } });
+    const result = await spawnClaude({ prompt: "p", mcpConfigPath: "/tmp/empty.json", model: "haiku", jsonSchema: { type: "object" } });
 
     const [, args] = spawnMock.mock.calls[0]!;
     expect(args).toEqual(expect.arrayContaining(["--tools", "", "--json-schema", '{"type":"object"}']));
-    expect(args).not.toContain("--mcp-config");
     expect(args).not.toContain("--dangerously-skip-permissions");
     expect(JSON.parse(result.response ?? "null")).toEqual({ act: false });
   });

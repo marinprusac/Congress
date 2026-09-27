@@ -24,7 +24,8 @@ import { cancelJob, enqueue, onQueueChange, PRIORITY, queueSnapshot } from "./jo
 import { runAi } from "./engine.js";
 import { broadcast, onStreamEvent, replayEvents } from "./runStream.js";
 import { deleteThreadRow, getThread, getThreadRow, listThreadMessages, listThreads, markThreadRead, updateThreadRow } from "./threads.js";
-import { getRunDetail, listRecentRuns } from "./runs.js";
+import { AUTONOMOUS_KINDS, getRunDetail, listRecentRuns, spendSince } from "./runs.js";
+import { startOfLocalDay } from "./pushPolicy.js";
 import { addFact, deleteFact, deleteTracking, getTracking, listFacts, listTracking, updateFact, updateTracking } from "./memory.js";
 import { startTrackingCheck } from "./tracking.js";
 import {
@@ -55,7 +56,11 @@ aiRoutes.put("/settings", requireSession, async (c) => {
   return c.json(await updateAiSettings(parsed.data));
 });
 
-aiRoutes.get("/settings/spend", requireSession, (c) => c.json({ spentTodayUsd: todaySpendUsd() }));
+aiRoutes.get("/settings/spend", requireSession, async (c) => {
+  const settings = await getAiSettings();
+  const proactive = spendSince(AUTONOMOUS_KINDS, startOfLocalDay(new Date(), settings.timeZone));
+  return c.json({ spentTodayUsd: todaySpendUsd(), proactiveSpentTodayUsd: proactive });
+});
 
 // ---- Threads ----
 

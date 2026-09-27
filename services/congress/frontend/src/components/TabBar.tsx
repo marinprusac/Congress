@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useNotifications } from "@/lib/notifications";
 import { CreateSheet } from "@/components/CreateSheet";
+import { useThreads } from "@/chat/useChatData";
 
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.75, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
@@ -40,7 +41,16 @@ function BellIcon() {
   );
 }
 
-function GearIcon() {
+function ChatIcon() {
+  return (
+    <svg viewBox="0 0 24 24" {...stroke} aria-hidden="true">
+      <path d="M4 5h16v11H9l-5 4V5Z" />
+      <path d="M8 9.5h8M8 12.5h5" />
+    </svg>
+  );
+}
+
+export function GearIcon() {
   return (
     <svg viewBox="0 0 24 24" {...stroke} aria-hidden="true">
       <circle cx="12" cy="12" r="3" />
@@ -86,6 +96,10 @@ export function TabBar() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
+  // Chats needing a look: unread, or waiting on an answer.
+  const threads = useThreads(false);
+  const chatBadge = (threads.data ?? []).filter((t) => t.unread || t.openAskCount > 0).length;
+  const inChat = pathname === "/chat" || pathname.startsWith("/chat/");
   const [creating, setCreating] = useState(false);
 
   // "/" jumps to Search from anywhere that isn't a text field (desktop).
@@ -102,7 +116,7 @@ export function TabBar() {
   return (
     <>
       <nav className="shell-tabbar" aria-label="Congress">
-        <Tab to="/" label="Home" active={pathname === "/" || pathname === "/chat" || pathname.startsWith("/chat/")}>
+        <Tab to="/" label="Home" active={pathname === "/"}>
           <HomeIcon />
         </Tab>
         <Tab to="/search" label="Search" active={pathname === "/search"}>
@@ -114,6 +128,10 @@ export function TabBar() {
           </span>
           <span className="shell-tab-label">New</span>
         </button>
+        <Tab to="/chat" label="Chats" ariaLabel={chatBadge > 0 ? `Chats, ${chatBadge} need you` : "Chats"} active={inChat}>
+          <ChatIcon />
+          {chatBadge > 0 && <span className="shell-tab-badge shell-tab-badge--accent">{chatBadge > 9 ? "9+" : chatBadge}</span>}
+        </Tab>
         <Tab
           to="/notifications"
           label="Inbox"
@@ -121,9 +139,6 @@ export function TabBar() {
           active={pathname === "/notifications"}>
           <BellIcon />
           {unreadCount > 0 && <span className="shell-tab-badge">{unreadCount > 9 ? "9+" : unreadCount}</span>}
-        </Tab>
-        <Tab to="/settings" label="Settings" active={pathname === "/settings"} className="shell-tab--settings">
-          <GearIcon />
         </Tab>
       </nav>
       {creating && <CreateSheet onClose={() => setCreating(false)} />}

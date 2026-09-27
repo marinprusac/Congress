@@ -190,6 +190,40 @@ describe("threaded chat", () => {
     expect(publishEvent.mock.calls[0]?.[0]).toMatchObject({ type: "congress.ai_chat_run", payload: { message: "with tools" } });
   });
 
+  it("tells a resumed session about asks other runs posted since the owner last wrote", async () => {
+    runAi.mockResolvedValue(outcome({ sessionId: "sess-x" }));
+    const { thread } = createThread({ text: "Track my car registration" });
+    await settled(thread.id);
+    // A background check later posts a reminder into the same thread.
+    insertMessage({ threadId: thread.id, role: "assistant", kind: "message", text: "Renewed it yet?", payload: { title: "Car registration", links: [] }, runId: "bg" });
+
+    postMessage(thread.id, "I did");
+    await settled(thread.id);
+
+    const ctx = runAi.mock.calls.at(-1)![0];
+    expect(ctx.resumeSessionId).toBe("sess-x");
+    expect(ctx.body).toContain("Posted in this thread since the owner last wrote");
+    expect(ctx.body).toContain('Congress message "Car registration": Renewed it yet?');
+    expect(ctx.body.indexOf("Renewed it yet?")).toBeLessThan(ctx.body.indexOf("## Message from the owner"));
+  });
+
+  it("gives a fresh session the thread's recent history", async () => {
+    const row = insertThread({ title: "Old" });
+    insertMessage({ threadId: row.id, role: "user", text: "Plan a trip to Split" });
+    insertMessage({ threadId: row.id, role: "assistant", text: "Sure - when?" });
+    runAi.mockResolvedValue(outcome());
+
+    postMessage(row.id, "Next weekend");
+    await settled(row.id);
+
+    const body = runAi.mock.calls[0]![0].body;
+    expect(runAi.mock.calls[0]![0].resumeSessionId).toBeNull();
+    expect(body).toContain("## Earlier in this thread");
+    expect(body).toContain("Owner: Plan a trip to Split");
+    expect(body).toContain("Congress: Sure - when?");
+    expect(body).not.toContain("Owner: Next weekend");
+  });
+
   it("marks runs cut off by a restart as interrupted", () => {
     const row = insertThread({});
     insertMessage({ threadId: row.id, role: "user", text: "hello" });

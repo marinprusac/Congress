@@ -112,7 +112,13 @@ interface NewAsk {
   expiresAt?: Date | null;
 }
 
+// Models sometimes double-escape newlines in tool arguments ("\\n" text).
+export function unescapeNewlines(text: string): string {
+  return text.includes("\n") ? text : text.replace(/\\n/g, "\n").replace(/\\t/g, "  ");
+}
+
 async function createAsk(ask: NewAsk, origin: AskOrigin): Promise<{ message: AiMessage; delivery: PushDecision | "scheduled" }> {
+  ask = { ...ask, text: unescapeNewlines(ask.text) };
   const threadId = targetThread(origin, ask.title);
   const delayed = ask.deliverAt && ask.deliverAt.getTime() > Date.now();
   const message = insertMessage({

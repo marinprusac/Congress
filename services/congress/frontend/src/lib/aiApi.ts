@@ -149,6 +149,12 @@ export function updateAiSettings(input: UpdateAiSettingsRequest): Promise<AiSett
   return fetch(`${API_BASE}/settings`, sendJson("PUT", input)).then((res) => json(res));
 }
 
-export function fetchAiSpend(): Promise<{ spentTodayUsd: number }> {
+export const aiRunsQueryKey = ["congress", "ai", "runs"] as const;
+
+export function fetchAiRuns(): Promise<AiRunDetail[]> {
+  return fetch(`${API_BASE}/runs`).then((res) => jsonOrError(res));
+}
+
+export function fetchAiSpend(): Promise<{ spentTodayUsd: number; proactiveSpentTodayUsd: number }> {
   return fetch(`${API_BASE}/settings/spend`).then((res) => json(res));
 }

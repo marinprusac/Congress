@@ -58,8 +58,37 @@ export async function repairInventedTokens(text: string): Promise<string> {
   });
 }
 
-export async function ownerMessageBody(text: string): Promise<string> {
-  return chatPromptBody(text, await resolveReferencedExhibits(text));
+const ASK_KINDS = new Set(["message", "question", "proposal"]);
+const HISTORY_LIMIT = 20;
+
+function describeForContext(m: AiMessage): string {
+  const payload = (m.payload ?? {}) as { title?: string | null };
+  const title = payload.title ? `"${payload.title}": ` : "";
+  const body = m.text.replace(/\s+/g, " ").slice(0, 600);
+  if (m.role === "user") return `Owner${m.kind === "answer" ? " (answered)" : m.kind === "decision" ? " (decided)" : ""}: ${body}`;
+  if (ASK_KINDS.has(m.kind)) return `Congress ${m.kind}${m.askState ? ` [${m.askState}]` : ""} ${title}${body}`;
+  return `Congress: ${body}`;
+}
+
+// What this run's CLI session may not know: asks other runs (a tracked
+// item's check, a proactive run) posted since the owner last spoke - or,
+// for a fresh session, the thread's recent history.
+export function threadContext(threadId: number, beforeMessageId: number, fresh: boolean): string | null {
+  const earlier = listThreadMessages(threadId, { before: beforeMessageId, limit: HISTORY_LIMIT }).messages;
+  if (fresh) {
+    if (earlier.length === 0) return null;
+    return `## Earlier in this thread\n${earlier.map((m) => `- ${describeForContext(m)}`).join("\n")}`;
+  }
+  const lastOwner = [...earlier].reverse().findIndex((m) => m.role === "user");
+  const since = lastOwner === -1 ? earlier : earlier.slice(earlier.length - lastOwner);
+  const asks = since.filter((m) => ASK_KINDS.has(m.kind));
+  if (asks.length === 0) return null;
+  return `## Posted in this thread since the owner last wrote\n${asks.map((m) => `- ${describeForContext(m)}`).join("\n")}`;
+}
+
+export async function ownerMessageBody(text: string, context: string | null = null): Promise<string> {
+  const body = chatPromptBody(text, await resolveReferencedExhibits(text));
+  return context ? `${context}\n\n${body}` : body;
 }
 
 // A stored session the CLI no longer has; the run is retried fresh.
@@ -80,7 +109,11 @@ export function postMessage(threadId: number, text: string): { userMessage: AiMe
   if (!thread.title) updateThreadRow(threadId, { title: titleFromText(text) });
   if (thread.archivedAt) updateThreadRow(threadId, { archivedAt: null });
   const userMessage = insertMessage({ threadId, role: "user", text });
-  const runId = startThreadRun(threadId, { kind: "chat", buildBody: () => ownerMessageBody(text), summaryText: text });
+  const runId = startThreadRun(threadId, {
+    kind: "chat",
+    buildBody: (fresh) => ownerMessageBody(text, threadContext(threadId, userMessage.id, fresh)),
+    summaryText: text,
+  });
   return { userMessage, runId };
 }
 
@@ -91,15 +124,19 @@ export function retryLast(threadId: number): { runId: string } {
   if (thread.pendingRunId) throw new ThreadBusyError();
   const page = listThreadMessages(threadId, { limit: 2 });
   const [prev, last] = page.messages.length === 2 ? page.messages : [undefined, page.messages[0]];
-  let userText: string | null = null;
-  if (last?.role === "user") userText = last.text;
+  let owner: AiMessage | null = null;
+  if (last?.role === "user") owner = last;
   else if (last && last.role === "assistant" && last.status !== "ok" && prev?.role === "user") {
     deleteMessageRow(last.id);
-    userText = prev.text;
+    owner = prev;
   }
-  if (!userText) throw new ThreadBusyError("Nothing to retry.");
-  const text = userText;
-  const runId = startThreadRun(threadId, { kind: "chat", buildBody: () => ownerMessageBody(text), summaryText: text });
+  if (!owner) throw new ThreadBusyError("Nothing to retry.");
+  const { id: ownerId, text } = owner;
+  const runId = startThreadRun(threadId, {
+    kind: "chat",
+    buildBody: (fresh) => ownerMessageBody(text, threadContext(threadId, ownerId, fresh)),
+    summaryText: text,
+  });
   notifyThreadUpdated(threadId);
   return { runId };
 }
@@ -107,7 +144,8 @@ export function retryLast(threadId: number): { runId: string } {
 export interface ThreadRunInput {
   kind: AiRunKind;
   // Built when the run starts (it may resolve exhibits over the network).
-  buildBody: () => Promise<string>;
+  // `fresh`: no CLI session to resume, so include the thread's history.
+  buildBody: (fresh: boolean) => Promise<string>;
   // What the owner said, for the congress.ai_chat_run event.
   summaryText: string;
   trigger?: string;
@@ -147,15 +185,14 @@ export function startThreadRun(threadId: number, input: ThreadRunInput): string 
 async function executeThreadRun(threadId: number, current: { runId: string }, input: ThreadRunInput, signal: AbortSignal): Promise<void> {
   const thread = getThreadRow(threadId);
   if (!thread) return;
-  const body = await input.buildBody();
-  const common = { kind: input.kind, body, actor: "congress", threadId, trigger: input.trigger ?? "owner", signal, meta: { threadId } };
+  const common = { kind: input.kind, actor: "congress", threadId, trigger: input.trigger ?? "owner", signal, meta: { threadId } };
 
-  let result: RunOutcome = await runAi({ ...common, runId: current.runId, resumeSessionId: thread.sessionId });
+  let result: RunOutcome = await runAi({ ...common, body: await input.buildBody(!thread.sessionId), runId: current.runId, resumeSessionId: thread.sessionId });
   if (!result.ok && !result.refused && !result.cancelled && thread.sessionId && result.activity.length === 0 && MISSING_SESSION.test(result.errorMessage ?? "")) {
     current.runId = randomUUID();
     updateThreadRow(threadId, { pendingRunId: current.runId, sessionId: null });
     notifyThreadUpdated(threadId);
-    result = await runAi({ ...common, runId: current.runId, resumeSessionId: null });
+    result = await runAi({ ...common, body: await input.buildBody(true), runId: current.runId, resumeSessionId: null });
   }
 
   // A thread deleted mid-run has nowhere to put the reply.

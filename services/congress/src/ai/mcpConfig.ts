@@ -47,9 +47,11 @@ export function buildMcpServers(
   return mcpServers;
 }
 
-export async function writeMcpConfigFile(actor: string, run?: RunContextInfo): Promise<McpConfigFile> {
+// `empty`: a config with no servers at all (the gate), so the CLI can't fall
+// back to whatever MCP servers this machine's user has configured.
+export async function writeMcpConfigFile(actor: string, run?: RunContextInfo, opts: { empty?: boolean } = {}): Promise<McpConfigFile> {
   const dir = await mkdtemp(join(tmpdir(), "congress-ai-mcp-"));
   const path = join(dir, "mcp.json");
-  await writeFile(path, JSON.stringify({ mcpServers: buildMcpServers(actor, run) }, null, 2));
+  await writeFile(path, JSON.stringify({ mcpServers: opts.empty ? {} : buildMcpServers(actor, run) }, null, 2));
   return { path, cleanup: () => rm(dir, { recursive: true, force: true }) };
 }

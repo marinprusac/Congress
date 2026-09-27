@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
 import type { AiActivityEntry, AiRunKind, AiRunMeta, AiRunResult, AiRunStatus, AiTranscriptEntry } from "@congress/shared-types";
 import { env } from "../env.js";
@@ -35,8 +38,8 @@ export interface SpawnResult {
 
 export interface SpawnOptions {
   prompt: string;
-  // null runs with no MCP servers at all (the gate).
-  mcpConfigPath: string | null;
+  // For the gate this lists no servers at all.
+  mcpConfigPath: string;
   model: string;
   resumeSessionId?: string | null;
   signal?: AbortSignal;
@@ -59,6 +62,14 @@ function stringifyToolContent(content: unknown): string {
   return JSON.stringify(content);
 }
 
+// Replaces Claude Code's own (coding-agent) system prompt; the real framing
+// travels in the prompt itself (see prompt.ts).
+export const SYSTEM_PROMPT =
+  "You are the assistant built into Congress, a personal productivity system. Follow the instructions in the user's message and act only through the MCP tools you are given.";
+
+// Every run is isolated from the machine it runs on: only the MCP servers
+// Congress lists (none for the gate), no skills, no project CLAUDE.md (see
+// aiWorkspaceDir), and Congress's own system prompt.
 export function buildClaudeArgs(opts: SpawnOptions): string[] {
   const args = ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", opts.model];
   if (opts.jsonSchema) {
@@ -66,9 +77,17 @@ export function buildClaudeArgs(opts: SpawnOptions): string[] {
   } else {
     args.push("--allowedTools", "mcp__*", "--dangerously-skip-permissions");
   }
-  if (opts.mcpConfigPath) args.push("--mcp-config", opts.mcpConfigPath, "--strict-mcp-config");
+  args.push("--mcp-config", opts.mcpConfigPath, "--strict-mcp-config", "--disable-slash-commands", "--system-prompt", SYSTEM_PROMPT);
   if (opts.resumeSessionId) args.push("--resume", opts.resumeSessionId);
   return args;
+}
+
+// A fixed, empty directory outside any repo: nothing to auto-discover, and
+// stable because the CLI files its sessions (for --resume) by working dir.
+export function aiWorkspaceDir(): string {
+  const dir = join(tmpdir(), "congress-ai-workspace");
+  mkdirSync(dir, { recursive: true });
+  return dir;
 }
 
 // Shells out to the `claude` CLI in print mode and stream-parses its
@@ -83,7 +102,7 @@ export async function spawnClaude(opts: SpawnOptions, onEvent?: (event: SpawnPro
   if (env.CLAUDE_CODE_OAUTH_TOKEN) childEnv.CLAUDE_CODE_OAUTH_TOKEN = env.CLAUDE_CODE_OAUTH_TOKEN;
 
   const startedAt = Date.now();
-  const child = spawn("claude", args, { env: childEnv, stdio: ["pipe", "pipe", "pipe"] });
+  const child = spawn("claude", args, { env: childEnv, cwd: aiWorkspaceDir(), stdio: ["pipe", "pipe", "pipe"] });
   child.stdin.on("error", () => {});
   child.stdin.write(opts.prompt);
   child.stdin.end();
@@ -307,7 +326,7 @@ export async function runAi(ctx: RunContext): Promise<RunOutcome> {
   }
 
   const prompt = buildPrompt(settings, ctx.body, new Date(), ctx.jsonSchema ? undefined : memoryPromptSection(settings.timeZone));
-  const mcpConfig = ctx.jsonSchema ? null : await writeMcpConfigFile(ctx.actor, { runId, threadId });
+  const mcpConfig = await writeMcpConfigFile(ctx.actor, { runId, threadId }, { empty: Boolean(ctx.jsonSchema) });
   insertRunRow({ id: runId, ...base, status: "running" });
   startRun(runId, ctx.kind, ctx.meta ?? {}, threadId);
 
@@ -315,7 +334,7 @@ export async function runAi(ctx: RunContext): Promise<RunOutcome> {
     const result = await spawnClaude(
       {
         prompt,
-        mcpConfigPath: mcpConfig?.path ?? null,
+        mcpConfigPath: mcpConfig.path,
         model,
         resumeSessionId: ctx.resumeSessionId,
         signal: ctx.signal,
@@ -345,6 +364,6 @@ export async function runAi(ctx: RunContext): Promise<RunOutcome> {
     finishRun({ type: "run_finished", runId, threadId, status: "error", ok: false, response: null, errorMessage });
     throw err;
   } finally {
-    await mcpConfig?.cleanup();
+    await mcpConfig.cleanup();
   }
 }
