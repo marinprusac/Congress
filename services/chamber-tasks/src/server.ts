@@ -11,6 +11,7 @@ import {
 } from "@congress/chamber-kit";
 import { tasksManifest } from "./manifest.js";
 import { taskFeedCandidates } from "./feedRules.js";
+import { env } from "./env.js";
 import {
   listTasks,
   listOpenTasks,
@@ -88,7 +89,7 @@ app.delete("/api/tasks/:id", async (c) => {
 mountExhibitSearchRoutes(app, { search: searchTaskExhibits, resolve: resolveTaskExhibits, chip: chipTaskExhibit });
 
 // Home feed candidates - see feedRules.ts.
-mountFeedRoute(app, async (now) => taskFeedCandidates(await listOpenTasks(), now));
+mountFeedRoute(app, async (now) => taskFeedCandidates(await listOpenTasks(), now, env.OWNER_TIMEZONE));
 
 mountManualRefsRoutes(
   app,

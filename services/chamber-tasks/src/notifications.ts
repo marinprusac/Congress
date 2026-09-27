@@ -3,6 +3,7 @@ import { createPublishEvent } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
 import { tasks, dueNotifications } from "./db/schema.js";
 import { env } from "./env.js";
+import { dueDeadline } from "./dueDate.js";
 
 // Publishes to Congress's push relay rather than pushing a notification
 // directly - this Chamber only knows a task is due, not whether anything
@@ -48,8 +49,10 @@ export async function checkDueTasks(): Promise<void> {
   const publishes: Promise<void>[] = [];
 
   for (const row of rows) {
-    if (!row.dueDate || row.dueDate.getTime() - now > LOOKAHEAD_MS) continue;
-    const state = row.dueDate.getTime() < now ? "overdue" : "due_soon";
+    if (!row.dueDate) continue;
+    const deadlineMs = dueDeadline(row.dueDate, env.OWNER_TIMEZONE).getTime();
+    if (deadlineMs - now > LOOKAHEAD_MS) continue;
+    const state = deadlineMs <= now ? "overdue" : "due_soon";
     currentlyDue.set(row.id, state);
     if (priorState.get(row.id) !== state) {
       publishes.push(
@@ -98,7 +101,7 @@ export function nextThresholdMs(now: number): number | null {
   let soonest: number | null = null;
   for (const row of rows) {
     if (!row.dueDate) continue;
-    const dueMs = row.dueDate.getTime();
+    const dueMs = dueDeadline(row.dueDate, env.OWNER_TIMEZONE).getTime();
     for (const candidate of [dueMs - LOOKAHEAD_MS, dueMs]) {
       if (candidate > now && (soonest === null || candidate < soonest)) soonest = candidate;
     }

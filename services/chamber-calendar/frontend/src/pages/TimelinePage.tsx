@@ -79,7 +79,7 @@ export function TimelinePage() {
 
               const { event, past, ongoing } = entry;
               const tentative = isTentative(event);
-              const place = [event.location?.trim(), event.calendarSummary].filter(Boolean).join(" · ");
+              const place = event.location?.trim() ?? "";
               return (
                 <Link
                   key={event.id}

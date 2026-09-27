@@ -324,7 +324,7 @@
 
 .feed-exhibit-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.75rem;
 }
 
@@ -354,21 +354,19 @@
   color: var(--color-slate);
 }
 
+/* The full title, wrapping if it must - context goes on the lines below. */
 .feed-exhibit-name {
   min-width: 0;
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   font-family: var(--font-display);
   font-size: 1.05rem;
+  line-height: 1.3;
   color: var(--color-ink);
 }
 
-/* In a single-exhibit row the reason is short and the point of the row -
-   it keeps its width and the name truncates instead. */
-.feed-exhibit .feed-card-reason {
-  flex: 0 0 auto;
+.feed-exhibit-reason {
+  color: var(--color-accent);
 }
 
 .feed-exhibit:hover .feed-exhibit-name {

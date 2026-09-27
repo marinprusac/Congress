@@ -66,15 +66,24 @@ function FeedEntry({ item, registry }: { item: FeedItem; registry: ChamberRegist
   }
   // The item's own information, inline - tapping still opens the exhibit.
   const preview = item.preview;
+  // The title gets its line to itself; the reason joins the time below it,
+  // unless it only repeats it (an all-day event's "Today").
+  const time = preview?.time ? formatPreviewTime(preview.time) : undefined;
+  const reason = item.reason && item.reason !== time ? item.reason : undefined;
   return (
     <section className="feed-card">
       <button type="button" className="feed-exhibit" onClick={() => navigate(resolveChamberPath(item.url, item.chamber, true))}>
         <span className="feed-exhibit-head">
           <ChamberMark name={item.chamber} />
           <span className="feed-exhibit-name">{preview?.title ?? item.name}</span>
-          {item.reason && <span className="feed-card-reason">{item.reason}</span>}
         </span>
-        {preview?.time && <span className="feed-exhibit-time">{formatPreviewTime(preview.time)}</span>}
+        {(time || reason) && (
+          <span className="feed-exhibit-time">
+            {time}
+            {time && reason && " · "}
+            {reason && <span className="feed-exhibit-reason">{reason}</span>}
+          </span>
+        )}
         {preview?.fields && preview.fields.length > 0 && <span className="feed-exhibit-fields">{preview.fields.join(" · ")}</span>}
         {preview?.body && <span className="feed-exhibit-body">{preview.body}</span>}
       </button>

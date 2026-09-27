@@ -20,9 +20,11 @@ import { db, runMigrations } from "./db/client.js";
 import { tasks } from "./db/schema.js";
 import { checkDueTasks, nextThresholdMs, stopDueTaskNotifications } from "./notifications.js";
 
-const NOW = Date.parse("2026-03-01T12:00:00.000Z");
+// A task is due until its day ends in Zagreb (env.OWNER_TIMEZONE's default).
+// March 2026 before the 29th is CET, +01:00.
 const HOUR = 60 * 60 * 1000;
-const DAY = 24 * HOUR;
+const midnight = (day: number) => Date.UTC(2026, 2, 1 + day) - HOUR;
+const NOW = midnight(0) + 12 * HOUR;
 
 beforeAll(() => runMigrations(migrationsDir("chamber-tasks")));
 
@@ -44,12 +46,14 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function task(name: string, dueOffsetMs: number | null, completed = false) {
+// Due `dueDay` days from today, stored as that day's local midnight (what the
+// editor sends) - its deadline is midnight(dueDay + 1).
+function task(name: string, dueDay: number | null, completed = false) {
   return db
     .insert(tasks)
     .values({
       name,
-      dueDate: dueOffsetMs === null ? null : new Date(NOW + dueOffsetMs),
+      dueDate: dueDay === null ? null : new Date(midnight(dueDay)),
       completed,
       createdAt: new Date(NOW),
       updatedAt: new Date(NOW),
@@ -75,62 +79,73 @@ describe("nextThresholdMs", () => {
   });
 
   it("ignores a completed task", () => {
-    task("done", 2 * DAY, true);
+    task("done", 2, true);
     expect(nextThresholdMs(NOW)).toBeNull();
   });
 
   it("arms for the due-soon threshold of a task more than a day out", () => {
-    // Two thresholds per task: due - 24h, and due itself.
-    task("later", 3 * DAY);
-    expect(nextThresholdMs(NOW)).toBe(NOW + 2 * DAY);
+    // Two thresholds per task: deadline - 24h, and the deadline itself.
+    task("later", 3);
+    expect(nextThresholdMs(NOW)).toBe(midnight(3));
   });
 
-  it("arms for the due date itself once the due-soon threshold has passed", () => {
-    task("soon", 6 * HOUR);
-    expect(nextThresholdMs(NOW)).toBe(NOW + 6 * HOUR);
+  it("arms for the end of the due day once the due-soon threshold has passed", () => {
+    task("today", 0);
+    expect(nextThresholdMs(NOW)).toBe(midnight(1));
   });
 
   it("ignores a threshold that is already in the past", () => {
     // Anything already crossed is handled by the check that runs immediately
     // before the timer is re-armed.
-    task("overdue", -2 * HOUR);
+    task("overdue", -1);
     expect(nextThresholdMs(NOW)).toBeNull();
   });
 
   it("takes the soonest threshold across every task", () => {
-    task("far", 10 * DAY);
-    task("near", 5 * HOUR);
-    task("mid", 2 * DAY);
-    expect(nextThresholdMs(NOW)).toBe(NOW + 5 * HOUR);
+    task("far", 10);
+    task("near", 0);
+    task("mid", 2);
+    expect(nextThresholdMs(NOW)).toBe(midnight(1));
   });
 
   it("treats a threshold exactly at 'now' as passed, not upcoming", () => {
-    task("boundary", DAY);
-    expect(nextThresholdMs(NOW)).toBe(NOW + DAY);
+    task("boundary", 1);
+    expect(nextThresholdMs(midnight(1))).toBe(midnight(2));
   });
 });
 
 describe("checkDueTasks", () => {
   it("publishes nothing when no task is within the lookahead window", async () => {
-    task("later", 3 * DAY);
+    task("later", 3);
     await checkDueTasks();
     expect(published()).toEqual([]);
   });
 
-  it("publishes due_soon for a task inside the 24-hour window", async () => {
-    const t = task("soon", 6 * HOUR);
+  it("publishes due_soon for a task due today", async () => {
+    const t = task("today", 0);
     await checkDueTasks();
     expect(published()).toEqual([{ type: "tasks.due_soon", taskId: t.id }]);
   });
 
-  it("publishes overdue for a task past its due date", async () => {
-    const t = task("late", -HOUR);
+  it("publishes overdue for a task whose due day has ended", async () => {
+    const t = task("late", -1);
     await checkDueTasks();
     expect(published()).toEqual([{ type: "tasks.overdue", taskId: t.id }]);
   });
 
+  it("reads a UTC-midnight due date (a bare date over MCP) as the same local day", async () => {
+    const t = db
+      .insert(tasks)
+      .values({ name: "mcp", dueDate: new Date("2026-03-01"), completed: false, createdAt: new Date(NOW), updatedAt: new Date(NOW) })
+      .returning()
+      .get();
+    await checkDueTasks();
+    expect(published()).toEqual([{ type: "tasks.due_soon", taskId: t.id }]);
+    expect(nextThresholdMs(NOW)).toBe(midnight(1));
+  });
+
   it("carries the name and a link in the payload, for a rule to template from", async () => {
-    const t = task("Taxes", 6 * HOUR);
+    const t = task("Taxes", 0);
     await checkDueTasks();
     expect(publishSpy.mock.calls[0]![0].payload).toEqual({
       taskId: t.id,
@@ -140,7 +155,7 @@ describe("checkDueTasks", () => {
   });
 
   it("ignores completed tasks entirely", async () => {
-    task("done", -HOUR, true);
+    task("done", -1, true);
     await checkDueTasks();
     expect(published()).toEqual([]);
   });
@@ -151,7 +166,7 @@ describe("state transitions", () => {
   // an unchanged state on every check would flood the Logs Chamber's
   // append-only history and re-fire automations with no dedupe of their own.
   it("does not re-publish a state that has not changed", async () => {
-    task("soon", 6 * HOUR);
+    task("today", 0);
     await checkDueTasks();
     publishSpy.mockClear();
 
@@ -159,18 +174,22 @@ describe("state transitions", () => {
     expect(published()).toEqual([]);
   });
 
-  it("publishes again when a task crosses from due_soon to overdue", async () => {
-    const t = task("soon", 2 * HOUR);
+  it("stays due, not overdue, until the due day ends", async () => {
+    const t = task("today", 0);
     await checkDueTasks();
     publishSpy.mockClear();
 
-    vi.setSystemTime(NOW + 3 * HOUR);
+    vi.setSystemTime(midnight(1) - 1);
+    await checkDueTasks();
+    expect(published()).toEqual([]);
+
+    vi.setSystemTime(midnight(1));
     await checkDueTasks();
     expect(published()).toEqual([{ type: "tasks.overdue", taskId: t.id }]);
   });
 
   it("publishes due_cleared when a task is completed", async () => {
-    const t = task("soon", 6 * HOUR);
+    const t = task("today", 0);
     await checkDueTasks();
     publishSpy.mockClear();
 
@@ -180,17 +199,17 @@ describe("state transitions", () => {
   });
 
   it("publishes due_cleared when a due date is pushed back out of range", async () => {
-    const t = task("soon", 6 * HOUR);
+    const t = task("today", 0);
     await checkDueTasks();
     publishSpy.mockClear();
 
-    db.update(tasks).set({ dueDate: new Date(NOW + 10 * DAY) }).where(sql`id = ${t.id}`).run();
+    db.update(tasks).set({ dueDate: new Date(midnight(10)) }).where(sql`id = ${t.id}`).run();
     await checkDueTasks();
     expect(published()).toEqual([{ type: "tasks.due_cleared", taskId: t.id }]);
   });
 
   it("publishes due_cleared when a task is deleted outright", async () => {
-    const t = task("soon", 6 * HOUR);
+    const t = task("today", 0);
     await checkDueTasks();
     publishSpy.mockClear();
 
@@ -200,7 +219,7 @@ describe("state transitions", () => {
   });
 
   it("only clears once, not on every subsequent check", async () => {
-    const t = task("soon", 6 * HOUR);
+    const t = task("today", 0);
     await checkDueTasks();
     db.run(sql`delete from tasks where id = ${t.id}`);
     await checkDueTasks();
@@ -211,7 +230,7 @@ describe("state transitions", () => {
   });
 
   it("re-publishes for a task that becomes due again after being cleared", async () => {
-    const t = task("soon", 6 * HOUR);
+    const t = task("today", 0);
     await checkDueTasks();
     db.update(tasks).set({ completed: true }).where(sql`id = ${t.id}`).run();
     await checkDueTasks();
@@ -223,16 +242,15 @@ describe("state transitions", () => {
   });
 
   it("tracks several tasks independently", async () => {
-    const a = task("a", 2 * HOUR);
-    const b = task("b", 6 * HOUR);
+    const a = task("a", 0);
+    const b = task("b", 5);
     await checkDueTasks();
     publishSpy.mockClear();
 
     // Only a crosses into overdue.
-    vi.setSystemTime(NOW + 3 * HOUR);
+    vi.setSystemTime(midnight(1));
     await checkDueTasks();
     expect(published()).toEqual([{ type: "tasks.overdue", taskId: a.id }]);
     expect(published().some((p) => p.taskId === b.id)).toBe(false);
   });
 });
-
