@@ -6,9 +6,9 @@ import { workouts } from "./db/schema.js";
 // but an Exhibit needs a unique, human-legible name - "<title> · <date>"
 // disambiguates by day, and a "(2)", "(3)", ... suffix (ordered by start
 // time, ties broken by id) disambiguates same-title workouts logged on the
-// same calendar day. Day boundaries are UTC: this Chamber (like
-// chamber-deputy's own scheduling.ts) has no owner-timezone setting of its
-// own, and the VPS it runs on has no fixed TZ either.
+// same calendar day. Day boundaries are UTC: this Chamber has no
+// owner-timezone setting of its own, and the VPS it runs on has no fixed
+// TZ either.
 const EXHIBIT_DATE_FORMAT = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
 
 export function dayKeyUTC(date: Date): string {

@@ -128,6 +128,18 @@ export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
       costUsd: { type: "number" },
     },
   },
+  {
+    type: "congress.ai_proactive_run",
+    label: "AI acted on its own",
+    description: "Congress's AI ran without being asked - a tracked item's check or a proactive look at what's happening.",
+    payloadFields: {
+      kind: { type: "string" },
+      trigger: { type: "string" },
+      summary: { type: "string" },
+      toolCallCount: { type: "number" },
+      costUsd: { type: "number" },
+    },
+  },
 ];
 
 // Top-level paths Congress's own shell owns (services/congress/frontend's

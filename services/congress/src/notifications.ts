@@ -23,7 +23,8 @@ function toNotification(row: typeof notifications.$inferSelect): Notification {
 // would make a merely-unchanged re-push (the same still-true condition,
 // polled again) nag the bell repeatedly, so `readAt` is only cleared when
 // the visible content actually changed, or the row didn't exist yet.
-export function pushNotification(push: NotificationPushRequest): void {
+// `silent`: inbox only, no Web Push to devices (e.g. a quiet AI ask).
+export function pushNotification(push: NotificationPushRequest, opts: { silent?: boolean } = {}): void {
   const existing = db
     .select()
     .from(notifications)
@@ -45,7 +46,7 @@ export function pushNotification(push: NotificationPushRequest): void {
         readAt: null,
       })
       .run();
-    notifyDevices(push.title, body, push.chamber, chamberUrl);
+    if (!opts.silent) notifyDevices(push.title, body, push.chamber, chamberUrl);
     return;
   }
 
@@ -57,7 +58,11 @@ export function pushNotification(push: NotificationPushRequest): void {
   // Same gate as the readAt reset above - an unchanged re-push (the same
   // still-true condition, polled again) must not buzz every subscribed
   // device on every poll tick, only a genuinely new or changed notification.
-  if (changed) notifyDevices(push.title, body, push.chamber, chamberUrl);
+  if (changed && !opts.silent) notifyDevices(push.title, body, push.chamber, chamberUrl);
+}
+
+export function dismissNotificationByKey(chamber: string, dedupeKey: string): void {
+  db.delete(notifications).where(and(eq(notifications.chamber, chamber), eq(notifications.dedupeKey, dedupeKey))).run();
 }
 
 // Fire-and-forget - sendWebPush already swallows per-subscription delivery

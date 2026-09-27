@@ -1,1 +1,0 @@
-ALTER TABLE `directives` ADD `time_based` integer DEFAULT true NOT NULL;

@@ -80,6 +80,8 @@ export const settings = sqliteTable("settings", {
   // Set once legacyImport.ts has copied the retired Capitol/Logs Chambers'
   // own SQLite files into the tables below - see that file.
   legacyImportedAt: integer("legacy_imported_at", { mode: "timestamp_ms" }),
+  // Set once Deputy's directives were imported as tracked items.
+  directivesImportedAt: integer("directives_imported_at", { mode: "timestamp_ms" }),
 });
 
 // ---- Event settings, history, notifications, push (formerly the Logs Chamber) ----
@@ -222,27 +224,147 @@ export const pushSubscriptions = sqliteTable("push_subscriptions", {
 export const aiSettings = sqliteTable("ai_settings", {
   id: integer("id").primaryKey().default(1),
   contextPrompt: text("context_prompt").notNull().default(""),
-  chatIdleWindowMs: integer("chat_idle_window_ms").notNull().default(30 * 60 * 1000),
   budgetCapUsd: real("budget_cap_usd").notNull().default(10),
   model: text("model").notNull().default("claude-sonnet-5"),
   retentionDays: integer("retention_days").notNull().default(30),
   paused: integer("paused", { mode: "boolean" }).notNull().default(false),
   pausedReason: text("paused_reason"),
+  maxPushesPerDay: integer("max_pushes_per_day").notNull().default(3),
+  // Local hours [start, end) when asks never push; null = no quiet hours.
+  quietHoursStart: integer("quiet_hours_start").default(22),
+  quietHoursEnd: integer("quiet_hours_end").default(7),
+  // IANA zone for quiet hours and the daily push count; null = server zone.
+  timeZone: text("time_zone"),
+  proactiveEnabled: integer("proactive_enabled", { mode: "boolean" }).notNull().default(true),
+  proactiveBudgetUsd: real("proactive_budget_usd").notNull().default(2),
+  gateModel: text("gate_model").notNull().default("claude-haiku-4-5-20251001"),
+  gateSensitivity: text("gate_sensitivity", { enum: ["low", "normal", "high"] }).notNull().default("normal"),
+  heartbeatHours: real("heartbeat_hours").notNull().default(4),
 });
 
-// The chat thread. sessionId is the `claude` CLI's own session id - rows
-// sharing one are one resumed conversation (see ai/chat.ts).
+// One conversation. sessionId is the `claude` CLI session every run in it
+// --resumes; pendingRunId is set while a run for it is queued or running.
+export const aiThreads = sqliteTable(
+  "ai_threads",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    title: text("title"),
+    origin: text("origin", { enum: ["owner", "ai"] }).notNull().default("owner"),
+    trackingId: integer("tracking_id"),
+    sessionId: text("session_id"),
+    pendingRunId: text("pending_run_id"),
+    pinnedAt: integer("pinned_at", { mode: "timestamp_ms" }),
+    archivedAt: integer("archived_at", { mode: "timestamp_ms" }),
+    lastReadAt: integer("last_read_at", { mode: "timestamp_ms" }),
+    lastMessageAt: integer("last_message_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("ai_threads_last_message_at_idx").on(table.lastMessageAt)]
+);
+
+// A thread's rows, in order. Asks (message/question/proposal) are rows too,
+// so a thread renders as one list; askState/payload only apply to them.
 export const aiMessages = sqliteTable(
   "ai_messages",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    sessionId: text("session_id").notNull(),
-    role: text("role", { enum: ["user", "assistant"] }).notNull(),
+    threadId: integer("thread_id").notNull(),
+    role: text("role", { enum: ["user", "assistant", "system"] }).notNull(),
+    kind: text("kind", { enum: ["text", "message", "question", "proposal", "answer", "decision", "notice"] })
+      .notNull()
+      .default("text"),
+    status: text("status", { enum: ["ok", "error", "refused", "cancelled"] }).notNull().default("ok"),
     text: text("text").notNull(),
+    runId: text("run_id"),
+    payloadJson: text("payload_json"),
+    askState: text("ask_state", {
+      enum: ["open", "answered", "expired", "withdrawn", "approved", "rejected", "executed", "failed"],
+    }),
+    urgency: text("urgency", { enum: ["quiet", "push"] }),
+    deliverAt: integer("deliver_at", { mode: "timestamp_ms" }),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+    // When a (possibly delayed) ask actually reached the owner, and pushed.
+    deliveredAt: integer("delivered_at", { mode: "timestamp_ms" }),
+    pushedAt: integer("pushed_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   },
-  (table) => [index("ai_messages_session_id_idx").on(table.sessionId), index("ai_messages_created_at_idx").on(table.createdAt)]
+  (table) => [
+    index("ai_messages_thread_id_idx").on(table.threadId, table.id),
+    index("ai_messages_created_at_idx").on(table.createdAt),
+    index("ai_messages_ask_state_idx").on(table.askState),
+  ]
 );
+
+// One row per AI run of any kind - the audit trail behind "Why?" and
+// Settings → AI → Activity. activityJson is the ordered notes + tool calls.
+export const aiRuns = sqliteTable(
+  "ai_runs",
+  {
+    id: text("id").primaryKey(),
+    threadId: integer("thread_id"),
+    kind: text("kind").notNull(),
+    trigger: text("trigger"),
+    actor: text("actor").notNull(),
+    model: text("model"),
+    status: text("status", { enum: ["running", "ok", "error", "refused", "cancelled"] }).notNull(),
+    errorMessage: text("error_message"),
+    startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+    finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+    costUsd: real("cost_usd"),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    durationMs: integer("duration_ms"),
+    toolCallCount: integer("tool_call_count").notNull().default(0),
+    activityJson: text("activity_json"),
+    verdictJson: text("verdict_json"),
+  },
+  (table) => [index("ai_runs_started_at_idx").on(table.startedAt), index("ai_runs_thread_id_idx").on(table.threadId)]
+);
+
+// Things the AI was asked to keep an eye on, each with its own next check.
+// recurrence advances nextCheckAt in code, so a check can't be forgotten.
+export const aiTracking = sqliteTable(
+  "ai_tracking",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    status: text("status", { enum: ["active", "paused", "done", "dropped"] }).notNull().default("active"),
+    watchEventsJson: text("watch_events_json").notNull().default("[]"),
+    nextCheckAt: integer("next_check_at", { mode: "timestamp_ms" }),
+    recurrenceJson: text("recurrence_json"),
+    refsJson: text("refs_json").notNull().default("[]"),
+    threadId: integer("thread_id"),
+    source: text("source", { enum: ["chat", "ai", "directive", "owner"] }).notNull().default("ai"),
+    lastCheckedAt: integer("last_checked_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("ai_tracking_next_check_at_idx").on(table.nextCheckAt)]
+);
+
+// Recent events for the gate's digest (what happened since it last looked).
+export const aiEventBuffer = sqliteTable(
+  "ai_event_buffer",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    chamber: text("chamber").notNull(),
+    type: text("type").notNull(),
+    payloadJson: text("payload_json"),
+    actor: text("actor"),
+    occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("ai_event_buffer_occurred_at_idx").on(table.occurredAt)]
+);
+
+// Plain facts about the owner, carried into every run's prompt.
+export const aiFacts = sqliteTable("ai_facts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  text: text("text").notNull(),
+  source: text("source", { enum: ["ai", "owner"] }).notNull().default("ai"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
 
 // One row per `claude` invocation, cost only - just enough to enforce
 // aiSettings.budgetCapUsd. `actor` records who asked (congress for chat,

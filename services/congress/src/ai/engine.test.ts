@@ -14,7 +14,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 // Output is only fed once spawn() is actually called: runAi awaits settings
 // and writes an MCP config file first, so emitting any earlier would fire
 // "close" before spawnClaude ever attached its listener.
-let fakeChild: EventEmitter & { stdin: PassThrough; stdout: PassThrough; stderr: PassThrough };
+type FakeChild = EventEmitter & { stdin: PassThrough; stdout: PassThrough; stderr: PassThrough; kill: (signal?: string) => void };
+let fakeChild: FakeChild;
 let feedFakeChild: () => void = () => {};
 const spawnMock = vi.fn((..._args: unknown[]) => {
   queueMicrotask(feedFakeChild);
@@ -24,14 +25,21 @@ vi.mock("node:child_process", () => ({
   spawn: (...args: unknown[]) => spawnMock(...args),
 }));
 
-function queueFakeChild(opts: { lines: string[]; exitCode: number; stderr?: string }): void {
-  const child = new EventEmitter() as EventEmitter & { stdin: PassThrough; stdout: PassThrough; stderr: PassThrough };
+// `hang: true` writes the lines but never exits until kill() is called.
+function queueFakeChild(opts: { lines: string[]; exitCode: number; stderr?: string; hang?: boolean }): void {
+  const child = new EventEmitter() as FakeChild;
   child.stdin = new PassThrough();
   child.stdout = new PassThrough();
   child.stderr = new PassThrough();
+  child.kill = vi.fn(() => {
+    child.stdout.end();
+    child.stderr.end();
+    setTimeout(() => child.emit("close", null), 0);
+  });
   fakeChild = child;
   feedFakeChild = () => {
     for (const line of opts.lines) child.stdout.write(`${line}\n`);
+    if (opts.hang) return;
     child.stdout.end();
     if (opts.stderr) child.stderr.write(opts.stderr);
     child.stderr.end();
@@ -43,13 +51,15 @@ import { db, runMigrations } from "../db/client.js";
 import { runAi, spawnClaude } from "./engine.js";
 import { getAiSettings, updateAiSettings } from "./settings.js";
 import { recordSpend, todaySpendUsd } from "./spend.js";
-import { getSnapshot } from "./runStream.js";
+import { replayEvents } from "./runStream.js";
+import { getRunDetail } from "./runs.js";
 
 beforeAll(() => runMigrations(migrationsDir("congress")));
 
 beforeEach(() => {
   db.run(sql`delete from ai_spend`);
   db.run(sql`delete from ai_settings`);
+  db.run(sql`delete from ai_runs`);
   spawnMock.mockClear();
 });
 
@@ -106,10 +116,9 @@ describe("runAi guardrails", () => {
 
     expect(written).toContain("I live in Zagreb.");
     expect(written.endsWith("## This run's directive\nWater the plants")).toBe(true);
-    const snapshot = getSnapshot();
-    expect(snapshot?.kind).toBe("remote");
-    expect(snapshot?.meta).toEqual({ chamber: "deputy", directiveId: 7 });
-    expect(snapshot?.events.at(-1)?.type).toBe("run_finished");
+    const replay = replayEvents();
+    expect(replay[0]).toMatchObject({ type: "run_started", kind: "remote", meta: { chamber: "deputy", directiveId: 7 } });
+    expect(replay.at(-1)?.type).toBe("run_finished");
   });
 });
 
@@ -217,8 +226,8 @@ describe("spawnClaude", () => {
     await spawnClaude(opts, (event) => events.push(event));
 
     expect(events).toEqual([
-      { type: "tool_start", toolName: "notes.search_notes", input: { query: "plants" } },
-      { type: "tool_result", toolName: "notes.search_notes", output: [{ type: "text", text: "found 2 notes" }], error: null },
+      { type: "tool_start", toolUseId: "call-1", toolName: "notes.search_notes", input: { query: "plants" } },
+      { type: "tool_result", toolUseId: "call-1", toolName: "notes.search_notes", output: [{ type: "text", text: "found 2 notes" }], error: null },
       { type: "assistant_text", text: "Here's what I found." },
     ]);
   });
@@ -239,6 +248,179 @@ describe("spawnClaude", () => {
     const events: unknown[] = [];
     await spawnClaude(opts, (event) => events.push(event));
 
-    expect(events).toContainEqual({ type: "tool_result", toolName: "notes.create_note", output: "permission denied", error: "permission denied" });
+    expect(events).toContainEqual({
+      type: "tool_result",
+      toolUseId: "call-1",
+      toolName: "notes.create_note",
+      output: "permission denied",
+      error: "permission denied",
+    });
+  });
+});
+
+describe("spawnClaude streaming and activity", () => {
+  const opts = { prompt: "go", mcpConfigPath: "/tmp/mcp.json", model: "sonnet" };
+  const delta = (text: string) =>
+    JSON.stringify({ type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } } });
+
+  it("emits text deltas and records interim text before a tool as a note", async () => {
+    queueFakeChild({
+      lines: [
+        delta("Let me "),
+        delta("check."),
+        JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "Let me check." }] } }),
+        JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", id: "t1", name: "mcp__notes__search", input: {} }] } }),
+        JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "ok" }] } }),
+        JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "Found it." }] } }),
+        JSON.stringify({ type: "result", is_error: false, result: "Found it." }),
+      ],
+      exitCode: 0,
+    });
+
+    const events: { type: string }[] = [];
+    const result = await spawnClaude(opts, (e) => events.push(e));
+
+    expect(events.filter((e) => e.type === "assistant_delta")).toEqual([
+      { type: "assistant_delta", text: "Let me " },
+      { type: "assistant_delta", text: "check." },
+    ]);
+    expect(result.activity).toEqual([
+      { type: "note", text: "Let me check." },
+      { type: "tool", toolUseId: "t1", toolName: "mcp__notes__search", input: {}, output: "ok", error: null },
+    ]);
+    expect(result.response).toBe("Found it.");
+  });
+
+  it("pairs parallel calls to the same tool by id, not name", async () => {
+    queueFakeChild({
+      lines: [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [
+              { type: "tool_use", id: "a", name: "search", input: { q: 1 } },
+              { type: "tool_use", id: "b", name: "search", input: { q: 2 } },
+            ],
+          },
+        }),
+        JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "b", content: "two" }] } }),
+        JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "a", content: "one" }] } }),
+        JSON.stringify({ type: "result", is_error: false, result: "done" }),
+      ],
+      exitCode: 0,
+    });
+
+    const result = await spawnClaude(opts);
+
+    expect(result.activity).toMatchObject([
+      { toolUseId: "a", input: { q: 1 }, output: "one" },
+      { toolUseId: "b", input: { q: 2 }, output: "two" },
+    ]);
+  });
+
+  it("kills the child and reports cancelled when the signal aborts", async () => {
+    queueFakeChild({ lines: [delta("Working")], exitCode: 0, hang: true });
+    const controller = new AbortController();
+
+    const pending = spawnClaude({ ...opts, signal: controller.signal });
+    await new Promise((r) => setTimeout(r, 5));
+    controller.abort();
+    const result = await pending;
+
+    expect(fakeChild.kill).toHaveBeenCalledWith("SIGTERM");
+    expect(result.ok).toBe(false);
+    expect(result.cancelled).toBe(true);
+    expect(result.response).toBeNull();
+  });
+
+  it("kills a run that exceeds its timeout", async () => {
+    queueFakeChild({ lines: [], exitCode: 0, hang: true });
+
+    const result = await spawnClaude({ ...opts, timeoutMs: 10 });
+
+    expect(fakeChild.kill).toHaveBeenCalled();
+    expect(result.ok).toBe(false);
+    expect(result.cancelled).toBe(false);
+    expect(result.errorMessage).toMatch(/too long/);
+  });
+
+  it("isolates every run from the machine's own MCP servers, skills and project files", async () => {
+    queueFakeChild({ lines: [JSON.stringify({ type: "result", is_error: false, result: "ok" })], exitCode: 0 });
+
+    await spawnClaude(opts);
+
+    const [, args, options] = spawnMock.mock.calls[0]! as [string, string[], { cwd: string }];
+    expect(args).toEqual(expect.arrayContaining(["--strict-mcp-config", "--mcp-config", "/tmp/mcp.json", "--disable-slash-commands", "--system-prompt"]));
+    expect(options.cwd).not.toContain("Congress");
+    expect(options.cwd).toMatch(/congress-ai-workspace$/);
+  });
+
+  it("runs a structured gate call with no tools and returns its structured output", async () => {
+    queueFakeChild({
+      lines: [JSON.stringify({ type: "result", is_error: false, result: "", structured_output: { act: false } })],
+      exitCode: 0,
+    });
+
+    const result = await spawnClaude({ prompt: "p", mcpConfigPath: "/tmp/empty.json", model: "haiku", jsonSchema: { type: "object" } });
+
+    const [, args] = spawnMock.mock.calls[0]!;
+    expect(args).toEqual(expect.arrayContaining(["--tools", "", "--json-schema", '{"type":"object"}']));
+    expect(args).not.toContain("--dangerously-skip-permissions");
+    expect(JSON.parse(result.response ?? "null")).toEqual({ act: false });
+  });
+});
+
+describe("runAi run records", () => {
+  it("writes an ai_runs row with the run's activity and cost", async () => {
+    queueFakeChild({
+      lines: [
+        JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", id: "t1", name: "x", input: {} }] } }),
+        JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "r" }] } }),
+        okResult(0.05),
+      ],
+      exitCode: 0,
+    });
+
+    const result = await runAi({ kind: "chat", body: "hi", actor: "congress", runId: "run-1", threadId: 3 });
+
+    expect(result.runId).toBe("run-1");
+    const run = getRunDetail("run-1");
+    expect(run).toMatchObject({ status: "ok", kind: "chat", threadId: 3, toolCallCount: 1, costUsd: 0.05 });
+    expect(run?.activity).toHaveLength(1);
+  });
+
+  it("records a refused run and still streams run_finished", async () => {
+    await updateAiSettings({ paused: true });
+
+    await runAi({ kind: "chat", body: "hi", actor: "congress", runId: "run-2", threadId: 4 });
+
+    expect(getRunDetail("run-2")?.status).toBe("refused");
+    expect(replayEvents().at(-1)).toMatchObject({ type: "run_finished", status: "refused", threadId: 4 });
+  });
+
+  it("refuses runs Congress starts itself once their own budget is spent, but not chat", async () => {
+    await updateAiSettings({ proactiveBudgetUsd: 0.5 });
+    db.run(sql`insert into ai_runs (id, kind, actor, status, started_at, cost_usd, tool_call_count) values ('old', 'tracking', 'congress', 'ok', ${Date.now()}, 0.6, 0)`);
+
+    const tracking = await runAi({ kind: "tracking", body: "check", actor: "congress" });
+    expect(tracking).toMatchObject({ refused: true, errorMessage: "Today's budget for proactive AI is used up." });
+    expect(spawnMock).not.toHaveBeenCalled();
+
+    queueFakeChild({ lines: [okResult()], exitCode: 0 });
+    expect((await runAi({ kind: "chat", body: "hi", actor: "congress" })).refused).toBe(false);
+  });
+
+  it("refuses proactive runs when proactive AI is turned off", async () => {
+    await updateAiSettings({ proactiveEnabled: false });
+    expect((await runAi({ kind: "proactive", body: "x", actor: "congress" })).errorMessage).toBe("Proactive AI is turned off.");
+  });
+
+  it("uses a per-run model override", async () => {
+    queueFakeChild({ lines: [okResult()], exitCode: 0 });
+
+    await runAi({ kind: "gate", body: "g", actor: "congress", model: "claude-haiku-4-5-20251001", jsonSchema: { type: "object" } });
+
+    const [, args] = spawnMock.mock.calls[0]!;
+    expect(args).toEqual(expect.arrayContaining(["--model", "claude-haiku-4-5-20251001"]));
   });
 });

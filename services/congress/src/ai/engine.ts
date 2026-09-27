@@ -1,33 +1,56 @@
+import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
-import type { AiRunKind, AiRunMeta, AiRunResult, AiTranscriptEntry } from "@congress/shared-types";
+import type { AiActivityEntry, AiRunKind, AiRunMeta, AiRunResult, AiRunStatus, AiTranscriptEntry } from "@congress/shared-types";
 import { env } from "../env.js";
 import { getAiSettings, updateAiSettings } from "./settings.js";
 import { recordSpend, todaySpendUsd } from "./spend.js";
 import { writeMcpConfigFile } from "./mcpConfig.js";
 import { buildPrompt } from "./prompt.js";
+import { memoryPromptSection } from "./memory.js";
 import { startRun, emitProgress, finishRun } from "./runStream.js";
+import { AUTONOMOUS_KINDS, finishRunRow, insertRunRow, spendSince } from "./runs.js";
+import { startOfLocalDay } from "./pushPolicy.js";
 
-// What spawnClaude reports as a run progresses, before it's known which
-// runId the run was assigned - runAi tags each one on the way to
-// emitProgress. spawnClaude itself knows nothing about runs, only about what
-// it just parsed off the CLI's stdout.
+// What spawnClaude reports as a run progresses; runAi tags each with a runId.
 export type SpawnProgressEvent =
-  | { type: "tool_start"; toolName: string; input: unknown }
-  | { type: "tool_result"; toolName: string; output: unknown; error: string | null }
-  | { type: "assistant_text"; text: string };
+  | { type: "tool_start"; toolUseId: string; toolName: string; input: unknown }
+  | { type: "tool_result"; toolUseId: string; toolName: string; output: unknown; error: string | null }
+  | { type: "assistant_text"; text: string }
+  | { type: "assistant_delta"; text: string };
 
 export interface SpawnResult {
   ok: boolean;
+  cancelled: boolean;
   response: string | null;
   sessionId: string | null;
   errorMessage: string | null;
   transcript: AiTranscriptEntry[];
+  activity: AiActivityEntry[];
   costUsd: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
   durationMs: number;
 }
+
+export interface SpawnOptions {
+  prompt: string;
+  // For the gate this lists no servers at all.
+  mcpConfigPath: string;
+  model: string;
+  resumeSessionId?: string | null;
+  signal?: AbortSignal;
+  // Tool-less structured run: `--tools ""` plus `--json-schema`.
+  jsonSchema?: object;
+  timeoutMs?: number;
+}
+
+// A run stuck past this is killed so it can't block the queue forever.
+export const RUN_TIMEOUT_MS = 15 * 60 * 1000;
+const KILL_GRACE_MS = 5_000;
 
 function stringifyToolContent(content: unknown): string {
   if (typeof content === "string") return content;
@@ -39,50 +62,75 @@ function stringifyToolContent(content: unknown): string {
   return JSON.stringify(content);
 }
 
-// Shells out to the `claude` CLI in headless/print mode and stream-parses its
-// --output-format stream-json events as they arrive. --allowedTools is
-// restricted to "mcp__*" (no built-in Bash/Read/Write/Edit/WebFetch - all
-// access stays MCP-mediated), and --strict-mcp-config ensures the only MCP
-// servers a run sees are the ones mcpConfig.ts generated from the live
-// registry.
-//
-// The prompt travels over stdin, not argv - a caller's prompt (e.g. a Deputy
-// directive with a long event backlog) has no fixed upper bound, and a long
-// enough one blew through the OS's argv limit ("spawn E2BIG").
-export async function spawnClaude(
-  opts: { prompt: string; mcpConfigPath: string; model: string; resumeSessionId?: string | null },
-  onEvent?: (event: SpawnProgressEvent) => void
-): Promise<SpawnResult> {
-  const args = [
-    "-p",
-    "--mcp-config",
-    opts.mcpConfigPath,
-    "--strict-mcp-config",
-    "--output-format",
-    "stream-json",
-    "--verbose",
-    "--allowedTools",
-    "mcp__*",
-    "--dangerously-skip-permissions",
-    "--model",
-    opts.model,
-  ];
-  if (opts.resumeSessionId) args.push("--resume", opts.resumeSessionId);
+// Replaces Claude Code's own (coding-agent) system prompt; the real framing
+// travels in the prompt itself (see prompt.ts).
+export const SYSTEM_PROMPT =
+  "You are the assistant built into Congress, a personal productivity system. Follow the instructions in the user's message and act only through the MCP tools you are given.";
 
-  // Only override these when Congress's own env actually sets one - otherwise
-  // inherit process.env as-is, so `claude` falls back to the ambient
-  // credential store `claude auth login` left for this OS user.
+// Every run is isolated from the machine it runs on: only the MCP servers
+// Congress lists (none for the gate), no skills, no project CLAUDE.md (see
+// aiWorkspaceDir), and Congress's own system prompt.
+export function buildClaudeArgs(opts: SpawnOptions): string[] {
+  const args = ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--model", opts.model];
+  if (opts.jsonSchema) {
+    args.push("--tools", "", "--json-schema", JSON.stringify(opts.jsonSchema));
+  } else {
+    args.push("--allowedTools", "mcp__*", "--dangerously-skip-permissions");
+  }
+  args.push("--mcp-config", opts.mcpConfigPath, "--strict-mcp-config", "--disable-slash-commands", "--system-prompt", SYSTEM_PROMPT);
+  if (opts.resumeSessionId) args.push("--resume", opts.resumeSessionId);
+  return args;
+}
+
+// A fixed, empty directory outside any repo: nothing to auto-discover, and
+// stable because the CLI files its sessions (for --resume) by working dir.
+export function aiWorkspaceDir(): string {
+  const dir = join(tmpdir(), "congress-ai-workspace");
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+// Shells out to the `claude` CLI in print mode and stream-parses its
+// stream-json output. Only MCP tools are ever allowed; the prompt goes over
+// stdin (argv has an OS size limit).
+export async function spawnClaude(opts: SpawnOptions, onEvent?: (event: SpawnProgressEvent) => void): Promise<SpawnResult> {
+  const args = buildClaudeArgs(opts);
+
+  // Only override credentials Congress's own env sets; otherwise inherit.
   const childEnv = { ...process.env };
   if (env.ANTHROPIC_API_KEY) childEnv.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY;
   if (env.CLAUDE_CODE_OAUTH_TOKEN) childEnv.CLAUDE_CODE_OAUTH_TOKEN = env.CLAUDE_CODE_OAUTH_TOKEN;
 
   const startedAt = Date.now();
-  const child = spawn("claude", args, { env: childEnv, stdio: ["pipe", "pipe", "pipe"] });
+  const child = spawn("claude", args, { env: childEnv, cwd: aiWorkspaceDir(), stdio: ["pipe", "pipe", "pipe"] });
+  child.stdin.on("error", () => {});
   child.stdin.write(opts.prompt);
   child.stdin.end();
 
+  let cancelled = false;
+  let timedOut = false;
+  let closed = false;
+  let killTimer: ReturnType<typeof setTimeout> | undefined;
+  const stop = () => {
+    if (closed) return;
+    child.kill("SIGTERM");
+    killTimer = setTimeout(() => child.kill("SIGKILL"), KILL_GRACE_MS);
+  };
+  const onAbort = () => {
+    cancelled = true;
+    stop();
+  };
+  if (opts.signal?.aborted) onAbort();
+  else opts.signal?.addEventListener("abort", onAbort, { once: true });
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    stop();
+  }, opts.timeoutMs ?? RUN_TIMEOUT_MS);
+
   const transcript: AiTranscriptEntry[] = [];
-  const pendingToolUses = new Map<string, { name: string; input: unknown }>();
+  const activity: AiActivityEntry[] = [];
+  const pendingToolUses = new Map<string, { name: string; input: unknown; entry: Extract<AiActivityEntry, { type: "tool" }> }>();
+  let lastText: string | null = null;
   let sessionId: string | null = null;
   let response: string | null = null;
   let costUsd: number | null = null;
@@ -90,9 +138,8 @@ export async function spawnClaude(
   let outputTokens: number | null = null;
   let ok = false;
   let errorMessage: string | null = null;
-  // Once a terminal "result" event arrives it's the authoritative verdict
-  // (it carries the CLI's own is_error) - a nonzero exit afterwards
-  // (cleanup/shutdown noise) must not flip an already-successful run.
+  // A parsed "result" event is the authoritative verdict; a nonzero exit
+  // afterwards (shutdown noise) must not flip it.
   let gotResult = false;
 
   const rl = createInterface({ input: child.stdout });
@@ -106,14 +153,31 @@ export async function spawnClaude(
     }
     if (typeof evt.session_id === "string") sessionId = evt.session_id;
 
-    if (evt.type === "assistant") {
+    if (evt.type === "stream_event") {
+      const inner = evt.event as { type?: string; delta?: { type?: string; text?: string } } | undefined;
+      if (inner?.type === "content_block_delta" && inner.delta?.type === "text_delta" && inner.delta.text) {
+        onEvent?.({ type: "assistant_delta", text: inner.delta.text });
+      }
+    } else if (evt.type === "assistant") {
       const content = (evt.message as { content?: unknown[] } | undefined)?.content ?? [];
       for (const block of content) {
         const b = block as { type?: string; id?: string; name?: string; input?: unknown; text?: string };
         if (b.type === "tool_use" && b.id && b.name) {
-          pendingToolUses.set(b.id, { name: b.name, input: b.input });
-          onEvent?.({ type: "tool_start", toolName: b.name, input: b.input });
+          if (lastText?.trim()) activity.push({ type: "note", text: lastText });
+          lastText = null;
+          const entry: Extract<AiActivityEntry, { type: "tool" }> = {
+            type: "tool",
+            toolUseId: b.id,
+            toolName: b.name,
+            input: b.input ?? null,
+            output: null,
+            error: null,
+          };
+          activity.push(entry);
+          pendingToolUses.set(b.id, { name: b.name, input: b.input, entry });
+          onEvent?.({ type: "tool_start", toolUseId: b.id, toolName: b.name, input: b.input });
         } else if (b.type === "text" && b.text) {
+          lastText = b.text;
           onEvent?.({ type: "assistant_text", text: b.text });
         }
       }
@@ -124,20 +188,26 @@ export async function spawnClaude(
         if (b.type === "tool_result" && b.tool_use_id) {
           const pending = pendingToolUses.get(b.tool_use_id);
           const error = b.is_error ? stringifyToolContent(b.content) : null;
-          transcript.push({ toolName: pending?.name ?? "unknown", input: pending?.input ?? null, output: b.content ?? null, error });
-          onEvent?.({ type: "tool_result", toolName: pending?.name ?? "unknown", output: b.content ?? null, error });
+          const toolName = pending?.name ?? "unknown";
+          transcript.push({ toolName, input: pending?.input ?? null, output: b.content ?? null, error });
+          if (pending) {
+            pending.entry.output = b.content ?? null;
+            pending.entry.error = error;
+          }
+          onEvent?.({ type: "tool_result", toolUseId: b.tool_use_id, toolName, output: b.content ?? null, error });
           pendingToolUses.delete(b.tool_use_id);
         }
       }
     } else if (evt.type === "result") {
       gotResult = true;
       ok = evt.is_error !== true;
-      response = typeof evt.result === "string" ? evt.result : null;
+      if (evt.structured_output !== undefined) response = JSON.stringify(evt.structured_output);
+      else response = typeof evt.result === "string" ? evt.result : null;
       costUsd = typeof evt.total_cost_usd === "number" ? evt.total_cost_usd : null;
       const usage = evt.usage as { input_tokens?: number; output_tokens?: number } | undefined;
       inputTokens = typeof usage?.input_tokens === "number" ? usage.input_tokens : null;
       outputTokens = typeof usage?.output_tokens === "number" ? usage.output_tokens : null;
-      if (!ok) errorMessage = response ?? "AI run failed.";
+      if (!ok) errorMessage = (typeof evt.result === "string" ? evt.result : null) ?? "AI run failed.";
     }
   });
 
@@ -148,16 +218,40 @@ export async function spawnClaude(
 
   const exitCode = await new Promise<number>((resolve, reject) => {
     child.on("error", reject);
-    child.on("close", (code) => resolve(code ?? -1));
+    child.on("close", (code) => {
+      closed = true;
+      resolve(code ?? -1);
+    });
+  }).finally(() => {
+    clearTimeout(timeout);
+    if (killTimer) clearTimeout(killTimer);
+    opts.signal?.removeEventListener("abort", onAbort);
   });
 
-  // Only a fallback for a run that never streamed its own verdict.
-  if (!gotResult && exitCode !== 0) {
+  if (cancelled) {
+    ok = false;
+    errorMessage = "Stopped.";
+  } else if (timedOut) {
+    ok = false;
+    errorMessage = "The run took too long and was stopped.";
+  } else if (!gotResult && exitCode !== 0) {
     ok = false;
     errorMessage = stderrOutput.trim() || `claude exited with code ${exitCode}`;
   }
 
-  return { ok, response, sessionId, errorMessage, transcript, costUsd, inputTokens, outputTokens, durationMs: Date.now() - startedAt };
+  return {
+    ok,
+    cancelled,
+    response: cancelled ? null : response,
+    sessionId,
+    errorMessage,
+    transcript,
+    activity,
+    costUsd,
+    inputTokens,
+    outputTokens,
+    durationMs: Date.now() - startedAt,
+  };
 }
 
 export interface RunContext {
@@ -166,63 +260,108 @@ export interface RunContext {
   body: string;
   actor: string;
   meta?: AiRunMeta;
-  // Chat only - the CLI session to --resume, or null to start fresh.
+  // Minted by the caller when it needs the id before the run starts.
+  runId?: string;
+  threadId?: number | null;
+  trigger?: string | null;
   resumeSessionId?: string | null;
+  signal?: AbortSignal;
+  model?: string;
+  // Gate-style run: no MCP servers, no tools, structured output.
+  jsonSchema?: object;
 }
 
-export type RunOutcome = AiRunResult & { sessionId: string | null };
+export type RunOutcome = AiRunResult & { runId: string; sessionId: string | null; activity: AiActivityEntry[] };
 
-function refused(errorMessage: string): RunOutcome {
-  return {
-    ok: false,
-    refused: true,
-    response: null,
-    sessionId: null,
-    errorMessage,
-    transcript: [],
-    costUsd: null,
-    inputTokens: null,
-    outputTokens: null,
-    durationMs: 0,
-  };
+function outcomeStatus(result: { ok: boolean; cancelled: boolean }): AiRunStatus {
+  if (result.cancelled) return "cancelled";
+  return result.ok ? "ok" : "error";
 }
 
 async function pauseForBudget(capUsd: number): Promise<void> {
   await updateAiSettings({ paused: true, pausedReason: `Daily budget cap reached ($${capUsd.toFixed(2)}).` });
 }
 
-// Every headless invocation goes through here, no exceptions - the pause
-// switch and the shared daily budget cap are enforced before a subprocess is
-// ever spawned, not left to each caller to remember. Callers queue this via
-// jobQueue.ts's enqueue.
+// Every headless invocation goes through here: the pause switch and the daily
+// budget cap are enforced before a subprocess is ever spawned. Callers queue
+// this via jobQueue.ts's enqueue.
 export async function runAi(ctx: RunContext): Promise<RunOutcome> {
   const settings = await getAiSettings();
+  const runId = ctx.runId ?? randomUUID();
+  const threadId = ctx.threadId ?? null;
+  const model = ctx.model ?? settings.model;
+  const base = { kind: ctx.kind, trigger: ctx.trigger ?? null, actor: ctx.actor, model, threadId };
 
-  if (settings.paused) {
-    return refused(`AI is paused${settings.pausedReason ? `: ${settings.pausedReason}` : "."}`);
+  const refuse = (errorMessage: string): RunOutcome => {
+    insertRunRow({ id: runId, ...base, status: "refused", errorMessage });
+    startRun(runId, ctx.kind, ctx.meta ?? {}, threadId);
+    finishRun({ type: "run_finished", runId, threadId, status: "refused", ok: false, response: null, errorMessage });
+    return {
+      runId,
+      ok: false,
+      refused: true,
+      cancelled: false,
+      response: null,
+      sessionId: null,
+      errorMessage,
+      transcript: [],
+      activity: [],
+      costUsd: null,
+      inputTokens: null,
+      outputTokens: null,
+      durationMs: 0,
+    };
+  };
+
+  if (settings.paused) return refuse(`AI is paused${settings.pausedReason ? `: ${settings.pausedReason}` : "."}`);
+  if ((AUTONOMOUS_KINDS as readonly string[]).includes(ctx.kind)) {
+    if (!settings.proactiveEnabled) return refuse("Proactive AI is turned off.");
+    if (spendSince(AUTONOMOUS_KINDS, startOfLocalDay(new Date(), settings.timeZone)) >= settings.proactiveBudgetUsd) {
+      return refuse("Today's budget for proactive AI is used up.");
+    }
   }
   if (todaySpendUsd() >= settings.budgetCapUsd) {
     await pauseForBudget(settings.budgetCapUsd);
-    return refused("Daily budget cap reached; AI has been paused.");
+    return refuse("Daily budget cap reached; AI has been paused.");
   }
 
-  const prompt = buildPrompt(settings, ctx.body);
-  const mcpConfig = await writeMcpConfigFile(ctx.actor);
-  const runId = startRun(ctx.kind, ctx.meta ?? {});
+  const prompt = buildPrompt(settings, ctx.body, new Date(), ctx.jsonSchema ? undefined : memoryPromptSection(settings.timeZone));
+  const mcpConfig = await writeMcpConfigFile(ctx.actor, { runId, threadId }, { empty: Boolean(ctx.jsonSchema) });
+  insertRunRow({ id: runId, ...base, status: "running" });
+  startRun(runId, ctx.kind, ctx.meta ?? {}, threadId);
 
   try {
     const result = await spawnClaude(
-      { prompt, mcpConfigPath: mcpConfig.path, model: settings.model, resumeSessionId: ctx.resumeSessionId },
+      {
+        prompt,
+        mcpConfigPath: mcpConfig.path,
+        model,
+        resumeSessionId: ctx.resumeSessionId,
+        signal: ctx.signal,
+        jsonSchema: ctx.jsonSchema,
+      },
       (event) => emitProgress({ ...event, runId })
     );
 
     recordSpend(ctx.actor, result.costUsd);
     if (todaySpendUsd() >= settings.budgetCapUsd) await pauseForBudget(settings.budgetCapUsd);
 
-    finishRun({ type: "run_finished", runId, ok: result.ok, response: result.response, errorMessage: result.errorMessage });
-    return { ...result, refused: false };
+    const status = outcomeStatus(result);
+    finishRunRow(runId, { ...result, status });
+    finishRun({ type: "run_finished", runId, threadId, status, ok: result.ok, response: result.response, errorMessage: result.errorMessage });
+    return { ...result, runId, refused: false };
   } catch (err) {
-    finishRun({ type: "run_finished", runId, ok: false, response: null, errorMessage: (err as Error).message });
+    const errorMessage = (err as Error).message;
+    finishRunRow(runId, {
+      status: "error",
+      errorMessage,
+      costUsd: null,
+      inputTokens: null,
+      outputTokens: null,
+      durationMs: 0,
+      activity: [],
+    });
+    finishRun({ type: "run_finished", runId, threadId, status: "error", ok: false, response: null, errorMessage });
     throw err;
   } finally {
     await mcpConfig.cleanup();

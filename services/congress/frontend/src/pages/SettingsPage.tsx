@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChamberHeader,
   ChamberMark,
@@ -172,6 +172,7 @@ function GeneralTab() {
 // - see useChamberSettingsPanels above and RemoteModule's `settings` field.
 export function SettingsPage() {
   useAppliedTheme();
+  const navigate = useNavigate();
 
   // A link can open Settings straight to a tab with "?from=<tab>" (e.g. the
   // AI-paused banners' "?from=ai", Home's pin bubble "?from=home") - a bare
@@ -203,7 +204,11 @@ export function SettingsPage() {
 
   return (
     <div className="chamber-shell">
-      <ChamberHeader icon={<SettingsGearIcon />} title="Settings" />
+      <ChamberHeader
+        icon={<SettingsGearIcon />}
+        title="Settings"
+        onBack={() => ((window.history.state as { idx?: number } | null)?.idx ? navigate(-1) : navigate("/"))}
+      />
       <main className="chamber-main">
         <div className="settings-tabs" role="tablist" aria-label="Settings categories">
           <button

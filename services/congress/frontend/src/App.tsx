@@ -4,7 +4,10 @@ import { ChamberHost } from "@/components/ChamberHost";
 import { TabBar } from "@/components/TabBar";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { HomePage } from "@/pages/HomePage";
-import { ChatPage } from "@/pages/ChatPage";
+import { ChatIndex, ChatLayout } from "@/chat/ChatLayout";
+import { ThreadView } from "@/chat/ThreadView";
+import { MemoryPage } from "@/chat/MemoryPage";
+import { useChatInvalidation } from "@/chat/useChatData";
 import { SearchPage } from "@/pages/SearchPage";
 import { NotificationsPage } from "@/pages/NotificationsPage";
 import { ViewPage } from "@/pages/ViewPage";
@@ -14,6 +17,8 @@ import { ViewPage } from "@/pages/ViewPage";
 // RESERVED_CHAMBER_NAMES), and the service worker serves them from the
 // cached shell (sw.ts) - keep the three in step.
 export function App() {
+  // App-wide, so a reply that lands while no chat is open still updates.
+  useChatInvalidation();
   return (
     // One LoginGate around everything - the tab bar needs the same gate
     // every route already has.
@@ -30,8 +35,12 @@ export function App() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
-        {/* Congress's own AI chat. */}
-        <Route path="/chat" element={<ChatPage />} />
+        {/* Congress's own AI chat: threads, one per conversation. */}
+        <Route path="/chat" element={<ChatLayout />}>
+          <Route index element={<ChatIndex />} />
+          <Route path="memory" element={<MemoryPage />} />
+          <Route path=":threadId" element={<ThreadView />} />
+        </Route>
         {/* A view card with no full-screen page of its own, given the whole
             screen. */}
         <Route path="/view/:chamber/:viewId" element={<ViewPage />} />

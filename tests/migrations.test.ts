@@ -20,7 +20,6 @@ const SERVICES: { name: string; load: () => Promise<DbClientModule> }[] = [
   { name: "chamber-documents", load: () => import("../services/chamber-documents/src/db/client.js") },
   { name: "chamber-tasks", load: () => import("../services/chamber-tasks/src/db/client.js") },
   { name: "chamber-map", load: () => import("../services/chamber-map/src/db/client.js") },
-  { name: "chamber-deputy", load: () => import("../services/chamber-deputy/src/db/client.js") },
 ];
 
 interface DbClientModule {

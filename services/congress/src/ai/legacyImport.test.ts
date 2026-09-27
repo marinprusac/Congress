@@ -33,9 +33,8 @@ describe("importLegacyDeputySettings", () => {
   it("copies Deputy's settings row into ai_settings", async () => {
     expect(importLegacyDeputySettings({ deputyDbPath: makeDeputyFile() })).toBe(true);
 
-    expect(await getAiSettings()).toEqual({
+    expect(await getAiSettings()).toMatchObject({
       contextPrompt: "I live in Zagreb.",
-      chatIdleWindowMs: 600000,
       budgetCapUsd: 4,
       model: "claude-opus-5-5",
       retentionDays: 14,

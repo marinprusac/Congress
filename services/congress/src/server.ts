@@ -45,6 +45,7 @@ import { listHistory } from "./eventHistory.js";
 import { listNotifications, markNotificationRead, markAllNotificationsRead, dismissNotification } from "./notifications.js";
 import { publicKey, saveSubscription, removeSubscription } from "./pushSubscriptions.js";
 import { mcpApp } from "./mcp/server.js";
+import { parseRunContext, withRunContext } from "./ai/runContext.js";
 import { aiRoutes } from "./ai/routes.js";
 import { getFeed } from "./feed.js";
 
@@ -317,6 +318,8 @@ app.all("/api/:chamber/*", requireSession, forwardToChamber);
 // the same shared-secret header Chambers use to register/heartbeat, baked
 // into createMcpApp itself (chamber-kit) rather than an extra middleware
 // layer here, same as every other Chamber's own /mcp mount.
+app.use("/mcp", (c, next) => withRunContext(parseRunContext((h) => c.req.header(h)), next));
+app.use("/mcp/*", (c, next) => withRunContext(parseRunContext((h) => c.req.header(h)), next));
 app.route("/mcp", mcpApp);
 
 // Each Chamber's own frontend is reachable through Capitol at

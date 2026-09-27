@@ -28,6 +28,8 @@ export interface UseExhibitEditorCoreOptions {
   onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
   onCreate?: (title: string) => Promise<CapitolExhibitSearchResult>;
   onEnter?: () => void;
+  // Multiline only: runs on Enter first; return true to consume it (send).
+  onSubmitKey?: () => boolean;
   autoFocus?: boolean;
 }
 
@@ -48,7 +50,7 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
   containerRef: (el: HTMLDivElement | null) => void;
   picker: ExhibitPickerState;
 } {
-  const { value, onChange, readOnly = false, placeholder, mode, renderIcon, onNavigate, onCreate, onEnter, autoFocus } = options;
+  const { value, onChange, readOnly = false, placeholder, mode, renderIcon, onNavigate, onCreate, onEnter, onSubmitKey, autoFocus } = options;
 
   const containerElRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -66,6 +68,8 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
   onChangeRef.current = onChange;
   const onEnterRef = useRef(onEnter);
   onEnterRef.current = onEnter;
+  const onSubmitKeyRef = useRef(onSubmitKey);
+  onSubmitKeyRef.current = onSubmitKey;
   const valueRef = useRef(value);
   valueRef.current = value;
 
@@ -255,6 +259,7 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
         EditorView.editable.of(!readOnly),
       ];
       if (mode === "inline") extensions.push(...createSingleLineExtension(() => onEnterRef.current?.()));
+      else extensions.push(keymap.of([{ key: "Enter", run: () => onSubmitKeyRef.current?.() ?? false }]));
       // defaultKeymap/historyKeymap last, so the exhibit picker (Prec.highest)
       // and single-line Enter binding both take priority over their defaults
       // at the same precedence level.

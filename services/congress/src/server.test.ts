@@ -111,8 +111,9 @@ describe("session-only routes", () => {
     { method: "GET", path: "/congress/push/config" },
     // AI (moved in from Deputy). POST /chat/messages is left out on purpose:
     // an accepted one would spawn a real `claude` run.
-    { method: "GET", path: "/congress/ai/chat/messages" },
-    { method: "DELETE", path: "/congress/ai/chat/messages" },
+    { method: "GET", path: "/congress/ai/threads" },
+    { method: "GET", path: "/congress/ai/queue" },
+    { method: "GET", path: "/congress/ai/runs" },
     { method: "PUT", path: "/congress/ai/settings", body: { contextPrompt: "" } },
     { method: "GET", path: "/congress/ai/settings/spend" },
     { method: "GET", path: "/congress/feed" },

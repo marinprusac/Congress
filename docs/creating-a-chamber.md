@@ -124,7 +124,7 @@ don't reimplement them:
 | `createManualRefs`/`createManualRefsByExhibitId` | CRUD for the "Connections" side-panel's manually-added refs, separate from wikilinks parsed out of body text. |
 | `extractOutgoingExhibitRefs(text)` | Parses `[[...]]` tokens out of body text into an exhibit-id list. |
 | `mountFeedRoute(app, getCandidates)`, `formatDuration`, `closeness`, `plainTextPreview` | `GET /api/feed` for Congress's home feed, plus helpers for phrasing a candidate's reason and flattening a body into its inline preview — see §5.1. |
-| `runCongressAi(capitolUrl, internalToken, { prompt, actor, meta })`, `fetchCongressAiSettings` | Run a prompt through Congress's own AI (queued, budget/pause-guarded, MCP access to every Chamber) and read its pause switch — what Deputy's directives use. Never spawn `claude` yourself. |
+| `runCongressAi(capitolUrl, internalToken, { prompt, actor, meta })`, `fetchCongressAiSettings` | Run a prompt through Congress's own AI (queued, budget/pause-guarded, MCP access to every Chamber) and read its pause switch. Rarely needed: Congress's AI already sees every published event and can track things on its own. Never spawn `claude` yourself. |
 | `mountManifestAndHealth`, `mountExhibitSearchRoutes`, `mountSettingsRoutes`, `mountManualRefsRoutes`, `mountStaticFrontend` | One-line Hono route mounting for each of the above. Mount `mountStaticFrontend` last — it's the SPA fallback; it also serves `frontend/public/*` directly (falling through from `frontend/dist`) so assets like your icon resolve even before `build:web` has run. |
 
 And `congress-ui`'s frontend surface:
@@ -277,8 +277,8 @@ about this" (a due date, an incoming webhook, anything else only your
 Chamber can detect) — or that something should happen elsewhere in
 response — don't invent your own alert UI, don't push a notification
 directly, and don't call another Chamber's API yourself. Publish a domain
-event instead, and let Congress's own log rules (Settings → Logs) and Deputy's directives
-decide whether/what to do about it. This keeps the "should this even fire, and what happens" decision
+event instead, and let Congress's own log rules (Settings → Logs) and its AI (which sees
+every event, and acts on items it was asked to watch) decide whether/what to do about it. This keeps the "should this even fire, and what happens" decision
 editable without a code change, and means your Chamber has no idea whether
 anything is listening at all.
 
@@ -320,7 +320,7 @@ events: [
 ```
 
 This is purely a declared catalog — it's what populates the trigger-event
-picker on Congress's Logs settings and Deputy's directive editor (read live off
+picker on Congress's Logs settings and the AI's watched events (read live off
 `GET /congress/registry`, never hardcoded to a specific chamber name), not a
 subscription or a requirement to actually fire that event. Defaulted to
 `[]`, so most Chambers never touch this field at all.
@@ -350,12 +350,11 @@ const { heartbeatNow } = createChamberBootstrap({
 ```
 
 `getSubscriptions` is read fresh on every heartbeat (not baked into the
-static manifest), so it can — and for Deputy, does —
-reflect owner-editable state: recompute it from whatever directives
-currently reference a trigger type, aggregating to one entry per type (see
-`chamber-deputy/src/subscriptions.ts` for the worked pattern). `type: "*"`
-subscribes to every event type regardless of what it's called — used by a
-Chamber whose own logic doesn't filter by type at all (Deputy Chamber).
+static manifest), so it can reflect owner-editable state: recompute it
+from whatever rules currently reference a trigger type, aggregating to one
+entry per type. `type: "*"` subscribes to every event type regardless of
+what it's called, for a Chamber whose own logic doesn't filter by type at
+all.
 Congress's own filter is only ever a coarse "could this possibly interest
 this Chamber" gate; do your own precise per-rule matching (condition
 fields, whatever else you need) inside `onEvent` after receiving, same as
@@ -373,7 +372,7 @@ it.
 ### 5.4 Being called through MCP
 
 Any MCP tool your Chamber registers via `registerTools` (§4) is automatically
-callable by Deputy (and any MCP client) — there's nothing to opt into
+callable by Congress's AI (and any MCP client) — there's nothing to opt into
 or declare separately, since callers just resolve your `mcpUrl` off the
 registry and call whatever `tools/list` returns. A clear `description`
 and per-property `description`s in your `inputSchema` are what the agent
