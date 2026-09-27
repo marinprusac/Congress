@@ -14,7 +14,8 @@ import {
   retryAiThread,
 } from "@/lib/aiApi";
 import { Composer } from "./Composer";
-import { MessageItem, useChatNavigation } from "./MessageItem";
+import { MessageItem } from "./MessageItem";
+import { useChatNavigation } from "./chatNav";
 import { LiveActivity } from "./RunActivity";
 import { ThreadActions } from "./ThreadActions";
 import { layoutMarkers } from "./chatFormat";

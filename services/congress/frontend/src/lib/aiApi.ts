@@ -5,6 +5,7 @@ import type {
   AiThreadMessagesPage,
   CreateAiThreadRequest,
   CreateAiThreadResponse,
+  OpenAsk,
   PostAiThreadMessageResponse,
   UpdateAiSettingsRequest,
   UpdateAiThreadRequest,
@@ -76,6 +77,34 @@ export async function cancelAiRun(runId: string): Promise<void> {
 
 export function fetchAiRun(runId: string): Promise<AiRunDetail> {
   return fetch(`${API_BASE}/runs/${runId}`).then((res) => jsonOrError(res));
+}
+
+export const aiAsksQueryKey = ["congress", "ai", "asks"] as const;
+
+export function fetchOpenAsks(): Promise<OpenAsk[]> {
+  return fetch(`${API_BASE}/asks`).then((res) => jsonOrError(res));
+}
+
+// A 400 carries per-field messages for the form.
+export class AskAnswerError extends Error {
+  constructor(
+    message: string,
+    readonly fieldErrors: Record<string, string>
+  ) {
+    super(message);
+  }
+}
+
+export async function answerAsk(messageId: number, values: Record<string, unknown>): Promise<void> {
+  const res = await fetch(`${API_BASE}/messages/${messageId}/answer`, sendJson("POST", { values }));
+  if (res.ok) return;
+  const body = (await res.json().catch(() => null)) as { message?: string; fieldErrors?: Record<string, string> } | null;
+  throw new AskAnswerError(body?.message ?? `Couldn't send the answer (${res.status})`, body?.fieldErrors ?? {});
+}
+
+export async function decideAsk(messageId: number, approve: boolean, note?: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/messages/${messageId}/decide`, sendJson("POST", { approve, note }));
+  if (!res.ok) await jsonOrError(res);
 }
 
 export function updateAiSettings(input: UpdateAiSettingsRequest): Promise<AiSettings> {

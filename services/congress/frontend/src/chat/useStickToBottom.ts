@@ -45,6 +45,13 @@ export function useStickToBottom(key: string, version: string) {
     setHasNew(false);
   }, [key]);
 
+  // Follow new content on commit too, not only via ResizeObserver (which
+  // lags a frame and doesn't run at all while rendering is throttled).
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (el && atBottomRef.current) el.scrollTop = el.scrollHeight;
+  }, [version]);
+
   const lastVersionRef = useRef<{ key: string; version: string } | null>(null);
   useEffect(() => {
     const prev = lastVersionRef.current;

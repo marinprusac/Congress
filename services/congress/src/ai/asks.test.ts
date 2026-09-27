@@ -27,7 +27,7 @@ import {
   sendMessage,
   withdrawAsk,
 } from "./asks.js";
-import { getMessage, getThreadRow, insertThread, listThreadMessages } from "./threads.js";
+import { getMessage, getThreadRow, insertMessage, insertThread, listThreadMessages } from "./threads.js";
 
 function outcome(): RunOutcome {
   return {
@@ -146,9 +146,14 @@ describe("delivery and pushes", () => {
     expect(listThreadMessages(thread.id).messages).toHaveLength(0);
     expect(notificationRows()).toHaveLength(0);
 
+    insertMessage({ threadId: thread.id, role: "user", text: "meanwhile" });
     await runAskTimerTick(new Date(at.getTime() + 1000));
-    expect(notificationRows().map((r) => r.dedupe_key)).toEqual([`ask-${message.id}`]);
-    expect(db.get<{ d: number | null }>(sql`select delivered_at as d from ai_messages where id = ${message.id}`)?.d).not.toBeNull();
+    // Delivered at the end of the thread, after what was said in between.
+    const rows = listThreadMessages(thread.id).messages;
+    expect(rows.map((m) => m.text)).toEqual(["meanwhile", "Call mum"]);
+    const delivered = rows.at(-1)!;
+    expect(delivered.id).not.toBe(message.id);
+    expect(notificationRows().map((r) => r.dedupe_key)).toEqual([`ask-${delivered.id}`]);
   });
 
   it("cancels an undelivered reminder but won't unsend a delivered message", async () => {

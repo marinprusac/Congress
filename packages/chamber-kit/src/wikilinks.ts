@@ -8,7 +8,8 @@ export const WIKILINK_PATTERN = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 export function extractOutgoingExhibitRefs(text: string): string[] {
   const ids = new Set<string>();
   for (const match of text.matchAll(WIKILINK_PATTERN)) {
-    const target = match[1]?.trim();
+    // A pipe escaped for a Markdown table cell leaves "\\" on the target.
+    const target = match[1]?.trim().replace(/\\$/, "");
     if (!target) continue;
     const parsed = parseExhibitToken(target);
     if (parsed) ids.add(parsed.id);
@@ -23,7 +24,8 @@ export function extractOutgoingExhibitRefs(text: string): string[] {
 export function extractExhibitTokensWithLabels(text: string): Array<ExhibitToken & { token: string; label: string }> {
   const seen = new Map<string, ExhibitToken & { token: string; label: string }>();
   for (const match of text.matchAll(WIKILINK_PATTERN)) {
-    const target = match[1]?.trim();
+    // A pipe escaped for a Markdown table cell leaves "\\" on the target.
+    const target = match[1]?.trim().replace(/\\$/, "");
     if (!target) continue;
     const parsed = parseExhibitToken(target);
     if (!parsed) continue;

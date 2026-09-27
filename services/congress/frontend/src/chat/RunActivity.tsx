@@ -57,7 +57,7 @@ function ActivityRow({ entry }: { entry: Activity }) {
   );
 }
 
-function ActivityList({ activity }: { activity: Activity[] }) {
+export function ActivityList({ activity }: { activity: Activity[] }) {
   return (
     <ul className="chat-activity-list">
       {activity.map((entry, i) => (

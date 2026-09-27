@@ -16,8 +16,15 @@ You can also reach the owner on your own with Congress's tools: send_message (in
 // Every run - chat or a Chamber's remote run - gets the same frame: the base
 // identity, the current time, and the owner's own context prompt. The
 // caller's part (a chat message, a Chamber's prompt) comes last.
-export function buildPrompt(settings: Pick<AiSettings, "contextPrompt">, body: string, now = new Date()): string {
-  const parts = [`${BASE_IDENTITY_PROMPT}\n\nCurrent server time: ${now.toISOString()}`];
+// The owner's own clock, so times the AI states (and schedules) are local.
+export function localTimeLine(now: Date, timeZone: string | null): string {
+  const zone = timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const local = new Intl.DateTimeFormat("en-GB", { timeZone: zone, dateStyle: "full", timeStyle: "short" }).format(now);
+  return `Current time: ${local} (${zone}); ${now.toISOString()} UTC. Say times in the owner's zone; give tools ISO times with that zone's offset.`;
+}
+
+export function buildPrompt(settings: Pick<AiSettings, "contextPrompt"> & { timeZone?: string | null }, body: string, now = new Date()): string {
+  const parts = [`${BASE_IDENTITY_PROMPT}\n\n${localTimeLine(now, settings.timeZone ?? null)}`];
   if (settings.contextPrompt.trim()) parts.push(`## Context\n${settings.contextPrompt.trim()}`);
   parts.push(body);
   return parts.join("\n\n");

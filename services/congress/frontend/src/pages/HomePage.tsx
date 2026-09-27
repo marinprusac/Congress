@@ -15,6 +15,7 @@ import {
   useCapitolSettings,
 } from "@congress/congress-ui";
 import { ViewSlot, viewHref } from "@/components/ViewSlot";
+import { HomeAsks } from "@/components/HomeAsks";
 import { feedQueryKey, fetchFeed } from "@/lib/feedApi";
 import { formatPreviewTime } from "@/lib/formatPreviewTime";
 import { aiThreadQueryKey, aiThreadsQueryKey, createAiThread } from "@/lib/aiApi";
@@ -146,6 +147,7 @@ export function HomePage() {
       <ChamberHeader icon={<CapitolMark className="h-6 w-6 text-ink" />} title="Congress" titleHref="" />
       <main className="chamber-main home-main">
         <Composer />
+        <HomeAsks />
         <PinnedViews registry={registry} />
         {feed.isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}
         {feed.isError && <p className="font-mono text-sm text-alert">Couldn't load the feed.</p>}

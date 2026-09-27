@@ -17,8 +17,9 @@ import {
   updateThreadRow,
 } from "./threads.js";
 import { publishEvent } from "../events.js";
-import { resolveExhibits } from "../exhibits.js";
-import { extractExhibitTokensWithLabels } from "@congress/chamber-kit";
+import { getCachedChamber, resolveExhibits } from "../exhibits.js";
+import { extractExhibitTokensWithLabels, WIKILINK_PATTERN } from "@congress/chamber-kit";
+import { buildExhibitToken, parseExhibitToken } from "@congress/shared-types";
 
 export class ThreadNotFoundError extends Error {}
 export class ThreadBusyError extends Error {}
@@ -33,6 +34,27 @@ export async function resolveReferencedExhibits(text: string): Promise<Reference
     const r = results?.[i];
     if (r && "name" in r) return { token: t.token, label: t.label, name: r.name, url: r.url, state: "ok" as const };
     return { token: t.token, label: t.label, name: null, url: null, state: r && "deleted" in r ? ("deleted" as const) : ("unavailable" as const) };
+  });
+}
+
+// A token the AI made up (never known to Congress, and its Chamber says it
+// doesn't exist) becomes its plain label rather than a "deleted" chip.
+export async function repairInventedTokens(text: string): Promise<string> {
+  const tokens = extractExhibitTokensWithLabels(text).slice(0, 40);
+  if (tokens.length === 0) return text;
+  const results = await resolveExhibits(tokens.map((t) => ({ id: t.id, chamber: t.chamber }))).catch(() => null);
+  if (!results) return text;
+  const invented = new Set(
+    tokens.filter((t, i) => {
+      const r = results[i];
+      return r !== undefined && "deleted" in r && getCachedChamber(t.id) === null;
+    }).map((t) => t.token)
+  );
+  if (invented.size === 0) return text;
+  return text.replace(WIKILINK_PATTERN, (full, rawTarget: string, rawAlias?: string) => {
+    const parsed = parseExhibitToken(rawTarget.trim().replace(/\\$/, ""));
+    if (!parsed || !invented.has(buildExhibitToken(parsed))) return full;
+    return rawAlias?.trim() || parsed.id;
   });
 }
 
@@ -143,7 +165,7 @@ async function executeThreadRun(threadId: number, current: { runId: string }, in
   const status = result.refused ? "refused" : result.cancelled ? "cancelled" : result.ok ? "ok" : "error";
   const text =
     status === "ok"
-      ? (result.response?.trim() || "(no response)")
+      ? await repairInventedTokens(result.response?.trim() || "(no response)")
       : status === "cancelled"
         ? "Stopped."
         : (result.errorMessage ?? "The assistant failed to respond.");

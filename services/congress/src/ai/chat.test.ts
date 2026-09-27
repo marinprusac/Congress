@@ -8,10 +8,14 @@ vi.mock("./engine.js", () => ({ runAi: (ctx: RunContext) => runAi(ctx) }));
 const publishEvent = vi.fn();
 vi.mock("../events.js", () => ({ publishEvent: (...a: unknown[]) => publishEvent(...a) }));
 const resolveExhibits = vi.fn();
-vi.mock("../exhibits.js", () => ({ resolveExhibits: (...a: unknown[]) => resolveExhibits(...a) }));
+const getCachedChamber = vi.fn((_id: string): string | null => null);
+vi.mock("../exhibits.js", () => ({
+  resolveExhibits: (...a: unknown[]) => resolveExhibits(...a),
+  getCachedChamber: (id: string) => getCachedChamber(id),
+}));
 
 import { db, runMigrations } from "../db/client.js";
-import { createThread, postMessage, recoverInterruptedThreads, retryLast, ThreadBusyError } from "./chat.js";
+import { createThread, postMessage, recoverInterruptedThreads, repairInventedTokens, retryLast, ThreadBusyError } from "./chat.js";
 import { cancelJob } from "./jobQueue.js";
 import { getThread, getThreadRow, insertMessage, insertThread, listThreadMessages, plainSnippet, titleFromText, updateThreadRow } from "./threads.js";
 
@@ -195,6 +199,19 @@ describe("threaded chat", () => {
 
     expect(getThreadRow(row.id)?.pendingRunId).toBeNull();
     expect(listThreadMessages(row.id).messages.at(-1)).toMatchObject({ status: "error" });
+  });
+});
+
+describe("repairInventedTokens", () => {
+  it("turns tokens nobody knows into plain labels, keeping real and deleted ones", async () => {
+    resolveExhibits.mockResolvedValue([
+      { id: "note-1", chamber: "notes", name: "Real", url: "/n/1" },
+      { id: "Gym plan", chamber: "notes", deleted: true },
+      { id: "note-9", chamber: "notes", deleted: true },
+    ]);
+    getCachedChamber.mockImplementation((id) => (id === "note-9" ? "notes" : null));
+    const text = "[[exhibit:notes:note-1|Real]], [[exhibit:notes:Gym plan|Gym plan]] and | [[exhibit:notes:note-9\\|Old]] |";
+    expect(await repairInventedTokens(text)).toBe("[[exhibit:notes:note-1|Real]], Gym plan and | [[exhibit:notes:note-9\\|Old]] |");
   });
 });
 

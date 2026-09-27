@@ -22,7 +22,15 @@ import { runAi } from "./engine.js";
 import { broadcast, onStreamEvent, replayEvents } from "./runStream.js";
 import { deleteThreadRow, getThread, getThreadRow, listThreadMessages, listThreads, markThreadRead, updateThreadRow } from "./threads.js";
 import { getRunDetail, listRecentRuns } from "./runs.js";
-import { AskClosedError, AskInvalidError, AskNotFoundError, answerQuestion, decideProposal, listOpenAsks } from "./asks.js";
+import {
+  AskClosedError,
+  AskInvalidError,
+  AskNotFoundError,
+  answerQuestion,
+  clearReadMessageNotifications,
+  decideProposal,
+  listOpenAsks,
+} from "./asks.js";
 import { randomUUID } from "node:crypto";
 
 // Mounted at /congress/ai (server.ts), ahead of the /api/:chamber/*
@@ -93,6 +101,7 @@ aiRoutes.post("/threads/:id/read", requireSession, (c) => {
   const id = threadId(c.req.param("id"));
   if (!id || !getThreadRow(id)) return c.json({ error: "not_found" }, 404);
   markThreadRead(id);
+  clearReadMessageNotifications(id);
   return c.body(null, 204);
 });
 

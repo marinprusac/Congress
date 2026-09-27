@@ -45,6 +45,15 @@ describe("extractOutgoingExhibitRefs", () => {
 // Feeds chamber-calendar's richTextMirror.projectRichToPlain, which needs
 // both the token (to resolve a live label) and the embedded alias (the
 // fallback when resolution fails) for every reference in a rich value.
+describe("escaped pipes in Markdown tables", () => {
+  it("reads [[exhibit:x:y\\|Label]] as the clean token", () => {
+    expect(extractExhibitTokensWithLabels("| [[exhibit:notes:note-3\\|Standup]] |")).toEqual([
+      { chamber: "notes", id: "note-3", token: "exhibit:notes:note-3", label: "Standup" },
+    ]);
+    expect(extractOutgoingExhibitRefs("| [[exhibit:notes:note-3\\|Standup]] |")).toEqual(["note-3"]);
+  });
+});
+
 describe("extractExhibitTokensWithLabels", () => {
   it("returns the full token, chamber, id, and alias", () => {
     expect(extractExhibitTokensWithLabels("see [[exhibit:map:place-4|Grandma's House]]")).toEqual([

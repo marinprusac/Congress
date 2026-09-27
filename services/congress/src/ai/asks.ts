@@ -217,7 +217,7 @@ function formatValue(field: AskField, value: unknown): string {
 }
 
 export function answerSummary(fields: AskField[], answers: AskAnswers): string {
-  return fields.map((f) => `**${f.label}:** ${formatValue(f, answers[f.key])}`).join("\n");
+  return fields.map((f) => `- **${f.label}:** ${formatValue(f, answers[f.key])}`).join("\n");
 }
 
 export function answerQuestion(messageId: number, values: Record<string, unknown>): { message: AiMessage; runId: string } {
@@ -281,14 +281,15 @@ async function executeProposal(messageId: number, payload: AskProposalPayload, t
   notifyThreadUpdated(threadId);
   const lines = payload.actions.map((a, i) => {
     const r = results[i];
-    return `${i + 1}. ${a.summary} (${a.server}.${a.tool}) - ${r?.ok ? "done" : `failed: ${r?.error ?? "unknown"}`}`;
+    const outcome = r?.ok ? `done, returned: ${JSON.stringify(r.output).slice(0, 600)}` : `failed: ${r?.error ?? "unknown"}`;
+    return `${i + 1}. ${a.summary} (${a.server}.${a.tool}) - ${outcome}`;
   });
   startThreadRun(threadId, {
     kind: "answer",
     trigger: "decision",
     summaryText: `Approved: ${payload.title}`,
     buildBody: async () =>
-      `## The owner approved your proposal "${payload.title}"\nCongress executed the calls exactly as proposed:\n${lines.join("\n")}\n\n${failed ? "Something failed - explain briefly and suggest a fix (a new proposal if it needs approval again)." : "Confirm briefly what changed."}`,
+      `## The owner approved your proposal "${payload.title}"\nCongress executed the calls exactly as proposed:\n${lines.join("\n")}\n\n${failed ? "Something failed - explain briefly and suggest a fix (a new proposal if it needs approval again)." : "Confirm briefly what changed. To mention something that was created, get its chip with get_exhibit_chip (the chamber plus the id in the result) - never write a token yourself."}`,
   });
 }
 
@@ -379,13 +380,26 @@ function nextWakeMs(): number | null {
   return times.length ? Math.min(...times) : null;
 }
 
+// A reminder belongs where it arrives, not where it was written: re-add it
+// at the end of its thread (threads are ordered by id).
+function moveToEnd(messageId: number, now: Date): number {
+  return db.transaction((tx) => {
+    const row = tx.select().from(aiMessages).where(eq(aiMessages.id, messageId)).get();
+    if (!row) return messageId;
+    const { id: _id, ...rest } = row;
+    const fresh = tx.insert(aiMessages).values({ ...rest, deliverAt: null, createdAt: now }).returning({ id: aiMessages.id }).get();
+    tx.delete(aiMessages).where(eq(aiMessages.id, messageId)).run();
+    return fresh.id;
+  });
+}
+
 export async function runAskTimerTick(now = new Date()): Promise<void> {
   const dueDeliveries = db
     .select({ id: aiMessages.id })
     .from(aiMessages)
     .where(and(isNull(aiMessages.deliveredAt), isNotNull(aiMessages.deliverAt), lte(aiMessages.deliverAt, now)))
     .all();
-  for (const { id } of dueDeliveries) await deliver(id, now);
+  for (const { id } of dueDeliveries) await deliver(moveToEnd(id, now), now);
   const expired = db
     .select({ id: aiMessages.id, threadId: aiMessages.threadId })
     .from(aiMessages)
@@ -420,6 +434,17 @@ export function startAskTimer(): void {
 export function stopAskTimer(): void {
   running = false;
   if (timer) clearTimeout(timer);
+}
+
+// Reading a thread clears its messages' inbox entries; open questions and
+// proposals keep theirs until they're answered.
+export function clearReadMessageNotifications(threadId: number): void {
+  const rows = db
+    .select({ id: aiMessages.id })
+    .from(aiMessages)
+    .where(and(eq(aiMessages.threadId, threadId), eq(aiMessages.kind, "message"), isNotNull(aiMessages.deliveredAt)))
+    .all();
+  for (const { id } of rows) dismissNotificationByKey("congress", dedupeKey(id));
 }
 
 // The AI's own view: what it is still waiting on, pending reminders, and

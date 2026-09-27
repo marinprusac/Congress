@@ -1,18 +1,13 @@
 import { memo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import type { AiMessage } from "@congress/shared-types";
-import { ChatMarkdown, resolveChamberPath, showToast } from "@congress/congress-ui";
+import { ChatMarkdown, showToast } from "@congress/congress-ui";
 import { StoredActivity } from "./RunActivity";
+import { AskCard } from "./AskCards";
+import { useChatNavigation } from "./chatNav";
 import { timeLabel } from "./chatFormat";
 
-export function useChatNavigation() {
-  const navigate = useNavigate();
-  return {
-    onNavigatePath: (path: string) => navigate(path),
-    // In-shell navigation, same as the Home feed's exhibit cards.
-    onNavigateExhibit: (result: { chamber: string; url: string }) => navigate(resolveChamberPath(result.url, result.chamber, true)),
-  };
-}
+export { useChatNavigation };
 
 function copy(text: string) {
   void navigator.clipboard
@@ -43,10 +38,15 @@ function Stamp({ message, show }: { message: AiMessage; show: boolean }) {
 export const MessageItem = memo(function MessageItem({ message, stamp, onRetry, retrying }: MessageItemProps) {
   const nav = useChatNavigation();
 
+  if (message.kind === "message" || message.kind === "question" || message.kind === "proposal") {
+    return <AskCard message={message} />;
+  }
+
   if (message.role === "user") {
     return (
       <div className="chat-msg chat-msg--user">
         <Stamp message={message} show={stamp} />
+        {message.kind === "answer" || message.kind === "decision" ? <span className="chat-user-label">{message.kind === "answer" ? "Your answer" : "Your decision"}</span> : null}
         <div className="chat-user-bubble" onDoubleClick={() => copy(message.text)}>
           <ChatMarkdown text={message.text} {...nav} />
         </div>

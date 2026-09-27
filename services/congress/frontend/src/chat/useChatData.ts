@@ -1,7 +1,8 @@
 import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import type { AiMessage, AiThreadMessagesPage } from "@congress/shared-types";
 import { useAiStream, useAiStreamEvents, type AiLiveRun } from "@congress/congress-ui";
-import { aiThreadMessagesQueryKey, aiThreadQueryKey, aiThreadsQueryKey, fetchAiThread, fetchAiThreadMessages, fetchAiThreads } from "@/lib/aiApi";
+import { notificationsQueryKey } from "@/lib/notifications";
+import { aiAsksQueryKey, aiThreadMessagesQueryKey, aiThreadQueryKey, aiThreadsQueryKey, fetchAiThread, fetchAiThreadMessages, fetchAiThreads } from "@/lib/aiApi";
 
 export type MessagesData = InfiniteData<AiThreadMessagesPage, number | undefined>;
 
@@ -37,6 +38,9 @@ export function useChatInvalidation(): void {
     if (threadId === null || threadId === undefined) return;
     void queryClient.invalidateQueries({ queryKey: aiThreadsQueryKey });
     void queryClient.invalidateQueries({ queryKey: aiThreadQueryKey(threadId) });
+    void queryClient.invalidateQueries({ queryKey: aiAsksQueryKey });
+    // Asks add and clear inbox entries too.
+    void queryClient.invalidateQueries({ queryKey: notificationsQueryKey });
   });
 }
 
