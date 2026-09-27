@@ -388,6 +388,23 @@ describe("runAi run records", () => {
     expect(replayEvents().at(-1)).toMatchObject({ type: "run_finished", status: "refused", threadId: 4 });
   });
 
+  it("refuses runs Congress starts itself once their own budget is spent, but not chat", async () => {
+    await updateAiSettings({ proactiveBudgetUsd: 0.5 });
+    db.run(sql`insert into ai_runs (id, kind, actor, status, started_at, cost_usd, tool_call_count) values ('old', 'tracking', 'congress', 'ok', ${Date.now()}, 0.6, 0)`);
+
+    const tracking = await runAi({ kind: "tracking", body: "check", actor: "congress" });
+    expect(tracking).toMatchObject({ refused: true, errorMessage: "Today's budget for proactive AI is used up." });
+    expect(spawnMock).not.toHaveBeenCalled();
+
+    queueFakeChild({ lines: [okResult()], exitCode: 0 });
+    expect((await runAi({ kind: "chat", body: "hi", actor: "congress" })).refused).toBe(false);
+  });
+
+  it("refuses proactive runs when proactive AI is turned off", async () => {
+    await updateAiSettings({ proactiveEnabled: false });
+    expect((await runAi({ kind: "proactive", body: "x", actor: "congress" })).errorMessage).toBe("Proactive AI is turned off.");
+  });
+
   it("uses a per-run model override", async () => {
     queueFakeChild({ lines: [okResult()], exitCode: 0 });
 

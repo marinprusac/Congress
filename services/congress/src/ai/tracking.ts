@@ -5,6 +5,7 @@ import { enqueue, JobCancelledError, PRIORITY } from "./jobQueue.js";
 import { runAi } from "./engine.js";
 import { getAiSettings } from "./settings.js";
 import { threadForRun } from "./asks.js";
+import { publishProactiveRun } from "./proactive.js";
 import { describeRecurrence, nextOccurrenceAfter } from "./recurrence.js";
 import { checkingItems, dueTracking, getTracking, nextTrackingCheckMs, onTrackingChange, serverTimeZone, setTrackingSchedule } from "./memory.js";
 
@@ -66,6 +67,7 @@ export async function startTrackingCheck(itemId: number, trigger: CheckTrigger, 
     { entry: { runId, kind: "tracking", threadId: item.threadId, meta: { trackingId: itemId } }, priority: PRIORITY.tracking }
   )
     .then((result) => {
+      publishProactiveRun("tracking", trigger, result);
       // Try again later rather than silently skipping a scheduled check.
       if (result.refused && trigger === "schedule") setTrackingSchedule(itemId, { nextCheckAt: new Date(Date.now() + REFUSED_RETRY_MS) });
       const opened = threadForRun(runId);

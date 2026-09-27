@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import type { AiActivityEntry, AiMessageRun, AiRunDetail, AiRunStatus } from "@congress/shared-types";
 import { db } from "../db/client.js";
 import { aiRuns } from "../db/schema.js";
@@ -47,6 +47,22 @@ export function finishRunRow(
     })
     .where(eq(aiRuns.id, id))
     .run();
+}
+
+export function setRunVerdict(id: string, verdict: unknown): void {
+  db.update(aiRuns).set({ verdictJson: JSON.stringify(verdict) }).where(eq(aiRuns.id, id)).run();
+}
+
+// Runs Congress starts on its own, with their own daily budget.
+export const AUTONOMOUS_KINDS = ["proactive", "tracking", "gate"] as const;
+
+export function spendSince(kinds: readonly string[], since: Date): number {
+  const row = db
+    .select({ total: sql<number>`coalesce(sum(${aiRuns.costUsd}), 0)` })
+    .from(aiRuns)
+    .where(and(inArray(aiRuns.kind, [...kinds]), gte(aiRuns.startedAt, since)))
+    .get();
+  return row?.total ?? 0;
 }
 
 // Anything still "running" at boot was cut off by a restart.

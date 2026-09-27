@@ -169,6 +169,12 @@ export const aiSettingsSchema = z.object({
   quietHoursStart: z.number().int().min(0).max(23).nullable(),
   quietHoursEnd: z.number().int().min(0).max(23).nullable(),
   timeZone: z.string().max(64).nullable(),
+  // Proactive AI: runs it starts on its own (checks, the gate, proactive runs).
+  proactiveEnabled: z.boolean(),
+  proactiveBudgetUsd: z.number().min(0),
+  gateModel: z.string().min(1),
+  gateSensitivity: z.enum(["low", "normal", "high"]),
+  heartbeatHours: z.number().min(0.5).max(48),
 });
 export type AiSettings = z.infer<typeof aiSettingsSchema>;
 

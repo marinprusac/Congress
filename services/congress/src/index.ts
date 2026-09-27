@@ -11,6 +11,7 @@ import { recoverInterruptedThreads } from "./ai/chat.js";
 import { startAskTimer, stopAskTimer } from "./ai/asks.js";
 import { startTrackingScheduler, stopTrackingScheduler } from "./ai/tracking.js";
 import { listTracking } from "./ai/memory.js";
+import { startProactive, stopProactive } from "./ai/proactive.js";
 
 runMigrations();
 importLegacyChamberData();
@@ -27,6 +28,7 @@ startHistoryPruneSweep();
 startAiRetentionSweep();
 startAskTimer();
 startTrackingScheduler(() => listTracking(["active"]));
+startProactive();
 
 function shutdown() {
   console.log("Shutting down Congress...");
@@ -36,6 +38,7 @@ function shutdown() {
   stopAiRetentionSweep();
   stopAskTimer();
   stopTrackingScheduler();
+  stopProactive();
   server.close(() => {
     closeDb();
     process.exit(0);

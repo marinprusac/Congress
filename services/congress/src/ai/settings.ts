@@ -14,6 +14,11 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
   quietHoursStart: 22,
   quietHoursEnd: 7,
   timeZone: null,
+  proactiveEnabled: true,
+  proactiveBudgetUsd: 2,
+  gateModel: "claude-haiku-4-5-20251001",
+  gateSensitivity: "normal",
+  heartbeatHours: 4,
 };
 
 export const { getSettings: getAiSettings, updateSettings: updateAiSettings } = createSingleRowSettings<
@@ -33,6 +38,11 @@ export const { getSettings: getAiSettings, updateSettings: updateAiSettings } = 
     quietHoursStart: row.quietHoursStart,
     quietHoursEnd: row.quietHoursEnd,
     timeZone: row.timeZone,
+    proactiveEnabled: row.proactiveEnabled,
+    proactiveBudgetUsd: row.proactiveBudgetUsd,
+    gateModel: row.gateModel,
+    gateSensitivity: row.gateSensitivity,
+    heartbeatHours: row.heartbeatHours,
   }),
   defaults: DEFAULT_AI_SETTINGS,
 });

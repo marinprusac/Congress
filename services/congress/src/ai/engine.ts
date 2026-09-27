@@ -9,7 +9,8 @@ import { writeMcpConfigFile } from "./mcpConfig.js";
 import { buildPrompt } from "./prompt.js";
 import { memoryPromptSection } from "./memory.js";
 import { startRun, emitProgress, finishRun } from "./runStream.js";
-import { finishRunRow, insertRunRow } from "./runs.js";
+import { AUTONOMOUS_KINDS, finishRunRow, insertRunRow, spendSince } from "./runs.js";
+import { startOfLocalDay } from "./pushPolicy.js";
 
 // What spawnClaude reports as a run progresses; runAi tags each with a runId.
 export type SpawnProgressEvent =
@@ -294,6 +295,12 @@ export async function runAi(ctx: RunContext): Promise<RunOutcome> {
   };
 
   if (settings.paused) return refuse(`AI is paused${settings.pausedReason ? `: ${settings.pausedReason}` : "."}`);
+  if ((AUTONOMOUS_KINDS as readonly string[]).includes(ctx.kind)) {
+    if (!settings.proactiveEnabled) return refuse("Proactive AI is turned off.");
+    if (spendSince(AUTONOMOUS_KINDS, startOfLocalDay(new Date(), settings.timeZone)) >= settings.proactiveBudgetUsd) {
+      return refuse("Today's budget for proactive AI is used up.");
+    }
+  }
   if (todaySpendUsd() >= settings.budgetCapUsd) {
     await pauseForBudget(settings.budgetCapUsd);
     return refuse("Daily budget cap reached; AI has been paused.");

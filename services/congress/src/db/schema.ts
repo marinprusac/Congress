@@ -233,6 +233,11 @@ export const aiSettings = sqliteTable("ai_settings", {
   quietHoursEnd: integer("quiet_hours_end").default(7),
   // IANA zone for quiet hours and the daily push count; null = server zone.
   timeZone: text("time_zone"),
+  proactiveEnabled: integer("proactive_enabled", { mode: "boolean" }).notNull().default(true),
+  proactiveBudgetUsd: real("proactive_budget_usd").notNull().default(2),
+  gateModel: text("gate_model").notNull().default("claude-haiku-4-5-20251001"),
+  gateSensitivity: text("gate_sensitivity", { enum: ["low", "normal", "high"] }).notNull().default("normal"),
+  heartbeatHours: real("heartbeat_hours").notNull().default(4),
 });
 
 // One conversation. sessionId is the `claude` CLI session every run in it
@@ -334,6 +339,20 @@ export const aiTracking = sqliteTable(
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [index("ai_tracking_next_check_at_idx").on(table.nextCheckAt)]
+);
+
+// Recent events for the gate's digest (what happened since it last looked).
+export const aiEventBuffer = sqliteTable(
+  "ai_event_buffer",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    chamber: text("chamber").notNull(),
+    type: text("type").notNull(),
+    payloadJson: text("payload_json"),
+    actor: text("actor"),
+    occurredAt: integer("occurred_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("ai_event_buffer_occurred_at_idx").on(table.occurredAt)]
 );
 
 // Plain facts about the owner, carried into every run's prompt.
