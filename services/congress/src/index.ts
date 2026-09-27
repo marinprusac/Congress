@@ -7,10 +7,12 @@ import { startEventCatalogSync, stopEventCatalogSync } from "./eventCatalogSync.
 import { startHistoryPruneSweep, stopHistoryPruneSweep } from "./eventHistory.js";
 import { importLegacyDeputySettings } from "./ai/legacyImport.js";
 import { startAiRetentionSweep, stopAiRetentionSweep } from "./ai/retention.js";
+import { recoverInterruptedThreads } from "./ai/chat.js";
 
 runMigrations();
 importLegacyChamberData();
 importLegacyDeputySettings();
+recoverInterruptedThreads();
 
 const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (info) => {
   console.log(`Congress listening on http://${info.address}:${info.port}`);

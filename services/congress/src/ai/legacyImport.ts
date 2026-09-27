@@ -41,7 +41,6 @@ export function importLegacyDeputySettings(opts: { db?: AppDb; deputyDbPath?: st
       .values({
         id: 1,
         contextPrompt: row.context_prompt,
-        chatIdleWindowMs: row.chat_idle_window_ms,
         budgetCapUsd: row.budget_cap_usd,
         model: row.model,
         retentionDays: row.retention_days,

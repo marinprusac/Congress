@@ -1,82 +1,44 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AiRunProgressEvent } from "@congress/shared-types";
-import { startRun, emitProgress, finishRun, getSnapshot, onProgress } from "./runStream.js";
+import { describe, expect, it } from "vitest";
+import type { AiStreamEvent } from "@congress/shared-types";
+import { emitProgress, finishRun, onStreamEvent, replayEvents, startRun } from "./runStream.js";
 
-// runStream.ts holds module-level state (currentRun) - reset it between
-// tests the only way it's exposed to change: starting a fresh run.
-beforeEach(() => {
-  startRun("chat", {});
-});
+describe("runStream", () => {
+  it("replays a run's events without deltas, plus the current live text", () => {
+    startRun("r1", "chat", { threadId: 1 }, 1);
+    emitProgress({ type: "assistant_delta", runId: "r1", text: "Hel" });
+    emitProgress({ type: "assistant_delta", runId: "r1", text: "lo" });
 
-describe("startRun/getSnapshot", () => {
-  it("has no run before startRun is ever called", () => {
-    // Nothing to assert against a truly pristine module (the beforeEach
-    // above already started one) - covered instead by asserting a fresh
-    // run's own snapshot starts with just its own run_started event.
-    const snapshot = getSnapshot();
-    expect(snapshot?.events).toEqual([{ type: "run_started", runId: snapshot!.runId, kind: "chat", meta: {}, startedAt: snapshot!.startedAt }]);
+    const replay = replayEvents();
+
+    expect(replay.map((e) => e.type)).toEqual(["run_started", "assistant_text"]);
+    expect(replay.at(-1)).toEqual({ type: "assistant_text", runId: "r1", text: "Hello" });
   });
 
-  it("tags a new run with a fresh runId, kind, and caller meta", () => {
-    const runId = startRun("remote", { directiveId: 7 });
-    const snapshot = getSnapshot();
-    expect(snapshot?.runId).toBe(runId);
-    expect(snapshot?.kind).toBe("remote");
-    expect(snapshot?.meta).toEqual({ directiveId: 7 });
-  });
-});
+  it("commits text written before a tool call as a note", () => {
+    startRun("r2", "chat", {}, 2);
+    const seen: AiStreamEvent[] = [];
+    const off = onStreamEvent((e) => seen.push(e));
+    emitProgress({ type: "assistant_text", runId: "r2", text: "Checking." });
+    emitProgress({ type: "tool_start", runId: "r2", toolUseId: "t", toolName: "x", input: {} });
+    off();
 
-describe("emitProgress/finishRun", () => {
-  it("appends events for the current run to its own replayable snapshot, in order", () => {
-    const runId = startRun("remote", { directiveId: 3 });
-    emitProgress({ type: "tool_start", runId, toolName: "notes.search_notes", input: {} });
-    emitProgress({ type: "tool_result", runId, toolName: "notes.search_notes", output: [], error: null });
-    finishRun({ type: "run_finished", runId, ok: true, response: "Done.", errorMessage: null });
-
-    const snapshot = getSnapshot();
-    expect(snapshot?.events.map((e) => e.type)).toEqual(["run_started", "tool_start", "tool_result", "run_finished"]);
+    expect(seen.map((e) => e.type)).toEqual(["assistant_text", "assistant_note", "tool_start"]);
+    expect(replayEvents().map((e) => e.type)).toEqual(["run_started", "assistant_note", "tool_start"]);
   });
 
-  it("ignores an event tagged with a stale runId from a since-superseded run", () => {
-    const staleRunId = startRun("chat", {});
-    const freshRunId = startRun("chat", {});
-    emitProgress({ type: "assistant_text", runId: staleRunId, text: "late arrival" });
+  it("stops appending live text once the run finishes", () => {
+    startRun("r3", "chat", {}, null);
+    emitProgress({ type: "assistant_delta", runId: "r3", text: "Done" });
+    finishRun({ type: "run_finished", runId: "r3", threadId: null, status: "ok", ok: true, response: "Done", errorMessage: null });
 
-    const snapshot = getSnapshot();
-    expect(snapshot?.runId).toBe(freshRunId);
-    expect(snapshot?.events.some((e) => e.type === "assistant_text")).toBe(false);
+    expect(replayEvents().at(-1)?.type).toBe("run_finished");
   });
 
-  it("leaves the finished run's own terminal state in place until the next run starts", () => {
-    const runId = startRun("chat", {});
-    finishRun({ type: "run_finished", runId, ok: true, response: "Done.", errorMessage: null });
+  it("ignores progress from a run that is no longer current", () => {
+    startRun("old", "chat", {}, null);
+    startRun("new", "chat", {}, null);
+    emitProgress({ type: "tool_start", runId: "old", toolUseId: "t", toolName: "x", input: {} });
 
-    const snapshot = getSnapshot();
-    expect(snapshot?.runId).toBe(runId);
-    expect(snapshot?.events.at(-1)).toEqual({ type: "run_finished", runId, ok: true, response: "Done.", errorMessage: null });
-  });
-});
-
-describe("onProgress", () => {
-  it("delivers live events to a subscriber as they're emitted", () => {
-    const received: AiRunProgressEvent[] = [];
-    const unsubscribe = onProgress((event) => received.push(event));
-
-    const runId = startRun("remote", { directiveId: 1 });
-    emitProgress({ type: "tool_start", runId, toolName: "tasks.create_task", input: {} });
-    finishRun({ type: "run_finished", runId, ok: true, response: null, errorMessage: null });
-
-    expect(received.map((e) => e.type)).toEqual(["run_started", "tool_start", "run_finished"]);
-    unsubscribe();
-  });
-
-  it("stops delivering events once unsubscribed", () => {
-    const listener = vi.fn();
-    const unsubscribe = onProgress(listener);
-    unsubscribe();
-
-    startRun("chat", {});
-
-    expect(listener).not.toHaveBeenCalled();
+    expect(replayEvents().map((e) => e.runId)).toEqual(["new"]);
   });
 });

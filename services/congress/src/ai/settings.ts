@@ -5,7 +5,6 @@ import { aiSettings } from "../db/schema.js";
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
   contextPrompt: "",
-  chatIdleWindowMs: 30 * 60 * 1000,
   budgetCapUsd: 10,
   model: "claude-sonnet-5",
   retentionDays: 30,
@@ -21,7 +20,6 @@ export const { getSettings: getAiSettings, updateSettings: updateAiSettings } = 
   table: aiSettings,
   toSettings: (row) => ({
     contextPrompt: row.contextPrompt,
-    chatIdleWindowMs: row.chatIdleWindowMs,
     budgetCapUsd: row.budgetCapUsd,
     model: row.model,
     retentionDays: row.retentionDays,

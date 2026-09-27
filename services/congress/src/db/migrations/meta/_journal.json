@@ -169,6 +169,20 @@
       "when": 1790463558834,
       "tag": "0023_drop_widget_canvas",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1790518981919,
+      "tag": "0024_ai_threads",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1790519002144,
+      "tag": "0025_ai_threads_drop_legacy",
+      "breakpoints": true
     }
   ]
 }

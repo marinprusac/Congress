@@ -222,7 +222,6 @@ export const pushSubscriptions = sqliteTable("push_subscriptions", {
 export const aiSettings = sqliteTable("ai_settings", {
   id: integer("id").primaryKey().default(1),
   contextPrompt: text("context_prompt").notNull().default(""),
-  chatIdleWindowMs: integer("chat_idle_window_ms").notNull().default(30 * 60 * 1000),
   budgetCapUsd: real("budget_cap_usd").notNull().default(10),
   model: text("model").notNull().default("claude-sonnet-5"),
   retentionDays: integer("retention_days").notNull().default(30),
@@ -230,18 +229,80 @@ export const aiSettings = sqliteTable("ai_settings", {
   pausedReason: text("paused_reason"),
 });
 
-// The chat thread. sessionId is the `claude` CLI's own session id - rows
-// sharing one are one resumed conversation (see ai/chat.ts).
+// One conversation. sessionId is the `claude` CLI session every run in it
+// --resumes; pendingRunId is set while a run for it is queued or running.
+export const aiThreads = sqliteTable(
+  "ai_threads",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    title: text("title"),
+    origin: text("origin", { enum: ["owner", "ai"] }).notNull().default("owner"),
+    trackingId: integer("tracking_id"),
+    sessionId: text("session_id"),
+    pendingRunId: text("pending_run_id"),
+    pinnedAt: integer("pinned_at", { mode: "timestamp_ms" }),
+    archivedAt: integer("archived_at", { mode: "timestamp_ms" }),
+    lastReadAt: integer("last_read_at", { mode: "timestamp_ms" }),
+    lastMessageAt: integer("last_message_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("ai_threads_last_message_at_idx").on(table.lastMessageAt)]
+);
+
+// A thread's rows, in order. Asks (message/question/proposal) are rows too,
+// so a thread renders as one list; askState/payload only apply to them.
 export const aiMessages = sqliteTable(
   "ai_messages",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    sessionId: text("session_id").notNull(),
-    role: text("role", { enum: ["user", "assistant"] }).notNull(),
+    threadId: integer("thread_id").notNull(),
+    role: text("role", { enum: ["user", "assistant", "system"] }).notNull(),
+    kind: text("kind", { enum: ["text", "message", "question", "proposal", "answer", "decision", "notice"] })
+      .notNull()
+      .default("text"),
+    status: text("status", { enum: ["ok", "error", "refused", "cancelled"] }).notNull().default("ok"),
     text: text("text").notNull(),
+    runId: text("run_id"),
+    payloadJson: text("payload_json"),
+    askState: text("ask_state", {
+      enum: ["open", "answered", "expired", "withdrawn", "approved", "rejected", "executed", "failed"],
+    }),
+    urgency: text("urgency", { enum: ["quiet", "push"] }),
+    deliverAt: integer("deliver_at", { mode: "timestamp_ms" }),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   },
-  (table) => [index("ai_messages_session_id_idx").on(table.sessionId), index("ai_messages_created_at_idx").on(table.createdAt)]
+  (table) => [
+    index("ai_messages_thread_id_idx").on(table.threadId, table.id),
+    index("ai_messages_created_at_idx").on(table.createdAt),
+    index("ai_messages_ask_state_idx").on(table.askState),
+  ]
+);
+
+// One row per AI run of any kind - the audit trail behind "Why?" and
+// Settings → AI → Activity. activityJson is the ordered notes + tool calls.
+export const aiRuns = sqliteTable(
+  "ai_runs",
+  {
+    id: text("id").primaryKey(),
+    threadId: integer("thread_id"),
+    kind: text("kind").notNull(),
+    trigger: text("trigger"),
+    actor: text("actor").notNull(),
+    model: text("model"),
+    status: text("status", { enum: ["running", "ok", "error", "refused", "cancelled"] }).notNull(),
+    errorMessage: text("error_message"),
+    startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+    finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+    costUsd: real("cost_usd"),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    durationMs: integer("duration_ms"),
+    toolCallCount: integer("tool_call_count").notNull().default(0),
+    activityJson: text("activity_json"),
+    verdictJson: text("verdict_json"),
+  },
+  (table) => [index("ai_runs_started_at_idx").on(table.startedAt), index("ai_runs_thread_id_idx").on(table.threadId)]
 );
 
 // One row per `claude` invocation, cost only - just enough to enforce

@@ -35,7 +35,6 @@ describe("importLegacyDeputySettings", () => {
 
     expect(await getAiSettings()).toEqual({
       contextPrompt: "I live in Zagreb.",
-      chatIdleWindowMs: 600000,
       budgetCapUsd: 4,
       model: "claude-opus-5-5",
       retentionDays: 14,
