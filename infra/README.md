@@ -19,8 +19,8 @@ decision. See "Access control" below for what that means in practice.
 - Ports: this VPS already runs other services on `3000` and `4000`, so
   Congress's production port differs from its dev default: **Congress
   `8000`**, **Notes Chamber `8011`**, **Calendar Chamber `8012`**, **Documents
-  Chamber `8013`**, **Tasks Chamber `8014`**, **Deputy Chamber
-  `8018`**, **Map Chamber `8019`**, **Fitness Chamber `8020`** (each Chamber
+  Chamber `8013`**, **Tasks Chamber `8014`**, **Map Chamber `8019`**,
+  **Fitness Chamber `8020`** (each Chamber
   matches its dev default). All bind `127.0.0.1` only — the only thing
   reachable from outside the box at all is Caddy, on 80/443.
 - Each service's `.env` (untracked, created by hand on the server) sets
@@ -34,7 +34,6 @@ decision. See "Access control" below for what that means in practice.
 Every service (`congress-core`, `congress-chamber-notes`,
 `congress-chamber-calendar`, `congress-chamber-documents`,
 `congress-chamber-tasks`,
-`congress-chamber-deputy`,
 `congress-chamber-map`, `congress-chamber-fitness`) has its own discrete unit
 under `infra/systemd/`, installed at `/etc/systemd/system/` and enabled
 (`systemctl enable --now`). All share the same body: `User=marin`,
@@ -276,3 +275,21 @@ Its `services/chamber-automation/` directory (`.env`, `data/`, `node_modules`)
 lingers because rsync `--delete` protects those; delete it by hand when
 convenient. Its stale `automation` row in Congress's chamber registry is
 removed by migration `0019`.
+
+## Retiring the Deputy Chamber (one-time)
+
+Deputy's directives became Congress's own tracked items: on its first boot
+after this deploy, Congress imports every directive from
+`services/chamber-deputy/data/deputy.sqlite3` (`LEGACY_DEPUTY_DB_PATH`, read
+only) into Memory, keeping each one's schedule, trigger event, enabled state
+and references. Check Chats -> Memory afterwards. Then, on the server:
+
+    sudo systemctl disable --now congress-chamber-deputy
+    sudo rm /etc/systemd/system/congress-chamber-deputy.service
+    sudo systemctl daemon-reload
+
+Keep `services/chamber-deputy/data/` until the import has been checked; the
+rest of that directory (`.env`, `node_modules`) can go right away. Migration
+`0029` removes Deputy's registry row, cached exhibits and event settings.
+Once the import has run in production, `ai/legacyDirectivesImport.ts` and
+`ai/legacyImport.ts` can be deleted.

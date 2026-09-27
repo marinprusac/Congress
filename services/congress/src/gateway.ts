@@ -4,17 +4,6 @@ import { getChamber } from "./registry.js";
 
 const FORWARD_TIMEOUT_MS = 10_000;
 
-// Deputy's "Run now" POST (POST /api/directives/:id/run) blocks on a full
-// headless run in Congress's own AI before responding - unlike every other
-// Chamber route, which answers in milliseconds, it can legitimately take
-// minutes (multiple cross-Chamber MCP tool calls, or queued behind another
-// run). The default FORWARD_TIMEOUT_MS would abort the proxy well before the
-// run finishes, eating the response even though the run itself completes.
-// (The chat and the run stream used to be Deputy routes too; they're
-// Congress's own now, under /congress/ai/*, and never pass through here.)
-const DEPUTY_BLOCKING_RUN_TIMEOUT_MS = 5 * 60 * 1000;
-const DEPUTY_DIRECTIVE_RUN_PATH = /^\/directives\/\d+\/run$/;
-
 // A Chamber's registered apiBase is its origin plus "/api"; its frontend and
 // its public assets are served from the origin itself. Named rather than
 // inlined at each call site both because it is the same rule twice over and
@@ -34,9 +23,9 @@ export function rewriteChamberPath(path: string, prefix: string, base: string, s
   return `${base}${remainder}${search}`;
 }
 
-// See DEPUTY_BLOCKING_RUN_TIMEOUT_MS above.
-export function timeoutFor(chamberName: string, method: string, remainder: string): number {
-  if (chamberName === "deputy" && method === "POST" && DEPUTY_DIRECTIVE_RUN_PATH.test(remainder)) return DEPUTY_BLOCKING_RUN_TIMEOUT_MS;
+// The one place a slow Chamber route would get a longer proxy timeout. None
+// needs one today (Deputy's blocking "Run now" was the only one).
+export function timeoutFor(_chamberName: string, _method: string, _remainder: string): number {
   return FORWARD_TIMEOUT_MS;
 }
 

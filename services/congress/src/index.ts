@@ -12,11 +12,13 @@ import { startAskTimer, stopAskTimer } from "./ai/asks.js";
 import { startTrackingScheduler, stopTrackingScheduler } from "./ai/tracking.js";
 import { listTracking } from "./ai/memory.js";
 import { startProactive, stopProactive } from "./ai/proactive.js";
+import { importLegacyDirectives } from "./ai/legacyDirectivesImport.js";
 
 runMigrations();
 importLegacyChamberData();
 importLegacyDeputySettings();
 recoverInterruptedThreads();
+await importLegacyDirectives();
 
 const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (info) => {
   console.log(`Congress listening on http://${info.address}:${info.port}`);

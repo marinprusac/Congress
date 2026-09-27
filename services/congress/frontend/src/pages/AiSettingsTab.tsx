@@ -13,8 +13,7 @@ const inputClass =
   "w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
 
 // Settings -> AI: the one pause switch and daily budget shared by the chat
-// and every Chamber's remote runs (e.g. Deputy's directives), plus the
-// context handed to every run. Moved in from Deputy's own Settings tab.
+// and every other run, the proactive AI's own controls, and the run log.
 export function AiSettingsTab() {
   const queryClient = useQueryClient();
   const settingsQuery = useQuery({ queryKey: aiSettingsQueryKey, queryFn: fetchAiSettings });

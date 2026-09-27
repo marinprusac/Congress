@@ -80,6 +80,8 @@ export const settings = sqliteTable("settings", {
   // Set once legacyImport.ts has copied the retired Capitol/Logs Chambers'
   // own SQLite files into the tables below - see that file.
   legacyImportedAt: integer("legacy_imported_at", { mode: "timestamp_ms" }),
+  // Set once Deputy's directives were imported as tracked items.
+  directivesImportedAt: integer("directives_imported_at", { mode: "timestamp_ms" }),
 });
 
 // ---- Event settings, history, notifications, push (formerly the Logs Chamber) ----

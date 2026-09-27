@@ -183,7 +183,7 @@ export type UpdateAiSettingsRequest = z.infer<typeof updateAiSettingsRequestSche
 
 // Opaque caller metadata echoed back on the run stream (run_started), so a
 // Chamber's own frontend can tell its runs apart from everyone else's -
-// e.g. Deputy's progress rings key off { chamber: "deputy", directiveId }.
+// e.g. a tracked item's check carries { trackingId }.
 export const aiRunMetaSchema = z.record(z.string(), z.unknown());
 export type AiRunMeta = z.infer<typeof aiRunMetaSchema>;
 

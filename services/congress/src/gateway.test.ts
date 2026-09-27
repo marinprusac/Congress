@@ -53,22 +53,9 @@ describe("rewriteChamberPath", () => {
 });
 
 describe("timeoutFor", () => {
-  it("gives Deputy's 'Run now' directive POST minutes, because it blocks on a full headless run", () => {
-    expect(timeoutFor("deputy", "POST", "/directives/42/run")).toBe(5 * 60 * 1000);
-    expect(timeoutFor("deputy", "POST", "/directives/7/run")).toBe(5 * 60 * 1000);
-  });
-
-  it("gives every other Deputy route the ordinary timeout", () => {
-    expect(timeoutFor("deputy", "POST", "/directives")).toBe(10_000);
-    expect(timeoutFor("deputy", "GET", "/directives/42/run")).toBe(10_000);
-    expect(timeoutFor("deputy", "POST", "/directives/42")).toBe(10_000);
-    // The chat moved to Congress's own /congress/ai/* - no longer a Deputy
-    // route, so no longer exempt.
-    expect(timeoutFor("deputy", "POST", "/chat/messages")).toBe(10_000);
-  });
-
-  it("gives another chamber's identically-named route the ordinary timeout", () => {
+  it("gives every Chamber route the ordinary timeout", () => {
     expect(timeoutFor("notes", "POST", "/directives/42/run")).toBe(10_000);
+    expect(timeoutFor("tasks", "GET", "/tasks")).toBe(10_000);
   });
 });
 
