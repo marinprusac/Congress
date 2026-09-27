@@ -48,10 +48,9 @@ function isUnconfirmedInvitation(attendance: { isInvitation: boolean; responseSt
 // the form.
 const DATETIME_LOCAL_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
-// `start` (and, only from a desktop click-drag on the Agenda's own timeline -
-// see AgendaGapRow - `duration`, in minutes) let the Agenda hand off a
-// picked time straight into a prefilled create form, instead of always
-// landing on defaultValues()'s own rounded-to-now guess.
+// `start`, `duration` (minutes) and `title` let a link hand a prefilled
+// create form over, instead of always landing on defaultValues()'s own
+// rounded-to-now guess.
 function defaultValues(searchParams: URLSearchParams): EventFormValues {
   const startParam = searchParams.get("start");
   const start =
@@ -109,7 +108,7 @@ function identityKey(id: EventIdentity | null): string | null {
   return id ? `${id.accountId}::${id.calendarId}::${id.eventId}` : null;
 }
 
-// Matches AgendaPage's own prefetchEvent queryKey exactly (String(accountId),
+// Matches useEventLinks' prefetch queryKey exactly (String(accountId),
 // not the number fetchEvent itself takes) - see its own comment for why a
 // mismatch here silently turns the prefetch into a wasted, never-read cache
 // entry rather than a visible bug.

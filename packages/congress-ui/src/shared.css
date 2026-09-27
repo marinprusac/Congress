@@ -18,9 +18,7 @@
    (react-router's Link, never a real page load), so iOS Safari's own
    long-press affordances on an <a> - a link-preview popup
    (-webkit-touch-callout) and a "drag this link out" ghost
-   (-webkit-user-drag) - never make sense here and only get in the way of a
-   Chamber's own long-press gesture (useLongPressDrag; see its own inline
-   style for the belt-and-suspenders per-element version of this same fix).
+   (-webkit-user-drag) - never make sense here and only get in the way.
    A genuine external link - one that opens a real separate page, marked
    target="_blank" the same way every one of those in this codebase already
    is (e.g. EventViewPage's "Open in Google Calendar"), or a same-origin
@@ -1090,8 +1088,7 @@ a[download] {
 /* The "+" button docked beside the search input - replaces the old "New"
    entry in ChamberPicker's now-removed sub-nav bar. Also reused (without
    .list-search-row's fixed/floating positioning) by pages with no local
-   search input but the same need for a "+" trigger, e.g. Calendar's Agenda
-   toolbar. */
+   search input but the same need for a "+" trigger. */
 .list-search-new {
   display: flex;
   flex-shrink: 0;

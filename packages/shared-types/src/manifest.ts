@@ -16,10 +16,10 @@ export const manifestRoutesSchema = z.object({
 export type ManifestRoutes = z.infer<typeof manifestRoutesSchema>;
 
 // One entry per *view* a Chamber offers - a screen that genuinely can't be
-// expressed as a list of exhibits (Calendar's Agenda, the Map, Fitness's
+// expressed as a list of exhibits (Calendar's Week, the Map, Fitness's
 // Health charts). A plain list of exhibits (open tasks, upcoming events) is
 // deliberately NOT a view: those exhibits reach the home feed and Search on
-// their own. `fullPath` (relative to the Chamber, e.g. "/" for the Agenda)
+// their own. `fullPath` (relative to the Chamber, e.g. "/" for Calendar's Timeline)
 // is the full-screen page. `card` says the Chamber also exports a compact
 // feed card for it (the component keyed by `id` in its remote-entry `views`
 // export, e.g. a map preview); without one the feed shows the view as a
