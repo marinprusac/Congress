@@ -27,6 +27,18 @@ export { ChamberMark, CapitolMark, getChamberIcon } from "./ChamberMarks.js";
 export { ViewCard } from "./ViewCard.js";
 export { fetchRegistry } from "./registry.js";
 export { useAiRunStream, fetchAiSettings, aiSettingsQueryKey, type AiRunStreamState, type AiToolCall } from "./useAiRunStream.js";
+export {
+  useAiStream,
+  useAiStreamEvents,
+  reduceAiStream,
+  type AiStreamState,
+  type AiStreamMessage,
+  type AiLiveRun,
+  type AiLiveActivity,
+  type AiLiveTool,
+} from "./aiStream.js";
+export { ChatMarkdown } from "./ChatMarkdown.js";
+export { useKeyboardInset } from "./useKeyboardInset.js";
 export { fetchEventCatalog } from "./eventCatalog.js";
 export type { EventCatalogEntry } from "./eventCatalog.js";
 export { TriggerEventPicker } from "./TriggerEventPicker.js";

@@ -28,6 +28,8 @@ interface ExhibitFieldEditorProps {
   // content with no minimum, which reads as an oddly cramped empty field.
   minRows?: number;
   autoFocus?: boolean;
+  // Runs on Enter first; return true to consume it (e.g. send a message).
+  onSubmitKey?: () => boolean;
 }
 
 // The shared multi-line editing/viewing surface: full Markdown (headers,
@@ -48,6 +50,7 @@ export function ExhibitFieldEditor({
   onCreate,
   minRows,
   autoFocus,
+  onSubmitKey,
 }: ExhibitFieldEditorProps) {
   const { containerRef, picker } = useExhibitEditorCore({
     value,
@@ -58,6 +61,7 @@ export function ExhibitFieldEditor({
     renderIcon,
     onNavigate,
     onCreate,
+    onSubmitKey,
     autoFocus,
   });
 

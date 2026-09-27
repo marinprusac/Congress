@@ -102,7 +102,7 @@ export function TabBar() {
   return (
     <>
       <nav className="shell-tabbar" aria-label="Congress">
-        <Tab to="/" label="Home" active={pathname === "/" || pathname === "/chat"}>
+        <Tab to="/" label="Home" active={pathname === "/" || pathname === "/chat" || pathname.startsWith("/chat/")}>
           <HomeIcon />
         </Tab>
         <Tab to="/search" label="Search" active={pathname === "/search"}>

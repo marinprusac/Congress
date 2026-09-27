@@ -23,6 +23,22 @@ export function titleFromText(text: string): string {
   return `${(space > 30 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
 
+// A message as one plain line for the thread list: chips become their
+// labels and Markdown syntax (tables, emphasis, links, headings) is dropped.
+export function plainSnippet(text: string): string {
+  return text
+    .replace(/\[\[exhibit:[^\]|]+?\\?\|([^\]]+)\]\]/g, "$1")
+    .replace(/\[\[exhibit:[^\]]+\]\]/g, "")
+    .replace(/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/gm, "")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, "")
+    .replace(/[*_`~]+/g, "")
+    .replace(/\s*\|\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, SNIPPET_LENGTH);
+}
+
 function toThread(row: ThreadRow, extras: { snippet: string | null; openAskCount: number }): AiThread {
   const lastReadAt = row.lastReadAt?.getTime() ?? 0;
   return {
@@ -55,7 +71,7 @@ function threadExtras(threadId: number): { snippet: string | null; openAskCount:
     .from(aiMessages)
     .where(and(eq(aiMessages.threadId, threadId), eq(aiMessages.askState, "open"), visibleNow(now)))
     .get();
-  return { snippet: last ? last.text.replace(/\s+/g, " ").slice(0, SNIPPET_LENGTH) : null, openAskCount: open?.count ?? 0 };
+  return { snippet: last ? plainSnippet(last.text) || null : null, openAskCount: open?.count ?? 0 };
 }
 
 export function listThreads(opts: { archived?: boolean } = {}): AiThread[] {

@@ -193,7 +193,7 @@ export type AiRunRequest = z.infer<typeof aiRunRequestSchema>;
 export const aiRunResultSchema = z.object({
   ok: z.boolean(),
   refused: z.boolean(),
-  cancelled: z.boolean().default(false),
+  cancelled: z.boolean().optional(),
   response: z.string().nullable(),
   errorMessage: z.string().nullable(),
   transcript: z.array(aiTranscriptEntrySchema),

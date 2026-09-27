@@ -35,7 +35,6 @@ export function AiSettingsTab() {
       const s = settingsQuery.data;
       const loaded: UpdateAiSettingsRequest = {
         contextPrompt: s.contextPrompt,
-        chatIdleWindowMs: s.chatIdleWindowMs,
         budgetCapUsd: s.budgetCapUsd,
         model: s.model,
         retentionDays: s.retentionDays,
@@ -93,16 +92,6 @@ export function AiSettingsTab() {
         />
 
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <FormLabel>Chat idle window (minutes)</FormLabel>
-            <input
-              type="number"
-              min={1}
-              value={draft.chatIdleWindowMs != null ? Math.round(draft.chatIdleWindowMs / 60_000) : ""}
-              onChange={(e) => setDraft((d) => ({ ...d, chatIdleWindowMs: Number(e.target.value) * 60_000 }))}
-              className={inputClass}
-            />
-          </div>
           <div>
             <FormLabel>Daily budget cap (USD)</FormLabel>
             <input

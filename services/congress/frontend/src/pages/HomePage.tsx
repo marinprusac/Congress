@@ -1,11 +1,23 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ChamberRegistryEntry, FeedItem } from "@congress/shared-types";
-import { ChamberHeader, CapitolMark, ChamberMark, fetchRegistry, resolveChamberPath, useAppliedTheme, useCapitolSettings } from "@congress/congress-ui";
+import {
+  ChamberHeader,
+  CapitolMark,
+  ChamberMark,
+  ExhibitInlineField,
+  fetchRegistry,
+  getChamberIcon,
+  resolveChamberPath,
+  showToast,
+  useAppliedTheme,
+  useCapitolSettings,
+} from "@congress/congress-ui";
 import { ViewSlot, viewHref } from "@/components/ViewSlot";
 import { feedQueryKey, fetchFeed } from "@/lib/feedApi";
 import { formatPreviewTime } from "@/lib/formatPreviewTime";
+import { aiThreadQueryKey, aiThreadsQueryKey, createAiThread } from "@/lib/aiApi";
 
 function findView(registry: ChamberRegistryEntry[] | undefined, chamber: string, viewId: string) {
   const entry = registry?.find((c) => c.name === chamber);
@@ -13,22 +25,51 @@ function findView(registry: ChamberRegistryEntry[] | undefined, chamber: string,
   return entry && view ? { entry, view } : null;
 }
 
-// "Ask Congress" - hands the message to the chat page, which sends it (see
-// ChatPage's `send` navigation state) so the thread, the live tool progress
-// and the reply all show up in one place.
+// "Ask Congress" - starts a new chat thread with the message and opens it;
+// "@" references an exhibit, same as in the chat itself.
 function Composer() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const submit = async () => {
+    const trimmed = text.trim();
+    if (!trimmed) return navigate("/chat");
+    if (sending) return;
+    setSending(true);
+    try {
+      const { thread, runId } = await createAiThread({ text: trimmed });
+      queryClient.setQueryData(aiThreadQueryKey(thread.id), { ...thread, pendingRunId: runId });
+      // The run may already be over (an instant refusal); confirm with the server.
+      void queryClient.invalidateQueries({ queryKey: aiThreadQueryKey(thread.id) });
+      void queryClient.invalidateQueries({ queryKey: aiThreadsQueryKey });
+      setText("");
+      navigate(`/chat/${thread.id}`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Couldn't reach Congress", "error");
+      setSending(false);
+    }
+  };
   return (
     <form
       className="home-composer"
       onSubmit={(e) => {
         e.preventDefault();
-        const trimmed = text.trim();
-        navigate("/chat", trimmed ? { state: { send: trimmed } } : undefined);
+        void submit();
       }}
     >
-      <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask Congress —" aria-label="Ask Congress" enterKeyHint="send" />
+      <ExhibitInlineField
+        value={text}
+        onChange={setText}
+        placeholder="Ask Congress —"
+        className="home-composer-field"
+        wrapperClassName="exhibit-field home-composer-wrap"
+        renderIcon={(chamber) => getChamberIcon(chamber)}
+        onEnter={() => void submit()}
+      />
+      <button type="submit" className="home-composer-send" disabled={sending} aria-label={text.trim() ? "Ask" : "Open chats"}>
+        {sending ? <span className="home-composer-spinner" aria-hidden="true" /> : "→"}
+      </button>
     </form>
   );
 }

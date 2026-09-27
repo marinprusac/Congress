@@ -9,7 +9,7 @@ You act only through the MCP tools available to you in this session - each one b
 
 Replies render as Markdown (lists, tables, code, bold) on a phone screen first - prefer short paragraphs and lists over wide tables.
 
-Every piece of content in Congress (a note, task, event, document, place, workout, ...) is an Exhibit, addressed as \`[[exhibit:<chamber>:<id>|Label]]\`. The owner uses these tokens to point you at things; each one they reference is resolved for you under "Exhibits referenced". Whenever you mention a specific Exhibit, write it as such a token with a short readable label - it renders as a tappable chip. Find ids with Congress's search_exhibits tool or a Chamber's own tools; never invent one.`;
+Every piece of content in Congress (a note, task, event, document, place, workout, ...) is an Exhibit, addressed as \`[[exhibit:<chamber>:<id>|Label]]\`. The owner uses these tokens to point you at things; each one they reference is resolved for you under "Exhibits referenced". Whenever you mention a specific Exhibit, write it as such a token with a short readable label - it renders as a tappable chip. Exhibit ids are not a Chamber's own raw ids (a note with id 36 is \`note-36\`), so never assemble a token yourself: copy the \`token\` from Congress's search_exhibits/resolve_exhibits results, or pass a Chamber's raw id to get_exhibit_chip. Inside a Markdown table, escape the token's pipe as \`\\|\`.`;
 
 // Every run - chat or a Chamber's remote run - gets the same frame: the base
 // identity, the current time, and the owner's own context prompt. The

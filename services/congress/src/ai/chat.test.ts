@@ -13,7 +13,7 @@ vi.mock("../exhibits.js", () => ({ resolveExhibits: (...a: unknown[]) => resolve
 import { db, runMigrations } from "../db/client.js";
 import { createThread, postMessage, recoverInterruptedThreads, retryLast, ThreadBusyError } from "./chat.js";
 import { cancelJob } from "./jobQueue.js";
-import { getThread, getThreadRow, insertMessage, insertThread, listThreadMessages, titleFromText, updateThreadRow } from "./threads.js";
+import { getThread, getThreadRow, insertMessage, insertThread, listThreadMessages, plainSnippet, titleFromText, updateThreadRow } from "./threads.js";
 
 function outcome(overrides: Partial<RunOutcome> = {}): RunOutcome {
   return {
@@ -202,6 +202,14 @@ describe("titleFromText", () => {
   it("uses exhibit labels and truncates on a word boundary", () => {
     expect(titleFromText("Look at [[exhibit:notes:n-1|Groceries]] now")).toBe("Look at Groceries now");
     expect(titleFromText("word ".repeat(30))).toMatch(/^(word ){5,}.*…$/);
+  });
+});
+
+describe("plainSnippet", () => {
+  it("flattens Markdown and chips into one readable line", () => {
+    const table = "| Title | Summary |\n|-------|---------|\n| [[exhibit:notes:note-3\\|Standup]] | **Daily** notes |";
+    expect(plainSnippet(table)).toBe("Title Summary Standup Daily notes");
+    expect(plainSnippet("## Plan\n- [Docs](https://x.y) and `code`")).toBe("Plan Docs and code");
   });
 });
 

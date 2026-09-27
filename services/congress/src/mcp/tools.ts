@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult } from "@congress/chamber-kit";
+import { buildChipToken } from "@congress/shared-types";
 import { listChambers, getChamber, detachChamber, attachChamber } from "../registry.js";
 import {
   searchExhibits,
@@ -78,12 +79,12 @@ export function registerTools(server: McpServer) {
     {
       title: "Search Exhibits",
       description:
-        "Search for Exhibits (notes, calendar events, and other referenceable objects) across every active Chamber.",
+        "Search for Exhibits (notes, calendar events, and other referenceable objects) across every active Chamber. Each result's `token` is the exact chip to paste into a reply.",
       inputSchema: { query: z.string().min(1) },
     },
     async ({ query }) => {
       const results = await searchExhibits(query);
-      return mcpTextResult(results);
+      return mcpTextResult(results.map((r) => ({ ...r, token: buildChipToken({ chamber: r.chamber, id: r.id, name: r.name }) })));
     }
   );
 
@@ -99,7 +100,7 @@ export function registerTools(server: McpServer) {
     },
     async ({ refs }) => {
       const results = await resolveExhibits(refs);
-      return mcpTextResult(results);
+      return mcpTextResult(results.map((r) => ("name" in r ? { ...r, token: buildChipToken({ chamber: r.chamber, id: r.id, name: r.name }) } : r)));
     }
   );
 
