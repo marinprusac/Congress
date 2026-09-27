@@ -64,9 +64,32 @@ async function deliverToChamber(chamberName: string, body: unknown): Promise<voi
 // /congress/events/publish in server.ts, which doesn't await this): each
 // interested Chamber's own delivery retries independently in the
 // background.
+export interface PublishedEvent {
+  chamber: string;
+  type: string;
+  payload: unknown;
+  occurredAt: string;
+  actor?: string;
+}
+
+// In-process observers of every publish (Congress's AI); never throw out.
+const publishListeners = new Set<(event: PublishedEvent) => void>();
+export function onEventPublished(listener: (event: PublishedEvent) => void): () => void {
+  publishListeners.add(listener);
+  return () => publishListeners.delete(listener);
+}
+
 export function publishEvent(req: EventPublishRequest): void {
   const occurredAt = req.occurredAt ?? new Date().toISOString();
   const body = { chamber: req.chamber, type: req.type, payload: req.payload, occurredAt, actor: req.actor };
+
+  for (const listener of publishListeners) {
+    try {
+      listener(body);
+    } catch (err) {
+      console.warn(`Event listener failed for ${req.type}: ${(err as Error).message}`);
+    }
+  }
 
   // Congress's own log rules (record to history / push a notification) are
   // core now, not a subscribing Chamber - handled in-process for every

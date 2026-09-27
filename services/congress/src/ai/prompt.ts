@@ -23,9 +23,17 @@ export function localTimeLine(now: Date, timeZone: string | null): string {
   return `Current time: ${local} (${zone}); ${now.toISOString()} UTC. Say times in the owner's zone; give tools ISO times with that zone's offset.`;
 }
 
-export function buildPrompt(settings: Pick<AiSettings, "contextPrompt"> & { timeZone?: string | null }, body: string, now = new Date()): string {
+// `memory` (facts + tracked items) goes between the owner's context and the
+// caller's part; the tool-less gate run gets none.
+export function buildPrompt(
+  settings: Pick<AiSettings, "contextPrompt"> & { timeZone?: string | null },
+  body: string,
+  now = new Date(),
+  memory?: string
+): string {
   const parts = [`${BASE_IDENTITY_PROMPT}\n\n${localTimeLine(now, settings.timeZone ?? null)}`];
   if (settings.contextPrompt.trim()) parts.push(`## Context\n${settings.contextPrompt.trim()}`);
+  if (memory) parts.push(memory);
   parts.push(body);
   return parts.join("\n\n");
 }

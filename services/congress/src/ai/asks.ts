@@ -57,6 +57,11 @@ function targetThread(origin: AskOrigin, title: string): number {
   return thread.id;
 }
 
+// The thread a run's asks opened, if it had none of its own.
+export function threadForRun(runId: string): number | null {
+  return runThreads.get(runId) ?? null;
+}
+
 const dedupeKey = (messageId: number) => `ask-${messageId}`;
 
 async function pushesToday(now: Date, timeZone: string | null): Promise<number> {

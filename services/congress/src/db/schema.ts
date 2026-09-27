@@ -314,6 +314,37 @@ export const aiRuns = sqliteTable(
   (table) => [index("ai_runs_started_at_idx").on(table.startedAt), index("ai_runs_thread_id_idx").on(table.threadId)]
 );
 
+// Things the AI was asked to keep an eye on, each with its own next check.
+// recurrence advances nextCheckAt in code, so a check can't be forgotten.
+export const aiTracking = sqliteTable(
+  "ai_tracking",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    status: text("status", { enum: ["active", "paused", "done", "dropped"] }).notNull().default("active"),
+    watchEventsJson: text("watch_events_json").notNull().default("[]"),
+    nextCheckAt: integer("next_check_at", { mode: "timestamp_ms" }),
+    recurrenceJson: text("recurrence_json"),
+    refsJson: text("refs_json").notNull().default("[]"),
+    threadId: integer("thread_id"),
+    source: text("source", { enum: ["chat", "ai", "directive", "owner"] }).notNull().default("ai"),
+    lastCheckedAt: integer("last_checked_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("ai_tracking_next_check_at_idx").on(table.nextCheckAt)]
+);
+
+// Plain facts about the owner, carried into every run's prompt.
+export const aiFacts = sqliteTable("ai_facts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  text: text("text").notNull(),
+  source: text("source", { enum: ["ai", "owner"] }).notNull().default("ai"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 // One row per `claude` invocation, cost only - just enough to enforce
 // aiSettings.budgetCapUsd. `actor` records who asked (congress for chat,
 // the calling Chamber otherwise).

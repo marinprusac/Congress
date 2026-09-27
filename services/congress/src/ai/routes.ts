@@ -1,7 +1,10 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { HttpBindings } from "@hono/node-server";
+import { z } from "zod";
 import {
+  factTextSchema,
+  updateTrackedItemRequestSchema,
   answerAskRequestSchema,
   decideAskRequestSchema,
   aiRunRequestSchema,
@@ -22,6 +25,8 @@ import { runAi } from "./engine.js";
 import { broadcast, onStreamEvent, replayEvents } from "./runStream.js";
 import { deleteThreadRow, getThread, getThreadRow, listThreadMessages, listThreads, markThreadRead, updateThreadRow } from "./threads.js";
 import { getRunDetail, listRecentRuns } from "./runs.js";
+import { addFact, deleteFact, deleteTracking, getTracking, listFacts, listTracking, updateFact, updateTracking } from "./memory.js";
+import { startTrackingCheck } from "./tracking.js";
 import {
   AskClosedError,
   AskInvalidError,
@@ -173,6 +178,56 @@ aiRoutes.post("/messages/:id/decide", requireSession, async (c) => {
     const { body, status } = askErrorResponse(err);
     return c.json(body, status);
   }
+});
+
+// ---- Memory (tracked items + facts) ----
+
+const positiveId = (raw: string) => {
+  const id = Number(raw);
+  return Number.isInteger(id) && id > 0 ? id : null;
+};
+
+aiRoutes.get("/tracking", requireSession, (c) => c.json(listTracking(c.req.query("closed") === "1" ? undefined : ["active", "paused"])));
+
+aiRoutes.patch("/tracking/:id", requireSession, async (c) => {
+  const id = positiveId(c.req.param("id"));
+  const parsed = updateTrackedItemRequestSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  const item = id ? updateTracking(id, parsed.data) : null;
+  return item ? c.json(item) : c.json({ error: "not_found" }, 404);
+});
+
+aiRoutes.delete("/tracking/:id", requireSession, (c) => {
+  const id = positiveId(c.req.param("id"));
+  return id && deleteTracking(id) ? c.body(null, 204) : c.json({ error: "not_found" }, 404);
+});
+
+aiRoutes.post("/tracking/:id/check", requireSession, async (c) => {
+  const id = positiveId(c.req.param("id"));
+  if (!id || !getTracking(id)) return c.json({ error: "not_found" }, 404);
+  const runId = await startTrackingCheck(id, "owner");
+  return runId ? c.json({ runId }) : c.json({ error: "busy", message: "A check is already running." }, 409);
+});
+
+aiRoutes.get("/facts", requireSession, (c) => c.json(listFacts()));
+
+aiRoutes.post("/facts", requireSession, async (c) => {
+  const parsed = z.object({ text: factTextSchema }).safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  return c.json(addFact(parsed.data.text, "owner"), 201);
+});
+
+aiRoutes.patch("/facts/:id", requireSession, async (c) => {
+  const id = positiveId(c.req.param("id"));
+  const parsed = z.object({ text: factTextSchema }).safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
+  const fact = id ? updateFact(id, parsed.data.text) : null;
+  return fact ? c.json(fact) : c.json({ error: "not_found" }, 404);
+});
+
+aiRoutes.delete("/facts/:id", requireSession, (c) => {
+  const id = positiveId(c.req.param("id"));
+  return id && deleteFact(id) ? c.body(null, 204) : c.json({ error: "not_found" }, 404);
 });
 
 // ---- Runs ----

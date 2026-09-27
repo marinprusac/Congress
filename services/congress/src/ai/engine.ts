@@ -7,6 +7,7 @@ import { getAiSettings, updateAiSettings } from "./settings.js";
 import { recordSpend, todaySpendUsd } from "./spend.js";
 import { writeMcpConfigFile } from "./mcpConfig.js";
 import { buildPrompt } from "./prompt.js";
+import { memoryPromptSection } from "./memory.js";
 import { startRun, emitProgress, finishRun } from "./runStream.js";
 import { finishRunRow, insertRunRow } from "./runs.js";
 
@@ -298,7 +299,7 @@ export async function runAi(ctx: RunContext): Promise<RunOutcome> {
     return refuse("Daily budget cap reached; AI has been paused.");
   }
 
-  const prompt = buildPrompt(settings, ctx.body);
+  const prompt = buildPrompt(settings, ctx.body, new Date(), ctx.jsonSchema ? undefined : memoryPromptSection(settings.timeZone));
   const mcpConfig = ctx.jsonSchema ? null : await writeMcpConfigFile(ctx.actor, { runId, threadId });
   insertRunRow({ id: runId, ...base, status: "running" });
   startRun(runId, ctx.kind, ctx.meta ?? {}, threadId);

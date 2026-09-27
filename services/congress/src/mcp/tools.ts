@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult } from "@congress/chamber-kit";
 import { buildChipToken } from "@congress/shared-types";
 import { registerAskTools } from "./askTools.js";
+import { registerMemoryTools } from "./memoryTools.js";
 import { listChambers, getChamber, detachChamber, attachChamber } from "../registry.js";
 import {
   searchExhibits,
@@ -252,4 +253,5 @@ export function registerTools(server: McpServer) {
   );
 
   registerAskTools(server);
+  registerMemoryTools(server);
 }
