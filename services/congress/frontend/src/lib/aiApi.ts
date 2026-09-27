@@ -6,6 +6,9 @@ import type {
   CreateAiThreadRequest,
   CreateAiThreadResponse,
   OpenAsk,
+  Fact,
+  TrackedItem,
+  UpdateTrackedItemRequest,
   PostAiThreadMessageResponse,
   UpdateAiSettingsRequest,
   UpdateAiThreadRequest,
@@ -105,6 +108,41 @@ export async function answerAsk(messageId: number, values: Record<string, unknow
 export async function decideAsk(messageId: number, approve: boolean, note?: string): Promise<void> {
   const res = await fetch(`${API_BASE}/messages/${messageId}/decide`, sendJson("POST", { approve, note }));
   if (!res.ok) await jsonOrError(res);
+}
+
+export const aiTrackingQueryKey = ["congress", "ai", "tracking"] as const;
+export const aiFactsQueryKey = ["congress", "ai", "facts"] as const;
+
+export function fetchTracking(includeClosed = false): Promise<TrackedItem[]> {
+  return fetch(`${API_BASE}/tracking${includeClosed ? "?closed=1" : ""}`).then((res) => jsonOrError(res));
+}
+
+export function updateTrackedItem(id: number, patch: UpdateTrackedItemRequest): Promise<TrackedItem> {
+  return fetch(`${API_BASE}/tracking/${id}`, sendJson("PATCH", patch)).then((res) => jsonOrError(res));
+}
+
+export async function deleteTrackedItem(id: number): Promise<void> {
+  assertDeleteOk(await fetch(`${API_BASE}/tracking/${id}`, { method: "DELETE" }), "delete tracked item");
+}
+
+export function checkTrackedItem(id: number): Promise<{ runId: string }> {
+  return fetch(`${API_BASE}/tracking/${id}/check`, { method: "POST" }).then((res) => jsonOrError(res));
+}
+
+export function fetchFacts(): Promise<Fact[]> {
+  return fetch(`${API_BASE}/facts`).then((res) => jsonOrError(res));
+}
+
+export function addFact(text: string): Promise<Fact> {
+  return fetch(`${API_BASE}/facts`, sendJson("POST", { text })).then((res) => jsonOrError(res));
+}
+
+export function updateFact(id: number, text: string): Promise<Fact> {
+  return fetch(`${API_BASE}/facts/${id}`, sendJson("PATCH", { text })).then((res) => jsonOrError(res));
+}
+
+export async function deleteFact(id: number): Promise<void> {
+  assertDeleteOk(await fetch(`${API_BASE}/facts/${id}`, { method: "DELETE" }), "delete fact");
 }
 
 export function updateAiSettings(input: UpdateAiSettingsRequest): Promise<AiSettings> {

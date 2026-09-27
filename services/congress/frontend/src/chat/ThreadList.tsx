@@ -73,6 +73,9 @@ export function ThreadList() {
           <p className="chat-eyebrow">Congress</p>
           <h1 className="chat-title chat-title--large">Chats</h1>
         </div>
+        <Link to="/chat/memory" className="chat-memory-link">
+          Memory
+        </Link>
         <Link to="/chat/new" className="chat-new" aria-label="New chat">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />

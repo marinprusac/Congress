@@ -4,9 +4,15 @@ import { mcpTextResult } from "@congress/chamber-kit";
 import { factTextSchema, recurrenceSchema, trackingStatusSchema, watchEventSchema } from "@congress/shared-types";
 import { currentRunContext } from "../ai/runContext.js";
 import { getAiSettings } from "../ai/settings.js";
-import { addFact, createTracking, deleteFact, getTracking, listFacts, listTracking, updateFact, updateTracking } from "../ai/memory.js";
+import { addFact, createTracking, deleteFact, getTracking, listFacts, listTracking, serverTimeZone, updateFact, updateTracking } from "../ai/memory.js";
 
 const iso = z.string().datetime({ offset: true });
+
+// Echoed back so the AI can see the weekday it actually scheduled.
+function localCheck(iso: string | null, timeZone: string | null): string | null {
+  if (!iso) return null;
+  return new Intl.DateTimeFormat("en-GB", { timeZone: serverTimeZone(timeZone), weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+}
 
 // The AI's memory: tracked items (with their own schedule) and facts.
 export function registerMemoryTools(server: McpServer) {
@@ -19,7 +25,7 @@ export function registerMemoryTools(server: McpServer) {
       inputSchema: {
         title: z.string().min(1).max(120),
         body: z.string().max(4000).describe("What to watch and what to do - your notes for future checks."),
-        nextCheckAt: iso.optional().describe("First check (ISO with offset). Defaults to the next recurrence slot."),
+        nextCheckAt: iso.optional().describe("First check (ISO with offset). Omit it when a recurrence is set - the first slot is computed for you."),
         recurrence: recurrenceSchema.optional().describe("Checks repeat on this schedule in the owner's time zone."),
         watchEvents: z.array(watchEventSchema).max(20).optional().describe('Event types that matter, e.g. {"type":"tasks.overdue","immediate":true}.'),
         refs: z.array(z.string()).max(20).optional().describe("Related exhibit tokens."),
@@ -32,7 +38,7 @@ export function registerMemoryTools(server: McpServer) {
         { title, body, recurrence, watchEvents, refs, nextCheckAt: nextCheckAt ? new Date(nextCheckAt) : null, threadId: ctx.threadId, source: ctx.threadId ? "chat" : "ai" },
         settings.timeZone
       );
-      return mcpTextResult({ ok: true, item });
+      return mcpTextResult({ ok: true, item, nextCheckLocal: localCheck(item.nextCheckAt, settings.timeZone) });
     }
   );
 
@@ -54,7 +60,8 @@ export function registerMemoryTools(server: McpServer) {
     },
     async ({ id, ...patch }) => {
       const item = updateTracking(id, patch);
-      return mcpTextResult(item ? { ok: true, item } : { error: "not_found", id });
+      const settings = await getAiSettings();
+      return mcpTextResult(item ? { ok: true, item, nextCheckLocal: localCheck(item.nextCheckAt, settings.timeZone) } : { error: "not_found", id });
     }
   );
 
