@@ -62,16 +62,21 @@ describe("calendarFeedCandidates", () => {
     expect(items).toHaveLength(1);
   });
 
-  it("shows the event's time, place, calendar and description inline", () => {
+  it("shows the event's time, place and description inline, but not its calendar", () => {
     const e = event("a", 20, 60, { location: "Dental clinic, Ilica 5", description: "Bring the **X-ray** from [[exhibit:documents:document-2|March]]" });
     const [item] = calendarFeedCandidates([e], now);
     expect(item).toMatchObject({
       preview: {
         time: { start: e.start, end: e.end, allDay: false },
-        fields: ["Dental clinic, Ilica 5", "Me"],
+        fields: ["Dental clinic, Ilica 5"],
         body: "Bring the X-ray from March",
       },
     });
+  });
+
+  it("leaves fields out when the event has no location", () => {
+    const [item] = calendarFeedCandidates([event("a", 20, 60)], now);
+    expect(item?.kind === "exhibit" && item.preview?.fields).toBeUndefined();
   });
 
   it("never offers the Timeline/Week views - it has no feed card", () => {

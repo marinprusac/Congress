@@ -3,13 +3,13 @@ import type { FeedCandidate, FeedPreview } from "@congress/shared-types";
 import { toExhibitId } from "./google/eventId.js";
 import type { CalendarEvent } from "./types.js";
 
-// What the feed shows inline for an event: when, where, which calendar,
-// and the description.
+// What the feed shows inline for an event: when, where, and the description.
+// Which calendar it's on doesn't matter here.
 function preview(event: CalendarEvent): FeedPreview {
-  const fields = [event.location?.trim(), event.calendarSummary].filter((f): f is string => Boolean(f)).map((f) => f.slice(0, 80));
+  const location = event.location?.trim();
   return {
     time: { start: event.start, end: event.end, allDay: event.allDay },
-    fields: fields.length > 0 ? fields : undefined,
+    fields: location ? [location.slice(0, 80)] : undefined,
     body: plainTextPreview(event.description),
   };
 }
