@@ -1,13 +1,15 @@
-// Every app's own main.tsx calls this once, before its first render (same
-// shape as markShellHosted() in ShellHostContext.ts). Blocks pinch-zoom in
-// standalone iOS PWAs - CSS `touch-action` (see styles.css) stops
-// double-tap-zoom fine, but iOS Safari doesn't honor touch-action for
-// pinch, only this WebKit-only gesture event actually prevents it.
+// Called once from every app's main.tsx. The page never zooms (see also the
+// viewport meta and styles.css's touch-action); the Map's own pinch still
+// works since Leaflet reads the touches itself.
 export function preventPinchZoom(): void {
+  const block = (event: Event) => event.preventDefault();
+  for (const type of ["gesturestart", "gesturechange", "gestureend"]) {
+    document.addEventListener(type, block, { passive: false });
+  }
   document.addEventListener(
-    "gesturestart",
+    "touchmove",
     (event) => {
-      event.preventDefault();
+      if (event.touches.length > 1) event.preventDefault();
     },
     { passive: false }
   );
