@@ -1,9 +1,8 @@
 import type { Manifest } from "@congress/shared-types";
 
-// The minimum a Chamber has to send to POST /congress/register. Kept here
-// rather than rebuilt in each suite so a change to the manifest contract
-// breaks one place instead of six.
-export function makeManifest(name: string, origin = "http://127.0.0.1:9", overrides: Partial<Manifest> = {}): Manifest {
+// The minimum manifest a Chamber module carries. Kept here so a change to the
+// manifest contract breaks one place instead of every suite.
+export function makeManifest(name: string, overrides: Partial<Manifest> = {}): Manifest {
   return {
     name,
     displayName: `${name[0]?.toUpperCase()}${name.slice(1)} Chamber`,
@@ -12,9 +11,6 @@ export function makeManifest(name: string, origin = "http://127.0.0.1:9", overri
     views: [],
     exhibitTypes: [],
     events: [],
-    apiBase: `${origin}/api`,
-    mcpUrl: `${origin}/mcp`,
-    healthUrl: `${origin}/health`,
     ...overrides,
   };
 }

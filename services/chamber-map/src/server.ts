@@ -9,14 +9,12 @@ import {
   reprocessRequestSchema,
 } from "./types.js";
 import {
-  mountManifestAndHealth,
+  actorMiddleware,
   mountExhibitSearchRoutes,
   mountSettingsRoutes,
   mountManualRefsRoutes,
-  mountStaticFrontend,
   mountFeedRoute,
 } from "@congress/chamber-kit";
-import { manifest } from "./manifest.js";
 import {
   listPlaces,
   listRecentPlaces,
@@ -36,11 +34,11 @@ import { getSettings, updateSettings } from "./settings.js";
 import { getPollState, toPollHealth } from "./pollState.js";
 import { reprocessRange } from "./reprocess.js";
 import { searchPlaceExhibits, resolvePlaceExhibits } from "./exhibits.js";
-import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
 
-mountManifestAndHealth(app, manifest);
+// Stamps who made each request - see actorContext.ts.
+app.use("/api/*", actorMiddleware);
 
 app.get("/api/places/recent", async (c) => {
   return c.json(await listRecentPlaces());
@@ -190,7 +188,3 @@ mountManualRefsRoutes(
 );
 
 mountSettingsRoutes(app, { getSettings, updateSettings }, updateSettingsRequestSchema);
-
-app.route("/mcp", mcpApp);
-
-mountStaticFrontend(app);

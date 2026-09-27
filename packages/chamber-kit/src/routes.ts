@@ -168,7 +168,7 @@ export function mountManualRefsRoutes(
 const STATIC_ASSET_EXTENSION =
   /\.(js|mjs|css|map|json|html|ico|png|jpe?g|gif|svg|webp|avif|woff2?|ttf|eot|otf|wasm|txt|xml|webmanifest|br|gz|pdf)$/i;
 
-function cacheControlFor(path: string): string | undefined {
+export function cacheControlFor(path: string): string | undefined {
   if (path.includes("/assets/")) {
     return "public, max-age=31536000, immutable";
   }

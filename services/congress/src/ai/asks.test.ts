@@ -89,7 +89,7 @@ beforeAll(async () => {
     const s = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: 0 }, () => resolve(s));
   });
   const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  registerChamber(makeManifest("tasks", origin));
+  registerChamber(makeManifest("tasks", { mcpUrl: `${origin}/mcp` }));
 });
 
 afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));

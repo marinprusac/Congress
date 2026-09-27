@@ -3,14 +3,12 @@ import type { HttpBindings } from "@hono/node-server";
 import { updateSettingsRequestSchema, healthIngestRequestSchema } from "./types.js";
 import type { HealthMetricType } from "./types.js";
 import {
-  mountManifestAndHealth,
+  actorMiddleware,
   mountExhibitSearchRoutes,
   mountSettingsRoutes,
   mountManualRefsRoutes,
-  mountStaticFrontend,
   mountFeedRoute,
 } from "@congress/chamber-kit";
-import { manifest } from "./manifest.js";
 import { listWorkouts, listRecentWorkouts, getWorkout, getWeekStats, resyncWorkoutExhibitByExhibitId } from "./workouts.js";
 import { fitnessFeedCandidates } from "./feedRules.js";
 import { listManualRefsByExhibitId, addManualRefByExhibitId, removeManualRefByExhibitId } from "./refs.js";
@@ -31,11 +29,11 @@ import { syncNow } from "./hevy/poller.js";
 import { isValidIngestToken, ingestSamples } from "./health/ingest.js";
 import { normalizeHealthAutoExportPayload } from "./health/normalize.js";
 import { listHealthMetrics, getLatestHealthMetrics } from "./healthMetrics.js";
-import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
 
-mountManifestAndHealth(app, manifest);
+// Stamps who made each request - see actorContext.ts.
+app.use("/api/*", actorMiddleware);
 
 app.get("/api/workouts/recent", async (c) => {
   return c.json(await listRecentWorkouts());
@@ -180,7 +178,3 @@ mountManualRefsRoutes(
 );
 
 mountSettingsRoutes(app, { getSettings, updateSettings }, updateSettingsRequestSchema);
-
-app.route("/mcp", mcpApp);
-
-mountStaticFrontend(app);

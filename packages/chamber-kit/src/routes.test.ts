@@ -25,8 +25,6 @@ describe("mountManifestAndHealth", () => {
     routes: [],
     widgets: [],
     events: [],
-    apiBase: "http://127.0.0.1:8011/api",
-    healthUrl: "http://127.0.0.1:8011/health",
   } as unknown as Manifest;
 
   it("serves the manifest verbatim", async () => {
@@ -34,10 +32,10 @@ describe("mountManifestAndHealth", () => {
     mountManifestAndHealth(app, manifest);
     const res = await app.request("/manifest");
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toMatchObject({ name: "notes", apiBase: manifest.apiBase });
+    await expect(res.json()).resolves.toMatchObject({ name: "notes" });
   });
 
-  it("answers the heartbeat sweep's liveness probe", async () => {
+  it("answers a liveness probe", async () => {
     const app = newApp();
     mountManifestAndHealth(app, manifest);
     const res = await app.request("/health");

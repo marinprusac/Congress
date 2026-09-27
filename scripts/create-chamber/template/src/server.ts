@@ -2,14 +2,12 @@ import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import { createItemRequestSchema, updateItemRequestSchema, updateSettingsRequestSchema } from "./types.js";
 import {
-  mountManifestAndHealth,
+  actorMiddleware,
   mountExhibitSearchRoutes,
   mountSettingsRoutes,
   mountManualRefsRoutes,
-  mountStaticFrontend,
   mountFeedRoute,
 } from "@congress/chamber-kit";
-import { manifest } from "./manifest.js";
 import { itemFeedCandidates } from "./feedRules.js";
 import {
   listItems,
@@ -26,11 +24,11 @@ import {
 } from "./items.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { searchItemExhibits, resolveItemExhibits } from "./exhibits.js";
-import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
 
-mountManifestAndHealth(app, manifest);
+// Stamps who made each request - see actorContext.ts.
+app.use("/api/*", actorMiddleware);
 
 app.get("/api/items/recent", async (c) => {
   return c.json(await listRecentItems());
@@ -97,7 +95,3 @@ mountManualRefsRoutes(
 );
 
 mountSettingsRoutes(app, { getSettings, updateSettings }, updateSettingsRequestSchema);
-
-app.route("/mcp", mcpApp);
-
-mountStaticFrontend(app);

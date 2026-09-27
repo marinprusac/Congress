@@ -52,7 +52,7 @@ export function registerTools(server: McpServer) {
     {
       title: "Detach Chamber",
       description:
-        "Manually take a Chamber out of rotation - the gateway stops proxying its API/frontend and it disappears from the active list - without deregistering it. Sticks even if the Chamber keeps heartbeating; only attach_chamber clears it.",
+        "Manually take a Chamber out of rotation - its API, frontend, feed, search and MCP tools stop being served while its module stays loaded. Survives restarts; only attach_chamber clears it.",
       inputSchema: { name: z.string().min(1) },
     },
     async ({ name }) => {

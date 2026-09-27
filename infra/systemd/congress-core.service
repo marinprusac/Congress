@@ -1,5 +1,5 @@
 [Unit]
-Description=Congress - core service (registry, gateway, auth, exhibits, sharing)
+Description=Congress - the whole system (every Chamber runs inside it)
 After=network.target
 
 [Service]

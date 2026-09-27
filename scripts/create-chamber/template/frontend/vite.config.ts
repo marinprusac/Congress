@@ -3,17 +3,15 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-const PROXY_TARGET = "http://127.0.0.1:__CHAMBER_PORT__";
-// Exhibit search/resolve/connections go straight to Congress, not this
-// Chamber's own backend - in prod this resolves same-origin through
-// Congress's proxy automatically, so only dev needs an explicit target.
+// Everything - this Chamber's own API included - is served by Congress,
+// which runs every Chamber in its own process. Same-origin in production.
 const CONGRESS_PROXY_TARGET = "http://127.0.0.1:3000";
 const root = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig(({ command }) => ({
   root,
   // In production this Chamber's frontend is proxied through Congress at
-  // "/__CHAMBER_NAME__/*" (see services/congress/src/gateway.ts), so built
+  // "/__CHAMBER_NAME__/*" (see services/congress/src/gateway.ts's serveChamberAssets), so built
   // asset URLs must carry that prefix. The dev server still runs standalone
   // at "/".
   base: command === "build" ? "/__CHAMBER_NAME__/" : "/",
@@ -25,10 +23,8 @@ export default defineConfig(({ command }) => ({
   },
   server: {
     proxy: {
-      "/api": PROXY_TARGET,
-      "/manifest": PROXY_TARGET,
-      "/health": PROXY_TARGET,
-      "/mcp": PROXY_TARGET,
+      "/api": CONGRESS_PROXY_TARGET,
+      "/auth": CONGRESS_PROXY_TARGET,
       "/congress": CONGRESS_PROXY_TARGET,
     },
   },

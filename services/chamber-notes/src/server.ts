@@ -2,12 +2,10 @@ import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import { createNoteRequestSchema, updateNoteRequestSchema } from "./types.js";
 import {
-  mountManifestAndHealth,
+  actorMiddleware,
   mountExhibitSearchRoutes,
   mountManualRefsRoutes,
-  mountStaticFrontend,
 } from "@congress/chamber-kit";
-import { notesManifest } from "./manifest.js";
 import {
   listNotes,
   listPinnedNotes,
@@ -23,11 +21,11 @@ import {
   TitleConflictError,
 } from "./notes.js";
 import { searchNoteExhibits, resolveNoteExhibits, chipNoteExhibit } from "./exhibits.js";
-import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
 
-mountManifestAndHealth(app, notesManifest);
+// Stamps who made each request - see actorContext.ts.
+app.use("/api/*", actorMiddleware);
 
 app.get("/api/notes/pinned", async (c) => {
   return c.json(await listPinnedNotes());
@@ -103,7 +101,3 @@ mountManualRefsRoutes(
   { list: listManualRefsByExhibitId, add: addManualRefByExhibitId, remove: removeManualRefByExhibitId },
   resyncNoteExhibitByExhibitId
 );
-
-app.route("/mcp", mcpApp);
-
-mountStaticFrontend(app);

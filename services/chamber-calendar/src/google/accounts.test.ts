@@ -1,4 +1,5 @@
 import { migrationsDir } from "@congress/test-support";
+import { setCongressHost } from "@congress/chamber-kit";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./oauth.js", async () => {
@@ -33,14 +34,17 @@ function insertExpiredAccount(id: number) {
 }
 
 describe("ensureFreshAccessToken", () => {
+  const publish = vi.fn();
+
   beforeEach(() => {
     db.run("delete from google_accounts");
     vi.mocked(refreshAccessToken).mockReset();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200 } as Response));
+    publish.mockReset();
+    setCongressHost({ publishEvent: publish, syncExhibit: () => {}, resolveExhibits: async () => [] });
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    setCongressHost(null);
   });
 
   it("publishes calendar.account_needs_reconnect the first time a refresh is revoked", async () => {
@@ -49,11 +53,8 @@ describe("ensureFreshAccessToken", () => {
 
     await expect(ensureFreshAccessToken(getAccountRow(1)!)).rejects.toThrow(AccountNeedsReconnectError);
 
-    expect(fetch).toHaveBeenCalledTimes(1);
-    const [url, init] = vi.mocked(fetch).mock.calls[0]!;
-    expect(url).toBe("http://127.0.0.1:9/congress/events/publish");
-    const body = JSON.parse((init as RequestInit).body as string);
-    expect(body).toMatchObject({
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish.mock.calls[0]![0]).toMatchObject({
       chamber: "calendar",
       type: "calendar.account_needs_reconnect",
       payload: { accountId: 1, label: "Account 1" },
@@ -66,11 +67,11 @@ describe("ensureFreshAccessToken", () => {
     vi.mocked(refreshAccessToken).mockRejectedValue(new RevokedTokenError());
 
     await expect(ensureFreshAccessToken(getAccountRow(1)!)).rejects.toThrow(AccountNeedsReconnectError);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledTimes(1);
 
     // A later call (e.g. the next poll cycle) still sees a stale token and
     // re-checks the same already-flagged account.
     await expect(ensureFreshAccessToken(getAccountRow(1)!)).rejects.toThrow(AccountNeedsReconnectError);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledTimes(1);
   });
 });

@@ -2,14 +2,12 @@ import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import { createTaskRequestSchema, updateTaskRequestSchema, updateTasksSettingsRequestSchema } from "./types.js";
 import {
-  mountManifestAndHealth,
+  actorMiddleware,
   mountExhibitSearchRoutes,
   mountSettingsRoutes,
   mountManualRefsRoutes,
-  mountStaticFrontend,
   mountFeedRoute,
 } from "@congress/chamber-kit";
-import { tasksManifest } from "./manifest.js";
 import { taskFeedCandidates } from "./feedRules.js";
 import { env } from "./env.js";
 import {
@@ -27,11 +25,11 @@ import {
 } from "./tasks.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { searchTaskExhibits, resolveTaskExhibits, chipTaskExhibit } from "./exhibits.js";
-import { mcpApp } from "./mcp/server.js";
 
 export const app = new Hono<{ Bindings: HttpBindings }>();
 
-mountManifestAndHealth(app, tasksManifest);
+// Stamps who made each request - see actorContext.ts.
+app.use("/api/*", actorMiddleware);
 
 app.get("/api/tasks/open", async (c) => {
   return c.json(await listOpenTasks());
@@ -98,7 +96,3 @@ mountManualRefsRoutes(
 );
 
 mountSettingsRoutes(app, { getSettings, updateSettings }, updateTasksSettingsRequestSchema);
-
-app.route("/mcp", mcpApp);
-
-mountStaticFrontend(app);

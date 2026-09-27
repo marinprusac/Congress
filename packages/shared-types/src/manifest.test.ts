@@ -6,8 +6,6 @@ const base = {
   displayName: "Notes",
   version: "0.1.0",
   routes: { home: "/notes", settings: "/notes/settings" },
-  apiBase: "http://127.0.0.1:8011/api",
-  healthUrl: "http://127.0.0.1:8011/health",
 };
 
 describe("manifestSchema views/exhibitTypes", () => {

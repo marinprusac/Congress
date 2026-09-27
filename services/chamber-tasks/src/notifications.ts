@@ -12,8 +12,6 @@ import { dueDeadline } from "./dueDate.js";
 // this Chamber's manifest.ts for the event catalog.
 export const publishEvent = createPublishEvent({
   chamber: "tasks",
-  capitolUrl: env.CAPITOL_URL,
-  internalToken: env.CONGRESS_INTERNAL_TOKEN,
 });
 
 // A task surfaces once its due date is within a day out, and stays surfaced

@@ -1,11 +1,10 @@
 import { z } from "zod";
 import { chamberSubscriptionSchema } from "./events.js";
 
-// "detached" is a manual owner override (see congress/src/registry.ts's
-// detachChamber/attachChamber) - distinct from "offline" so an incoming
-// heartbeat from a Chamber that's still actually running doesn't silently
-// undo it. Everywhere in the frontend that gates on `status === "active"`
-// already treats "detached" the same as "offline" for free.
+// "offline" means the Chamber failed to start inside Congress. "detached" is
+// a manual owner override (see congress/src/registry.ts's detachChamber/
+// attachChamber) that survives restarts. The frontend treats both as "not
+// active".
 export const chamberStatusSchema = z.enum(["active", "offline", "detached"]);
 export type ChamberStatus = z.infer<typeof chamberStatusSchema>;
 
@@ -97,13 +96,13 @@ export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
   {
     type: "congress.chamber_offline",
     label: "Chamber went offline",
-    description: "A registered Chamber missed its heartbeat threshold and was marked offline.",
+    description: "A Chamber failed to start and was marked offline.",
     payloadFields: { chamberName: { type: "string" } },
   },
   {
     type: "congress.chamber_online",
     label: "Chamber came back online",
-    description: "A previously-offline Chamber registered or heartbeated again.",
+    description: "A previously-offline Chamber started successfully again.",
     payloadFields: { chamberName: { type: "string" } },
   },
   {
@@ -153,9 +152,8 @@ export const manifestSchema = z.object({
   displayName: z.string().min(1),
   version: z.string().min(1),
   routes: manifestRoutesSchema,
-  apiBase: z.string().url(),
+  // Filled in by Congress when it loads the Chamber (its /mcp/<name> mount).
   mcpUrl: z.string().url().optional(),
-  healthUrl: z.string().url(),
   // Home feed views and "+"-creatable Exhibit types - see the schemas above.
   // Defaulted so a Chamber registering an older manifest shape (or one with
   // neither) never has to think about these fields.
@@ -170,11 +168,8 @@ export type Manifest = z.infer<typeof manifestSchema>;
 export const chamberRegistryEntrySchema = manifestSchema.extend({
   status: chamberStatusSchema,
   registeredAt: z.string(),
-  lastHeartbeatAt: z.string().nullable(),
-  // This Chamber's current dynamic event interest list, kept fresh on every
-  // heartbeat (see events.ts's chamberSubscriptionSchema) - not part of the
-  // static manifest above, since it changes at runtime as the Chamber's own
-  // rules/automations are edited, independent of a redeploy.
+  // This Chamber's current event interest list (see events.ts's
+  // chamberSubscriptionSchema), read live from the loaded module.
   subscriptions: z.array(chamberSubscriptionSchema).default([]),
 });
 export type ChamberRegistryEntry = z.infer<typeof chamberRegistryEntrySchema>;

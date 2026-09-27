@@ -3,7 +3,6 @@ import { like, or, inArray, desc } from "drizzle-orm";
 import { createTableBackedExhibits, createPushExhibitSync, scoreExhibitMatch } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
 import { workouts } from "./db/schema.js";
-import { env } from "./env.js";
 import { composeExhibitTitle } from "./workoutTitle.js";
 import { getSettings } from "./settings.js";
 import { listRoutines, getRoutine, toRoutineExhibitId, parseRoutineExhibitId } from "./routines.js";
@@ -72,8 +71,6 @@ export const resolveWorkoutExhibits = workoutExhibits.resolve;
 
 export const pushExhibitSync = createPushExhibitSync({
   chamber: "fitness",
-  capitolUrl: env.CAPITOL_URL,
-  internalToken: env.CONGRESS_INTERNAL_TOKEN,
 });
 
 // Routines are Hevy-backed, not a local table - styled directly on

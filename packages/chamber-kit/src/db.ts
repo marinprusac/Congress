@@ -45,3 +45,32 @@ export function createDb<TSchema extends Record<string, unknown>>(dbPath: string
 
   return { db, runMigrations, closeDb };
 }
+
+// For a Chamber: opens its SQLite file on first use (not at import), so
+// Congress can point it at the Chamber's own path first. `db` forwards to the
+// real handle; closeDb() lets the next use reopen it.
+export function createLazyDb<TSchema extends Record<string, unknown>>(
+  resolvePath: () => string,
+  schema: TSchema,
+  migrationsFolder: string
+) {
+  let handle: ReturnType<typeof createDb<TSchema>> | null = null;
+  const open = () => (handle ??= createDb(resolvePath(), schema));
+
+  const db = new Proxy({} as ReturnType<typeof createDb<TSchema>>["db"], {
+    get(_target, prop) {
+      const real = open().db;
+      const value = Reflect.get(real, prop, real);
+      return typeof value === "function" ? value.bind(real) : value;
+    },
+  });
+
+  return {
+    db,
+    runMigrations: (folder = migrationsFolder) => open().runMigrations(folder),
+    closeDb: () => {
+      handle?.closeDb();
+      handle = null;
+    },
+  };
+}

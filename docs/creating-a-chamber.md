@@ -1,39 +1,42 @@
 # Creating a Chamber
 
-This is the practical guide to building your own Chamber — a new, fully
-independent module (own process, own port, own SQLite file, own frontend
-build, own MCP server) that plugs into Congress. For the *why* behind this
-architecture (why Chambers are genuinely separate processes rather than
-modules in one app, why Exhibits work the way they do, the full design
-intent), read `docs/congress-project-brief.md` first — this doc assumes
-that context and focuses on the *how*.
+This is the practical guide to building your own Chamber — a new module
+(own folder and package, own SQLite file, own `.env`, own frontend build, own
+MCP tools) that Congress loads into its own process. For the *why* behind
+Exhibits and the rest of the design intent, read
+`docs/congress-project-brief.md` first — but note that the brief's
+"every Chamber is a separate process" is no longer true: Chambers are
+modules inside Congress now (see CLAUDE.md, "The Chamber contract").
 
 If you just want to start: skip to [Quickstart](#quickstart).
 
 ## 1. What a Chamber is
 
-Every Chamber implements the same small contract:
+Every Chamber's `src/module.ts` default-exports a `defineChamber({...})`:
 
-- `GET /manifest` — self-description (name, routes, apiBase, mcpUrl, healthUrl, views, exhibitTypes, events).
-- `GET /health` — liveness.
-- Exhibit editor routes, an optional settings panel, and zero or more *views* (genuine screens — see §5.1).
-- `GET /api/feed` — what of yours belongs on Congress's home feed right now (§5.1).
-- A REST API under `/api/*`.
-- An MCP server at `/mcp`.
+- `manifest` — self-description (name, routes, views, exhibitTypes, events).
+- `app` — a Hono app with your REST API under `/api/*`: exhibit editor
+  routes, `GET /api/feed` (what of yours belongs on the home feed, §5.1), the
+  Exhibit search/resolve contract (§4), an optional settings API.
+- `registerTools` — your MCP tools.
+- `dir` and `initEnv` — your folder, and your config loader.
+- `start()` / `stop()` — migrations plus any pollers/timers you run.
 
-On boot, a Chamber `POST`s its manifest to `/congress/register` (retrying
-with backoff so start order never matters), then heartbeats on an interval.
-Congress marks it `offline` if a heartbeat is missed. That's the entire
-handshake — there is no second step where you register a Chamber with
-Congress by editing Congress's own code. See §5 for exactly what that buys
-you for free.
+Congress imports every module listed in
+`services/congress/src/chambers/modules.ts` and, at boot, hands each one its
+own `.env`, calls `start()`, and registers its manifest. Your API is then
+reachable at `/api/<name>/*` (dispatched in-process), your MCP tools at
+`/mcp/<name>`, and your built frontend at `/<name>/*`. A Chamber whose config
+or `start()` throws is marked `offline` and skipped — it can't take Congress
+down. See §5 for what else that buys you for free.
 
 Two packages exist specifically so you almost never write this contract by
 hand:
 
-- **`@congress/chamber-kit`** — backend factories: DB setup, env loading,
-  the registration/heartbeat/shutdown lifecycle, MCP transport, the Exhibit
-  content contract, settings, manual references, wikilink parsing.
+- **`@congress/chamber-kit`** — backend factories: `defineChamber`, lazy DB
+  setup, per-Chamber config, MCP tools, the Exhibit content contract,
+  settings, manual references, wikilink parsing, and the calls back into
+  Congress (events, exhibit sync).
 - **`@congress/congress-ui`** — the shared frontend surface: page layout,
   Exhibit chips/picker/annotated text, dark mode, the Chamber icon set,
   form primitives, the view-card body.
@@ -43,44 +46,43 @@ A handful of frontend files (`Layout.tsx`, `main.tsx`, `App.tsx`,
 *deliberately* kept as small, per-Chamber files rather than further
 abstracted — routing, copy, and what counts as urgent are genuinely
 Chamber-specific. Everything that was ever
-pure copy-paste boilerplate (icons, DB/env/MCP/registration wiring, the
+pure copy-paste boilerplate (icons, DB/env/MCP wiring, the
 exhibits/settings/route-mounting pattern) has already been factored into
 the two packages above.
 
 ## 2. Quickstart
 
 ```
-pnpm create-chamber <name> "<Display Name>" <port>
+pnpm create-chamber <name> "<Display Name>"
 # e.g.
-pnpm create-chamber budget "Budget" 8015
+pnpm create-chamber budget "Budget"
 pnpm install
 ```
 
 This generates `services/chamber-budget/` — a complete, working Chamber
 with a generic single-entity example ("Items": a name + a body, searchable,
 cross-referenceable via `[[...]]`, with view/new/settings pages, an example
-home-feed rule in `src/feedRules.ts`, and no views), its own placeholder icon
-(`frontend/public/icons/mark.svg`, ready to swap for real artwork whenever
-you like — see §5) — plus `infra/systemd/congress-chamber-budget.service`
-for later production rollout. It also seeds `services/chamber-budget/.env`
-from `.env.example` (untracked, like every other Chamber's `.env`) and
-prints a checklist of what to edit next.
+home-feed rule in `src/feedRules.ts`, and no views) and its own placeholder
+icon (`frontend/public/icons/mark.svg`, ready to swap for real artwork
+whenever you like — see §5). It also adds the Chamber to Congress's module
+list (`services/congress/src/chambers/modules.ts` plus a workspace
+dependency in `services/congress/package.json`), seeds
+`services/chamber-budget/.env` from `.env.example` (untracked, like every
+other Chamber's `.env`), and prints a checklist of what to edit next.
 
-The generator validates your chosen name (lowercase kebab-case) and port
-against every existing service's `package.json` and `.env.example`, so a
-collision fails immediately instead of silently colliding with a running
-Chamber later.
+The generator validates your chosen name (lowercase kebab-case) against
+every existing service's `package.json`.
 
-Bring it up locally:
+Bring it up locally — there's no Chamber process to start; Congress runs it:
 
 ```
-pnpm --filter chamber-budget dev:server   # backend, watch mode
-pnpm --filter chamber-budget dev:web      # frontend, separate terminal
+pnpm --filter chamber-budget db:generate   # the template ships no migrations yet
+pnpm --filter congress dev:server          # Congress + every Chamber, one process
 ```
 
-Visit `http://localhost:8015` — the generated Chamber runs standalone.
-Registration with Congress happens automatically on backend boot as long as
-Congress itself is running (`pnpm dev:congress` from repo root) — see §5.
+To iterate on the frontend with hot reload, `pnpm --filter chamber-budget
+dev:web` runs your Chamber's Vite dev server, which proxies `/api`, `/auth`
+and `/congress` to Congress on `:3000`.
 
 ## 3. What's generated vs. what you write by hand
 
@@ -110,22 +112,19 @@ don't reimplement them:
 
 | Factory | What it gives you |
 |---|---|
-| `createDb(dbPath, schema)` | better-sqlite3 + WAL + drizzle, migrations wired up. |
-| `loadEnv(schema)` | zod-validated env loading; extend `chamberEnvSchema` with your own `PORT`/`DB_PATH` defaults. |
-| `createChamberBootstrap({...})` | The entire boot sequence — migrate, listen, register + heartbeat with Congress, clean shutdown on SIGINT/SIGTERM. Your `src/index.ts` is ~7 lines that call this once. |
-| `createMcpApp(name, registerTools, internalToken)` | The full MCP transport/session/error plumbing, plus gating `/mcp` behind the same shared-secret header used for register/heartbeat/events - you only write `server.registerTool(...)` calls. |
-| `fetchRegistry(capitolUrl, internalToken)` | Server-side counterpart to congress-ui's own `fetchRegistry` - resolves another Chamber's `apiBase`/`mcpUrl` out of the live registry, e.g. before calling one of its tools. |
-| `listChamberTools(mcpUrl, internalToken)` / `callChamberTool(mcpUrl, internalToken, name, args)` | A short-lived MCP *client* against another Chamber's own `mcpUrl` - `tools/list`/`tools/call`, gated the same way. What Automation Chamber's automations use to actually do something, see §5.4. |
+| `defineChamber({...})` | Your `src/module.ts` — what Congress loads (see §1). |
+| `createLazyDb(() => env.DB_PATH, schema, migrationsFolder)` | better-sqlite3 + WAL + drizzle, opened on first use rather than on import, migrations wired up. |
+| `defineChamberEnv(name, schema)` | Your zod-validated config, parsed from the source Congress hands `initEnv` (your own `.env`), never the shared `process.env`. Resolve relative paths against your folder (see any Chamber's `src/env.ts`). |
+| `registerTools` + `mcpTextResult` | Your MCP tools; Congress mounts the transport at `/mcp/<name>` — you only write `server.registerTool(...)` calls. |
 | `createTableBackedExhibits(config)` | Implements the whole Exhibit content contract (search/resolve) for a table-backed entity from a handful of callbacks. |
-| `createPushExhibitSync(opts)` | Fire-and-forget `POST /congress/exhibits/sync` after create/update/delete. |
-| `createPublishEvent(opts)` | Fire-and-forget `POST /congress/events/publish` for a domain event another Chamber's rules or automations might react to - see §5.3. |
-| `mountEventReceiveRoute(app, internalToken, onEvent)` | Mounts `POST /api/events/receive`, the push counterpart to `createPublishEvent` - Congress calls this directly the moment a publish matches your own declared subscriptions, instead of you polling for it. See §5.3. |
+| `createPushExhibitSync({ chamber })` | Hands Congress an exhibit create/update/delete, in-process. |
+| `createPublishEvent({ chamber })` | Publishes a domain event to Congress's relay, in-process — see §5.3. |
+| `resolveExhibitsServerSide(refs)` | Resolve exhibit tokens to their current labels from your backend. |
 | `createSingleRowSettings(config)` | The "id is always 1, select-then-upsert" settings pattern every Chamber uses. |
 | `createManualRefs`/`createManualRefsByExhibitId` | CRUD for the "Connections" side-panel's manually-added refs, separate from wikilinks parsed out of body text. |
 | `extractOutgoingExhibitRefs(text)` | Parses `[[...]]` tokens out of body text into an exhibit-id list. |
 | `mountFeedRoute(app, getCandidates)`, `formatDuration`, `closeness`, `plainTextPreview` | `GET /api/feed` for Congress's home feed, plus helpers for phrasing a candidate's reason and flattening a body into its inline preview — see §5.1. |
-| `runCongressAi(capitolUrl, internalToken, { prompt, actor, meta })`, `fetchCongressAiSettings` | Run a prompt through Congress's own AI (queued, budget/pause-guarded, MCP access to every Chamber) and read its pause switch. Rarely needed: Congress's AI already sees every published event and can track things on its own. Never spawn `claude` yourself. |
-| `mountManifestAndHealth`, `mountExhibitSearchRoutes`, `mountSettingsRoutes`, `mountManualRefsRoutes`, `mountStaticFrontend` | One-line Hono route mounting for each of the above. Mount `mountStaticFrontend` last — it's the SPA fallback; it also serves `frontend/public/*` directly (falling through from `frontend/dist`) so assets like your icon resolve even before `build:web` has run. |
+| `actorMiddleware`, `mountExhibitSearchRoutes`, `mountSettingsRoutes`, `mountManualRefsRoutes` | One-line Hono route mounting for each of the above; `app.use("/api/*", actorMiddleware)` first, so events you publish are attributed to whoever made the request. |
 
 And `congress-ui`'s frontend surface:
 
@@ -140,7 +139,7 @@ And `congress-ui`'s frontend surface:
 | `useSearchableList`, `useListRowPrefetch`, `ListSearchInput`, `ListLoadingState`, `ListErrorState`, `ListEmptyState` | Search + loading/error/empty states + hover-prefetch, for a view that genuinely needs a list. |
 | `PageHeader`, `FormLabel`, `FormTextInput`, `FormErrorMessage`, `FormSubmitButton` | Generic page/form chrome. |
 | `ViewCard` | Loading/error/empty body for a view's feed card — see §5.1. |
-| `createQueryClient`, `resolveApiBase`, `parseJsonResponse`, `assertDeleteOk`, `confirmDelete` | Per-Chamber isolated TanStack Query client, dev/prod API base resolution, fetch helpers. |
+| `createQueryClient`, `resolveApiBase`, `parseJsonResponse`, `assertDeleteOk`, `confirmDelete` | Per-Chamber isolated TanStack Query client, your API base (`/api/<name>`), fetch helpers. |
 
 ## 4. The Exhibit contract (cross-Chamber search & linking)
 
@@ -161,13 +160,11 @@ hand instead of using the factory.
 
 ## 5. Plugging into Congress
 
-This is automatic. `gateway.ts`'s `/api/:chamber/*` and `/<chamberName>/*`
-proxying, the chamber registry, Congress's home feed, Search, the "+" sheet,
-and Congress's shell-hosting (`ChamberHost` dynamically `import()`ing your
-Chamber's `remote-entry.js`) are all driven by the `/congress/registry` API
-— they pick up a new Chamber the moment it successfully registers and
-heartbeats. **There is no Congress-side code to edit** to make a new Chamber
-appear.
+Once your module is in Congress's module list (the generator does this), the
+rest is automatic: `/api/<name>/*` dispatch, `/mcp/<name>`, serving your
+built frontend at `/<name>/*`, the chamber registry, the home feed, Search,
+the "+" sheet, and shell-hosting (`ChamberHost` dynamically `import()`ing
+your `remote-entry.js`) all pick your Chamber up at boot.
 
 ### 5.1 The home screen: feed, "+", Search and views
 
@@ -241,10 +238,10 @@ so it keeps the `currentColor` behavior. A Chamber that's offline, or one
 that never got around to shipping its own `mark.svg`, falls back to a
 generic mark everywhere its icon would appear — never broken, just plain.
 
-Everything else — including `mcpUrl`, which is what makes your Chamber's
-tools reachable at `/mcp` (gated by `CONGRESS_INTERNAL_TOKEN`, not a
-session cookie, since MCP clients are machines) — just works once the
-manifest is correct and the process is heartbeating.
+Everything else — including your MCP tools at `/mcp/<name>` (gated by
+`CONGRESS_INTERNAL_TOKEN`, not a session cookie, since MCP clients are
+machines) — just works once the manifest is correct and the module is in
+Congress's module list.
 
 ### 5.2 Settings tab
 
@@ -285,11 +282,7 @@ anything is listening at all.
 ```ts
 import { createPublishEvent } from "@congress/chamber-kit";
 
-const publishEvent = createPublishEvent({
-  chamber: "budget",
-  capitolUrl: env.CAPITOL_URL,
-  internalToken: env.CONGRESS_INTERNAL_TOKEN,
-});
+const publishEvent = createPublishEvent({ chamber: "budget" });
 
 await publishEvent({
   type: "budget.overspent",
@@ -299,12 +292,10 @@ await publishEvent({
 
 `type` is conventionally `"<chamber>.<event>"` (e.g. `budget.overspent`) so
 it's self-namespacing without a separate chamber filter downstream. Congress
-never stores this or inspects `type`/`payload` — `POST
-/congress/events/publish` immediately push-relays it to every currently-
-active Chamber whose own declared subscriptions match (see "Receiving
-events" below), retrying a briefly-unreachable one with increasing delays
-rather than storing anything durably. Publishing works the same whether or
-not anything happens to be subscribed, or even registered.
+never stores this or inspects `type`/`payload` — it hands it, in-process, to
+Congress's own log rules and AI and to every active Chamber whose
+subscriptions match (see "Receiving events" below). Publishing works the
+same whether or not anything happens to be subscribed.
 
 Optionally declare the event types you may publish in your manifest's
 `events` array (`type`/`label`/`description?`):
@@ -325,56 +316,32 @@ picker on Congress's Logs settings and the AI's watched events (read live off
 subscription or a requirement to actually fire that event. Defaulted to
 `[]`, so most Chambers never touch this field at all.
 
-**Receiving events** is symmetric, and just as generic — every Chamber gets
-it via `chamber-kit`, whether or not it ever ends up used. There are two
-halves: a fixed-convention route that Congress pushes to, and a dynamic
-subscription list carried on your existing heartbeat that tells Congress
-what you actually want pushed.
+**Receiving events** is two optional fields on your module:
 
 ```ts
-// server.ts
-import { mountEventReceiveRoute } from "@congress/chamber-kit";
-
-mountEventReceiveRoute(app, env.CONGRESS_INTERNAL_TOKEN, async (event) => {
-  if (event.type !== "budget.overspent") return;
-  // ...react to event.payload...
+// module.ts
+export default defineChamber({
+  // ...manifest, app, registerTools, dir, initEnv, start, stop...
+  subscriptions: () => [{ type: "budget.overspent" }],
+  onEvent: async (event) => {
+    if (event.type !== "budget.overspent") return;
+    // ...react to event.payload...
+  },
 });
 ```
 
-```ts
-// index.ts
-const { heartbeatNow } = createChamberBootstrap({
-  // ...displayName, manifest, app, env, runMigrations, closeDb...
-  getSubscriptions: () => [{ type: "budget.overspent" }],
-});
-```
-
-`getSubscriptions` is read fresh on every heartbeat (not baked into the
-static manifest), so it can reflect owner-editable state: recompute it
-from whatever rules currently reference a trigger type, aggregating to one
-entry per type. `type: "*"` subscribes to every event type regardless of
-what it's called, for a Chamber whose own logic doesn't filter by type at
-all.
-Congress's own filter is only ever a coarse "could this possibly interest
-this Chamber" gate; do your own precise per-rule matching (condition
-fields, whatever else you need) inside `onEvent` after receiving, same as
-before this system moved off polling. If a rule/directive mutation
-changes what `getSubscriptions()` would now return, call the returned
-`heartbeatNow()` right after the mutation so Congress's copy updates
-immediately instead of waiting up to `HEARTBEAT_INTERVAL_MS` for the next
-scheduled beat.
-
-A Chamber that never expects to react to another Chamber's events omits
-`getSubscriptions` and `mountEventReceiveRoute` entirely — there's nothing
-to opt into structurally, and Congress simply never has anything to push to
-it.
+`subscriptions()` is read fresh on every publish, so it can reflect
+owner-editable state and changes take effect immediately. `type: "*"`
+subscribes to every event type. Congress's filter is only a coarse gate; do
+your own precise matching inside `onEvent`. A throwing handler is logged and
+never affects the publisher or other subscribers. A Chamber that never
+reacts to events omits both.
 
 ### 5.4 Being called through MCP
 
 Any MCP tool your Chamber registers via `registerTools` (§4) is automatically
-callable by Congress's AI (and any MCP client) — there's nothing to opt into
-or declare separately, since callers just resolve your `mcpUrl` off the
-registry and call whatever `tools/list` returns. A clear `description`
+callable by Congress's AI (and any MCP client, with the internal token) at
+`/mcp/<name>` — there's nothing to opt into or declare separately. A clear `description`
 and per-property `description`s in your `inputSchema` are what the agent
 sees when deciding how to use your tools, so they're worth the same care
 as your REST API's own request validation.
@@ -382,48 +349,33 @@ as your REST API's own request validation.
 ## 6. Local dev workflow
 
 ```
-pnpm --filter chamber-<name> dev:server     # backend, tsx watch mode
-pnpm --filter chamber-<name> dev:web        # frontend, Vite dev server
+pnpm --filter congress dev:server           # Congress + every Chamber, tsx watch mode
+pnpm --filter chamber-<name> dev:web        # your frontend, Vite dev server
 pnpm --filter chamber-<name> typecheck      # tsc --noEmit, server + frontend
-pnpm -r typecheck                           # the whole repo - run before committing
+pnpm typecheck && pnpm test                 # the whole repo - run before committing
 ```
 
-There's no test suite in this repo — `pnpm -r typecheck` is the one
-automated check, and it's expected to pass cleanly. The dev frontend proxies
-`/api`, `/manifest`, `/health`, `/mcp` to your Chamber's own backend port,
-and exhibit search/resolve calls to Congress's dev port (`3000`) —
-see the `PROXY_TARGET`/`CAPITOL_PROXY_TARGET` constants at the top of
-`frontend/vite.config.ts` if you ever need to point dev at a non-default
-port.
+Your Chamber's config comes from its own `services/chamber-<name>/.env`. The
+dev frontend proxies `/api`, `/auth` and `/congress` to Congress's dev port
+(`3000`) — see `CONGRESS_PROXY_TARGET` at the top of
+`frontend/vite.config.ts`. A new feature ships with tests in the same change
+(see CLAUDE.md).
 
 ## 7. Shipping to production
 
-Two extra build artifacts are required for shell-hosting (Congress embedding
-your Chamber's frontend directly, not just proxying to it) beyond the
-normal `build:web`:
+Your frontend needs its normal build plus the shell-hosting artifact:
 
 ```
 pnpm --filter chamber-<name> build:web      # normal production build
 pnpm --filter chamber-<name> build:remote   # shell-hosting artifact, run after build:web
 ```
 
-`infra/deploy/build-artifacts.sh` (which the GitHub Actions deploy workflow
-runs on every push to `main`) already discovers and builds every
-`services/chamber-*/` directory this way automatically — a new Chamber
-needs **zero edits** to that script. What's still manual, on the server,
-one time per Chamber:
-
-1. Copy the systemd unit the scaffold already generated for you
-   (`infra/systemd/congress-chamber-<name>.service`) to
-   `/etc/systemd/system/` and `daemon-reload`.
-2. Create `services/chamber-<name>/.env` on the server (untracked) with
-   production values — critically, `CAPITOL_URL=http://127.0.0.1:8000`
-   (the `.env.example` default of `:3000` is the dev value).
-3. `sudo systemctl enable --now congress-chamber-<name>`.
-
-Full detail (including the passwordless-sudo requirement `remote-apply.sh`
-depends on) is in `infra/README.md`'s "Adding a new Chamber's infra"
-section.
+`infra/deploy/build-artifacts.sh` (run by the GitHub Actions deploy on every
+push to `main`) already discovers and builds every `services/chamber-*/`
+directory, and the deploy restarts `congress-core`, which loads your module.
+The only manual step, one time: if your Chamber needs config, create
+`services/chamber-<name>/.env` on the server (untracked) from its
+`.env.example`. See `infra/README.md`.
 
 ## 8. Self-hosting the whole system from scratch
 
@@ -435,19 +387,18 @@ access-control model (public HTTPS + a signed session cookie, not
 Tailscale/network-level access — see that doc for why). Its "First-time
 server bootstrap" section is a literal, copy-pasteable script.
 
-The short version: one VPS, one `systemd` unit per service (all bound to
-`127.0.0.1`), Caddy as the only public listener (reverse-proxying to
-Congress alone — no Chamber port is ever exposed), and a 30-second polling
-timer that fast-forwards `origin/main`, rebuilds, and restarts affected
-services. There's no separate "deploy" step — pushing to `main` *is* the
+The short version: one VPS, one `systemd` unit (`congress-core`, bound to
+`127.0.0.1`) running Congress and every Chamber in one process, Caddy as the
+only public listener, and a GitHub Actions workflow that builds, rsyncs and
+restarts it. There's no separate "deploy" step — pushing to `main` *is* the
 deploy.
 
 ## 9. Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|
-| New Chamber never appears in Search, the "+" sheet or the home feed | Check its process logs for registration errors — usually a wrong `CAPITOL_URL` or mismatched `CONGRESS_INTERNAL_TOKEN` between the Chamber's `.env` and Congress's. |
-| Chamber shows as `offline` in the registry | Missed heartbeats — check the process is actually still running and `HEARTBEAT_INTERVAL_MS` vs. Congress's sweep timeout haven't drifted apart. |
-| `chamber_unreachable` 503 from Congress's gateway | The registered `apiBase` in the manifest doesn't actually resolve (typo, wrong port, or the Chamber crashed after registering but before deregistering). |
+| New Chamber never appears in Search, the "+" sheet or the home feed | It isn't in `services/congress/src/chambers/modules.ts`, or it failed to start — check Congress's log for `[<name>] failed to start`. |
+| Chamber shows as `offline` in the registry | Its config (`.env`) failed validation or its `start()` threw at boot. Fix it and restart Congress. |
+| `chamber_offline` 503 from Congress's gateway | The Chamber is offline (above) or the owner detached it. |
 | Exhibit chips render as a generic diamond icon everywhere | That Chamber hasn't shipped `frontend/public/icons/mark.svg` yet, is offline, or the fetch to `/congress/chambers/<name>/icon` failed — see §5. Not a bug, just unbranded. |
-| 404s or empty responses only in production, not dev | Almost always a chamber-name-string mismatch somewhere production-only touches — `resolveApiBase("<name>", ...)` in `frontend/src/lib/api.ts`, the Vite `base: "/<name>/"` in both `vite.config.ts` and `vite.remote.config.ts`, or `ownChamber`/`ChamberMark name=` in `Layout.tsx`. The scaffold generator keeps these in sync automatically; if you're hand-editing an existing Chamber's name after the fact, grep for the old name across `src/`, `frontend/src/`, and `infra/`. |
+| 404s or empty responses only in production, not dev | Almost always a chamber-name-string mismatch somewhere production-only touches — `resolveApiBase("<name>")` in `frontend/src/lib/api.ts`, `name` in `src/manifest.ts`, the Vite `base: "/<name>/"` in both `vite.config.ts` and `vite.remote.config.ts`, or `ownChamber`/`ChamberMark name=` in `Layout.tsx`. The scaffold generator keeps these in sync automatically; if you're hand-editing an existing Chamber's name after the fact, grep for the old name across `src/`, `frontend/src/`, and `infra/`. |

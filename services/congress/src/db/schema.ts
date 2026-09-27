@@ -9,11 +9,8 @@ export const chambers = sqliteTable("chambers", {
   viewsJson: text("views_json").notNull().default("[]"),
   exhibitTypesJson: text("exhibit_types_json").notNull().default("[]"),
   eventsJson: text("events_json").notNull().default("[]"),
-  // This Chamber's current dynamic event interest list (see shared-types/
-  // events.ts's chamberSubscriptionSchema), refreshed on every heartbeat -
-  // small bounded routing metadata, not an event log, so keeping it here
-  // doesn't reopen the "Congress stores no events" decision. Read by
-  // events.ts's fan-out to decide who a given publish gets pushed to.
+  // The Chamber's event interest list when it was loaded (informational;
+  // events.ts reads the module's subscriptions() live).
   subscriptionsJson: text("subscriptions_json").notNull().default("[]"),
   apiBase: text("api_base").notNull(),
   mcpUrl: text("mcp_url"),

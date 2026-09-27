@@ -1,36 +1,21 @@
 import { Hono } from "hono";
-import type { Context } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import { z } from "zod";
-import { mountManifestAndHealth, mountStaticFrontend } from "@congress/chamber-kit";
+import { createMcpApp, mountManifestAndHealth, mountStaticFrontend } from "@congress/chamber-kit";
 import {
   updateEventSettingsRequestSchema,
   pushSubscriptionRequestSchema,
   pushUnsubscribeRequestSchema,
-  manifestSchema,
-  exhibitSyncRequestSchema,
   updateCapitolSettingsRequestSchema,
-  eventPublishRequestSchema,
-  chamberSubscriptionSchema,
   manualRefRequestSchema,
-  RESERVED_CHAMBER_NAMES,
 } from "@congress/shared-types";
 import { env } from "./env.js";
-import { requireInternalToken, requireSessionOrInternalToken } from "./auth.js";
 import { authRoutes, requireSession } from "./sessionAuth.js";
 import { capitolManifest } from "./manifest.js";
+import { listChambers, getChamber } from "./registry.js";
+import { dispatchToChamber, forwardToChamber, serveChamberAssets, serveChamberIcon } from "./gateway.js";
+import { getModule } from "./chambers/runtime.js";
 import {
-  registerChamber,
-  deregisterChamber,
-  recordHeartbeat,
-  listChambers,
-  sweepStaleChambers,
-  getChamber,
-} from "./registry.js";
-import { forwardToChamber, forwardToChamberFrontend, proxyToChamberIcon, proxyToChamberPath } from "./gateway.js";
-import { hasValidSession } from "./sessionAuth.js";
-import {
-  syncExhibit,
   searchExhibits,
   resolveExhibits,
   getConnections,
@@ -49,21 +34,6 @@ import { parseRunContext, withRunContext } from "./ai/runContext.js";
 import { aiRoutes } from "./ai/routes.js";
 import { getFeed } from "./feed.js";
 
-// Only Capitol itself validates register/deregister/heartbeat/exhibit-resolve
-// requests - no Chamber ever needs these shapes, so they live here rather
-// than in the shared-types barrel every service imports. `subscriptions` on
-// both register and heartbeat is this Chamber's own dynamic event interest
-// list (see shared-types/events.ts's chamberSubscriptionSchema) - defaulted
-// so a Chamber that never subscribes to anything doesn't have to think
-// about this field.
-const registerRequestSchema = manifestSchema.extend({
-  subscriptions: z.array(chamberSubscriptionSchema).default([]),
-});
-const deregisterRequestSchema = z.object({ name: z.string().min(1) });
-const heartbeatRequestSchema = z.object({
-  name: z.string().min(1),
-  subscriptions: z.array(chamberSubscriptionSchema).default([]),
-});
 // Chamber included per-ref since an id that never synced has no cache row to
 // infer the owning chamber from.
 const capitolExhibitResolveRequestSchema = z.object({
@@ -76,10 +46,10 @@ mountManifestAndHealth(app, capitolManifest);
 
 app.route("/auth", authRoutes);
 
-app.get("/congress/registry", requireSessionOrInternalToken, (c) => c.json(listChambers()));
+app.get("/congress/registry", requireSession, (c) => c.json(listChambers()));
 
-// Public/unauthenticated - see proxyToChamberIcon's own comment for why.
-app.get("/congress/chambers/:name/icon", (c) => proxyToChamberIcon(c, c.req.param("name")));
+// Public/unauthenticated - see serveChamberIcon's own comment for why.
+app.get("/congress/chambers/:name/icon", (c) => serveChamberIcon(c, c.req.param("name")));
 
 app.get("/congress/settings", requireSession, async (c) => c.json(await getSettings()));
 
@@ -96,8 +66,8 @@ app.put("/congress/settings", requireSession, async (c) => {
 // exhibits, merged and ranked. See feed.ts.
 app.get("/congress/feed", requireSession, async (c) => c.json({ items: await getFeed() }));
 
-// Congress's own AI: the chat, the shared budget/pause settings, the live
-// run stream, and POST /congress/ai/run for Chambers - see ai/routes.ts.
+// Congress's own AI: the chat, the shared budget/pause settings and the
+// live run stream - see ai/routes.ts.
 app.route("/congress/ai", aiRoutes);
 
 // One row per known event type, auto-derived from the live registry - no
@@ -167,75 +137,9 @@ app.post("/congress/push/unsubscribe", requireSession, async (c) => {
   return c.json({ ok: true });
 });
 
-app.post("/congress/register", requireInternalToken, async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = registerRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_manifest", issues: parsed.error.flatten() }, 400);
-  }
-  // A Chamber is served at "/<name>/*" - one named after a shell route
-  // would be unreachable (see RESERVED_CHAMBER_NAMES).
-  if ((RESERVED_CHAMBER_NAMES as readonly string[]).includes(parsed.data.name)) {
-    return c.json({ error: "reserved_name" }, 400);
-  }
-  const entry = registerChamber(parsed.data, parsed.data.subscriptions);
-  return c.json(entry, 201);
-});
-
-app.post("/congress/deregister", requireInternalToken, async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = deregisterRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  const entry = deregisterChamber(parsed.data.name);
-  if (!entry) return c.json({ error: "chamber_not_found" }, 404);
-  return c.json(entry, 200);
-});
-
-app.post("/congress/heartbeat", requireInternalToken, async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = heartbeatRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  const entry = recordHeartbeat(parsed.data.name, parsed.data.subscriptions);
-  if (!entry) return c.json({ error: "chamber_not_found" }, 404);
-  return c.json(entry, 200);
-});
-
-app.post("/congress/exhibits/sync", requireInternalToken, async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = exhibitSyncRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  syncExhibit(parsed.data);
-  return c.json({ ok: true });
-});
-
-// Push-relays a domain event to every currently-active, currently-
-// subscribed Chamber instead of storing it - see events.ts's own comment.
-// Not awaited: publishEvent kicks off each interested Chamber's own
-// background delivery/retry and returns immediately, so a slow or
-// temporarily-unreachable subscriber never makes the publishing Chamber's
-// own request hang.
-app.post("/congress/events/publish", requireInternalToken, async (c) => {
-  const body = await c.req.json().catch(() => null);
-  const parsed = eventPublishRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  }
-  publishEvent(parsed.data);
-  return c.json({ ok: true });
-});
-
 // The browser itself is the publisher here, not another Chamber - the PWA
 // shell's own service-worker controllerchange handler (main.tsx) calls this
-// right before it force-reloads onto a newly-activated version. Session-
-// gated rather than internal-token-gated for that reason (see
-// requireSessionOrInternalToken's own comment on the same distinction for
-// /congress/registry).
+// right before it force-reloads onto a newly-activated version.
 app.post("/congress/events/app-updated", requireSession, async (c) => {
   publishEvent({ chamber: "congress", type: "congress.app_updated", payload: {} });
   return c.json({ ok: true });
@@ -249,11 +153,7 @@ app.get("/congress/exhibits/search", requireSession, async (c) => {
   return c.json({ results });
 });
 
-// requireSessionOrInternalToken (not requireSession) - a Chamber's own
-// backend resolves exhibit tokens too now (e.g. chamber-calendar projecting
-// a rich value's tokens to plain labels before syncing to Google), and it
-// has no session cookie to present, only the shared internal token.
-app.post("/congress/exhibits/resolve", requireSessionOrInternalToken, async (c) => {
+app.post("/congress/exhibits/resolve", requireSession, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = capitolExhibitResolveRequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -273,8 +173,7 @@ app.get("/congress/exhibits/:id/connections", requireSession, async (c) => {
 // (`targetExhibitId`) - proxies to `:id`'s own Chamber's
 // "/api/exhibits/:id/refs" (see mountManualRefsRoutes in @congress/chamber-kit).
 // Shares its logic with the create_exhibit_connection MCP tool via
-// addManualConnection, since an MCP tool handler has no Hono Context to hand
-// proxyToChamberPath (which this route used to call directly).
+// addManualConnection.
 app.post("/congress/exhibits/:id/connections", requireSession, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = manualRefRequestSchema.safeParse(body);
@@ -297,60 +196,36 @@ app.delete("/congress/exhibits/:id/connections/:otherExhibitId", requireSession,
   return c.json(result);
 });
 
-// Reachable at /api/fitness/health/ingest, forwarded through
-// unauthenticated by Congress itself - unlike every other "/api/:chamber/*"
-// request, this one is called by an iOS Shortcuts automation, which cannot
-// present a session cookie. The secret check happens entirely inside
-// chamber-fitness's own route handler (src/health/ingest.ts), comparing a
-// caller-supplied header against that Chamber's own settings row - safe
-// because chamber-fitness itself is only reachable through this forward
-// (only Congress is publicly exposed; every Chamber binds 127.0.0.1).
-// Registered ahead of the generic "/api/:chamber/*" wildcard below (Hono
-// matches route registration order), exactly like every /congress/* route
-// already is. No dedicated auth middleware here on purpose - Congress
-// asserts nothing about the caller for this one path, so a middleware whose
-// only job would be to call next() is pure ceremony.
-app.post("/api/fitness/health/ingest", (c) => proxyToChamberPath(c, "fitness", "/health/ingest", "system"));
+// Called by an iOS Shortcuts automation, which can't present a session
+// cookie - chamber-fitness checks its own ingest secret instead. Registered
+// ahead of the "/api/:chamber/*" wildcard below.
+app.post("/api/fitness/health/ingest", (c) => dispatchToChamber(c, "fitness", "/health/ingest", "system"));
 
 app.all("/api/:chamber/*", requireSession, forwardToChamber);
 
-// /mcp is called by MCP clients (Claude Code), not the browser - gated by
-// the same shared-secret header Chambers use to register/heartbeat, baked
-// into createMcpApp itself (chamber-kit) rather than an extra middleware
-// layer here, same as every other Chamber's own /mcp mount.
+// /mcp and /mcp/<chamber> are called by MCP clients (the `claude` CLI), not
+// the browser - gated by the internal-token header inside createMcpApp.
 app.use("/mcp", (c, next) => withRunContext(parseRunContext((h) => c.req.header(h)), next));
 app.use("/mcp/*", (c, next) => withRunContext(parseRunContext((h) => c.req.header(h)), next));
+
+// Each Chamber's MCP server - still real HTTP, since the CLI is a subprocess.
+const chamberMcpApps = new Map<string, ReturnType<typeof createMcpApp>>();
+app.all("/mcp/:chamber", (c) => {
+  const name = c.req.param("chamber");
+  const module = getModule(name);
+  if (!module || getChamber(name)?.status !== "active") return c.json({ error: "chamber_not_found" }, 404);
+  let mcp = chamberMcpApps.get(name);
+  if (!mcp) {
+    mcp = createMcpApp(name, module.registerTools, env.CONGRESS_INTERNAL_TOKEN);
+    chamberMcpApps.set(name, mcp);
+  }
+  return mcp.fetch(c.req.raw, c.env);
+});
+
 app.route("/mcp", mcpApp);
 
-// Each Chamber's own frontend is reachable through Capitol at
-// "/<chamberName>/*", proxied straight through to that Chamber's process.
-// Only intercepts paths whose first segment is an actually-registered
-// Chamber name, so it can't shadow Capitol's own static assets or routes.
-async function chamberFrontendProxy(c: Context<{ Bindings: HttpBindings }>) {
-  const chamberName = c.req.param("chamberName") ?? "";
-  const chamber = getChamber(chamberName);
-  if (!chamber) return undefined;
-  if (!(await hasValidSession(c))) {
-    return c.json({ error: "unauthorized" }, 401);
-  }
-  return forwardToChamberFrontend(c, chamber);
-}
-app.all("/:chamberName", async (c, next) => (await chamberFrontendProxy(c)) ?? next());
-app.all("/:chamberName/*", async (c, next) => (await chamberFrontendProxy(c)) ?? next());
+// A Chamber's built assets at "/<name>/*"; every other "/<name>/..." path is
+// a shell route, served by Congress's own SPA below.
+app.get("/:chamberName/*", serveChamberAssets);
 
 mountStaticFrontend(app);
-
-let sweepInterval: ReturnType<typeof setInterval> | undefined;
-
-export function startHeartbeatSweep() {
-  sweepInterval = setInterval(() => {
-    const stale = sweepStaleChambers(env.HEARTBEAT_TIMEOUT_MS);
-    if (stale.length > 0) {
-      console.log(`Marked stale Chambers offline: ${stale.join(", ")}`);
-    }
-  }, env.HEARTBEAT_SWEEP_INTERVAL_MS);
-}
-
-export function stopHeartbeatSweep() {
-  if (sweepInterval) clearInterval(sweepInterval);
-}

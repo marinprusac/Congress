@@ -2,7 +2,7 @@ import type { ItemSummary, ItemDetail, CreateItemRequest, UpdateItemRequest } fr
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
-const API_BASE = resolveApiBase("__CHAMBER_NAME__", import.meta.env.PROD);
+const API_BASE = resolveApiBase("__CHAMBER_NAME__");
 
 export function fetchItems(): Promise<ItemSummary[]> {
   return fetch(`${API_BASE}/items`).then((res) => json(res));

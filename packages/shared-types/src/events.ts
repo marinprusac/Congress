@@ -63,16 +63,10 @@ export const eventLogEntrySchema = z.object({
 });
 export type EventLogEntry = z.infer<typeof eventLogEntrySchema>;
 
-// One entry in a Chamber's own dynamic, owner-editable interest list -
-// carried on every heartbeat (not the static manifest, since what a Chamber
-// cares about changes at runtime as its own rules/automations/directives
-// are edited) so Congress knows who to push a given publish to without
-// broadcasting to every registered Chamber regardless of interest. `type`
-// of "*" means "every event type" (used by a Chamber whose own logic
-// doesn't filter by type at all, e.g. Deputy). Congress's own filter is a
-// coarse "could this possibly interest this Chamber" gate; the Chamber
-// still does its own precise per-rule matching after receiving (see
-// docs/creating-a-chamber.md's Events section).
+// One entry in a Chamber's dynamic event interest list (its module's
+// `subscriptions()`), so Congress only relays what could interest it. `type`
+// "*" means every event type. The Chamber still does its own precise
+// matching in `onEvent`.
 export const chamberSubscriptionSchema = z.object({
   type: z.string().min(1),
 });

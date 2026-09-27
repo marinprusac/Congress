@@ -1,7 +1,4 @@
 import type { Manifest } from "@congress/shared-types";
-import { env } from "./env.js";
-
-const base = `http://${env.HOST}:${env.PORT}`;
 
 export const notesManifest: Manifest = {
   name: "notes",
@@ -11,9 +8,6 @@ export const notesManifest: Manifest = {
     home: "/notes",
     settings: "/notes/settings",
   },
-  apiBase: `${base}/api`,
-  mcpUrl: `${base}/mcp`,
-  healthUrl: `${base}/health`,
   // Views are only genuine screens (see shared-types' manifestViewSchema) -
   // this Chamber's exhibits reach the home feed and Search on their own.
   // exhibitTypes is what the home screen's "+" can create here.

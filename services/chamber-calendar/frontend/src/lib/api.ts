@@ -12,7 +12,7 @@ import type {
 } from "../../../src/types";
 import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
-const API_BASE = resolveApiBase("calendar", import.meta.env.PROD);
+const API_BASE = resolveApiBase("calendar");
 
 export function fetchAccounts(): Promise<GoogleAccount[]> {
   return fetch(`${API_BASE}/accounts`).then((res) => json(res));

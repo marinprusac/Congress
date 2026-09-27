@@ -10,7 +10,6 @@ import { toExhibitId } from "./eventId.js";
 import { publishEvent } from "../events.js";
 import { computeGoogleAttendance, resolveAttendance } from "../attendance.js";
 import type { AttendanceStatus } from "../types.js";
-import { env } from "../env.js";
 import { resolveExhibitsServerSide, extractExhibitTokensWithLabels, scoreExhibitMatch } from "@congress/chamber-kit";
 import { buildExhibitToken, type CapitolExhibitResolveResult, type ExhibitToken } from "@congress/shared-types";
 import { projectRichToPlain, reconcileRichValue } from "./richTextMirror.js";
@@ -160,7 +159,7 @@ export async function buildLabelResolver(tokens: ExhibitToken[]): Promise<(token
   if (tokens.length === 0) return () => null;
   let results: CapitolExhibitResolveResult[];
   try {
-    results = await resolveExhibitsServerSide(tokens, env.CAPITOL_URL, env.CONGRESS_INTERNAL_TOKEN);
+    results = await resolveExhibitsServerSide(tokens);
   } catch {
     return () => null;
   }

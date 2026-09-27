@@ -16,7 +16,7 @@ import type {
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
-const API_BASE = resolveApiBase("map", import.meta.env.PROD);
+const API_BASE = resolveApiBase("map");
 
 // --- Places ---
 

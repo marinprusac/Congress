@@ -1,12 +1,7 @@
 import type { Manifest } from "@congress/shared-types";
-import { env } from "./env.js";
 
-const base = `http://${env.HOST}:${env.PORT}`;
-
-// This is Congress's own self-descriptive manifest (served at GET /manifest,
-// not registered into the chamber registry - Congress is the registry
-// owner, not a registrant). It has no widgets of its own to compose onto
-// Capitol's canvas.
+// Congress's own self-description (GET /manifest). Not in the chamber
+// registry - Congress hosts the Chambers, it isn't one.
 export const capitolManifest: Manifest = {
   name: "congress",
   displayName: "Congress",
@@ -15,9 +10,6 @@ export const capitolManifest: Manifest = {
     home: "/",
     settings: "/settings",
   },
-  apiBase: `${base}/api`,
-  mcpUrl: `${base}/mcp`,
-  healthUrl: `${base}/health`,
   views: [],
   exhibitTypes: [],
   events: [],

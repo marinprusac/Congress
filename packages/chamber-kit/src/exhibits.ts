@@ -1,4 +1,5 @@
 import type { ExhibitSearchResult, ExhibitResolveResult, ExhibitSyncRequest } from "@congress/shared-types";
+import { getCongressHost } from "./host.js";
 
 function createExhibitIdCodec(prefix: string) {
   function toExhibitId(id: number): string {
@@ -12,23 +13,14 @@ function createExhibitIdCodec(prefix: string) {
   return { toExhibitId, parseId };
 }
 
-export function createPushExhibitSync(opts: { chamber: string; capitolUrl: string; internalToken: string }) {
+export function createPushExhibitSync(opts: { chamber: string }) {
   return async function pushExhibitSync(push: Omit<ExhibitSyncRequest, "chamber">): Promise<void> {
+    const host = getCongressHost();
+    if (!host) return;
     try {
-      const res = await fetch(`${opts.capitolUrl}/congress/exhibits/sync`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Congress-Internal-Token": opts.internalToken,
-        },
-        body: JSON.stringify({ chamber: opts.chamber, ...push }),
-        signal: AbortSignal.timeout(5_000),
-      });
-      if (!res.ok) {
-        console.warn(`Exhibit sync rejected by Capitol: ${res.status}`);
-      }
+      host.syncExhibit({ chamber: opts.chamber, ...push });
     } catch (err) {
-      console.warn(`Exhibit sync failed: ${(err as Error).message}`);
+      console.warn(`[${opts.chamber}] exhibit sync failed: ${(err as Error).message}`);
     }
   };
 }

@@ -10,6 +10,7 @@ import { exhibitSearchResultSchema, exhibitResolveResultSchema, buildChipToken }
 import { db } from "./db/client.js";
 import { exhibitCache, exhibitRefs } from "./db/schema.js";
 import { listChambers, getChamber } from "./registry.js";
+import { chamberFetch } from "./chambers/runtime.js";
 
 const FAN_OUT_TIMEOUT_MS = 5_000;
 
@@ -78,7 +79,7 @@ export async function searchExhibits(query: string): Promise<CapitolExhibitSearc
   const perChamberResults = await Promise.all(
     chambers.map(async (chamber): Promise<CapitolExhibitSearchResult[]> => {
       try {
-        const res = await fetch(`${chamber.apiBase}/exhibits/search?q=${encodeURIComponent(query)}`, {
+        const res = await chamberFetch(chamber.name, `/exhibits/search?q=${encodeURIComponent(query)}`, {
           signal: AbortSignal.timeout(FAN_OUT_TIMEOUT_MS),
         });
         if (!res.ok) return [];
@@ -113,7 +114,7 @@ async function resolveManyLive(ids: string[], chamber: string): Promise<CapitolE
   }
 
   try {
-    const res = await fetch(`${entry.apiBase}/exhibits/resolve`, {
+    const res = await chamberFetch(entry.name, `/exhibits/resolve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids }),
@@ -329,8 +330,8 @@ const exhibitChipResponseSchema = z.union([
 
 // Builds a ready-to-paste `[[exhibit:chamber:id|Name]]` chip for a Chamber's
 // own raw row id (e.g. what its create_x/get_x MCP tools already return) -
-// Congress has no local access to another Chamber's DB, so this always makes
-// one live HTTP call to that Chamber's own GET /exhibits/chip/:rawId,
+// Congress has no local access to another Chamber's DB, so this always asks
+// that Chamber's own GET /exhibits/chip/:rawId (in-process),
 // mirroring resolveOneLive's chamber-lookup + fetch + typed-failure shape.
 export async function getExhibitChip(
   chamber: string,
@@ -343,7 +344,7 @@ export async function getExhibitChip(
   if (!entry || entry.status !== "active") return { error: "chamber_not_found" };
 
   try {
-    const res = await fetch(`${entry.apiBase}/exhibits/chip/${encodeURIComponent(rawId)}`, {
+    const res = await chamberFetch(entry.name, `/exhibits/chip/${encodeURIComponent(rawId)}`, {
       signal: AbortSignal.timeout(FAN_OUT_TIMEOUT_MS),
     });
     if (res.status === 404) return { error: "not_found" };
@@ -361,9 +362,7 @@ export async function getExhibitChip(
 
 // Adds a manual Connection from `id` to `targetExhibitId`, proxying to `id`'s
 // owning Chamber's own "/api/exhibits/:id/refs" (see mountManualRefsRoutes in
-// @congress/chamber-kit). A plain fetch rather than gateway.ts's
-// proxyToChamberPath, since that needs a Hono Context this function (callable
-// from both an HTTP route and an MCP tool handler) doesn't have.
+// @congress/chamber-kit), callable from both an HTTP route and an MCP tool.
 export async function addManualConnection(
   id: string,
   targetExhibitId: string,
@@ -384,7 +383,7 @@ export async function addManualConnection(
   const entry = getChamber(chamber);
   if (!entry || entry.status !== "active") return { error: "not_found" };
   try {
-    const res = await fetch(`${entry.apiBase}/exhibits/${encodeURIComponent(id)}/refs`, {
+    const res = await chamberFetch(entry.name, `/exhibits/${encodeURIComponent(id)}/refs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ targetExhibitId, targetChamber }),
@@ -409,8 +408,9 @@ export async function removeManualConnection(
   const entry = getChamber(owner.chamber);
   if (!entry || entry.status !== "active") return { error: "not_found" };
   try {
-    const res = await fetch(
-      `${entry.apiBase}/exhibits/${encodeURIComponent(owner.ownerId)}/refs/${encodeURIComponent(otherId)}`,
+    const res = await chamberFetch(
+      entry.name,
+      `/exhibits/${encodeURIComponent(owner.ownerId)}/refs/${encodeURIComponent(otherId)}`,
       { method: "DELETE", signal: AbortSignal.timeout(FAN_OUT_TIMEOUT_MS) }
     );
     if (!res.ok) return { error: "not_found" };

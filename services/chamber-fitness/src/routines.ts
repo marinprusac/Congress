@@ -1,5 +1,4 @@
 import { createPushExhibitSync } from "@congress/chamber-kit";
-import { env } from "./env.js";
 import { getSettings } from "./settings.js";
 import { HevyApiError, fetchRoutinesPage, fetchRoutine, fetchRoutineFolders, fetchExerciseTemplatesPage, createRoutine as hevyCreateRoutine, updateRoutine as hevyUpdateRoutine } from "./hevy/client.js";
 import {
@@ -41,8 +40,6 @@ async function requireApiKey(): Promise<string> {
 // config behave identically.
 const pushRoutineExhibitSync = createPushExhibitSync({
   chamber: "fitness",
-  capitolUrl: env.CAPITOL_URL,
-  internalToken: env.CONGRESS_INTERNAL_TOKEN,
 });
 
 const ROUTINE_EXHIBIT_PREFIX = "routine-";
