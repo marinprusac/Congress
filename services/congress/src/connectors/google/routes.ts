@@ -17,7 +17,10 @@ const SETTINGS_PATH = "/settings?from=accounts";
 // Mounted at /congress/connectors/google.
 export const googleConnectorRoutes = new Hono<{ Bindings: HttpBindings }>();
 
-googleConnectorRoutes.use("*", requireSession);
+// The callback arrives cross-site from Google, where the SameSite=Strict
+// session cookie isn't sent; its single-use state (only minted by the
+// session-gated /start) authorises it instead.
+googleConnectorRoutes.use("*", (c, next) => (c.req.path.endsWith("/callback") ? next() : requireSession(c, next)));
 
 googleConnectorRoutes.get("/", (c) => c.json(googleConnectorStatus()));
 

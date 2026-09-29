@@ -37,6 +37,20 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: services/chamber-whatsapp/reader/go.mod
+          cache-dependency-path: services/chamber-whatsapp/reader/go.sum
+
+      - name: Test and build wa-reader
+        working-directory: services/chamber-whatsapp/reader
+        run: |
+          go vet ./...
+          go test ./...
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags="-s -w" -o bin/wa-reader-linux-$arch ./cmd/wa-reader
+          done
+
       - name: Build frontend artifacts
         run: infra/deploy/build-artifacts.sh "${{ github.sha }}"
 

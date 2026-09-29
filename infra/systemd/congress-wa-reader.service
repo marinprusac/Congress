@@ -1,0 +1,47 @@
+[Unit]
+Description=wa-reader - read-only WhatsApp companion device for Congress
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wa-reader
+Group=wa-reader
+WorkingDirectory=/srv/congress/services/chamber-whatsapp
+# Same .env Congress reads for the Chamber; relative paths resolve against WorkingDirectory.
+EnvironmentFile=/srv/congress/services/chamber-whatsapp/.env
+ExecStart=/srv/congress/services/chamber-whatsapp/reader/bin/wa-reader serve
+Restart=on-failure
+RestartSec=30
+
+# /run/wa-reader/api.sock: group wa-reader (marin is a member), no one else.
+RuntimeDirectory=wa-reader
+RuntimeDirectoryMode=0750
+UMask=0077
+
+# Hardening: the only writable path is the data dir.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/srv/congress/services/chamber-whatsapp/data
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

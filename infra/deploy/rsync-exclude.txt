@@ -8,3 +8,5 @@ node_modules
 .env
 data
 dev-dist
+# Anchored: the per-arch symlink remote-apply.sh creates on the server.
+/services/chamber-whatsapp/reader/bin/wa-reader

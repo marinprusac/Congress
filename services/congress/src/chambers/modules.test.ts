@@ -35,9 +35,14 @@ afterAll(async () => {
 });
 
 describe("every Chamber in one process", () => {
-  it("starts all seven", () => {
+  it("starts all eight", () => {
     const active = listChambers().filter((c) => c.status === "active").map((c) => c.name);
-    expect(active.sort()).toEqual(["calendar", "documents", "fitness", "mail", "map", "notes", "tasks"]);
+    expect(active.sort()).toEqual(["calendar", "documents", "fitness", "mail", "map", "notes", "tasks", "whatsapp"]);
+  });
+
+  it("keeps WhatsApp out of Search and the feed", async () => {
+    expect((await chamberFetch("whatsapp", "/exhibits/search?q=")).status).toBe(404);
+    expect((await chamberFetch("whatsapp", "/feed")).status).toBe(404);
   });
 
   it.each(["notes", "calendar", "documents", "tasks", "map", "fitness", "mail"])("serves %s's exhibit search in-process", async (name) => {

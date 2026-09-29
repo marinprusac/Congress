@@ -1,0 +1,170 @@
+@import "@congress/congress-ui/styles.css";
+
+/* Chat list */
+.wa-chat-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.25rem;
+  border-bottom: 1px solid var(--color-dust);
+  min-height: 3.5rem;
+}
+.wa-chat-row:active {
+  background: color-mix(in srgb, var(--color-dust) 15%, transparent);
+}
+.wa-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-dust);
+  color: var(--color-slate);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+}
+.wa-avatar-group {
+  border-radius: 0.5rem;
+}
+.wa-section-label {
+  margin: 0.25rem 0.25rem 0;
+  color: var(--color-dust);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.wa-notice {
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-dust);
+  color: var(--color-slate);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+}
+.wa-notice-alert {
+  border-color: var(--color-alert);
+  color: var(--color-alert);
+}
+.wa-more {
+  display: block;
+  width: 100%;
+  margin: 0.75rem 0;
+  padding: 0.6rem;
+  border: 1px solid var(--color-dust);
+  color: var(--color-accent);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* Thread */
+.wa-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.wa-day {
+  margin: 0.75rem 0 0.35rem;
+  color: var(--color-dust);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.7rem;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.wa-row {
+  display: flex;
+}
+.wa-row-me {
+  justify-content: flex-end;
+}
+.wa-bubble {
+  max-width: min(85%, 34rem);
+  min-width: 0;
+  padding: 0.4rem 0.6rem 0.3rem;
+  border: 1px solid var(--color-dust);
+  background: var(--color-parchment);
+  overflow-wrap: anywhere;
+}
+.wa-bubble-me {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-dust));
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-parchment));
+}
+.wa-bubble-hit {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.wa-sender {
+  color: var(--color-accent);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+}
+.wa-text {
+  white-space: pre-wrap;
+  color: var(--color-ink);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+.wa-deleted {
+  color: var(--color-dust);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+.wa-quote {
+  margin-bottom: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  border-left: 3px solid var(--color-accent);
+  background: color-mix(in srgb, var(--color-dust) 12%, transparent);
+  color: var(--color-slate);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}
+.wa-meta {
+  margin-top: 0.15rem;
+  color: var(--color-dust);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.65rem;
+  text-align: right;
+}
+.wa-reactions {
+  margin-top: 0.15rem;
+  font-size: 0.9rem;
+}
+.wa-media-button {
+  display: block;
+  width: 100%;
+  margin-bottom: 0.25rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px dashed var(--color-dust);
+  color: var(--color-accent);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  text-align: left;
+}
+.wa-media-note {
+  margin-bottom: 0.25rem;
+  color: var(--color-dust);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+}
+.wa-media {
+  display: block;
+  max-width: 100%;
+  max-height: 60vh;
+  margin-bottom: 0.25rem;
+}
+.wa-audio {
+  width: min(16rem, 100%);
+  margin-bottom: 0.25rem;
+}
+.wa-readonly {
+  margin: 1rem 0 0.5rem;
+  color: var(--color-dust);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.7rem;
+  text-align: center;
+}
