@@ -57,6 +57,13 @@
       "when": 1790684140264,
       "tag": "0007_google_connector",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790688154492,
+      "tag": "0008_organic_vertigo",
+      "breakpoints": true
     }
   ]
 }

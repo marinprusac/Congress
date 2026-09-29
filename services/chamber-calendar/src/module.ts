@@ -6,7 +6,7 @@ import { runMigrations, closeDb } from "./db/client.js";
 import { calendarManifest } from "./manifest.js";
 import { registerTools } from "./mcp/tools.js";
 import { startUpcomingEventNotifications, stopUpcomingEventNotifications } from "./notifications.js";
-import { startCalendarCacheSync, stopCalendarCacheSync } from "./google/cache.js";
+import { calendarSync } from "./sync.js";
 import { forgetAccount, migrateLegacyAccounts } from "./google/accounts.js";
 
 // Loaded by Congress into its own process - see chamber-kit's module.ts.
@@ -19,11 +19,11 @@ export default defineChamber({
   start() {
     runMigrations();
     migrateLegacyAccounts();
-    startCalendarCacheSync();
     startUpcomingEventNotifications();
+    calendarSync.start();
   },
   stop() {
-    stopCalendarCacheSync();
+    calendarSync.stop();
     stopUpcomingEventNotifications();
     closeDb();
   },

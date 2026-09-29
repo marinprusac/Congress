@@ -131,8 +131,14 @@ export function startUpcomingEventNotifications(): void {
   pollInterval = setInterval(pollUpcomingEvents, POLL_INTERVAL_MS);
 }
 
+// Re-reads the cache right after a Google sync; a no-op while stopped.
+export function refreshUpcomingEventNotifications(): void {
+  if (pollInterval) pollUpcomingEvents();
+}
+
 export function stopUpcomingEventNotifications(): void {
   if (pollInterval) clearInterval(pollInterval);
+  pollInterval = undefined;
   for (const { timer } of scheduled.values()) clearTimeout(timer);
   scheduled.clear();
 }

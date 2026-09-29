@@ -149,3 +149,9 @@ export const eventAttendance = sqliteTable("event_attendance", {
   notAttending: integer("not_attending", { mode: "boolean" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
+
+export const settings = sqliteTable("settings", {
+  id: integer("id").primaryKey().default(1),
+  // How often the Google cache re-polls - see sync.ts.
+  syncIntervalMinutes: integer("sync_interval_minutes").notNull().default(5),
+});
