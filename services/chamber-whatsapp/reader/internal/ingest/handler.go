@@ -21,6 +21,7 @@ type Source interface {
 	OwnJID() types.JID
 	PNForLID(ctx context.Context, lid types.JID) (types.JID, bool)
 	GroupName(ctx context.Context, group types.JID) (string, error)
+	Contacts(ctx context.Context) (map[types.JID]types.ContactInfo, error)
 	ParseWebMessage(chat types.JID, msg *waWeb.WebMessageInfo) (*events.Message, error)
 }
 
@@ -103,7 +104,35 @@ func (h *Handler) Handle(evt any) {
 		}
 	case *events.JoinedGroup:
 		_ = h.st.SetChatName(ctx, e.JID.String(), e.Name, true)
+	case *events.AppStateSyncComplete:
+		// The initial full sync stores address-book names without emitting Contact events.
+		go h.SyncContacts(ctx)
 	}
+}
+
+// SyncContacts copies names from whatsmeow's local contact store (address
+// book, push and business names) into ours. Local read; nothing goes to WhatsApp.
+func (h *Handler) SyncContacts(ctx context.Context) {
+	all, err := h.src.Contacts(ctx)
+	if err != nil {
+		h.log.Warn("read contacts", "err", err)
+		return
+	}
+	n := 0
+	for jid, info := range all {
+		if !info.Found {
+			continue
+		}
+		full := info.FullName
+		if full == "" {
+			full = info.FirstName
+		}
+		pn := h.resolveUser(ctx, jid, types.EmptyJID)
+		if err := h.st.UpsertContact(ctx, store.Contact{JID: pn.String(), FullName: full, PushName: info.PushName, BusinessName: info.BusinessName}); err == nil {
+			n++
+		}
+	}
+	h.log.Info("contacts synced", "count", n)
 }
 
 func isUserServer(s string) bool {

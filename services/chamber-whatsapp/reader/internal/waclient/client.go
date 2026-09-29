@@ -35,6 +35,8 @@ type Reader interface {
 	Download(ctx context.Context, m MediaRef) ([]byte, error)
 	PNForLID(ctx context.Context, lid types.JID) (types.JID, bool)
 	GroupName(ctx context.Context, group types.JID) (string, error)
+	// Contacts reads the names whatsmeow keeps locally (address book, push names).
+	Contacts(ctx context.Context) (map[types.JID]types.ContactInfo, error)
 	ParseWebMessage(chat types.JID, msg *waWeb.WebMessageInfo) (*events.Message, error)
 }
 
@@ -177,6 +179,10 @@ func (c *client) GroupName(ctx context.Context, group types.JID) (string, error)
 		return "", err
 	}
 	return info.Name, nil
+}
+
+func (c *client) Contacts(ctx context.Context) (map[types.JID]types.ContactInfo, error) {
+	return c.cli.Store.Contacts.GetAllContacts(ctx)
 }
 
 func (c *client) ParseWebMessage(chat types.JID, msg *waWeb.WebMessageInfo) (*events.Message, error) {
