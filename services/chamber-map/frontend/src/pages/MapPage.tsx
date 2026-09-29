@@ -11,6 +11,7 @@ import { formatDuration } from "@/lib/formatDuration";
 import { InvalidateSizeOnResize } from "@/components/InvalidateSizeOnResize";
 import { placeMarkerIcon } from "@/lib/markerIcon";
 import { tripPositions } from "@/lib/tripPath";
+import { dayMarkers } from "@/lib/dayMarkers";
 import type { Trip, Visit } from "../../../src/types";
 import "leaflet/dist/leaflet.css";
 import "@/components/mapMarker.css";
@@ -199,15 +200,7 @@ export function MapPage() {
   // day, not one per visit - two stops at Home shouldn't draw two pins.
   // Bookend visits fold in here too, so a route-only or entirely-quiet day
   // still shows *something* on the map, not an empty tile.
-  const markers = useMemo(() => {
-    const byKey = new Map<string, Visit>();
-    for (const v of [...visits, ...bookendVisits]) {
-      if (v.status === "ignored" || v.latitude === null || v.longitude === null) continue;
-      const key = v.placeId ? `place-${v.placeId}` : `visit-${v.id}`;
-      if (!byKey.has(key)) byKey.set(key, v);
-    }
-    return [...byKey.values()];
-  }, [visits, leadingVisitQuery.data, trailingVisitQuery.data, activeVisitQuery.data]);
+  const markers = useMemo(() => dayMarkers([...visits, ...bookendVisits]), [visits, leadingVisitQuery.data, trailingVisitQuery.data, activeVisitQuery.data]);
 
   // entries, with a carried-over visit spliced onto whichever end(s) would
   // otherwise open or close on a bare route (see the query block above) - an
