@@ -2,6 +2,7 @@ import { chamberFeedResponseSchema, type ChamberRegistryEntry, type FeedCandidat
 import { listChambers } from "./registry.js";
 import { resolveExhibits } from "./exhibits.js";
 import { chamberFetch } from "./chambers/runtime.js";
+import { listLocalSources } from "./exhibitSources.js";
 
 // The home "For You" feed. Every active Chamber is asked for its own scored
 // candidates (GET /api/feed, chamber-kit's mountFeedRoute) - the domain
@@ -32,7 +33,7 @@ async function fetchChamberCandidates(chamber: ChamberRegistryEntry, timeoutMs: 
 }
 
 export interface ChamberCandidates {
-  chamber: ChamberRegistryEntry;
+  chamber: Pick<ChamberRegistryEntry, "name" | "views">;
   candidates: FeedCandidate[];
 }
 
@@ -99,7 +100,16 @@ export function rankFeed(perChamber: ChamberCandidates[]): Unresolved[] {
 export async function getFeed(opts: { timeoutMs?: number } = {}): Promise<FeedItem[]> {
   const timeoutMs = opts.timeoutMs ?? FEED_FAN_OUT_TIMEOUT_MS;
   const active = listChambers().filter((c) => c.status === "active");
-  const perChamber = await Promise.all(active.map(async (chamber) => ({ chamber, candidates: await fetchChamberCandidates(chamber, timeoutMs) })));
+  const perChamber: ChamberCandidates[] = await Promise.all(
+    active.map(async (chamber) => ({ chamber, candidates: await fetchChamberCandidates(chamber, timeoutMs) }))
+  );
+  for (const source of listLocalSources()) {
+    try {
+      perChamber.unshift({ chamber: { name: source.namespace, views: [] }, candidates: source.feedCandidates(new Date()) });
+    } catch (err) {
+      console.warn(`[feed] ${source.namespace} failed: ${(err as Error).message}`);
+    }
+  }
   const ranked = rankFeed(perChamber);
 
   const exhibitRefs = ranked.flatMap((item) => (item.kind === "exhibit" ? [{ id: item.exhibitId, chamber: item.chamber }] : []));

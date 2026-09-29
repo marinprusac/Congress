@@ -1,6 +1,7 @@
 import { and, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import type {
+  ExhibitResolveResult,
   ExhibitSyncRequest,
   CapitolExhibitSearchResult,
   CapitolExhibitResolveResult,
@@ -11,6 +12,7 @@ import { db } from "./db/client.js";
 import { exhibitCache, exhibitRefs } from "./db/schema.js";
 import { listChambers, getChamber } from "./registry.js";
 import { chamberFetch } from "./chambers/runtime.js";
+import { getLocalSource, listLocalSources } from "./exhibitSources.js";
 
 const FAN_OUT_TIMEOUT_MS = 5_000;
 
@@ -100,7 +102,15 @@ export async function searchExhibits(query: string): Promise<CapitolExhibitSearc
   // comparison is 0-vs-0 and this sort is a no-op - the existing
   // per-chamber-recency, registration-order "browse recent" behavior is
   // unchanged.
-  return perChamberResults.flat().sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  const local = listLocalSources().flatMap((source) => {
+    try {
+      return source.search(query).map((r) => ({ ...r, chamber: source.namespace }));
+    } catch (err) {
+      console.warn(`[exhibits] ${source.namespace} search failed: ${(err as Error).message}`);
+      return [];
+    }
+  });
+  return [...local, ...perChamberResults.flat()].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 }
 
 // Resolves every id in one owning Chamber through a single POST
@@ -108,6 +118,9 @@ export async function searchExhibits(query: string): Promise<CapitolExhibitSearc
 // contract already takes an array and was clearly designed for this.
 // resolveOneLive (below) is the single-id case of this same call.
 async function resolveManyLive(ids: string[], chamber: string): Promise<CapitolExhibitResolveResult[]> {
+  const local = getLocalSource(chamber);
+  if (local) return cacheResolved(chamber, ids, new Map(local.resolve(ids).map((r) => [r.id, r])), local.typeOf);
+
   const entry = getChamber(chamber);
   if (!entry || entry.status !== "active") {
     return ids.map((id) => ({ id, chamber, unavailable: true }));
@@ -125,40 +138,48 @@ async function resolveManyLive(ids: string[], chamber: string): Promise<CapitolE
     const parsed = exhibitResolveResponseSchema.safeParse(await res.json());
     if (!parsed.success) return ids.map((id) => ({ id, chamber, unavailable: true }));
 
-    const byId = new Map(parsed.data.results.map((r) => [r.id, r]));
-
-    return ids.map((id) => {
-      const result = byId.get(id);
-      if (!result) return { id, chamber, unavailable: true };
-
-      if ("deleted" in result) {
-        syncExhibit({ chamber, id, type: "", name: "", url: "", deleted: true, outgoingRefs: [] });
-        return { id, chamber, deleted: true };
-      }
-
-      // A live resolve doesn't carry `type` (only /exhibits/search does), so
-      // a never-before-cached id gets an empty type here - harmless, since
-      // rendering only needs chamber (for the icon) + name + url.
-      const existing = db.select().from(exhibitCache).where(eq(exhibitCache.id, id)).get();
-      syncExhibit({
-        chamber,
-        id,
-        type: existing?.type ?? "",
-        name: result.name,
-        url: result.url,
-        outgoingRefs: db
-          .select({ targetId: exhibitRefs.targetId })
-          .from(exhibitRefs)
-          .where(eq(exhibitRefs.sourceId, id))
-          .all()
-          .map((r) => r.targetId),
-      });
-
-      return { id, chamber, name: result.name, url: result.url };
-    });
+    return cacheResolved(chamber, ids, new Map(parsed.data.results.map((r) => [r.id, r])));
   } catch {
     return ids.map((id) => ({ id, chamber, unavailable: true }));
   }
+}
+
+// Writes a live resolve back into the cache and maps it to results.
+function cacheResolved(
+  chamber: string,
+  ids: string[],
+  byId: Map<string, ExhibitResolveResult>,
+  typeOf?: (id: string) => string | null
+): CapitolExhibitResolveResult[] {
+  return ids.map((id) => {
+    const result = byId.get(id);
+    if (!result) return { id, chamber, unavailable: true };
+
+    if ("deleted" in result) {
+      syncExhibit({ chamber, id, type: "", name: "", url: "", deleted: true, outgoingRefs: [] });
+      return { id, chamber, deleted: true };
+    }
+
+    // A Chamber's live resolve doesn't carry `type` (only /exhibits/search
+    // does), so a never-before-cached id gets an empty type here - harmless,
+    // since rendering only needs chamber (for the icon) + name + url.
+    const existing = db.select().from(exhibitCache).where(eq(exhibitCache.id, id)).get();
+    syncExhibit({
+      chamber,
+      id,
+      type: typeOf?.(id) ?? existing?.type ?? "",
+      name: result.name,
+      url: result.url,
+      outgoingRefs: db
+        .select({ targetId: exhibitRefs.targetId })
+        .from(exhibitRefs)
+        .where(eq(exhibitRefs.sourceId, id))
+        .all()
+        .map((r) => r.targetId),
+    });
+
+    return { id, chamber, name: result.name, url: result.url };
+  });
 }
 
 export async function resolveOneLive(id: string, chamber: string): Promise<CapitolExhibitResolveResult> {
@@ -340,6 +361,12 @@ export async function getExhibitChip(
   | { id: string; chamber: string; name: string; url: string; token: string }
   | { error: "chamber_not_found" | "chamber_unavailable" | "not_found" }
 > {
+  const local = getLocalSource(chamber);
+  if (local) {
+    const hit = local.chip(rawId);
+    if (!hit) return { error: "not_found" };
+    return { ...hit, chamber, token: buildChipToken({ chamber, id: hit.id, name: hit.name }) };
+  }
   const entry = getChamber(chamber);
   if (!entry || entry.status !== "active") return { error: "chamber_not_found" };
 
@@ -380,6 +407,12 @@ export async function addManualConnection(
     await resolveOneLive(targetExhibitId, targetChamber);
   }
 
+  const local = getLocalSource(chamber);
+  if (local) {
+    const refs = local.addManualRef(id, targetExhibitId);
+    return refs ? { refs } : { error: "not_found" };
+  }
+
   const entry = getChamber(chamber);
   if (!entry || entry.status !== "active") return { error: "not_found" };
   try {
@@ -405,6 +438,11 @@ export async function removeManualConnection(
   const owner = getManualConnectionOwner(id, otherExhibitId);
   if (!owner) return { error: "not_found" };
   const otherId = owner.ownerId === id ? otherExhibitId : id;
+  const local = getLocalSource(owner.chamber);
+  if (local) {
+    const refs = local.removeManualRef(owner.ownerId, otherId);
+    return refs ? { refs } : { error: "not_found" };
+  }
   const entry = getChamber(owner.chamber);
   if (!entry || entry.status !== "active") return { error: "not_found" };
   try {
