@@ -212,3 +212,25 @@ describe("googleConnectorStatus", () => {
     expect(status.accounts[0]!.missing).toEqual([{ chamber: "mail", displayName: "MAIL", scopes: [GMAIL] }]);
   });
 });
+
+describe("connector routes and the SameSite=Strict session", () => {
+  const app = new Hono();
+  beforeAll(async () => {
+    app.route("/c", (await import("./routes.js")).googleConnectorRoutes);
+  });
+
+  it("keeps every route but the callback behind the session", async () => {
+    expect((await app.request("/c/")).status).toBe(401);
+    expect((await app.request("/c/start")).status).toBe(401);
+  });
+
+  it("lets Google's cross-site callback through without the cookie, authorised by its state alone", async () => {
+    expect((await app.request("/c/callback?state=forged&code=x")).status).toBe(400);
+    const state = createOAuthState("/settings");
+    const res = await app.request(`/c/callback?state=${state}`);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/settings");
+    // Single use.
+    expect((await app.request(`/c/callback?state=${state}`)).status).toBe(400);
+  });
+});

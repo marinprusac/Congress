@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TEST_MASTER_PASSWORD } from "@congress/test-support";
-import { authRoutes, requireSession } from "./sessionAuth.js";
+import { authRoutes, requireSession, resetLoginThrottle } from "./sessionAuth.js";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 app.route("/auth", authRoutes);
@@ -30,6 +30,7 @@ function cookieFrom(res: Response): string {
 
 afterEach(() => {
   vi.useRealTimers();
+  resetLoginThrottle();
 });
 
 describe("POST /auth/login", () => {
@@ -68,7 +69,7 @@ describe("POST /auth/login", () => {
     expect(setCookie).toContain("congress_session=");
     expect(setCookie).toContain("HttpOnly");
     expect(setCookie).toContain("Secure");
-    expect(setCookie).toContain("SameSite=Lax");
+    expect(setCookie).toContain("SameSite=Strict");
     expect(setCookie).toContain("Path=/");
     expect(setCookie).toContain("Max-Age=2592000");
   });
@@ -157,11 +158,21 @@ describe("login throttling", () => {
     expect((await login("wrong", ip)).status).toBe(429);
   });
 
-  it("uses the first entry of x-forwarded-for, which is the real client behind Caddy", async () => {
-    const chain = "4.4.4.1, 10.0.0.5, 10.0.0.6";
-    for (let i = 0; i < 5; i += 1) await login("wrong", chain);
-    // Same real client, different proxy chain - still the same locked-out IP.
-    expect((await login("wrong", "4.4.4.1, 172.16.0.1")).status).toBe(429);
+  it("uses the last x-forwarded-for entry (Caddy's), so a spoofed prefix can't dodge the lockout", async () => {
+    for (let i = 0; i < 5; i += 1) await login("wrong", `9.9.9.${i}, 4.4.4.1`);
+    // Same real client behind Caddy, fresh made-up first entry - still locked out.
+    expect((await login("wrong", "8.8.8.8, 4.4.4.1")).status).toBe(429);
+  });
+
+  it("caps failures across all IPs, locking out even the right password until the window passes", async () => {
+    for (let i = 0; i < 30; i += 1) expect((await login("wrong", `6.6.${i}.1`)).status).toBe(401);
+    const res = await login(TEST_MASTER_PASSWORD, "7.7.7.7");
+    expect(res.status).toBe(429);
+    expect(res.headers.get("set-cookie")).toBeNull();
+
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 15 * 60 * 1000 + 1);
+    expect((await login(TEST_MASTER_PASSWORD, "7.7.7.7")).status).toBe(200);
   });
 
   it("falls back to the socket address when there is no x-forwarded-for", async () => {

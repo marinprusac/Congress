@@ -109,8 +109,14 @@ The **only** thing standing between the open internet and this data is the
 master-password cookie:
 
 - `POST /auth/login` checks the password (sha256'd, timing-safe compared)
-  and sets a signed, `HttpOnly`, `Secure` session cookie. Rate-limited per
-  source IP (5 attempts / 15 min lockout) — see `sessionAuth.ts`.
+  and sets a signed, `HttpOnly`, `Secure`, `SameSite=Strict` session cookie.
+  Rate-limited per source IP (5 attempts / 15 min lockout; the IP is the
+  last `X-Forwarded-For` entry, the one Caddy adds) and globally (30
+  failures across all IPs in 15 min lock out everyone, the owner included,
+  until the window passes) — see `sessionAuth.ts`.
+- Because the cookie is `Strict`, the Google connector's OAuth callback
+  (a cross-site redirect from Google) is exempt from the session check; its
+  single-use `state`, minted only by the session-gated `/start`, authorises it.
 - Everything that carries real data — `/congress/registry`, `/api/:chamber/*`
   (the gateway to every Chamber), and the frontend — requires that cookie.
   `/health`, `/manifest`, and the static frontend shell stay open (nothing

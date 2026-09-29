@@ -15,6 +15,17 @@ const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
 const attemptsByIp = new Map<string, { count: number; lockedUntil: number }>();
 
+// A cap across all IPs, so guessing spread over many addresses is still slow.
+// While it's hit, everyone (the owner too) waits out the window.
+const MAX_GLOBAL_FAILURES = 30;
+let globalFailures: number[] = [];
+
+function recentGlobalFailures(): number {
+  const cutoff = Date.now() - LOCKOUT_MS;
+  globalFailures = globalFailures.filter((t) => t > cutoff);
+  return globalFailures.length;
+}
+
 function sha256(input: string): Buffer {
   return createHash("sha256").update(input).digest();
 }
@@ -27,9 +38,10 @@ function passwordMatches(candidate: string): boolean {
   );
 }
 
+// The last X-Forwarded-For entry is the one Caddy added; earlier ones are client-supplied.
 function clientIp(c: { req: { header: (name: string) => string | undefined }; env: HttpBindings }): string {
   const forwarded = c.req.header("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]!.trim();
+  if (forwarded) return forwarded.split(",").at(-1)!.trim();
   return c.env.incoming.socket.remoteAddress ?? "unknown";
 }
 
@@ -57,10 +69,17 @@ function recordFailure(ip: string): void {
   entry.count += 1;
   entry.lockedUntil = Date.now() + LOCKOUT_MS;
   attemptsByIp.set(ip, entry);
+  globalFailures.push(Date.now());
 }
 
 function recordSuccess(ip: string): void {
   attemptsByIp.delete(ip);
+}
+
+// Tests only: forget every failure.
+export function resetLoginThrottle(): void {
+  attemptsByIp.clear();
+  globalFailures = [];
 }
 
 export async function hasValidSession(c: Parameters<typeof getSignedCookie>[0]): Promise<boolean> {
@@ -84,7 +103,7 @@ authRoutes.get("/status", async (c) => {
 
 authRoutes.post("/login", async (c) => {
   const ip = clientIp(c);
-  if (isLockedOut(ip)) {
+  if (isLockedOut(ip) || recentGlobalFailures() >= MAX_GLOBAL_FAILURES) {
     return c.json({ error: "too_many_attempts" }, 429);
   }
 
@@ -100,7 +119,10 @@ authRoutes.post("/login", async (c) => {
   await setSignedCookie(c, COOKIE_NAME, SESSION_VALUE, env.SESSION_SECRET, {
     httpOnly: true,
     secure: true,
-    sameSite: "Lax",
+    // Strict: never sent on cross-site requests. The shell HTML is public
+    // and every data request is same-origin, so nothing needs it cross-site
+    // (the Google OAuth callback is authorised by its state instead).
+    sameSite: "Strict",
     path: "/",
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
