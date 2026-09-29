@@ -11,6 +11,13 @@ import (
 // Display name for a JID from contacts, "" when unknown (the UI falls back to the number).
 const contactName = `coalesce(nullif(%[1]s.full_name, ''), nullif(%[1]s.push_name, ''), nullif(%[1]s.business_name, ''), '')`
 
+// A group's name is its subject; a DM's is the contact's name, falling back to
+// whatever history sync called the chat.
+func chatName(chat, contact string) string {
+	return fmt.Sprintf(`CASE WHEN coalesce(%[1]s.is_group, 0) THEN coalesce(%[1]s.name, '')
+		ELSE coalesce(nullif(%[2]s, ''), %[1]s.name, '') END`, chat, fmt.Sprintf(contactName, contact))
+}
+
 type ChatRow struct {
 	JID           string `json:"jid"`
 	Name          string `json:"name"`
@@ -86,7 +93,7 @@ func (s *Store) ListChats(ctx context.Context, limit int, cursor string) ([]Chat
 	}
 	args = append(args, limit)
 	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(`
-		SELECT c.jid, coalesce(nullif(c.name, ''), `+fmt.Sprintf(contactName, "ct")+`), c.is_group, c.last_message_at,
+		SELECT c.jid, `+chatName("c", "ct")+`, c.is_group, c.last_message_at,
 			coalesce(m.text, ''), coalesce(m.type, ''), coalesce(m.from_me, 0), coalesce(`+fmt.Sprintf(contactName, "sc")+`, ''),
 			m.revoked_at IS NOT NULL
 		FROM chats c
@@ -114,7 +121,7 @@ func (s *Store) ListChats(ctx context.Context, limit int, cursor string) ([]Chat
 
 func (s *Store) Chat(ctx context.Context, jid string) (*ChatRow, error) {
 	var r ChatRow
-	err := s.db.QueryRowContext(ctx, `SELECT c.jid, coalesce(nullif(c.name, ''), `+fmt.Sprintf(contactName, "ct")+`), c.is_group, c.last_message_at
+	err := s.db.QueryRowContext(ctx, `SELECT c.jid, `+chatName("c", "ct")+`, c.is_group, c.last_message_at
 		FROM chats c LEFT JOIN contacts ct ON ct.jid = c.jid WHERE c.jid = ?`, jid).Scan(&r.JID, &r.Name, &r.IsGroup, &r.LastMessageAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -223,7 +230,7 @@ func (s *Store) SearchMessages(ctx context.Context, q, chat string, limit int) (
 	}
 	args = append(args, limit)
 	rows, err := s.db.QueryContext(ctx, `SELECT `+fmt.Sprintf(messageColumns, fmt.Sprintf(contactName, "sc"))+`,
-			coalesce(nullif(c.name, ''), `+fmt.Sprintf(contactName, "cc")+`)
+			`+chatName("c", "cc")+`
 		FROM messages_fts JOIN messages m ON m.rowid = messages_fts.rowid
 		LEFT JOIN contacts sc ON sc.jid = m.sender_jid
 		LEFT JOIN chats c ON c.jid = m.chat_jid
@@ -249,7 +256,7 @@ func (s *Store) SearchMessages(ctx context.Context, q, chat string, limit int) (
 // SearchChats matches chat and contact names.
 func (s *Store) SearchChats(ctx context.Context, q string, limit int) ([]ChatRow, error) {
 	like := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(strings.TrimSpace(q)) + "%"
-	rows, err := s.db.QueryContext(ctx, `SELECT c.jid, coalesce(nullif(c.name, ''), `+fmt.Sprintf(contactName, "ct")+`) AS n, c.is_group, c.last_message_at
+	rows, err := s.db.QueryContext(ctx, `SELECT c.jid, `+chatName("c", "ct")+` AS n, c.is_group, c.last_message_at
 		FROM chats c LEFT JOIN contacts ct ON ct.jid = c.jid
 		WHERE c.last_message_at > 0 AND (n LIKE ? ESCAPE '\' OR c.jid LIKE ? ESCAPE '\')
 		ORDER BY c.last_message_at DESC LIMIT ?`, like, like, limit)

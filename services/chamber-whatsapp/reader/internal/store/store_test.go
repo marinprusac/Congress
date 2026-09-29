@@ -194,6 +194,52 @@ func TestMergeChatMovesLIDChat(t *testing.T) {
 	}
 }
 
+func TestDMNamePrefersContactAndIgnoresMaskedNumbers(t *testing.T) {
+	s := open(t)
+	dm, grp := "385911111106@s.whatsapp.net", "g@g.us"
+	must(t, s.UpsertMessage(ctx, msg(dm, "1", 100, "x"), false))
+	must(t, s.UpsertMessage(ctx, msg(grp, "2", 200, "y"), true))
+	must(t, s.SetChatName(ctx, dm, "+385∙∙∙∙∙∙∙06", false)) // refused
+	must(t, s.SetChatName(ctx, dm, "Old history name", false))
+	must(t, s.UpsertContact(ctx, Contact{JID: dm, FullName: "Petra", PushName: "+385∙∙∙∙∙∙∙06"}))
+	must(t, s.SetChatName(ctx, grp, "Family", true))
+	must(t, s.UpsertContact(ctx, Contact{JID: grp, PushName: "not a group name"}))
+	names := map[string]string{}
+	chats, _ := s.ListChats(ctx, 10, "")
+	for _, c := range chats {
+		names[c.JID] = c.Name
+	}
+	if names[dm] != "Petra" || names[grp] != "Family" {
+		t.Fatalf("%v", names)
+	}
+	var push string
+	must(t, s.db.QueryRow(`SELECT push_name FROM contacts WHERE jid = ?`, dm).Scan(&push))
+	if push != "" {
+		t.Fatalf("masked push name stored: %q", push)
+	}
+}
+
+func TestMigrationClearsStoredMaskedNames(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "m.sqlite3")
+	s, err := Open(p)
+	must(t, err)
+	_, err = s.db.Exec(`INSERT INTO chats (jid, name, last_message_at) VALUES ('a@s.whatsapp.net', '+385∙∙∙∙∙∙∙06', 1), ('g@g.us', 'Family', 1);
+		INSERT INTO contacts (jid, push_name, updated_at) VALUES ('a@s.whatsapp.net', '+1∙∙∙∙80', 0);
+		PRAGMA user_version = 1;`)
+	must(t, err)
+	s.Close()
+	s, err = Open(p)
+	must(t, err)
+	defer s.Close()
+	var chatName, grpName, push string
+	must(t, s.db.QueryRow(`SELECT name FROM chats WHERE jid = 'a@s.whatsapp.net'`).Scan(&chatName))
+	must(t, s.db.QueryRow(`SELECT name FROM chats WHERE jid = 'g@g.us'`).Scan(&grpName))
+	must(t, s.db.QueryRow(`SELECT push_name FROM contacts`).Scan(&push))
+	if chatName != "" || push != "" || grpName != "Family" {
+		t.Fatalf("%q %q %q", chatName, push, grpName)
+	}
+}
+
 func TestSearchChatsEscapesLike(t *testing.T) {
 	s := open(t)
 	must(t, s.UpsertMessage(ctx, msg("g@g.us", "1", 100, "x"), true))
