@@ -52,12 +52,7 @@ type Message struct {
 
 // Open opens (creating if needed) the DB with 0600 permissions and migrates it.
 func Open(path string) (*Store, error) {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return nil, err
-	}
-	f.Close()
-	if err := os.Chmod(path, 0o600); err != nil {
+	if _, err := Touch(path); err != nil {
 		return nil, err
 	}
 	db, err := sql.Open("sqlite", DSN(path))
@@ -70,6 +65,17 @@ func Open(path string) (*Store, error) {
 		return nil, fmt.Errorf("migrate %s: %w", path, err)
 	}
 	return s, nil
+}
+
+// Touch creates a DB file if missing and forces it to 0600. Reports whether it existed.
+func Touch(path string) (bool, error) {
+	_, statErr := os.Stat(path)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return false, err
+	}
+	f.Close()
+	return statErr == nil, os.Chmod(path, 0o600)
 }
 
 // DSN is the modernc.org/sqlite connection string both DBs use.
