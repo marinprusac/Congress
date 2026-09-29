@@ -163,7 +163,7 @@ export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
 // App.tsx routes, and the service worker's shell-route allowlist). A Chamber
 // is served at "/<name>/*", so one named any of these would be unreachable -
 // Congress refuses to register it.
-export const RESERVED_CHAMBER_NAMES = ["congress", "search", "notifications", "settings", "chat", "view", "vendor", "auth", "api", "mcp", "privacy", "terms"] as const;
+export const RESERVED_CHAMBER_NAMES = ["congress", "search", "notifications", "settings", "chat", "view", "vendor", "auth", "api", "mcp", "privacy", "terms", "e", "types"] as const;
 
 export const manifestSchema = z.object({
   name: z.string().min(1),

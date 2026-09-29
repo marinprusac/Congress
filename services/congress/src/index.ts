@@ -2,7 +2,8 @@ import { serve } from "@hono/node-server";
 import { env } from "./env.js";
 import { app } from "./server.js";
 import { runMigrations, closeDb, sqlite } from "./db/client.js";
-import { runExhibitsMigrations, closeExhibitsDb, exhibitsSqlite } from "./typeEngine/db/client.js";
+import { closeExhibitsDb, exhibitsSqlite } from "./typeEngine/db/client.js";
+import { startTypeEngine } from "./typeEngine/index.js";
 import { startBackups, stopBackups } from "./typeEngine/backups.js";
 import { importLegacyChamberData } from "./legacyImport.js";
 import { startEventCatalogSync, stopEventCatalogSync } from "./eventCatalogSync.js";
@@ -19,7 +20,7 @@ import { loadChambers, stopChambers } from "./chambers/loader.js";
 import { CHAMBER_MODULES } from "./chambers/modules.js";
 
 runMigrations();
-runExhibitsMigrations();
+startTypeEngine();
 importLegacyChamberData();
 importLegacyDeputySettings();
 recoverInterruptedThreads();

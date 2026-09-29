@@ -35,6 +35,7 @@ import { parseRunContext, withRunContext } from "./ai/runContext.js";
 import { aiRoutes } from "./ai/routes.js";
 import { getFeed } from "./feed.js";
 import { googleConnectorRoutes } from "./connectors/google/routes.js";
+import { typeRoutes } from "./typeEngine/routes.js";
 
 // Chamber included per-ref since an id that never synced has no cache row to
 // infer the owning chamber from.
@@ -74,6 +75,9 @@ app.route("/congress/ai", aiRoutes);
 
 // Google sign-in shared by every Chamber that talks to Google.
 app.route("/congress/connectors/google", googleConnectorRoutes);
+
+// Runtime exhibit types and their records (typeEngine/).
+app.route("/congress", typeRoutes);
 
 // One row per known event type, auto-derived from the live registry - no
 // create/delete route exists, see eventSettings.ts. Synced before listing so

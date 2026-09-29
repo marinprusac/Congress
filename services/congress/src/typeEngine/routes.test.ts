@@ -1,0 +1,61 @@
+import type { HttpBindings } from "@hono/node-server";
+import { beforeAll, describe, expect, it } from "vitest";
+import { migrationsDir, TEST_MASTER_PASSWORD } from "@congress/test-support";
+import { runMigrations } from "../db/client.js";
+import { app } from "../server.js";
+import { startTypeEngine } from "./index.js";
+
+const json = { "Content-Type": "application/json" };
+const bindings = () => ({ incoming: { socket: { remoteAddress: "10.0.0.1" } } }) as unknown as HttpBindings;
+let cookie: string;
+
+function call(path: string, init: RequestInit = {}, withSession = true) {
+  return app.request(path, { ...init, headers: { ...json, ...(withSession ? { cookie } : {}), ...init.headers } }, bindings());
+}
+
+beforeAll(async () => {
+  runMigrations(migrationsDir("congress"));
+  startTypeEngine();
+  const res = await app.request(
+    "/auth/login",
+    { method: "POST", headers: { ...json, "x-forwarded-for": "9.9.9.8" }, body: JSON.stringify({ password: TEST_MASTER_PASSWORD }) },
+    bindings()
+  );
+  cookie = res.headers.get("set-cookie")!.split(";")[0]!;
+});
+
+describe("type routes", () => {
+  it("require a session", async () => {
+    expect((await call("/congress/types", {}, false)).status).toBe(401);
+    expect((await call("/congress/records", { method: "POST", body: "{}" }, false)).status).toBe(401);
+  });
+
+  it("list hidden types only with ?all=1", async () => {
+    expect(await (await call("/congress/types")).json()).toEqual([]);
+    const all = (await (await call("/congress/types?all=1")).json()) as { definition: { slug: string } }[];
+    expect(all.map((t) => t.definition.slug)).toEqual(["note"]);
+  });
+
+  it("create, read, patch and delete a record", async () => {
+    const created = await call("/congress/records", { method: "POST", body: JSON.stringify({ type: "note", values: { title: "Hello" } }) });
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+
+    const patched = await call(`/congress/records/${id}`, { method: "PATCH", body: JSON.stringify({ values: { body: "hi [[exhibit:e:x|X]]" } }) });
+    expect(await patched.json()).toMatchObject({ values: { title: "Hello", body: "hi [[exhibit:e:x|X]]", pinned: false } });
+
+    expect(((await (await call("/congress/records?type=note")).json()) as unknown[]).length).toBe(1);
+    expect((await call(`/congress/records/${id}`, { method: "DELETE" })).status).toBe(200);
+    expect((await call(`/congress/records/${id}`)).status).toBe(404);
+  });
+
+  it("answer 400 for bad input and 404 for unknown types", async () => {
+    expect((await call("/congress/records", { method: "POST", body: JSON.stringify({ type: "note", values: {} }) })).status).toBe(400);
+    expect((await call("/congress/records", { method: "POST", body: JSON.stringify({ type: "nope", values: {} }) })).status).toBe(404);
+    expect((await call("/congress/records/missing", { method: "PATCH", body: "{}" })).status).toBe(404);
+  });
+
+  it("leave the Google OAuth callback public", async () => {
+    expect((await call("/congress/connectors/google/callback?state=x", {}, false)).status).not.toBe(401);
+  });
+});
