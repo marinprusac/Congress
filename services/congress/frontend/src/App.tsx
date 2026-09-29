@@ -15,6 +15,7 @@ import { useChatInvalidation } from "@/chat/useChatData";
 import { SearchPage } from "@/pages/SearchPage";
 import { NotificationsPage } from "@/pages/NotificationsPage";
 import { ViewPage } from "@/pages/ViewPage";
+import { RecordPage } from "@/records/RecordPage";
 
 // Page transitions wait for a Chamber's bundle so they animate the real page.
 setRoutePreloader((path) => {
@@ -59,6 +60,9 @@ export function App() {
         {/* A view card with no full-screen page of its own, given the whole
             screen. */}
         <Route path="/view/:chamber/:viewId" element={<ViewPage />} />
+        {/* Every runtime exhibit type's records (typeEngine). */}
+        <Route path="/e/new/:type" element={<RecordPage />} />
+        <Route path="/e/:id" element={<RecordPage />} />
         {/* Old URLs of Chambers folded into Congress - bookmarks and the
             installed PWA's saved URL land here. */}
         <Route path="/capitol/*" element={<Navigate to="/" replace />} />

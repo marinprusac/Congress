@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChamberMark, fetchRegistry, resolveChamberPath, usePresence, useStackNav } from "@congress/congress-ui";
+import { fetchTypes } from "@/lib/recordsApi";
+import { TYPES_KEY } from "@/records/RecordPage";
 
 // The "+" sheet: every kind of Exhibit the active Chambers let the owner
 // create (manifest.exhibitTypes). Picking one opens that Chamber's own
@@ -9,6 +11,7 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
   const nav = useStackNav();
   const { mounted, state } = usePresence(open);
   const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
+  const { data: types } = useQuery({ queryKey: TYPES_KEY, queryFn: fetchTypes });
 
   useEffect(() => {
     if (!open) return;
@@ -21,16 +24,24 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
 
   if (!mounted) return null;
 
-  const options = (registry ?? [])
-    .filter((c) => c.status === "active")
-    .flatMap((c) => (c.exhibitTypes ?? []).map((t) => ({ chamber: c.name, ...t })));
+  // Runtime types first (core), then what each active Chamber offers.
+  const options = [
+    ...(types ?? [])
+      .filter((t) => !t.definition.hidden)
+      .map((t) => ({ chamber: "e", type: t.definition.slug, label: t.definition.label, path: `/e/new/${t.definition.slug}` })),
+    ...(registry ?? [])
+      .filter((c) => c.status === "active")
+      .flatMap((c) =>
+        (c.exhibitTypes ?? []).map((t) => ({ chamber: c.name, type: t.type, label: t.label, path: resolveChamberPath(t.createPath, c.name, true) }))
+      ),
+  ];
 
   return (
     <>
       <div className="create-sheet-backdrop" data-state={state} onClick={onClose} aria-hidden="true" />
       <div className="create-sheet" data-state={state} role="dialog" aria-label="Create">
         <div className="create-sheet-title">New —</div>
-        {options.length === 0 && <p className="p-4 font-mono text-xs text-dust">No Chamber offers anything to create right now.</p>}
+        {options.length === 0 && <p className="p-4 font-mono text-xs text-dust">Nothing to create right now.</p>}
         {options.map((option) => (
           <button
             key={`${option.chamber}:${option.type}`}
@@ -38,7 +49,7 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
             className="create-sheet-option"
             onClick={() => {
               onClose();
-              nav.push(resolveChamberPath(option.createPath, option.chamber, true));
+              nav.push(option.path);
             }}
           >
             <ChamberMark name={option.chamber} />

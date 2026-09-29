@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -50,7 +51,14 @@ export function forwardToChamber(c: Context): Promise<Response> {
 // A Chamber's icon (frontend/public/icons/mark.svg, copied into dist/ by
 // the build). Public: an icon carries nothing sensitive. Any miss is a 404
 // and the caller falls back to a generic mark.
+// Runtime exhibit types share one mark for now (typeEngine's "e").
+const RECORD_ICON = fileURLToPath(new URL("../frontend/public/icons/record.svg", import.meta.url));
+
 export async function serveChamberIcon(c: Context, chamberName: string): Promise<Response> {
+  if (chamberName === "e") {
+    const svg = await readFile(RECORD_ICON);
+    return c.body(svg, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=3600" });
+  }
   const module = getModule(chamberName);
   if (!module || getChamber(chamberName)?.status !== "active") {
     return c.json({ error: "chamber_not_found", chamber: chamberName }, 404);

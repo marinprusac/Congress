@@ -11,6 +11,8 @@ import {
   useStackNav,
 } from "@congress/congress-ui";
 import { viewHref } from "@/components/ViewSlot";
+import { fetchTypes } from "@/lib/recordsApi";
+import { TYPES_KEY } from "@/records/RecordPage";
 
 function SearchIcon() {
   return (
@@ -35,6 +37,8 @@ export function SearchPage() {
   const setQuery = (next: string) => setParams(next ? { q: next } : {}, { replace: true });
   const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
   const { results, loading } = useExhibitSearch(query, true);
+  const { data: types } = useQuery({ queryKey: TYPES_KEY, queryFn: fetchTypes });
+  const typeLabels = new Map((types ?? []).map((t) => [t.definition.slug, t.definition.label]));
 
   const needle = query.trim().toLowerCase();
   const chambers = (registry ?? []).filter((c) => c.status === "active" && (c.views ?? []).length > 0);
@@ -85,7 +89,7 @@ export function SearchPage() {
           >
             <ChamberMark name={result.chamber} />
             <span className="search-row-name">{result.name}</span>
-            <span className="search-row-meta">{displayNames.get(result.chamber) ?? result.chamber}</span>
+            <span className="search-row-meta">{result.chamber === "e" ? (typeLabels.get(result.type) ?? result.type) : (displayNames.get(result.chamber) ?? result.chamber)}</span>
           </button>
         ))}
       </main>

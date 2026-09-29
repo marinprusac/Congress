@@ -14,7 +14,7 @@ describe("chamberForPath", () => {
   });
 
   it("ignores the shell's own routes", () => {
-    for (const path of ["/", "", "/search", "/chat/12", "/notifications", "/settings?tab=ai", "/capitol/x", "/logs"]) {
+    for (const path of ["/", "", "/search", "/chat/12", "/notifications", "/settings?tab=ai", "/capitol/x", "/logs", "/e/01abc", "/e/new/note"]) {
       expect(chamberForPath(path)).toBeUndefined();
     }
   });
