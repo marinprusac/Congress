@@ -18,23 +18,6 @@ export function fetchAccounts(): Promise<GoogleAccount[]> {
   return fetch(`${API_BASE}/accounts`).then((res) => json(res));
 }
 
-export function updateAccountLabel(id: number, label: string): Promise<GoogleAccount> {
-  return fetch(`${API_BASE}/accounts/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ label }),
-  }).then((res) => json(res));
-}
-
-export async function disconnectAccount(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/accounts/${id}`, { method: "DELETE" });
-  assertDeleteOk(res, "disconnect account");
-}
-
-export function connectAccountUrl(): string {
-  return `${API_BASE}/oauth/google/start`;
-}
-
 export function fetchAvailableCalendars(accountId: number): Promise<GoogleCalendarListItem[]> {
   return fetch(`${API_BASE}/calendars/available?accountId=${accountId}`).then((res) => json(res));
 }

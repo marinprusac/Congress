@@ -1,7 +1,6 @@
 import { Hono, type Context } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import {
-  updateAccountRequestSchema,
   setCalendarSelectionRequestSchema,
   createEventRequestSchema,
   updateEventRequestSchema,
@@ -15,14 +14,7 @@ import {
   mountFeedRoute,
 } from "@congress/chamber-kit";
 import { calendarFeedCandidates, FEED_LOOKAHEAD_MS, FEED_LOOKBEHIND_MS } from "./feedRules.js";
-import { buildAuthUrl, exchangeCodeForTokens, decodeIdToken, createOAuthState, consumeOAuthState } from "./google/oauth.js";
-import {
-  listAccounts,
-  updateAccountLabel,
-  disconnectAccount,
-  upsertAccountFromOAuth,
-  AccountNeedsReconnectError,
-} from "./google/accounts.js";
+import { listAccounts, AccountNeedsReconnectError } from "./google/accounts.js";
 import { listGoogleCalendars, listSelectedCalendarsForUI, setCalendarSelection } from "./google/calendars.js";
 import { EventNotEditableError } from "./google/events.js";
 import {
@@ -67,55 +59,6 @@ function mapError(c: Context, err: unknown): Response {
 app.use("/api/*", actorMiddleware);
 
 app.get("/api/accounts", (c) => c.json(listAccounts()));
-
-app.patch("/api/accounts/:id", async (c) => {
-  const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
-  const body = await c.req.json().catch(() => null);
-  const parsed = updateAccountRequestSchema.safeParse(body);
-  if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
-  const account = updateAccountLabel(id, parsed.data.label);
-  if (!account) return c.json({ error: "not_found" }, 404);
-  return c.json(account);
-});
-
-app.delete("/api/accounts/:id", async (c) => {
-  const id = Number(c.req.param("id"));
-  if (!Number.isInteger(id)) return c.json({ error: "invalid_id" }, 400);
-  const deleted = await disconnectAccount(id);
-  if (!deleted) return c.json({ error: "not_found" }, 404);
-  return c.body(null, 204);
-});
-
-app.get("/api/oauth/google/start", (c) => {
-  const state = createOAuthState();
-  return c.redirect(buildAuthUrl(state));
-});
-
-app.get("/api/oauth/google/callback", async (c) => {
-  const code = c.req.query("code");
-  const state = c.req.query("state");
-  if (!code || !state || !consumeOAuthState(state)) {
-    return c.json({ error: "invalid_oauth_callback" }, 400);
-  }
-  try {
-    const tokens = await exchangeCodeForTokens(code);
-    if (!tokens.idToken) return c.json({ error: "missing_id_token" }, 502);
-    const { sub, email } = decodeIdToken(tokens.idToken);
-    upsertAccountFromOAuth({
-      sub,
-      email,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      scope: tokens.scope,
-      expiryMs: tokens.expiryMs,
-    });
-    return c.redirect("/calendar/settings?connected=1");
-  } catch (err) {
-    console.error("OAuth callback failed:", err);
-    return c.json({ error: "oauth_failed" }, 502);
-  }
-});
 
 app.get("/api/calendars/available", async (c) => {
   const accountId = Number(c.req.query("accountId"));

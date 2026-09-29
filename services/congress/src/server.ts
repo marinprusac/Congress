@@ -33,6 +33,7 @@ import { mcpApp } from "./mcp/server.js";
 import { parseRunContext, withRunContext } from "./ai/runContext.js";
 import { aiRoutes } from "./ai/routes.js";
 import { getFeed } from "./feed.js";
+import { googleConnectorRoutes } from "./connectors/google/routes.js";
 
 // Chamber included per-ref since an id that never synced has no cache row to
 // infer the owning chamber from.
@@ -69,6 +70,9 @@ app.get("/congress/feed", requireSession, async (c) => c.json({ items: await get
 // Congress's own AI: the chat, the shared budget/pause settings and the
 // live run stream - see ai/routes.ts.
 app.route("/congress/ai", aiRoutes);
+
+// Google sign-in shared by every Chamber that talks to Google.
+app.route("/congress/connectors/google", googleConnectorRoutes);
 
 // One row per known event type, auto-derived from the live registry - no
 // create/delete route exists, see eventSettings.ts. Synced before listing so

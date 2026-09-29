@@ -1,14 +1,7 @@
-import { env } from "../env.js";
+import type { GoogleClientConfig } from "./config.js";
 
-export const SCOPES = [
-  // openid + email are needed so Google's token response includes an
-  // id_token — that's how we learn the account's stable sub/email to key
-  // the upsert, not for any authentication purpose of our own.
-  "openid",
-  "email",
-  "https://www.googleapis.com/auth/calendar.events",
-  "https://www.googleapis.com/auth/calendar.readonly",
-];
+// Needed for the id_token (the account's stable sub + email).
+export const BASE_SCOPES = ["openid", "email"];
 
 export class RevokedTokenError extends Error {
   constructor() {
@@ -17,7 +10,7 @@ export class RevokedTokenError extends Error {
   }
 }
 
-interface TokenResult {
+export interface TokenResult {
   accessToken: string;
   refreshToken: string | undefined;
   scope: string;
@@ -25,39 +18,35 @@ interface TokenResult {
   idToken: string | undefined;
 }
 
-interface RefreshResult {
-  accessToken: string;
-  expiryMs: number;
-}
-
-export function buildAuthUrl(state: string): string {
+export function buildAuthUrl(config: GoogleClientConfig, state: string, scopes: string[], loginHint?: string): string {
   const params = new URLSearchParams({
-    client_id: env.GOOGLE_OAUTH_CLIENT_ID,
-    redirect_uri: env.GOOGLE_OAUTH_REDIRECT_URI,
+    client_id: config.clientId,
+    redirect_uri: config.redirectUri,
     response_type: "code",
-    scope: SCOPES.join(" "),
+    scope: [...new Set([...BASE_SCOPES, ...scopes])].join(" "),
     access_type: "offline",
+    // Consent every time so Google always returns a refresh token for the full scope set.
     prompt: "consent",
+    include_granted_scopes: "true",
     state,
   });
+  if (loginHint) params.set("login_hint", loginHint);
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
 
-export async function exchangeCodeForTokens(code: string): Promise<TokenResult> {
+export async function exchangeCodeForTokens(config: GoogleClientConfig, code: string): Promise<TokenResult> {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: env.GOOGLE_OAUTH_CLIENT_ID,
-      client_secret: env.GOOGLE_OAUTH_CLIENT_SECRET,
-      redirect_uri: env.GOOGLE_OAUTH_REDIRECT_URI,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      redirect_uri: config.redirectUri,
       grant_type: "authorization_code",
       code,
     }),
   });
-  if (!res.ok) {
-    throw new Error(`Token exchange failed: ${res.status} ${await res.text()}`);
-  }
+  if (!res.ok) throw new Error(`Token exchange failed: ${res.status} ${await res.text()}`);
   const body = (await res.json()) as {
     access_token: string;
     refresh_token?: string;
@@ -77,33 +66,30 @@ export async function exchangeCodeForTokens(code: string): Promise<TokenResult> 
 export function decodeIdToken(idToken: string): { sub: string; email: string } {
   const payloadSegment = idToken.split(".")[1];
   if (!payloadSegment) throw new Error("Malformed id_token");
-  const payload = JSON.parse(Buffer.from(payloadSegment, "base64url").toString("utf8")) as {
-    sub: string;
-    email: string;
-  };
+  const payload = JSON.parse(Buffer.from(payloadSegment, "base64url").toString("utf8")) as { sub: string; email: string };
   return { sub: payload.sub, email: payload.email };
 }
 
-export async function refreshAccessToken(refreshToken: string): Promise<RefreshResult> {
+export async function refreshAccessToken(
+  config: GoogleClientConfig,
+  refreshToken: string
+): Promise<{ accessToken: string; expiryMs: number }> {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: env.GOOGLE_OAUTH_CLIENT_ID,
-      client_secret: env.GOOGLE_OAUTH_CLIENT_SECRET,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
       grant_type: "refresh_token",
       refresh_token: refreshToken,
     }),
   });
   if (res.status === 400) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    if (body.error === "invalid_grant") {
-      throw new RevokedTokenError();
-    }
+    if (body.error === "invalid_grant") throw new RevokedTokenError();
+    throw new Error(`Token refresh failed: 400 ${body.error ?? ""}`);
   }
-  if (!res.ok) {
-    throw new Error(`Token refresh failed: ${res.status} ${await res.text()}`);
-  }
+  if (!res.ok) throw new Error(`Token refresh failed: ${res.status} ${await res.text()}`);
   const body = (await res.json()) as { access_token: string; expires_in: number };
   return { accessToken: body.access_token, expiryMs: Date.now() + body.expires_in * 1000 };
 }
@@ -120,23 +106,32 @@ export async function revokeToken(token: string): Promise<void> {
 }
 
 const STATE_TTL_MS = 10 * 60 * 1000;
-const pendingStates = new Map<string, number>();
+const pendingStates = new Map<string, { createdAt: number; returnTo: string }>();
 
 function pruneExpiredStates(): void {
   const now = Date.now();
-  for (const [state, createdAt] of pendingStates) {
-    if (now - createdAt > STATE_TTL_MS) pendingStates.delete(state);
+  for (const [state, entry] of pendingStates) {
+    if (now - entry.createdAt > STATE_TTL_MS) pendingStates.delete(state);
   }
 }
 
-export function createOAuthState(): string {
+export function createOAuthState(returnTo: string): string {
   pruneExpiredStates();
   const state = crypto.randomUUID();
-  pendingStates.set(state, Date.now());
+  pendingStates.set(state, { createdAt: Date.now(), returnTo });
   return state;
 }
 
-export function consumeOAuthState(state: string): boolean {
+// The returnTo the flow started with, or null for an unknown/expired state.
+export function consumeOAuthState(state: string): string | null {
   pruneExpiredStates();
-  return pendingStates.delete(state);
+  const entry = pendingStates.get(state);
+  pendingStates.delete(state);
+  return entry ? entry.returnTo : null;
+}
+
+// Only same-origin shell paths - never an open redirect.
+export function safeReturnTo(value: string | undefined, fallback: string): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return fallback;
+  return value;
 }

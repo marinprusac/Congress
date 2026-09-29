@@ -61,6 +61,28 @@ one manual step: if the Chamber needs config, create
 `services/chamber-<name>/.env` on the server (untracked) from its
 `.env.example`, then deploy.
 
+## Google connector and Mail (one-time)
+
+Google sign-in moved from the Calendar Chamber into Congress (Settings →
+Accounts), shared by Calendar and Mail. On first boot Calendar hands its
+stored accounts to Congress (same ids), so Calendar keeps working with no
+action. Congress reads `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`/`_REDIRECT_URI`
+from its own `.env`, falling back to `services/chamber-calendar/.env`.
+
+To connect accounts (or grant Mail its Gmail access), once:
+
+1. Google Cloud console → the same OAuth client → add the authorized
+   redirect URI `https://congress.marinprusac.com/congress/connectors/google/callback`.
+2. Enable the **Gmail API** in that project (and add the
+   `gmail.readonly` scope to the consent screen if it lists scopes).
+3. Optionally move the three `GOOGLE_OAUTH_*` lines into
+   `services/congress/.env` (with the new redirect URI) and drop them from
+   Calendar's `.env`; restart `congress-core`.
+4. Settings → Accounts → "Grant" (or Mail's settings → "Grant Gmail
+   access") for each account.
+
+Mail needs no `.env` of its own (it defaults to `./data/mail.sqlite3`).
+
 ## Chambers moved into Congress (one-time)
 
 Chambers used to run as their own `congress-chamber-*` units. The deploy that
@@ -203,7 +225,7 @@ sudo apt-get install -y rsync                     # if not already present
 # NODE_ENV=production, PORT=8000, CONGRESS_INTERNAL_TOKEN,
 # CONGRESS_MASTER_PASSWORD_HASH and SESSION_SECRET. Then each Chamber's own
 # services/chamber-<name>/.env from its .env.example, for the ones that
-# need config (calendar's Google OAuth, map's Traccar, ...).
+# need config (map's Traccar, fitness's Hevy key, ...).
 
 cd /srv/congress
 sudo cp infra/systemd/congress-core.service /etc/systemd/system/

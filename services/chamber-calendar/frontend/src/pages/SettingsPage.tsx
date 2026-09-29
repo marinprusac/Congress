@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { googleConnectHref } from "@congress/congress-ui";
 import {
   fetchAccounts,
-  disconnectAccount,
-  connectAccountUrl,
   fetchAvailableCalendars,
   fetchSelectedCalendars,
   setCalendarSelection,
@@ -70,35 +69,27 @@ function AccountCalendars({ account }: { account: GoogleAccount }) {
   );
 }
 
-export function SettingsPage() {
-  const queryClient = useQueryClient();
+const RETURN_TO = "/settings?from=calendar";
 
+export function SettingsPage() {
   const { data: accounts, isLoading, isError } = useQuery({
     queryKey: ["accounts"],
     queryFn: fetchAccounts,
   });
 
-  const disconnectMutation = useMutation({
-    mutationFn: (id: number) => disconnectAccount(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["calendars", "selected"] });
-      queryClient.invalidateQueries({ queryKey: ["events"] });
-    },
-  });
-
   return (
     <section>
       <div className="mb-8">
-        <div className="mb-3 flex items-baseline justify-between">
-          <h3 className="font-display text-xl text-ink">Connected Accounts</h3>
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="font-display text-xl text-ink">Google Accounts</h3>
           <a
-            href={connectAccountUrl()}
+            href={googleConnectHref({ returnTo: RETURN_TO })}
             className="font-mono text-xs uppercase tracking-wide text-accent hover:underline"
           >
-            + Connect a Google Account
+            + Connect account
           </a>
         </div>
+        <p className="mb-3 font-mono text-xs text-dust">Shared with other Chambers - rename or disconnect under Settings → Accounts.</p>
 
         {isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}
         {isError && <p className="font-mono text-sm text-alert">Failed to reach the Calendar API.</p>}
@@ -110,30 +101,21 @@ export function SettingsPage() {
 
         {accounts?.map((account) => (
           <div key={account.id} className="border-t border-dust py-3">
-            <div className="flex items-baseline justify-between gap-4">
-              <div>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <div className="min-w-0">
                 <span className="font-display text-lg text-ink">{account.label}</span>{" "}
                 <span className="font-mono text-xs text-dust">{account.email}</span>
-                {account.needsReconnect && (
-                  <span className="ml-2 font-mono text-xs uppercase text-alert">Needs reconnect</span>
-                )}
               </div>
-              <div className="flex shrink-0 gap-3 font-mono text-xs uppercase tracking-wide">
-                {account.needsReconnect && (
-                  <a href={connectAccountUrl()} className="text-accent hover:underline">
-                    Reconnect
-                  </a>
-                )}
-                <button
-                  type="button"
-                  onClick={() => disconnectMutation.mutate(account.id)}
-                  className="text-alert hover:underline"
+              {(account.needsReconnect || !account.hasAccess) && (
+                <a
+                  href={googleConnectHref({ returnTo: RETURN_TO, loginHint: account.email })}
+                  className="shrink-0 font-mono text-xs uppercase tracking-wide text-accent hover:underline"
                 >
-                  Disconnect
-                </button>
-              </div>
+                  {account.needsReconnect ? "Reconnect" : "Grant calendar access"}
+                </a>
+              )}
             </div>
-            <AccountCalendars account={account} />
+            {account.hasAccess && <AccountCalendars account={account} />}
           </div>
         ))}
       </div>

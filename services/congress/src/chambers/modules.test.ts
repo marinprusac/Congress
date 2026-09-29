@@ -22,9 +22,6 @@ beforeAll(async () => {
     envFor: (m) => ({
       DB_PATH: join(dataDir, `${m.manifest.name}.sqlite3`),
       FILES_DIR: join(dataDir, "documents-files"),
-      GOOGLE_OAUTH_CLIENT_ID: "id",
-      GOOGLE_OAUTH_CLIENT_SECRET: "secret",
-      GOOGLE_OAUTH_REDIRECT_URI: "http://127.0.0.1:9/oauth/callback",
       TRACCAR_URL: "http://127.0.0.1:9",
       TRACCAR_TOKEN: "token",
       TRACCAR_DEVICE_ID: "1",
@@ -38,12 +35,12 @@ afterAll(async () => {
 });
 
 describe("every Chamber in one process", () => {
-  it("starts all six", () => {
+  it("starts all seven", () => {
     const active = listChambers().filter((c) => c.status === "active").map((c) => c.name);
-    expect(active.sort()).toEqual(["calendar", "documents", "fitness", "map", "notes", "tasks"]);
+    expect(active.sort()).toEqual(["calendar", "documents", "fitness", "mail", "map", "notes", "tasks"]);
   });
 
-  it.each(["notes", "calendar", "documents", "tasks", "map", "fitness"])("serves %s's exhibit search in-process", async (name) => {
+  it.each(["notes", "calendar", "documents", "tasks", "map", "fitness", "mail"])("serves %s's exhibit search in-process", async (name) => {
     const res = await chamberFetch(name, "/exhibits/search?q=");
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ results: expect.any(Array) });

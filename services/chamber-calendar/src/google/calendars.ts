@@ -1,7 +1,8 @@
 import { and, eq } from "drizzle-orm";
 import type { GoogleCalendarListItem, SelectedCalendar } from "../types.js";
 import { db } from "../db/client.js";
-import { googleAccounts, selectedCalendars, cachedEvents } from "../db/schema.js";
+import { listGoogleAccounts } from "@congress/chamber-kit";
+import { selectedCalendars, cachedEvents } from "../db/schema.js";
 import { googleCalendarFetch } from "./client.js";
 import { getAccountRow } from "./accounts.js";
 
@@ -27,20 +28,22 @@ export async function listGoogleCalendars(accountId: number): Promise<GoogleCale
 }
 
 export function listSelectedCalendarsForUI(): SelectedCalendar[] {
-  const rows = db
+  const labels = new Map(listGoogleAccounts().map((a) => [a.id, a.label]));
+  return db
     .select({
       id: selectedCalendars.id,
       accountId: selectedCalendars.accountId,
-      accountLabel: googleAccounts.label,
       googleCalendarId: selectedCalendars.googleCalendarId,
       summary: selectedCalendars.summary,
       colorHex: selectedCalendars.colorHex,
       selected: selectedCalendars.selected,
     })
     .from(selectedCalendars)
-    .innerJoin(googleAccounts, eq(selectedCalendars.accountId, googleAccounts.id))
-    .all();
-  return rows;
+    .all()
+    .flatMap((row) => {
+      const accountLabel = labels.get(row.accountId);
+      return accountLabel === undefined ? [] : [{ ...row, accountLabel }];
+    });
 }
 
 export function listSelectedCalendarsInternal(): { accountId: number; googleCalendarId: string }[] {

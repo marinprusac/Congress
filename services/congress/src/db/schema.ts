@@ -376,3 +376,19 @@ export const aiSpend = sqliteTable(
   },
   (table) => [index("ai_spend_created_at_idx").on(table.createdAt)]
 );
+
+// Google connector accounts, shared by every Chamber that talks to Google
+// (connectors/google). `scope` is Google's space-separated granted list.
+export const googleAccounts = sqliteTable("google_accounts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  label: text("label").notNull(),
+  email: text("email").notNull(),
+  googleSub: text("google_sub").notNull().unique(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  scope: text("scope").notNull(),
+  tokenExpiry: integer("token_expiry", { mode: "timestamp_ms" }).notNull(),
+  needsReconnect: integer("needs_reconnect", { mode: "boolean" }).notNull().default(false),
+  connectedAt: integer("connected_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});

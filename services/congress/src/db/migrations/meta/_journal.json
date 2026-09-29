@@ -211,6 +211,13 @@
       "when": 1790524916438,
       "tag": "0029_retire_deputy",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1790683980633,
+      "tag": "0030_google_connector",
+      "breakpoints": true
     }
   ]
 }

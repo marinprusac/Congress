@@ -5,14 +5,11 @@ export const googleAccountSchema = z.object({
   label: z.string(),
   email: z.string(),
   needsReconnect: z.boolean(),
+  // Whether this account has granted the Calendar scopes.
+  hasAccess: z.boolean(),
   connectedAt: z.string(),
 });
 export type GoogleAccount = z.infer<typeof googleAccountSchema>;
-
-export const updateAccountRequestSchema = z.object({
-  label: z.string().min(1),
-});
-export type UpdateAccountRequest = z.infer<typeof updateAccountRequestSchema>;
 
 export const googleCalendarListItemSchema = z.object({
   googleCalendarId: z.string(),
