@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Message, ReaderStatus } from "./api";
-import { chatTitle, jidLabel, previewText, statusNotice, withDayBreaks } from "./format";
+import { chatTitle, jidLabel, needsPairing, previewText, qrPath, statusNotice, withDayBreaks } from "./format";
 
 const status = (over: Partial<ReaderStatus>): ReaderStatus => ({
   state: "connected",
@@ -44,10 +44,17 @@ describe("WhatsApp formatting", () => {
   it("warns about reader states and a silent phone", () => {
     const now = Date.UTC(2026, 8, 29);
     expect(statusNotice(null, true)?.tone).toBe("alert");
-    expect(statusNotice(status({ state: "logged_out" }), false)?.text).toContain("Re-pair");
+    expect(statusNotice(status({ state: "logged_out" }), false)?.text).toContain("link it again");
+    expect(statusNotice(status({ state: "not_paired" }), false)).toBeNull();
+    expect(needsPairing(status({ state: "not_paired" }))).toBe(true);
+    expect(needsPairing(status({ state: "logged_out" }))).toBe(false);
     expect(statusNotice(status({ lastPhoneAt: now - 2 * 86_400_000 }), false, now)).toBeNull();
     expect(statusNotice(status({ lastPhoneAt: now - 11 * 86_400_000 }), false, now)?.text).toContain("11 days");
     // Never seen (e.g. just paired, nothing yet) is not an alarm.
     expect(statusNotice(status({}), false, now)).toBeNull();
+  });
+
+  it("draws a QR matrix as one path inside the quiet zone", () => {
+    expect(qrPath(["10", "01"], 4)).toBe("M4 4h1v1h-1zM5 5h1v1h-1z");
   });
 });

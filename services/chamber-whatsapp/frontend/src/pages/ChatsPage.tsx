@@ -10,8 +10,9 @@ import {
   useShellHosted,
 } from "@congress/congress-ui";
 import { cursorAt, fetchChats, fetchStatus, ReaderUnavailableError, searchAll, type ChatSummary, type Message } from "@/lib/api";
-import { chatTitle, listTime, previewText, senderLabel, statusNotice } from "@/lib/format";
+import { chatTitle, listTime, needsPairing, previewText, senderLabel, statusNotice } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
+import { PairingPanel } from "@/components/PairingPanel";
 
 export function useChatPath() {
   const shellHosted = useShellHosted();
@@ -22,7 +23,14 @@ export function useChatPath() {
 }
 
 function StatusBanner() {
-  const status = useQuery({ queryKey: ["status"], queryFn: fetchStatus, refetchInterval: 60_000, retry: false });
+  const status = useQuery({
+    queryKey: ["status"],
+    queryFn: fetchStatus,
+    // Quicker while linking or reconnecting, so the page follows along.
+    refetchInterval: (q) => (q.state.data?.state === "connected" ? 60_000 : 5_000),
+    retry: false,
+  });
+  if (needsPairing(status.data ?? null)) return <PairingPanel />;
   const notice = statusNotice(status.data ?? null, status.error instanceof ReaderUnavailableError);
   if (status.isLoading || !notice) return null;
   return <p className={`wa-notice ${notice.tone === "alert" ? "wa-notice-alert" : ""}`}>{notice.text}</p>;

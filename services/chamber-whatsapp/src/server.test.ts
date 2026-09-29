@@ -61,7 +61,21 @@ describe("WhatsApp Chamber proxy", () => {
   it("offers no way to write", async () => {
     for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
       expect((await get("/api/chats", { method })).status).toBe(404);
+      expect((await get("/api/media/a/b", { method })).status).toBe(404);
     }
+    for (const method of ["PUT", "PATCH", "DELETE"]) {
+      expect((await get("/api/pairing", { method })).status).toBe(404);
+    }
+  });
+
+  it("relays starting a pairing session as the one POST", async () => {
+    seen.length = 0;
+    expect((await get("/api/pairing", { method: "POST" })).status).toBe(200);
+    await get("/api/pairing");
+    expect(seen).toEqual([
+      { method: "POST", url: "/pairing" },
+      { method: "GET", url: "/pairing" },
+    ]);
   });
 
   it("reports the daemon as unavailable when its socket is gone", async () => {

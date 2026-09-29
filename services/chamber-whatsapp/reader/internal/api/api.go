@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"congress/wa-reader/internal/pairing"
 	"congress/wa-reader/internal/store"
 	"congress/wa-reader/internal/waclient"
 )
@@ -21,12 +22,20 @@ type Downloader interface {
 	Download(ctx context.Context, m waclient.MediaRef) ([]byte, error)
 }
 
+type Pairer interface {
+	Start(ctx context.Context) error
+	Snapshot() pairing.Snapshot
+}
+
 type Server struct {
 	Store    *store.Store
 	Media    Downloader // nil when not connected to WhatsApp (offline mode)
+	Pairing  Pairer     // nil in offline mode
 	Status   func() any
 	MaxMedia int64
 	Log      *slog.Logger
+	// Outlives requests: a pairing session keeps running after POST /pairing returns.
+	Ctx context.Context
 
 	downloads chan struct{}
 }
@@ -40,8 +49,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /chats/{jid}/messages", s.messages)
 	mux.HandleFunc("GET /search", s.search)
 	mux.HandleFunc("GET /media/{chat}/{id}", s.media)
+	mux.HandleFunc("GET /pairing", s.pairingStatus)
+	mux.HandleFunc("POST /pairing", s.pairingStart)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		// The one non-GET: starting a pairing session (linking, never sending).
+		isPairingStart := r.Method == http.MethodPost && r.URL.Path == "/pairing"
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && !isPairingStart {
 			writeError(w, http.StatusMethodNotAllowed, "read_only")
 			return
 		}
@@ -150,6 +163,32 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"chats": chats, "messages": msgs})
+}
+
+func (s *Server) pairingStatus(w http.ResponseWriter, _ *http.Request) {
+	if s.Pairing == nil {
+		writeError(w, http.StatusServiceUnavailable, "offline")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.Pairing.Snapshot())
+}
+
+func (s *Server) pairingStart(w http.ResponseWriter, _ *http.Request) {
+	if s.Pairing == nil {
+		writeError(w, http.StatusServiceUnavailable, "offline")
+		return
+	}
+	err := s.Pairing.Start(s.Ctx)
+	if errors.Is(err, pairing.ErrAlreadyPaired) {
+		writeError(w, http.StatusConflict, "already_paired")
+		return
+	}
+	if err != nil {
+		s.Log.Error("start pairing", "err", err)
+		writeError(w, http.StatusBadGateway, "pairing_failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.Pairing.Snapshot())
 }
 
 // Types a browser may render inline; everything else is forced to download.

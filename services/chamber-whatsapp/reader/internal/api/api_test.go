@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"congress/wa-reader/internal/pairing"
 	"congress/wa-reader/internal/store"
 	"congress/wa-reader/internal/waclient"
 )
@@ -65,6 +66,57 @@ func TestOnlyReads(t *testing.T) {
 	}
 	if rec := get(h, "GET", "/status"); rec.Code != 200 || !strings.Contains(rec.Body.String(), "connected") {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+}
+
+type fakePairer struct {
+	started int
+	err     error
+	ctx     context.Context
+}
+
+func (f *fakePairer) Start(ctx context.Context) error { f.started++; f.ctx = ctx; return f.err }
+func (f *fakePairer) Snapshot() pairing.Snapshot {
+	if f.started > 0 {
+		return pairing.Snapshot{State: "waiting", QR: []string{"101", "010", "101"}}
+	}
+	return pairing.Snapshot{State: "idle"}
+}
+
+func TestPairingIsTheOnlyNonGet(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "m.sqlite3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	type key struct{}
+	daemonCtx := context.WithValue(context.Background(), key{}, "daemon")
+	fp := &fakePairer{}
+	h := (&Server{Store: st, Pairing: fp, Ctx: daemonCtx, MaxMedia: 1, Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Status: func() any { return nil }}).Handler()
+
+	if rec := get(h, "GET", "/pairing"); !strings.Contains(rec.Body.String(), `"idle"`) {
+		t.Fatalf("%s", rec.Body)
+	}
+	rec := get(h, "POST", "/pairing")
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"qr":["101"`) || fp.started != 1 {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	// The session must outlive the request that started it.
+	if fp.ctx.Value(key{}) != "daemon" {
+		t.Fatal("pairing started with the request context")
+	}
+	for _, path := range []string{"/status", "/chats", "/search", "/pairing/x"} {
+		if rec := get(h, "POST", path); rec.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("POST %s: %d", path, rec.Code)
+		}
+	}
+	if rec := get(h, "DELETE", "/pairing"); rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("DELETE /pairing: %d", rec.Code)
+	}
+	fp.err = pairing.ErrAlreadyPaired
+	if rec := get(h, "POST", "/pairing"); rec.Code != http.StatusConflict {
+		t.Fatalf("%d", rec.Code)
 	}
 }
 
