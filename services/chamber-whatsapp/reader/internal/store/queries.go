@@ -30,6 +30,7 @@ type MediaInfo struct {
 	Width    int64  `json:"width,omitempty"`
 	Height   int64  `json:"height,omitempty"`
 	Seconds  int64  `json:"seconds,omitempty"`
+	TooLarge bool   `json:"tooLarge,omitempty"`
 }
 
 type Quoted struct {
