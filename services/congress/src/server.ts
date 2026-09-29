@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import { z } from "zod";
@@ -227,6 +228,11 @@ app.all("/mcp/:chamber", (c) => {
 });
 
 app.route("/mcp", mcpApp);
+
+// Public privacy policy + terms (linked from Google's OAuth consent screen).
+const privacyHtml = readFileSync(new URL("./legal/privacy.html", import.meta.url), "utf8");
+app.get("/privacy", (c) => c.html(privacyHtml));
+app.get("/terms", (c) => c.redirect("/privacy#terms"));
 
 // A Chamber's built assets at "/<name>/*"; every other "/<name>/..." path is
 // a shell route, served by Congress's own SPA below.
