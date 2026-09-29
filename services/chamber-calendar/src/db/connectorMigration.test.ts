@@ -15,7 +15,8 @@ describe("migration 0007 (Google connector)", () => {
     cpSync(migrationsDir("chamber-calendar"), before, { recursive: true });
     const journalPath = join(before, "meta", "_journal.json");
     const journal = JSON.parse(readFileSync(journalPath, "utf8")) as { entries: Array<{ tag: string }> };
-    journal.entries = journal.entries.filter((e) => !e.tag.startsWith("0007"));
+    // Everything from 0007 on - drizzle skips a migration older than the last applied one.
+    journal.entries = journal.entries.filter((e) => e.tag < "0007");
     writeFileSync(journalPath, JSON.stringify(journal));
 
     const sqlite = new Database(join(dir, "calendar.sqlite3"));

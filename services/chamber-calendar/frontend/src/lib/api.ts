@@ -9,10 +9,33 @@ import type {
   UpdateEventRequest,
   MoveEventRequest,
   SetEventAttendanceRequest,
+  CalendarSettings,
+  UpdateCalendarSettingsRequest,
+  SyncStatus,
 } from "../../../src/types";
 import { resolveApiBase, parseJsonResponse as json, assertDeleteOk } from "@congress/congress-ui";
 
 const API_BASE = resolveApiBase("calendar");
+
+export function fetchSettings(): Promise<CalendarSettings> {
+  return fetch(`${API_BASE}/settings`).then((res) => json(res));
+}
+
+export function updateSettings(input: UpdateCalendarSettingsRequest): Promise<CalendarSettings> {
+  return fetch(`${API_BASE}/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  }).then((res) => json(res));
+}
+
+export function fetchSyncStatus(): Promise<SyncStatus> {
+  return fetch(`${API_BASE}/sync`).then((res) => json(res));
+}
+
+export function syncNow(): Promise<SyncStatus> {
+  return fetch(`${API_BASE}/sync`, { method: "POST" }).then((res) => json(res));
+}
 
 export function fetchAccounts(): Promise<GoogleAccount[]> {
   return fetch(`${API_BASE}/accounts`).then((res) => json(res));

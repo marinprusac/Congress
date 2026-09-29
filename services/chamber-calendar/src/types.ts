@@ -183,3 +183,19 @@ export type MoveEventRequest = z.infer<typeof moveEventRequestSchema>;
 // local-only note. false reverses either one.
 export const setEventAttendanceRequestSchema = z.object({ notAttending: z.boolean() });
 export type SetEventAttendanceRequest = z.infer<typeof setEventAttendanceRequestSchema>;
+
+export const calendarSettingsSchema = z.object({ syncIntervalMinutes: z.number().int() });
+export type CalendarSettings = z.infer<typeof calendarSettingsSchema>;
+
+export const updateCalendarSettingsRequestSchema = z.object({
+  syncIntervalMinutes: z.number().int().min(1).max(1440).optional(),
+});
+export type UpdateCalendarSettingsRequest = z.infer<typeof updateCalendarSettingsRequestSchema>;
+
+// The Google sync loop's state - in memory, reset (and a sync run) on start.
+export interface SyncStatus {
+  lastSyncedAt: string | null;
+  lastError: string | null;
+  syncing: boolean;
+  nextSyncAt: string | null;
+}

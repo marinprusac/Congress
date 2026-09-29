@@ -29,12 +29,6 @@ import { projectRichToPlain, reconcileRichValue } from "./richTextMirror.js";
 const CACHE_WINDOW_DAYS = 180;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// How often the cache re-polls Google to discover changes made outside this
-// Chamber's own write path (an edit made directly in Google Calendar) - same
-// cadence the old notification-only poll used, so no increase in baseline
-// Google API load versus before this cache existed.
-const CACHE_SYNC_INTERVAL_MS = 5 * 60 * 1000;
-
 function windowBounds(): { startISO: string; endISO: string } {
   const now = Date.now();
   return {
@@ -525,7 +519,9 @@ async function syncOneCalendar(accountId: number, calendarId: string): Promise<v
   for (const event of toPublish) void publishEvent(event);
 }
 
-export async function syncCalendarCache(): Promise<void> {
+// Returns one message per calendar that failed to sync (empty = all fine).
+export async function syncCalendarCache(): Promise<string[]> {
+  const failures: string[] = [];
   const selections = listSelectedCalendarsInternal();
   const byAccount = new Map<number, string[]>();
   for (const sel of selections) {
@@ -541,21 +537,13 @@ export async function syncCalendarCache(): Promise<void> {
       } catch (err) {
         if (err instanceof AccountNeedsReconnectError) {
           console.warn(`Calendar cache sync skipped account needing reconnect: ${err.label}`);
+          failures.push(`${err.label} needs reconnecting`);
         } else {
           console.warn(`Calendar cache sync failed for ${calendarId}: ${(err as Error).message}`);
+          failures.push(`${calendarId}: ${(err as Error).message}`);
         }
       }
     }
   }
-}
-
-let syncInterval: ReturnType<typeof setInterval> | undefined;
-
-export function startCalendarCacheSync(): void {
-  void syncCalendarCache();
-  syncInterval = setInterval(() => void syncCalendarCache(), CACHE_SYNC_INTERVAL_MS);
-}
-
-export function stopCalendarCacheSync(): void {
-  if (syncInterval) clearInterval(syncInterval);
+  return failures;
 }

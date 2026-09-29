@@ -6,13 +6,18 @@ import {
   updateEventRequestSchema,
   moveEventRequestSchema,
   setEventAttendanceRequestSchema,
+  updateCalendarSettingsRequestSchema,
+  type CalendarSettings,
 } from "./types.js";
 import {
   actorMiddleware,
   mountExhibitSearchRoutes,
   mountManualRefsRoutes,
   mountFeedRoute,
+  mountSettingsRoutes,
 } from "@congress/chamber-kit";
+import { getSettings, updateSettings } from "./settings.js";
+import { calendarSync } from "./sync.js";
 import { calendarFeedCandidates, FEED_LOOKAHEAD_MS, FEED_LOOKBEHIND_MS } from "./feedRules.js";
 import { listAccounts, AccountNeedsReconnectError } from "./google/accounts.js";
 import { listGoogleCalendars, listSelectedCalendarsForUI, setCalendarSelection } from "./google/calendars.js";
@@ -59,6 +64,22 @@ function mapError(c: Context, err: unknown): Response {
 app.use("/api/*", actorMiddleware);
 
 app.get("/api/accounts", (c) => c.json(listAccounts()));
+
+mountSettingsRoutes(
+  app,
+  {
+    getSettings,
+    async updateSettings(input: Partial<CalendarSettings>) {
+      const updated = await updateSettings(input);
+      if (input.syncIntervalMinutes !== undefined) await calendarSync.reschedule();
+      return updated;
+    },
+  },
+  updateCalendarSettingsRequestSchema
+);
+
+app.get("/api/sync", (c) => c.json(calendarSync.status()));
+app.post("/api/sync", async (c) => c.json(await calendarSync.syncNow()));
 
 app.get("/api/calendars/available", async (c) => {
   const accountId = Number(c.req.query("accountId"));
