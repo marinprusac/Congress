@@ -12,7 +12,7 @@ import { db } from "./db/client.js";
 import { exhibitCache, exhibitRefs } from "./db/schema.js";
 import { listChambers, getChamber } from "./registry.js";
 import { chamberFetch } from "./chambers/runtime.js";
-import { getLocalSource, listLocalSources } from "./exhibitSources.js";
+import { canonicalId, canonicalIds, getLocalSource, legacyIdsOf, listLocalSources } from "./exhibitSources.js";
 
 const FAN_OUT_TIMEOUT_MS = 5_000;
 
@@ -28,6 +28,16 @@ const exhibitResolveResponseSchema = z.object({ results: z.array(exhibitResolveR
 // task/document/place/automation write, which with Notes' autosave means
 // every 1.2 seconds while typing.
 export function syncExhibit(push: ExhibitSyncRequest): void {
+  // Refs to replaced (legacy) ids point at their replacement instead.
+  const aliases = canonicalIds([...push.outgoingRefs, ...(push.manualRefs ?? [])]);
+  if (aliases.size > 0) {
+    const canon = (id: string) => aliases.get(id)?.id ?? id;
+    push = {
+      ...push,
+      outgoingRefs: [...new Set(push.outgoingRefs.map(canon))].filter((id) => id !== push.id),
+      manualRefs: push.manualRefs?.map(canon),
+    };
+  }
   const now = new Date();
   db.transaction((tx) => {
     const existing = tx.select().from(exhibitCache).where(eq(exhibitCache.id, push.id)).get();
@@ -164,18 +174,20 @@ function cacheResolved(
     // does), so a never-before-cached id gets an empty type here - harmless,
     // since rendering only needs chamber (for the icon) + name + url.
     const existing = db.select().from(exhibitCache).where(eq(exhibitCache.id, id)).get();
+    // Re-sync keeps the exhibit's refs as they are, manual flags included.
+    const refs = db
+      .select({ targetId: exhibitRefs.targetId, isManual: exhibitRefs.isManual })
+      .from(exhibitRefs)
+      .where(eq(exhibitRefs.sourceId, id))
+      .all();
     syncExhibit({
       chamber,
       id,
       type: typeOf?.(id) ?? existing?.type ?? "",
       name: result.name,
       url: result.url,
-      outgoingRefs: db
-        .select({ targetId: exhibitRefs.targetId })
-        .from(exhibitRefs)
-        .where(eq(exhibitRefs.sourceId, id))
-        .all()
-        .map((r) => r.targetId),
+      outgoingRefs: refs.map((r) => r.targetId),
+      manualRefs: refs.filter((r) => r.isManual).map((r) => r.targetId),
     });
 
     return { id, chamber, name: result.name, url: result.url };
@@ -187,7 +199,22 @@ export async function resolveOneLive(id: string, chamber: string): Promise<Capit
   return result!;
 }
 
+// A legacy id resolves as its replacement, keyed by the id asked for.
 export async function resolveExhibits(
+  refs: { id: string; chamber: string }[],
+  prefetchedCache?: Map<string, typeof exhibitCache.$inferSelect>
+): Promise<CapitolExhibitResolveResult[]> {
+  const aliases = canonicalIds(refs.map((r) => r.id));
+  if (aliases.size === 0) return resolveCanonical(refs, prefetchedCache);
+  const effective = refs.map((r) => {
+    const alias = aliases.get(r.id);
+    return alias ? { id: alias.id, chamber: alias.namespace } : r;
+  });
+  const results = await resolveCanonical(effective);
+  return results.map((r, i) => ({ ...r, id: refs[i]!.id }));
+}
+
+async function resolveCanonical(
   refs: { id: string; chamber: string }[],
   // Lets a caller that already fetched the relevant exhibit_cache rows for
   // other reasons (getConnections, below) reuse that same batch instead of
@@ -257,7 +284,9 @@ export async function resolveExhibits(
 // a ref can only ever target something that already exists).
 export function getCachedChamber(id: string): string | null {
   const cached = db.select().from(exhibitCache).where(eq(exhibitCache.id, id)).get();
-  return cached?.chamber ?? null;
+  if (cached) return cached.chamber;
+  const alias = canonicalIds([id]).get(id);
+  return alias ? getCachedChamber(alias.id) : null;
 }
 
 // A Connection has no direction to the caller - exhibit_refs still stores
@@ -267,7 +296,8 @@ export function getCachedChamber(id: string): string | null {
 // connection the other side discovered independently), but this collapses
 // both directions into one deduped entry per "other" exhibit, isManual true
 // if either side's row is manual.
-export async function getConnections(id: string): Promise<ExhibitRefEntry[]> {
+export async function getConnections(rawId: string): Promise<ExhibitRefEntry[]> {
+  const id = canonicalId(rawId);
   const asOther = db.select().from(exhibitRefs).where(eq(exhibitRefs.targetId, id)).all();
   const asOwner = db.select().from(exhibitRefs).where(eq(exhibitRefs.sourceId, id)).all();
 
@@ -391,10 +421,14 @@ export async function getExhibitChip(
 // owning Chamber's own "/api/exhibits/:id/refs" (see mountManualRefsRoutes in
 // @congress/chamber-kit), callable from both an HTTP route and an MCP tool.
 export async function addManualConnection(
-  id: string,
-  targetExhibitId: string,
-  targetChamber?: string
+  rawId: string,
+  rawTargetId: string,
+  rawTargetChamber?: string
 ): Promise<{ refs: string[] } | { error: "not_found" }> {
+  const id = canonicalId(rawId);
+  const targetAlias = canonicalIds([rawTargetId]).get(rawTargetId);
+  const targetExhibitId = targetAlias?.id ?? rawTargetId;
+  const targetChamber = targetAlias?.namespace ?? rawTargetChamber;
   const chamber = getCachedChamber(id);
   if (!chamber) return { error: "not_found" };
 
@@ -432,9 +466,11 @@ export async function addManualConnection(
 // Removes a manual Connection between `id` and `otherExhibitId`, regardless
 // of which side the underlying row is stored on (see getManualConnectionOwner).
 export async function removeManualConnection(
-  id: string,
-  otherExhibitId: string
+  rawId: string,
+  rawOtherId: string
 ): Promise<{ refs: string[] } | { error: "not_found" }> {
+  const id = canonicalId(rawId);
+  const otherExhibitId = canonicalId(rawOtherId);
   const owner = getManualConnectionOwner(id, otherExhibitId);
   if (!owner) return { error: "not_found" };
   const otherId = owner.ownerId === id ? otherExhibitId : id;
@@ -445,15 +481,18 @@ export async function removeManualConnection(
   }
   const entry = getChamber(owner.chamber);
   if (!entry || entry.status !== "active") return { error: "not_found" };
-  try {
-    const res = await chamberFetch(
-      entry.name,
-      `/exhibits/${encodeURIComponent(owner.ownerId)}/refs/${encodeURIComponent(otherId)}`,
-      { method: "DELETE", signal: AbortSignal.timeout(FAN_OUT_TIMEOUT_MS) }
-    );
-    if (!res.ok) return { error: "not_found" };
-    return (await res.json()) as { refs: string[] };
-  } catch {
-    return { error: "not_found" };
+  // A Chamber may still store the connection under the other side's legacy id.
+  for (const candidate of [otherId, ...legacyIdsOf(otherId)]) {
+    try {
+      const res = await chamberFetch(
+        entry.name,
+        `/exhibits/${encodeURIComponent(owner.ownerId)}/refs/${encodeURIComponent(candidate)}`,
+        { method: "DELETE", signal: AbortSignal.timeout(FAN_OUT_TIMEOUT_MS) }
+      );
+      if (res.ok) return (await res.json()) as { refs: string[] };
+    } catch {
+      // try the next candidate
+    }
   }
+  return { error: "not_found" };
 }

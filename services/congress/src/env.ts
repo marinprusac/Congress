@@ -14,6 +14,9 @@ const envSchema = z.object({
   DB_PATH: z.string().default("./data/capitol.sqlite3"),
   // Runtime exhibit types: definitions plus one real table per type.
   EXHIBITS_DB_PATH: z.string().default("./data/exhibits.sqlite3"),
+  // One-time Notes Chamber -> Note type import (typeEngine/legacy/notesImport.ts).
+  NOTES_IMPORT_ENABLED: z.enum(["true", "false"]).default("false"),
+  LEGACY_NOTES_DB_PATH: z.string().optional(),
   // Web Push is additive (the in-app notification center works without it),
   // so an unset keypair must never crash boot - sendWebPush no-ops with a
   // one-time warning and GET /congress/push/config reports publicKey: null.

@@ -9,6 +9,7 @@ import { activeFields } from "./operations.js";
 import { quoteIdent } from "./ddl.js";
 import { addManualRef, NAMESPACE, readRow, recordUrl, removeManualRef, titleOf, typeOfRecord } from "./records.js";
 import { feedCandidatesFor } from "./feedRules.js";
+import { aliasesForIds, legacyIdsFor } from "./aliases.js";
 import type { Stored } from "./casts.js";
 
 // The "e" exhibit namespace: every type's records, in-process.
@@ -81,6 +82,8 @@ export const typeEngineSource: LocalExhibitSource = {
 
   addManualRef,
   removeManualRef,
+  canonicalize: aliasesForIds,
+  legacyIdsOf: legacyIdsFor,
 
   feedCandidates(now): FeedCandidate[] {
     return listTypes().flatMap((t) =>

@@ -11,7 +11,8 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p frontend/tsconfig.json",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/db/migrate.ts"
+    "db:migrate": "tsx src/db/migrate.ts",
+    "import:notes": "tsx src/typeEngine/legacy/importNotesCli.ts"
   },
   "dependencies": {
     "@congress/chamber-kit": "workspace:*",
@@ -37,6 +38,7 @@
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
+    "gray-matter": "^4.0.3",
     "hono": "^4.13.1",
     "lucide-react": "^1.30.0",
     "react": "^19.2.8",

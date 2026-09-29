@@ -36,6 +36,7 @@ import { aiRoutes } from "./ai/routes.js";
 import { getFeed } from "./feed.js";
 import { googleConnectorRoutes } from "./connectors/google/routes.js";
 import { typeRoutes } from "./typeEngine/routes.js";
+import { registerTypeTools } from "./typeEngine/mcpTools.js";
 
 // Chamber included per-ref since an id that never synced has no cache row to
 // infer the owning chamber from.
@@ -216,6 +217,10 @@ app.all("/api/:chamber/*", requireSession, forwardToChamber);
 // the browser - gated by the internal-token header inside createMcpApp.
 app.use("/mcp", (c, next) => withRunContext(parseRunContext((h) => c.req.header(h)), next));
 app.use("/mcp/*", (c, next) => withRunContext(parseRunContext((h) => c.req.header(h)), next));
+
+// Runtime exhibit types' tools (typeEngine/mcpTools.ts), rebuilt per request.
+const typesMcpApp = createMcpApp("types", registerTypeTools, env.CONGRESS_INTERNAL_TOKEN);
+app.all("/mcp/types", (c) => typesMcpApp.fetch(c.req.raw, c.env));
 
 // Each Chamber's MCP server - still real HTTP, since the CLI is a subprocess.
 const chamberMcpApps = new Map<string, ReturnType<typeof createMcpApp>>();
