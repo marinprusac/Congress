@@ -43,7 +43,7 @@ export function createDb<TSchema extends Record<string, unknown>>(dbPath: string
     sqlite.close();
   }
 
-  return { db, runMigrations, closeDb };
+  return { db, sqlite, runMigrations, closeDb };
 }
 
 // For a Chamber: opens its SQLite file on first use (not at import), so
