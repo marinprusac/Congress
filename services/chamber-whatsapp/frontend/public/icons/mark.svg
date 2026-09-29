@@ -1,0 +1,5 @@
+<svg viewBox="0 0 256 256" fill="none" stroke="currentColor" stroke-width="16" stroke-linejoin="round" stroke-linecap="round" xmlns="http://www.w3.org/2000/svg">
+  <!-- Generic speech bubble (deliberately not WhatsApp's logo). -->
+  <path d="M40 60 h176 a12 12 0 0 1 12 12 v100 a12 12 0 0 1 -12 12 h-96 l-44 36 v-36 h-36 a12 12 0 0 1 -12 -12 v-100 a12 12 0 0 1 12 -12 z" />
+  <path d="M76 110 h104 M76 142 h68" />
+</svg>
