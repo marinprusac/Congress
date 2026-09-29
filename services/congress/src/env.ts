@@ -12,6 +12,8 @@ const envSchema = z.object({
     .length(64, "CONGRESS_MASTER_PASSWORD_HASH must be a 64-char sha256 hex digest"),
   SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 characters"),
   DB_PATH: z.string().default("./data/capitol.sqlite3"),
+  // Runtime exhibit types: definitions plus one real table per type.
+  EXHIBITS_DB_PATH: z.string().default("./data/exhibits.sqlite3"),
   // Web Push is additive (the in-app notification center works without it),
   // so an unset keypair must never crash boot - sendWebPush no-ops with a
   // one-time warning and GET /congress/push/config reports publicKey: null.

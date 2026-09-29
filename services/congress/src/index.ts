@@ -1,7 +1,9 @@
 import { serve } from "@hono/node-server";
 import { env } from "./env.js";
 import { app } from "./server.js";
-import { runMigrations, closeDb } from "./db/client.js";
+import { runMigrations, closeDb, sqlite } from "./db/client.js";
+import { runExhibitsMigrations, closeExhibitsDb, exhibitsSqlite } from "./typeEngine/db/client.js";
+import { startBackups, stopBackups } from "./typeEngine/backups.js";
 import { importLegacyChamberData } from "./legacyImport.js";
 import { startEventCatalogSync, stopEventCatalogSync } from "./eventCatalogSync.js";
 import { startHistoryPruneSweep, stopHistoryPruneSweep } from "./eventHistory.js";
@@ -17,6 +19,7 @@ import { loadChambers, stopChambers } from "./chambers/loader.js";
 import { CHAMBER_MODULES } from "./chambers/modules.js";
 
 runMigrations();
+runExhibitsMigrations();
 importLegacyChamberData();
 importLegacyDeputySettings();
 recoverInterruptedThreads();
@@ -29,6 +32,10 @@ const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (
 });
 
 startEventCatalogSync();
+startBackups([
+  { name: "exhibits", sqlite: exhibitsSqlite, dbPath: env.EXHIBITS_DB_PATH },
+  { name: "congress", sqlite, dbPath: env.DB_PATH },
+]);
 startHistoryPruneSweep();
 startAiRetentionSweep();
 startAskTimer();
@@ -38,6 +45,7 @@ startProactive();
 async function shutdown() {
   console.log("Shutting down Congress...");
   stopEventCatalogSync();
+  stopBackups();
   stopHistoryPruneSweep();
   stopAiRetentionSweep();
   stopAskTimer();
@@ -46,6 +54,7 @@ async function shutdown() {
   await stopChambers();
   server.close(() => {
     closeDb();
+    closeExhibitsDb();
     process.exit(0);
   });
 }
