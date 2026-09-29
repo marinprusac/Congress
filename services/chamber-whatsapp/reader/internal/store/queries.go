@@ -28,7 +28,12 @@ type ChatRow struct {
 	LastFromMe    bool   `json:"lastFromMe"`
 	LastSender    string `json:"lastSender"`
 	LastRevoked   bool   `json:"lastRevoked"`
+	UnreadCount   int    `json:"unreadCount"`
+	MarkedUnread  bool   `json:"markedUnread"`
 }
+
+// Unread incoming messages in chat alias c (served by the messages_unread index).
+const unreadCount = `(SELECT count(*) FROM messages u WHERE u.chat_jid = c.jid AND u.from_me = 0 AND u.read_at IS NULL AND u.type != 'placeholder')`
 
 type MediaInfo struct {
 	Mimetype string `json:"mimetype"`
@@ -71,6 +76,7 @@ type MessageRow struct {
 	RevokedAt  *int64     `json:"revokedAt"`
 	Media      *MediaInfo `json:"media"`
 	Reactions  []Reaction `json:"reactions"`
+	Unread     bool       `json:"unread"`
 }
 
 // Cursor is "<ms>|<key>", the last row of the previous page.
@@ -86,7 +92,19 @@ func parseCursor(c string) (int64, string, bool) {
 func Cursor(ts int64, key string) string { return strconv.FormatInt(ts, 10) + "|" + key }
 
 func (s *Store) ListChats(ctx context.Context, limit int, cursor string) ([]ChatRow, error) {
+	return s.listChats(ctx, limit, cursor, false)
+}
+
+// UnreadChats lists chats with unread messages or marked unread, newest first.
+func (s *Store) UnreadChats(ctx context.Context, limit int, cursor string) ([]ChatRow, error) {
+	return s.listChats(ctx, limit, cursor, true)
+}
+
+func (s *Store) listChats(ctx context.Context, limit int, cursor string, unreadOnly bool) ([]ChatRow, error) {
 	where, args := "c.last_message_at > 0", []any{}
+	if unreadOnly {
+		where += " AND (c.marked_unread OR EXISTS (SELECT 1 FROM messages u WHERE u.chat_jid = c.jid AND u.from_me = 0 AND u.read_at IS NULL AND u.type != 'placeholder'))"
+	}
 	if ts, jid, ok := parseCursor(cursor); ok {
 		where += " AND (c.last_message_at < ? OR (c.last_message_at = ? AND c.jid < ?))"
 		args = append(args, ts, ts, jid)
@@ -95,7 +113,7 @@ func (s *Store) ListChats(ctx context.Context, limit int, cursor string) ([]Chat
 	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(`
 		SELECT c.jid, `+chatName("c", "ct")+`, c.is_group, c.last_message_at,
 			coalesce(m.text, ''), coalesce(m.type, ''), coalesce(m.from_me, 0), coalesce(`+fmt.Sprintf(contactName, "sc")+`, ''),
-			m.revoked_at IS NOT NULL
+			m.revoked_at IS NOT NULL, `+unreadCount+`, c.marked_unread
 		FROM chats c
 		LEFT JOIN contacts ct ON ct.jid = c.jid
 		LEFT JOIN messages m ON m.rowid = (
@@ -111,7 +129,7 @@ func (s *Store) ListChats(ctx context.Context, limit int, cursor string) ([]Chat
 	out := []ChatRow{}
 	for rows.Next() {
 		var r ChatRow
-		if err := rows.Scan(&r.JID, &r.Name, &r.IsGroup, &r.LastMessageAt, &r.LastText, &r.LastType, &r.LastFromMe, &r.LastSender, &r.LastRevoked); err != nil {
+		if err := rows.Scan(&r.JID, &r.Name, &r.IsGroup, &r.LastMessageAt, &r.LastText, &r.LastType, &r.LastFromMe, &r.LastSender, &r.LastRevoked, &r.UnreadCount, &r.MarkedUnread); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -121,8 +139,8 @@ func (s *Store) ListChats(ctx context.Context, limit int, cursor string) ([]Chat
 
 func (s *Store) Chat(ctx context.Context, jid string) (*ChatRow, error) {
 	var r ChatRow
-	err := s.db.QueryRowContext(ctx, `SELECT c.jid, `+chatName("c", "ct")+`, c.is_group, c.last_message_at
-		FROM chats c LEFT JOIN contacts ct ON ct.jid = c.jid WHERE c.jid = ?`, jid).Scan(&r.JID, &r.Name, &r.IsGroup, &r.LastMessageAt)
+	err := s.db.QueryRowContext(ctx, `SELECT c.jid, `+chatName("c", "ct")+`, c.is_group, c.last_message_at, `+unreadCount+`, c.marked_unread
+		FROM chats c LEFT JOIN contacts ct ON ct.jid = c.jid WHERE c.jid = ?`, jid).Scan(&r.JID, &r.Name, &r.IsGroup, &r.LastMessageAt, &r.UnreadCount, &r.MarkedUnread)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -130,14 +148,15 @@ func (s *Store) Chat(ctx context.Context, jid string) (*ChatRow, error) {
 }
 
 const messageColumns = `m.chat_jid, m.id, m.sender_jid, coalesce(` + "%s" + `, ''), m.from_me, m.ts, m.type, m.text, m.quoted_id,
-	m.edited_at, m.revoked_at, m.media_mimetype, m.media_size, m.media_filename, m.media_width, m.media_height, m.media_seconds`
+	m.edited_at, m.revoked_at, m.media_mimetype, m.media_size, m.media_filename, m.media_width, m.media_height, m.media_seconds,
+	m.from_me = 0 AND m.read_at IS NULL AND m.type != 'placeholder'`
 
 func scanMessage(sc interface{ Scan(...any) error }, extra ...any) (MessageRow, error) {
 	var r MessageRow
 	var edited, revoked, size, w, h, secs sql.NullInt64
 	var mime, fname sql.NullString
 	dest := []any{&r.ChatJID, &r.ID, &r.SenderJID, &r.SenderName, &r.FromMe, &r.TS, &r.Type, &r.Text, &r.QuotedID,
-		&edited, &revoked, &mime, &size, &fname, &w, &h, &secs}
+		&edited, &revoked, &mime, &size, &fname, &w, &h, &secs, &r.Unread}
 	if err := sc.Scan(append(dest, extra...)...); err != nil {
 		return r, err
 	}
@@ -156,7 +175,19 @@ func scanMessage(sc interface{ Scan(...any) error }, extra ...any) (MessageRow, 
 
 // Messages returns a page of a chat's messages, newest first.
 func (s *Store) Messages(ctx context.Context, chat string, limit int, cursor string) ([]MessageRow, error) {
+	return s.messages(ctx, chat, limit, cursor, false)
+}
+
+// UnreadMessages returns a page of a chat's unread messages, newest first.
+func (s *Store) UnreadMessages(ctx context.Context, chat string, limit int, cursor string) ([]MessageRow, error) {
+	return s.messages(ctx, chat, limit, cursor, true)
+}
+
+func (s *Store) messages(ctx context.Context, chat string, limit int, cursor string, unreadOnly bool) ([]MessageRow, error) {
 	where, args := "m.chat_jid = ?", []any{chat}
+	if unreadOnly {
+		where += " AND m.from_me = 0 AND m.read_at IS NULL AND m.type != 'placeholder'"
+	}
 	if ts, id, ok := parseCursor(cursor); ok {
 		where += " AND (m.ts < ? OR (m.ts = ? AND m.id < ?))"
 		args = append(args, ts, ts, id)
@@ -256,7 +287,7 @@ func (s *Store) SearchMessages(ctx context.Context, q, chat string, limit int) (
 // SearchChats matches chat and contact names.
 func (s *Store) SearchChats(ctx context.Context, q string, limit int) ([]ChatRow, error) {
 	like := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(strings.TrimSpace(q)) + "%"
-	rows, err := s.db.QueryContext(ctx, `SELECT c.jid, `+chatName("c", "ct")+` AS n, c.is_group, c.last_message_at
+	rows, err := s.db.QueryContext(ctx, `SELECT c.jid, `+chatName("c", "ct")+` AS n, c.is_group, c.last_message_at, `+unreadCount+`, c.marked_unread
 		FROM chats c LEFT JOIN contacts ct ON ct.jid = c.jid
 		WHERE c.last_message_at > 0 AND (n LIKE ? ESCAPE '\' OR c.jid LIKE ? ESCAPE '\')
 		ORDER BY c.last_message_at DESC LIMIT ?`, like, like, limit)
@@ -267,12 +298,22 @@ func (s *Store) SearchChats(ctx context.Context, q string, limit int) ([]ChatRow
 	out := []ChatRow{}
 	for rows.Next() {
 		var r ChatRow
-		if err := rows.Scan(&r.JID, &r.Name, &r.IsGroup, &r.LastMessageAt); err != nil {
+		if err := rows.Scan(&r.JID, &r.Name, &r.IsGroup, &r.LastMessageAt, &r.UnreadCount, &r.MarkedUnread); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+// UnreadTotals counts unread messages and the chats that need attention.
+func (s *Store) UnreadTotals(ctx context.Context) (messages, chats int, err error) {
+	err = s.db.QueryRowContext(ctx, `SELECT
+		(SELECT count(*) FROM messages WHERE `+unreadWhere+`),
+		(SELECT count(*) FROM chats c WHERE c.last_message_at > 0 AND (c.marked_unread OR EXISTS (
+			SELECT 1 FROM messages u WHERE u.chat_jid = c.jid AND u.from_me = 0 AND u.read_at IS NULL AND u.type != 'placeholder')))`).
+		Scan(&messages, &chats)
+	return
 }
 
 // MediaFor returns the stored download metadata of a message's attachment, nil if none.
