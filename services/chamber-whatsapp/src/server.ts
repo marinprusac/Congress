@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import { readerGet, readerPath, readerStartPairing } from "./readerClient.js";
 
-// Read-only proxy to wa-reader (GET, plus POST /api/pairing to link); no feed, exhibits or MCP,
-// so WhatsApp content never leaves this Chamber.
+// Read-only proxy to wa-reader (GET, plus POST /api/pairing to link). No feed
+// or exhibits yet; the AI reads through src/mcp/tools.ts.
 export const app = new Hono<{ Bindings: HttpBindings }>();
 
 const seg = (s: string) => encodeURIComponent(s);

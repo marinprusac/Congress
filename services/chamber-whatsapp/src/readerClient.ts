@@ -44,6 +44,16 @@ function readerRequest(method: "GET" | "POST", path: string, timeoutMs: number):
   });
 }
 
+export class ReaderError extends Error {}
+
+// GET + parse for in-process callers (the MCP tools); throws the reader's error code.
+export async function readerJson<T>(path: string): Promise<T> {
+  const res = await readerGet(path);
+  const body = (await res.json().catch(() => null)) as { error?: string } | null;
+  if (!res.ok) throw new ReaderError(body?.error ?? `reader_http_${res.status}`);
+  return body as T;
+}
+
 // Builds "/path?k=v" keeping only the named query parameters.
 export function readerPath(path: string, query: Record<string, string | undefined>, allowed: string[]): string {
   const params = new URLSearchParams();

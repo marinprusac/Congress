@@ -8,8 +8,8 @@ export const manifest: Manifest = {
     home: "/whatsapp",
     settings: "/whatsapp/settings",
   },
-  // The chat list is a genuine screen. No exhibitTypes, feed or events:
-  // WhatsApp content stays inside this Chamber (not in Search, feed or the AI).
+  // The chat list is a genuine screen. No exhibitTypes, feed or events yet;
+  // the AI reads chats through the MCP tools.
   views: [{ id: "chats", label: "WhatsApp", fullPath: "/" }],
   exhibitTypes: [],
   events: [],
