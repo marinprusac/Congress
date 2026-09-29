@@ -62,6 +62,14 @@ describe("public routes", () => {
     expect((await app.request("/health")).status).toBe(200);
   });
 
+  it("serves the privacy policy and terms without a credential", async () => {
+    const res = await app.request("/privacy");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("Google API Services User Data Policy");
+    const terms = await app.request("/terms");
+    expect(terms.headers.get("location")).toBe("/privacy#terms");
+  });
+
   it("reports auth status without a credential", async () => {
     expect((await app.request("/auth/status", {}, bindings())).status).toBe(200);
   });
