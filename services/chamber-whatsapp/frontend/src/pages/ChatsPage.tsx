@@ -40,18 +40,26 @@ function ChatRow({ chat }: { chat: ChatSummary }) {
   const chatPath = useChatPath();
   const title = chatTitle(chat);
   const who = chat.lastFromMe ? "You: " : chat.isGroup && chat.lastSender ? `${chat.lastSender}: ` : "";
+  const unread = (chat.unreadCount ?? 0) > 0 || chat.markedUnread;
   return (
     <li>
-      <StackLink to={chatPath(chat.jid)} className="wa-chat-row">
+      <StackLink to={chatPath(chat.jid)} className={`wa-chat-row ${unread ? "wa-chat-unread" : ""}`}>
         <Avatar name={title} group={chat.isGroup} />
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline justify-between gap-2">
-            <span className="truncate font-display text-lg text-ink">{title}</span>
-            <span className="shrink-0 font-mono text-xs text-dust">{listTime(chat.lastMessageAt)}</span>
+            <span className="wa-chat-title truncate font-display text-lg text-ink">{title}</span>
+            <span className="wa-chat-time shrink-0 font-mono text-xs text-dust">{listTime(chat.lastMessageAt)}</span>
           </span>
-          <span className="block truncate font-mono text-sm text-slate">
-            {who}
-            {previewText(chat.lastText, chat.lastType, chat.lastRevoked)}
+          <span className="flex items-center justify-between gap-2">
+            <span className="wa-chat-preview min-w-0 truncate font-mono text-sm text-slate">
+              {who}
+              {previewText(chat.lastText, chat.lastType, chat.lastRevoked)}
+            </span>
+            {unread && (
+              <span className="wa-unread-badge" aria-label={chat.unreadCount ? `${chat.unreadCount} unread` : "Marked unread"}>
+                {chat.unreadCount ? (chat.unreadCount > 99 ? "99+" : chat.unreadCount) : ""}
+              </span>
+            )}
           </span>
         </span>
       </StackLink>

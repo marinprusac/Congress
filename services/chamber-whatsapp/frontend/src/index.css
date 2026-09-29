@@ -9,6 +9,38 @@
   border-bottom: 1px solid var(--color-dust);
   min-height: 3.5rem;
 }
+.wa-chat-unread .wa-chat-title,
+.wa-chat-unread .wa-chat-preview {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.wa-chat-unread .wa-chat-time {
+  color: var(--color-accent);
+}
+.wa-unread-badge {
+  flex: none;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-parchment);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1.25rem;
+  text-align: center;
+}
+.wa-unread-divider {
+  margin: 0.75rem 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  border-top: 1px solid var(--color-accent);
+  padding-top: 0.25rem;
+}
 .wa-chat-row:active {
   background: color-mix(in srgb, var(--color-dust) 15%, transparent);
 }
@@ -22,7 +54,7 @@
   border-radius: 9999px;
   border: 1px solid var(--color-dust);
   color: var(--color-slate);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.8rem;
 }
 .wa-avatar-group {
@@ -31,7 +63,7 @@
 .wa-section-label {
   margin: 0.25rem 0.25rem 0;
   color: var(--color-dust);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -41,7 +73,7 @@
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--color-dust);
   color: var(--color-slate);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.8rem;
 }
 .wa-notice-alert {
@@ -55,7 +87,7 @@
   padding: 0.6rem;
   border: 1px solid var(--color-dust);
   color: var(--color-accent);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   text-align: center;
   text-transform: uppercase;
@@ -70,7 +102,7 @@
 .wa-day {
   margin: 0.75rem 0 0.35rem;
   color: var(--color-dust);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   text-align: center;
   text-transform: uppercase;
@@ -100,7 +132,7 @@
 }
 .wa-sender {
   color: var(--color-accent);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.75rem;
 }
 .wa-text {
@@ -126,7 +158,7 @@
 .wa-meta {
   margin-top: 0.15rem;
   color: var(--color-dust);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.65rem;
   text-align: right;
 }
@@ -141,14 +173,14 @@
   padding: 0.5rem 0.6rem;
   border: 1px dashed var(--color-dust);
   color: var(--color-accent);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   text-align: left;
 }
 .wa-media-note {
   margin-bottom: 0.25rem;
   color: var(--color-dust);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.8rem;
 }
 .wa-media {
@@ -180,7 +212,7 @@
 .wa-pairing-note {
   margin-top: 0.5rem;
   color: var(--color-dust);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.75rem;
 }
 .wa-qr {
@@ -191,7 +223,7 @@
 .wa-readonly {
   margin: 1rem 0 0.5rem;
   color: var(--color-dust);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 0.7rem;
   text-align: center;
 }

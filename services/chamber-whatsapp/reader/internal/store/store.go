@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -157,10 +158,14 @@ func (s *Store) UpsertMessage(ctx context.Context, m Message, isGroup bool) erro
 		return v
 	}
 	return s.tx(ctx, func(tx *sql.Tx) error {
+		var readAt any // incoming messages arrive unread; read state is kept on conflict
+		if m.FromMe {
+			readAt = m.TS
+		}
 		_, err := tx.Exec(`INSERT INTO messages (chat_jid, id, sender_jid, sender_lid, from_me, ts, type, text, quoted_id,
 				media_mimetype, media_size, media_filename, media_direct_path, media_key, media_sha256, media_enc_sha256,
-				media_width, media_height, media_seconds)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				media_width, media_height, media_seconds, read_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT (chat_jid, id) DO UPDATE SET
 				sender_jid = excluded.sender_jid, sender_lid = excluded.sender_lid, from_me = excluded.from_me,
 				ts = excluded.ts, type = excluded.type, quoted_id = excluded.quoted_id,
@@ -177,9 +182,14 @@ func (s *Store) UpsertMessage(ctx context.Context, m Message, isGroup bool) erro
 				media_seconds = CASE WHEN messages.revoked_at IS NULL THEN excluded.media_seconds END`,
 			m.ChatJID, m.ID, m.SenderJID, m.SenderLID, m.FromMe, m.TS, m.Type, m.Text, m.QuotedID,
 			null(md.Mimetype), null(md.Size), null(md.Filename), null(md.DirectPath), null(md.Key), null(md.SHA256), null(md.EncSHA256),
-			null(md.Width), null(md.Height), null(md.Seconds))
+			null(md.Width), null(md.Height), null(md.Seconds), readAt)
 		if err != nil {
 			return err
+		}
+		if m.FromMe { // replying means everything before was read
+			if err := setChatRead(tx, m.ChatJID, m.TS, m.TS); err != nil {
+				return err
+			}
 		}
 		return bumpChat(tx, m.ChatJID, isGroup, m.TS)
 	})
@@ -243,6 +253,85 @@ func (s *Store) SetReaction(ctx context.Context, chat, messageID, sender, emoji 
 		ON CONFLICT (chat_jid, message_id, sender_jid) DO UPDATE SET emoji = excluded.emoji, ts = excluded.ts
 		WHERE excluded.ts >= reactions.ts`, chat, messageID, sender, emoji, ts)
 	return err
+}
+
+// Incoming, real (not placeholder) messages without read state.
+const unreadWhere = `from_me = 0 AND read_at IS NULL AND type != 'placeholder'`
+
+// setChatRead marks a chat's incoming messages up to upTo (ms; 0 = all) read and
+// clears its marked-unread flag.
+func setChatRead(tx *sql.Tx, chat string, upTo, at int64) error {
+	if _, err := tx.Exec(`UPDATE messages SET read_at = ? WHERE chat_jid = ? AND from_me = 0 AND read_at IS NULL
+		AND (? = 0 OR ts <= ?)`, at, chat, upTo, upTo); err != nil {
+		return err
+	}
+	_, err := tx.Exec(`UPDATE chats SET marked_unread = 0 WHERE jid = ?`, chat)
+	return err
+}
+
+// SetChatRead updates local read state only (never WhatsApp): the chat's incoming
+// messages up to and including upToID ("" = all) become read.
+func (s *Store) SetChatRead(ctx context.Context, chat, upToID string, at int64) error {
+	return s.tx(ctx, func(tx *sql.Tx) error {
+		var upTo int64
+		if upToID != "" {
+			err := tx.QueryRow(`SELECT ts FROM messages WHERE chat_jid = ? AND id = ?`, chat, upToID).Scan(&upTo)
+			if err == sql.ErrNoRows {
+				return ErrNotFound
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return setChatRead(tx, chat, upTo, at)
+	})
+}
+
+// ErrNotFound is returned when a referenced message doesn't exist.
+var ErrNotFound = errors.New("not found")
+
+// SetReadByIDs applies a read receipt from one of the owner's own devices:
+// everything up to the newest listed message is read. Unknown IDs fall back to
+// the receipt time.
+func (s *Store) SetReadByIDs(ctx context.Context, chat string, ids []string, receiptTS, at int64) error {
+	return s.tx(ctx, func(tx *sql.Tx) error {
+		upTo := int64(0)
+		for _, id := range ids {
+			var ts int64
+			err := tx.QueryRow(`SELECT ts FROM messages WHERE chat_jid = ? AND id = ?`, chat, id).Scan(&ts)
+			if err != nil && err != sql.ErrNoRows {
+				return err
+			}
+			upTo = max(upTo, ts)
+		}
+		if upTo == 0 {
+			upTo = receiptTS
+		}
+		if upTo <= 0 {
+			return nil
+		}
+		return setChatRead(tx, chat, upTo, at)
+	})
+}
+
+// SetMarkedUnread records the phone's "mark as unread" on a chat.
+func (s *Store) SetMarkedUnread(ctx context.Context, chat string, marked bool) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE chats SET marked_unread = ? WHERE jid = ?`, marked, chat)
+	return err
+}
+
+// ApplyHistoryUnread applies a history-sync conversation's read state: only its
+// newest `unread` incoming messages stay unread.
+func (s *Store) ApplyHistoryUnread(ctx context.Context, chat string, unread int, marked bool, at int64) error {
+	return s.tx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`UPDATE messages SET read_at = ? WHERE chat_jid = ? AND read_at IS NULL AND from_me = 0
+			AND rowid NOT IN (SELECT rowid FROM messages WHERE chat_jid = ? AND `+unreadWhere+`
+				ORDER BY ts DESC, id DESC LIMIT ?)`, at, chat, chat, max(unread, 0)); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`UPDATE chats SET marked_unread = ? WHERE jid = ?`, marked, chat)
+		return err
+	})
 }
 
 // Masked reports WhatsApp's redacted-number placeholders ("+385∙∙∙∙∙∙∙06"),

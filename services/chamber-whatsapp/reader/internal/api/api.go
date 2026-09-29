@@ -1,5 +1,6 @@
-// Package api serves the messages store over a Unix socket. GET only;
-// nothing here can reach WhatsApp except the media downloader.
+// Package api serves the messages store over a Unix socket. GET only, except
+// starting pairing and marking chats read in the local DB; nothing here can
+// reach WhatsApp except the media downloader and pairing.
 package api
 
 import (
@@ -49,17 +50,30 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /chats/{jid}/messages", s.messages)
 	mux.HandleFunc("GET /search", s.search)
 	mux.HandleFunc("GET /media/{chat}/{id}", s.media)
+	mux.HandleFunc("GET /unread", s.unread)
+	mux.HandleFunc("POST /chats/{jid}/read", s.markRead)
 	mux.HandleFunc("GET /pairing", s.pairingStatus)
 	mux.HandleFunc("POST /pairing", s.pairingStart)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// The one non-GET: starting a pairing session (linking, never sending).
-		isPairingStart := r.Method == http.MethodPost && r.URL.Path == "/pairing"
-		if r.Method != http.MethodGet && r.Method != http.MethodHead && !isPairingStart {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && !allowedPost(r) {
 			writeError(w, http.StatusMethodNotAllowed, "read_only")
 			return
 		}
 		mux.ServeHTTP(w, r)
 	})
+}
+
+// The only non-GETs: starting a pairing session (linking, never sending) and
+// marking a chat read in the local DB (no receipt goes to WhatsApp).
+func allowedPost(r *http.Request) bool {
+	if r.Method != http.MethodPost {
+		return false
+	}
+	if r.URL.Path == "/pairing" {
+		return true
+	}
+	rest, ok := strings.CutPrefix(r.URL.Path, "/chats/")
+	return ok && strings.HasSuffix(rest, "/read") && strings.Count(rest, "/") == 1
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -128,7 +142,11 @@ func (s *Server) markTooLarge(rows []store.MessageRow) {
 
 func (s *Server) messages(w http.ResponseWriter, r *http.Request) {
 	n := limit(r, 50, 200)
-	rows, err := s.Store.Messages(r.Context(), r.PathValue("jid"), n, r.URL.Query().Get("cursor"))
+	list := s.Store.Messages
+	if r.URL.Query().Get("unread") == "1" {
+		list = s.Store.UnreadMessages
+	}
+	rows, err := list(r.Context(), r.PathValue("jid"), n, r.URL.Query().Get("cursor"))
 	if err != nil {
 		s.fail(w, err)
 		return
@@ -140,6 +158,84 @@ func (s *Server) messages(w http.ResponseWriter, r *http.Request) {
 		next = store.Cursor(last.TS, last.ID)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"messages": rows, "nextCursor": next})
+}
+
+// unread lists chats needing attention, each with its newest unread messages.
+func (s *Server) unread(w http.ResponseWriter, r *http.Request) {
+	n := limit(r, 50, 200)
+	per, err := strconv.Atoi(r.URL.Query().Get("messages"))
+	if err != nil || per < 0 {
+		per = 0
+	}
+	per = min(per, 100)
+	chats, err := s.Store.UnreadChats(r.Context(), n, r.URL.Query().Get("cursor"))
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	type unreadChat struct {
+		store.ChatRow
+		Messages []store.MessageRow `json:"messages"`
+	}
+	out := make([]unreadChat, 0, len(chats))
+	for _, c := range chats {
+		msgs := []store.MessageRow{}
+		if per > 0 && c.UnreadCount > 0 {
+			if msgs, err = s.Store.UnreadMessages(r.Context(), c.JID, per, ""); err != nil {
+				s.fail(w, err)
+				return
+			}
+			s.markTooLarge(msgs)
+		}
+		out = append(out, unreadChat{c, msgs})
+	}
+	totalMsgs, totalChats, err := s.Store.UnreadTotals(r.Context())
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	next := ""
+	if len(chats) == n {
+		last := chats[len(chats)-1]
+		next = store.Cursor(last.LastMessageAt, last.JID)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"chats": out, "totalMessages": totalMsgs, "totalChats": totalChats, "nextCursor": next})
+}
+
+// markRead updates local read state only; WhatsApp and the senders never hear of it.
+func (s *Server) markRead(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		UpTo string `json:"upTo"`
+	}
+	if r.ContentLength != 0 {
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "bad_body")
+			return
+		}
+	}
+	jid := r.PathValue("jid")
+	if c, err := s.Store.Chat(r.Context(), jid); err != nil {
+		s.fail(w, err)
+		return
+	} else if c == nil {
+		writeError(w, http.StatusNotFound, "chat_not_found")
+		return
+	}
+	err := s.Store.SetChatRead(r.Context(), jid, body.UpTo, time.Now().UnixMilli())
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "message_not_found")
+		return
+	}
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	c, err := s.Store.Chat(r.Context(), jid)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
 }
 
 func (s *Server) search(w http.ResponseWriter, r *http.Request) {

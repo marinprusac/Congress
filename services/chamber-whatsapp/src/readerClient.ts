@@ -17,16 +17,23 @@ export function readerGet(path: string, timeoutMs = 10_000): Promise<Response> {
   return readerRequest("GET", path, timeoutMs);
 }
 
-// The only POST is starting a pairing session (linking, never sending).
+// The only POSTs: starting a pairing session (linking, never sending) and
+// marking a chat read in wa-reader's own DB (WhatsApp is never told).
 export function readerStartPairing(): Promise<Response> {
   return readerRequest("POST", "/pairing", 15_000);
 }
 
-function readerRequest(method: "GET" | "POST", path: string, timeoutMs: number): Promise<Response> {
+export function readerMarkReadLocally(jid: string, upTo?: string): Promise<Response> {
+  const body = JSON.stringify(upTo ? { upTo } : {});
+  return readerRequest("POST", `/chats/${encodeURIComponent(jid)}/read`, 10_000, body);
+}
+
+function readerRequest(method: "GET" | "POST", path: string, timeoutMs: number, body?: string): Promise<Response> {
   return new Promise((resolvePromise) => {
     const unavailable = (detail: string) =>
       resolvePromise(Response.json({ error: "reader_unavailable", detail }, { status: 503 }));
-    const req = request({ socketPath: env.WA_READER_SOCKET, path, method, timeout: timeoutMs }, (res) => {
+    const headers = body === undefined ? {} : { "content-type": "application/json", "content-length": Buffer.byteLength(body) };
+    const req = request({ socketPath: env.WA_READER_SOCKET, path, method, headers, timeout: timeoutMs }, (res) => {
       const headers = new Headers();
       for (const name of PASS_HEADERS) {
         const value = res.headers[name];
@@ -40,15 +47,15 @@ function readerRequest(method: "GET" | "POST", path: string, timeoutMs: number):
       unavailable("timeout");
     });
     req.on("error", (err: NodeJS.ErrnoException) => unavailable(err.code ?? err.message));
-    req.end();
+    req.end(body);
   });
 }
 
 export class ReaderError extends Error {}
 
-// GET + parse for in-process callers (the MCP tools); throws the reader's error code.
-export async function readerJson<T>(path: string): Promise<T> {
-  const res = await readerGet(path);
+// Parses a reader response for in-process callers (the MCP tools); throws the reader's error code.
+export async function readerJson<T>(path: string | Promise<Response>): Promise<T> {
+  const res = await (typeof path === "string" ? readerGet(path) : path);
   const body = (await res.json().catch(() => null)) as { error?: string } | null;
   if (!res.ok) throw new ReaderError(body?.error ?? `reader_http_${res.status}`);
   return body as T;

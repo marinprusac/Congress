@@ -104,6 +104,19 @@ func (h *Handler) Handle(evt any) {
 		}
 	case *events.JoinedGroup:
 		_ = h.st.SetChatName(ctx, e.JID.String(), e.Name, true)
+	case *events.Receipt:
+		// Only the owner's own reads on another device (phone, WhatsApp Web).
+		if e.IsFromMe && (e.Type == types.ReceiptTypeRead || e.Type == types.ReceiptTypeReadSelf) {
+			h.touch(ctx, true)
+			if err := h.Receipt(ctx, e); err != nil {
+				h.log.Error("apply read receipt", "chat", e.Chat, "err", err)
+			}
+		}
+	case *events.MarkChatAsRead:
+		h.touch(ctx, true)
+		if err := h.MarkChatAsRead(ctx, e); err != nil {
+			h.log.Error("apply mark chat read", "chat", e.JID, "err", err)
+		}
 	case *events.AppStateSyncComplete:
 		// The initial full sync stores address-book names without emitting Contact events.
 		go h.SyncContacts(ctx)
@@ -236,6 +249,30 @@ func (h *Handler) Message(ctx context.Context, e *events.Message) error {
 	return err
 }
 
+// Receipt marks messages read up to the ones the owner read elsewhere.
+func (h *Handler) Receipt(ctx context.Context, e *events.Receipt) error {
+	info := types.MessageInfo{MessageSource: e.MessageSource}
+	chat := h.resolveChat(ctx, &info)
+	return h.st.SetReadByIDs(ctx, chat.String(), e.MessageIDs, e.Timestamp.UnixMilli(), h.now().UnixMilli())
+}
+
+// MarkChatAsRead applies the phone's "mark as read/unread" on a chat.
+func (h *Handler) MarkChatAsRead(ctx context.Context, e *events.MarkChatAsRead) error {
+	info := types.MessageInfo{MessageSource: types.MessageSource{Chat: e.JID}}
+	chat := h.resolveChat(ctx, &info).String()
+	if a := e.Action; a != nil && !a.GetRead() {
+		return h.st.SetMarkedUnread(ctx, chat, true)
+	}
+	upTo := int64(0)
+	if e.Action != nil {
+		upTo = e.Action.GetMessageRange().GetLastMessageTimestamp() * 1000
+	}
+	if upTo > 0 {
+		return h.st.SetReadByIDs(ctx, chat, nil, upTo, h.now().UnixMilli())
+	}
+	return h.st.SetChatRead(ctx, chat, "", h.now().UnixMilli())
+}
+
 // HistorySync stores the conversations the phone sends after pairing (and later top-ups).
 func (h *Handler) HistorySync(ctx context.Context, e *events.HistorySync) {
 	d := e.Data
@@ -262,14 +299,18 @@ func (h *Handler) HistorySync(ctx context.Context, e *events.HistorySync) {
 			}
 			stored++
 		}
+		var fake types.MessageInfo
+		fake.Chat = chat
+		resolved := h.resolveChat(ctx, &fake)
+		// The phone's own unread count (absent = 0), so a fresh pairing isn't all unread.
+		if err := h.st.ApplyHistoryUnread(ctx, resolved.String(), int(conv.GetUnreadCount()), conv.GetMarkedAsUnread(), h.now().UnixMilli()); err != nil {
+			h.log.Error("history unread state", "chat", chat, "err", err)
+		}
 		name := conv.GetName()
 		if name == "" {
 			name = conv.GetDisplayName()
 		}
 		if name != "" {
-			var fake types.MessageInfo
-			fake.Chat = chat
-			resolved := h.resolveChat(ctx, &fake)
 			_ = h.st.SetChatName(ctx, resolved.String(), name, resolved.Server == types.GroupServer)
 		}
 	}

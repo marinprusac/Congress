@@ -223,9 +223,9 @@ func TestMigrationClearsStoredMaskedNames(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "m.sqlite3")
 	s, err := Open(p)
 	must(t, err)
+	rollbackUnread(t, s, 1)
 	_, err = s.db.Exec(`INSERT INTO chats (jid, name, last_message_at) VALUES ('a@s.whatsapp.net', '+385∙∙∙∙∙∙∙06', 1), ('g@g.us', 'Family', 1);
-		INSERT INTO contacts (jid, push_name, updated_at) VALUES ('a@s.whatsapp.net', '+1∙∙∙∙80', 0);
-		PRAGMA user_version = 1;`)
+		INSERT INTO contacts (jid, push_name, updated_at) VALUES ('a@s.whatsapp.net', '+1∙∙∙∙80', 0);`)
 	must(t, err)
 	s.Close()
 	s, err = Open(p)

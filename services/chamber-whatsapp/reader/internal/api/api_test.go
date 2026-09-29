@@ -83,7 +83,7 @@ func (f *fakePairer) Snapshot() pairing.Snapshot {
 	return pairing.Snapshot{State: "idle"}
 }
 
-func TestPairingIsTheOnlyNonGet(t *testing.T) {
+func TestPairingPost(t *testing.T) {
 	st, err := store.Open(filepath.Join(t.TempDir(), "m.sqlite3"))
 	if err != nil {
 		t.Fatal(err)
@@ -212,5 +212,65 @@ func TestSearch(t *testing.T) {
 	// FTS syntax in user input must not error.
 	if rec := get(h, "GET", `/search?q=%22a%22+OR+NEAR(`); rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+}
+
+func post(h http.Handler, path, body string) *httptest.ResponseRecorder {
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("POST", path, strings.NewReader(body)))
+	return rec
+}
+
+func TestUnreadAndLocalMarkRead(t *testing.T) {
+	h, st, _ := setup(t)
+	for i, id := range []string{"u1", "u2", "u3"} {
+		if err := st.UpsertMessage(context.Background(), store.Message{ChatJID: chat, ID: id, SenderJID: chat,
+			TS: int64(1000 * (i + 1)), Type: "text", Text: id}, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var got struct {
+		Chats []struct {
+			JID         string `json:"jid"`
+			UnreadCount int    `json:"unreadCount"`
+			Messages    []struct {
+				ID     string `json:"id"`
+				Unread bool   `json:"unread"`
+			} `json:"messages"`
+		} `json:"chats"`
+		TotalMessages int `json:"totalMessages"`
+	}
+	rec := get(h, "GET", "/unread?messages=2")
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Chats) != 1 || got.Chats[0].UnreadCount != 3 || len(got.Chats[0].Messages) != 2 ||
+		got.Chats[0].Messages[0].ID != "u3" || !got.Chats[0].Messages[0].Unread || got.TotalMessages != 3 {
+		t.Fatalf("%s", rec.Body)
+	}
+
+	if rec := post(h, "/chats/"+chat+"/read", `{"upTo":"u2"}`); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"unreadCount":1`) {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	if rec := get(h, "GET", "/chats/"+chat+"/messages?unread=1"); !strings.Contains(rec.Body.String(), `"u3"`) || strings.Contains(rec.Body.String(), `"u2"`) {
+		t.Fatalf("%s", rec.Body)
+	}
+	if rec := post(h, "/chats/"+chat+"/read", `{"upTo":"nope"}`); rec.Code != 404 {
+		t.Fatalf("%d", rec.Code)
+	}
+	if rec := post(h, "/chats/unknown@s.whatsapp.net/read", ""); rec.Code != 404 {
+		t.Fatalf("%d", rec.Code)
+	}
+	if rec := post(h, "/chats/"+chat+"/read", ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"unreadCount":0`) {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	// Only exactly /chats/{jid}/read is writable.
+	for _, path := range []string{"/chats/" + chat + "/read/x", "/chats/" + chat + "/messages", "/chats/read", "/unread"} {
+		if rec := post(h, path, ""); rec.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("POST %s: %d", path, rec.Code)
+		}
+	}
+	if rec := get(h, "PUT", "/chats/"+chat+"/read"); rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("PUT: %d", rec.Code)
 	}
 }

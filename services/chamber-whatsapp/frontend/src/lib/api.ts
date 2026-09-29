@@ -1,6 +1,7 @@
 import { resolveApiBase, parseJsonResponse as json } from "@congress/congress-ui";
 
-// Mirrors wa-reader's JSON (reader/internal/store/queries.go). Read-only: GETs only.
+// Mirrors wa-reader's JSON (reader/internal/store/queries.go). Read-only: nothing
+// here reaches WhatsApp (marking read changes only wa-reader's own DB).
 export const API_BASE = resolveApiBase("whatsapp");
 
 export interface ReaderStatus {
@@ -24,6 +25,8 @@ export interface ChatSummary {
   lastFromMe: boolean;
   lastSender: string;
   lastRevoked: boolean;
+  unreadCount: number;
+  markedUnread: boolean;
 }
 
 export interface MediaInfo {
@@ -51,6 +54,7 @@ export interface Message {
   revokedAt: number | null;
   media: MediaInfo | null;
   reactions: { emoji: string; senderJid: string; senderName: string }[];
+  unread: boolean;
 }
 
 const enc = encodeURIComponent;
@@ -90,6 +94,17 @@ export async function startPairing(): Promise<PairingSnapshot> {
   const res = await fetch(`${API_BASE}/pairing`, { method: "POST" });
   if (res.status === 503) throw new ReaderUnavailableError("reader_unavailable");
   return json<PairingSnapshot>(res);
+}
+
+// Local read state only: no read receipt is sent, WhatsApp and the sender see nothing.
+export async function markReadLocally(jid: string, upTo?: string): Promise<ChatSummary> {
+  const res = await fetch(`${API_BASE}/chats/${enc(jid)}/read`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(upTo ? { upTo } : {}),
+  });
+  if (res.status === 503) throw new ReaderUnavailableError("reader_unavailable");
+  return json<ChatSummary>(res);
 }
 
 export const mediaUrl = (m: Pick<Message, "chatJid" | "id">) => `${API_BASE}/media/${enc(m.chatJid)}/${enc(m.id)}`;
