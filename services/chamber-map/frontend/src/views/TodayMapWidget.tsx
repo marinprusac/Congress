@@ -2,12 +2,13 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
 import { ViewCard } from "@congress/congress-ui";
-import { fetchVisits, fetchTrips } from "@/lib/api";
+import { fetchVisits, fetchTrips, fetchVisitActiveAt } from "@/lib/api";
 import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
 import { InvalidateSizeOnResize } from "@/components/InvalidateSizeOnResize";
 import { placeMarkerIcon } from "@/lib/markerIcon";
 import { tripPositions } from "@/lib/tripPath";
-import type { Trip, Visit } from "../../../src/types";
+import { dayMarkers } from "@/lib/dayMarkers";
+import type { Trip } from "../../../src/types";
 import "leaflet/dist/leaflet.css";
 import "@/components/mapMarker.css";
 
@@ -29,24 +30,21 @@ export function TodayMapWidget() {
   const from = todayIso();
   const visitsQuery = useQuery({ queryKey: ["visits", "today-widget"], queryFn: () => fetchVisits({ from }) });
   const tripsQuery = useQuery({ queryKey: ["trips", "today-widget"], queryFn: () => fetchTrips({ from }) });
+  // Where the day began - a stay from last night never "arrives" today.
+  const carriedQuery = useQuery({
+    queryKey: ["visit-active-at", from],
+    queryFn: () => fetchVisitActiveAt(from),
+  });
 
   const visits = visitsQuery.data ?? [];
   const trips = tripsQuery.data ?? [];
   const visitsById = useMemo(() => new Map(visits.map((v) => [v.id, v])), [visits]);
 
-  const markers = useMemo(() => {
-    const byKey = new Map<string, Visit>();
-    for (const v of visits) {
-      if (v.status === "ignored" || v.latitude === null || v.longitude === null) continue;
-      const key = v.placeId ? `place-${v.placeId}` : `visit-${v.id}`;
-      if (!byKey.has(key)) byKey.set(key, v);
-    }
-    return [...byKey.values()];
-  }, [visits]);
+  const markers = useMemo(() => dayMarkers([...visits, carriedQuery.data]), [visits, carriedQuery.data]);
 
   return (
     <ViewCard
-      isLoading={visitsQuery.isLoading}
+      isLoading={visitsQuery.isLoading || carriedQuery.isLoading}
       isError={visitsQuery.isError}
       errorLabel="Map unavailable."
       isEmpty={markers.length === 0}

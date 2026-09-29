@@ -103,6 +103,13 @@ export async function getVisitActiveAt(instant: Date): Promise<Visit | null> {
   return row ? toVisit(row) : null;
 }
 
+// A window's visits plus the stay already under way when it began (e.g. home since last night).
+export async function listVisitsCovering(from: Date, to: Date): Promise<Visit[]> {
+  const [inWindow, carried] = await Promise.all([listVisits({ from, to }), getVisitActiveAt(from)]);
+  if (!carried || new Date(carried.arrivedAt) >= from) return inWindow;
+  return [...inWindow, carried];
+}
+
 // The visit currently open (no departure recorded yet), if any - re-derived
 // from the DB on every poll tick rather than cached in memory, so a Chamber
 // restart never loses track of "where you currently are" (unlike the

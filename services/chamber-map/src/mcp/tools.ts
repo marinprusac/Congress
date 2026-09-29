@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult as textResult } from "@congress/chamber-kit";
-import { listVisits, listTrips } from "../visits.js";
+import { listVisits, listVisitsCovering, listTrips } from "../visits.js";
+import type { Visit } from "../types.js";
 
 function toDateRange(from?: string, to?: string): { from?: Date; to?: Date } {
   return {
@@ -11,8 +12,10 @@ function toDateRange(from?: string, to?: string): { from?: Date; to?: Date } {
 }
 
 async function summarizeVisits(from?: string, to?: string) {
-  const range = toDateRange(from, to);
-  const visits = await listVisits({ ...range });
+  return summarize(await listVisits(toDateRange(from, to)));
+}
+
+function summarize(visits: Visit[]) {
   return visits
     .filter((v) => v.status === "confirmed" || v.status === "adhoc")
     .map((v) => ({
@@ -75,7 +78,10 @@ export function registerTools(server: McpServer) {
     async ({ date }) => {
       const from = new Date(`${date}T00:00:00.000Z`).toISOString();
       const to = new Date(`${date}T23:59:59.999Z`).toISOString();
-      const [visits, trips] = await Promise.all([summarizeVisits(from, to), summarizeTrips(from, to)]);
+      const [visits, trips] = await Promise.all([
+        listVisitsCovering(new Date(from), new Date(to)).then(summarize),
+        summarizeTrips(from, to),
+      ]);
 
       const entries = [
         ...visits.map((v) => ({ type: "visit" as const, at: v.arrivedAt, ...v })),

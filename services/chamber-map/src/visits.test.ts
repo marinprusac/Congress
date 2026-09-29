@@ -13,6 +13,7 @@ import {
   guessTripMode,
   listTrips,
   listVisits,
+  listVisitsCovering,
   openConfirmedVisit,
   openPendingVisit,
   type TripFixAccumulator,
@@ -215,6 +216,42 @@ describe("getVisitActiveAt", () => {
     closeVisit(v.id, new Date("2026-01-01T09:00:00Z"));
 
     await expect(getVisitActiveAt(new Date("2026-01-02T00:00:00Z"))).resolves.toBeNull();
+  });
+});
+
+describe("listVisitsCovering", () => {
+  const from = new Date("2026-01-02T00:00:00Z");
+  const to = new Date("2026-01-02T23:59:59Z");
+
+  it("includes a stay that began before the window and is still open", async () => {
+    const home = makePlace("Home", 45, 9);
+    const v = openConfirmedVisit(home.id, new Date("2026-01-01T20:00:00Z"));
+
+    expect((await listVisits({ from, to })).length).toBe(0);
+    expect((await listVisitsCovering(from, to)).map((x) => x.id)).toEqual([v.id]);
+  });
+
+  it("adds the carried-over stay alongside the window's own visits, once", async () => {
+    const home = makePlace("Home", 45, 9);
+    const shop = makePlace("Shop", 46, 9);
+    const night = openConfirmedVisit(home.id, new Date("2026-01-01T20:00:00Z"));
+    closeVisit(night.id, new Date("2026-01-02T09:00:00Z"));
+    const later = openConfirmedVisit(shop.id, new Date("2026-01-02T10:00:00Z"));
+
+    expect((await listVisitsCovering(from, to)).map((x) => x.id)).toEqual([later.id, night.id]);
+  });
+
+  it("does not duplicate a visit that arrived exactly at the window start", async () => {
+    const home = makePlace("Home", 45, 9);
+    const v = openConfirmedVisit(home.id, from);
+    expect((await listVisitsCovering(from, to)).map((x) => x.id)).toEqual([v.id]);
+  });
+
+  it("leaves out a stay that ended before the window", async () => {
+    const home = makePlace("Home", 45, 9);
+    const v = openConfirmedVisit(home.id, new Date("2026-01-01T08:00:00Z"));
+    closeVisit(v.id, new Date("2026-01-01T09:00:00Z"));
+    expect(await listVisitsCovering(from, to)).toEqual([]);
   });
 });
 
