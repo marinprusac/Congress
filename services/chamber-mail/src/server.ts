@@ -26,6 +26,7 @@ import {
   listAccountLabels,
   listMailAccounts,
   mailboxSummary,
+  markThreadRead,
   searchThreads,
 } from "./mail.js";
 
@@ -97,6 +98,16 @@ app.get("/api/threads/:accountId/:threadId", async (c) => {
   if (!Number.isInteger(accountId)) return c.json({ error: "invalid_account_id" }, 400);
   try {
     return c.json(await getThread(accountId, c.req.param("threadId"), { includeHtml: true }));
+  } catch (err) {
+    return mapError(c, err);
+  }
+});
+
+app.post("/api/threads/:accountId/:threadId/read", async (c) => {
+  const accountId = Number(c.req.param("accountId"));
+  if (!Number.isInteger(accountId)) return c.json({ error: "invalid_account_id" }, 400);
+  try {
+    return c.json(await markThreadRead(accountId, c.req.param("threadId")));
   } catch (err) {
     return mapError(c, err);
   }

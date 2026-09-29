@@ -11,6 +11,7 @@ import {
   listAccountLabels,
   listMailAccounts,
   mailboxSummary,
+  markThreadRead,
   readAttachmentText,
   searchThreads,
 } from "../mail.js";
@@ -222,6 +223,17 @@ export function registerTools(server: McpServer) {
       },
     },
     async ({ accountId, messageId, partId }) => run(() => readAttachmentText(accountId, messageId, partId))
+  );
+
+  server.registerTool(
+    "mark_thread_read",
+    {
+      title: "Mark Thread Read",
+      description:
+        "Mark every message in a thread as read in Gmail (the owner's real mailbox). Reading a thread with get_thread does NOT do this - only call it when the owner asks, or when they've clearly dealt with the mail. Needs the account's Gmail read-sync grant.",
+      inputSchema: { accountId: accountIdSchema, threadId: z.string().min(1) },
+    },
+    async ({ accountId, threadId }) => run(() => markThreadRead(accountId, threadId))
   );
 
   server.registerTool(

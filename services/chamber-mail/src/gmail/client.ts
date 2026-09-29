@@ -1,7 +1,25 @@
-import { googleAccessToken } from "@congress/chamber-kit";
+import { getGoogleAccount, googleAccessToken } from "@congress/chamber-kit";
+import type { GoogleAccount } from "@congress/shared-types";
 import type { RawGmailMessage } from "./mime.js";
 
-export const MAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
+export const GMAIL_READONLY = "https://www.googleapis.com/auth/gmail.readonly";
+export const GMAIL_MODIFY = "https://www.googleapis.com/auth/gmail.modify";
+// What Mail asks for: modify covers reading plus marking read (never sending or deleting).
+export const MAIL_SCOPES = [GMAIL_MODIFY];
+
+// Accounts granted before read-sync still read with gmail.readonly.
+export function canRead(account: GoogleAccount): boolean {
+  return account.scopes.includes(GMAIL_READONLY) || account.scopes.includes(GMAIL_MODIFY);
+}
+
+export function canModify(account: GoogleAccount): boolean {
+  return account.scopes.includes(GMAIL_MODIFY);
+}
+
+function readScopes(accountId: number): string[] {
+  const account = getGoogleAccount(accountId);
+  return account && canModify(account) ? [GMAIL_MODIFY] : [GMAIL_READONLY];
+}
 
 const BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
 
@@ -20,10 +38,12 @@ export class GmailApiError extends Error {
   }
 }
 
-export async function gmailFetch<T>(accountId: number, path: string): Promise<T> {
-  const token = await googleAccessToken(accountId, MAIL_SCOPES);
+export async function gmailFetch<T>(accountId: number, path: string, write?: { method: "POST"; body: unknown }): Promise<T> {
+  const token = await googleAccessToken(accountId, write ? [GMAIL_MODIFY] : readScopes(accountId));
   const res = await fetch(`${BASE}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    method: write?.method ?? "GET",
+    headers: { Authorization: `Bearer ${token}`, ...(write ? { "Content-Type": "application/json" } : {}) },
+    body: write ? JSON.stringify(write.body) : undefined,
     signal: AbortSignal.timeout(30_000),
   });
   if (!res.ok) throw new GmailApiError(res.status, await res.text());
@@ -84,6 +104,13 @@ export function getThreadMetadata(accountId: number, threadId: string): Promise<
 
 export function getThreadFull(accountId: number, threadId: string): Promise<{ id: string; messages?: RawGmailMessage[] }> {
   return gmailFetch(accountId, `/threads/${encodeURIComponent(threadId)}?format=full`);
+}
+
+export function markThreadReadInGmail(accountId: number, threadId: string): Promise<unknown> {
+  return gmailFetch(accountId, `/threads/${encodeURIComponent(threadId)}/modify`, {
+    method: "POST",
+    body: { removeLabelIds: ["UNREAD"] },
+  });
 }
 
 export async function getAttachmentData(accountId: number, messageId: string, attachmentId: string): Promise<string> {

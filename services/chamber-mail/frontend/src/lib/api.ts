@@ -29,6 +29,10 @@ export function fetchThread(accountId: number, threadId: string): Promise<Thread
   return fetch(`${API_BASE}/threads/${accountId}/${encodeURIComponent(threadId)}`).then((res) => jsonOrCode(res));
 }
 
+export function markThreadRead(accountId: number, threadId: string): Promise<{ markedLocally: number }> {
+  return fetch(`${API_BASE}/threads/${accountId}/${encodeURIComponent(threadId)}/read`, { method: "POST" }).then((res) => jsonOrCode(res));
+}
+
 export function attachmentUrl(accountId: number, messageId: string, attachmentId: string, filename: string, mimeType: string): string {
   const params = new URLSearchParams({ filename, mimeType });
   return `${API_BASE}/messages/${accountId}/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}?${params.toString()}`;

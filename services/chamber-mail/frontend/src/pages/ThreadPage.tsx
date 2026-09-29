@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ExhibitActionBar,
   ExhibitLinksLayout,
@@ -10,7 +10,7 @@ import {
   useShellHosted,
 } from "@congress/congress-ui";
 import type { MessageDetail } from "../../../src/types";
-import { attachmentUrl, fetchThread, MailRequestError } from "@/lib/api";
+import { attachmentUrl, fetchThread, markThreadRead, MailRequestError } from "@/lib/api";
 import { EmailHtml } from "@/components/EmailHtml";
 
 function formatDate(iso: string): string {
@@ -97,6 +97,18 @@ export function ThreadPage() {
     retry: (count, err) => !(err instanceof MailRequestError) && count < 2,
   });
 
+  // Opening a thread marks it read in Gmail, once per visit.
+  const markRead = useMutation({ mutationFn: () => markThreadRead(accountId, threadId) });
+  const markedFor = useRef<string | null>(null);
+  const hasUnread = query.data?.messages.some((m) => m.unread) ?? false;
+  useEffect(() => {
+    const key = `${accountId}:${threadId}`;
+    if (!hasUnread || markedFor.current === key) return;
+    markedFor.current = key;
+    markRead.mutate();
+  }, [hasUnread, accountId, threadId, markRead]);
+  const readSyncMissing = markRead.error instanceof MailRequestError && markRead.error.code === "access_not_granted";
+
   if (!Number.isInteger(accountId) || !threadId) return <p className="font-mono text-sm text-alert">Invalid thread.</p>;
   if (query.isLoading) return <p className="font-mono text-sm text-dust">Loading —</p>;
   if (query.isError || !query.data) {
@@ -126,6 +138,17 @@ export function ThreadPage() {
         <p className="mt-1 font-mono text-xs text-dust">
           {thread.accountEmail} · {thread.messages.length} {thread.messages.length === 1 ? "message" : "messages"}
         </p>
+        {readSyncMissing && (
+          <p className="mt-1 font-mono text-xs text-dust">
+            Still unread in Gmail.{" "}
+            <a
+              href={googleConnectHref({ returnTo: `/mail/t/${accountId}/${threadId}`, loginHint: thread.accountEmail })}
+              className="uppercase text-accent hover:underline"
+            >
+              Grant read-sync
+            </a>
+          </p>
+        )}
       </div>
 
       <ExhibitLinksLayout

@@ -9,6 +9,8 @@ export const mailAccountSchema = z.object({
   needsReconnect: z.boolean(),
   // Whether this account has granted Gmail read access.
   hasAccess: z.boolean(),
+  // Whether Mail may mark threads read in Gmail (gmail.modify granted).
+  canMarkRead: z.boolean(),
   lastSyncedAt: z.string().nullable(),
   lastError: z.string().nullable(),
 });

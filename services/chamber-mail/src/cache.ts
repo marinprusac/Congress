@@ -150,6 +150,20 @@ export function getCachedThreadMessages(accountId: number, threadId: string): Me
     .map(toSummary);
 }
 
+// Returns how many cached messages flipped to read.
+export function markCachedThreadRead(accountId: number, threadId: string): number {
+  const rows = db
+    .select()
+    .from(messages)
+    .where(and(eq(messages.accountId, accountId), eq(messages.threadId, threadId), eq(messages.unread, true)))
+    .all();
+  for (const row of rows) {
+    const labelIds = (JSON.parse(row.labelIds) as string[]).filter((l) => l !== "UNREAD");
+    db.update(messages).set({ unread: false, labelIds: JSON.stringify(labelIds) }).where(eq(messages.id, row.id)).run();
+  }
+  return rows.length;
+}
+
 export function listCachedThreadIds(accountId: number): string[] {
   return db
     .selectDistinct({ threadId: messages.threadId })

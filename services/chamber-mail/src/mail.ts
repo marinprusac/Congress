@@ -1,8 +1,10 @@
-import { getGoogleAccount, hasGoogleScopes, listGoogleAccounts } from "@congress/chamber-kit";
+import { getGoogleAccount, listGoogleAccounts } from "@congress/chamber-kit";
 import type { GoogleAccount } from "@congress/shared-types";
-import { threadExhibitId, threadUrl } from "./cache.js";
+import { markCachedThreadRead, threadExhibitId, threadUrl } from "./cache.js";
 import {
-  MAIL_SCOPES,
+  canModify,
+  canRead,
+  markThreadReadInGmail,
   getAttachmentData,
   getLabel,
   getMessageFull,
@@ -48,7 +50,8 @@ export function listMailAccounts(): MailAccount[] {
       label: account.label,
       email: account.email,
       needsReconnect: account.needsReconnect,
-      hasAccess: hasGoogleScopes(account, MAIL_SCOPES),
+      hasAccess: canRead(account),
+      canMarkRead: canModify(account),
       lastSyncedAt: state?.lastSyncedAt?.toISOString() ?? null,
       lastError: state?.lastError ?? null,
     };
@@ -63,7 +66,7 @@ function requireAccount(accountId: number): GoogleAccount {
 
 function readableAccounts(accountId?: number): GoogleAccount[] {
   if (accountId !== undefined) return [requireAccount(accountId)];
-  return listGoogleAccounts().filter((a) => !a.needsReconnect && hasGoogleScopes(a, MAIL_SCOPES));
+  return listGoogleAccounts().filter((a) => !a.needsReconnect && canRead(a));
 }
 
 function labelsOf(messages: RawGmailMessage[]): string[] {
@@ -191,6 +194,13 @@ export async function getMessage(
 ): Promise<MessageDetail> {
   requireAccount(accountId);
   return toMessageDetail(accountId, await getMessageFull(accountId, messageId), opts);
+}
+
+// Marks every message in the thread read in Gmail, then in the local mirror.
+export async function markThreadRead(accountId: number, threadId: string): Promise<{ accountId: number; threadId: string; markedLocally: number }> {
+  requireAccount(accountId);
+  await markThreadReadInGmail(accountId, threadId);
+  return { accountId, threadId, markedLocally: markCachedThreadRead(accountId, threadId) };
 }
 
 export async function listAccountLabels(accountId: number): Promise<GmailLabel[]> {

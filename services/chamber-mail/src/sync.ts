@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import {
   GoogleAccountNeedsReconnectError,
   GoogleScopeMissingError,
-  hasGoogleScopes,
   listGoogleAccounts,
 } from "@congress/chamber-kit";
 import { db } from "./db/client.js";
@@ -17,7 +16,7 @@ import {
   toSummary,
   upsertCachedMessage,
 } from "./cache.js";
-import { GmailApiError, MAIL_SCOPES, getMessageMetadata, getProfile, listHistory, listMessageIds, mapLimit } from "./gmail/client.js";
+import { GmailApiError, canRead, getMessageMetadata, getProfile, listHistory, listMessageIds, mapLimit } from "./gmail/client.js";
 import { categoryOf, displayFrom } from "./gmail/mime.js";
 import { publishEvent } from "./events.js";
 import { getSettings } from "./settings.js";
@@ -185,7 +184,7 @@ export function syncAll(): Promise<void> {
   if (running) return running;
   running = (async () => {
     for (const account of listGoogleAccounts()) {
-      if (account.needsReconnect || !hasGoogleScopes(account, MAIL_SCOPES)) continue;
+      if (account.needsReconnect || !canRead(account)) continue;
       try {
         await syncAccount(account.id, account.email);
       } catch (err) {
