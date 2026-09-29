@@ -74,12 +74,13 @@ To connect accounts (or grant Mail its Gmail access), once:
 1. Google Cloud console → the same OAuth client → add the authorized
    redirect URI `https://congress.marinprusac.com/congress/connectors/google/callback`.
 2. Enable the **Gmail API** in that project (and add the
-   `gmail.readonly` scope to the consent screen if it lists scopes).
+   `gmail.modify` scope to the consent screen if it lists scopes - Mail
+   uses it to mark threads read when opened; it never sends or deletes).
 3. Optionally move the three `GOOGLE_OAUTH_*` lines into
    `services/congress/.env` (with the new redirect URI) and drop them from
    Calendar's `.env`; restart `congress-core`.
 4. Settings → Accounts → "Grant" (or Mail's settings → "Grant Gmail
-   access") for each account.
+   access" / "Grant read-sync") for each account.
 
 Mail needs no `.env` of its own (it defaults to `./data/mail.sqlite3`).
 

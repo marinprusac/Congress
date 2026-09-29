@@ -40,7 +40,7 @@ export function SettingsPage() {
             </a>
           </div>
         </div>
-        <p className="mb-3 font-mono text-xs text-dust">Read-only Gmail access. Accounts are shared with other Chambers - rename or disconnect them under Settings → Accounts.</p>
+        <p className="mb-3 font-mono text-xs text-dust">Mail reads Gmail and marks threads read when you open them - it never sends or deletes. Accounts are shared with other Chambers - rename or disconnect them under Settings → Accounts.</p>
 
         {accounts.isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}
         {accounts.isError && <p className="font-mono text-sm text-alert">Failed to reach the Mail API.</p>}
@@ -54,12 +54,12 @@ export function SettingsPage() {
                 <span className="font-display text-lg text-ink">{account.label}</span>{" "}
                 <span className="font-mono text-xs text-dust">{account.email}</span>
               </div>
-              {(account.needsReconnect || !account.hasAccess) && (
+              {(account.needsReconnect || !account.canMarkRead) && (
                 <a
                   href={googleConnectHref({ returnTo: RETURN_TO, loginHint: account.email })}
                   className="tap-target shrink-0 font-mono text-xs uppercase tracking-wide text-accent hover:underline"
                 >
-                  {account.needsReconnect ? "Reconnect" : "Grant Gmail access"}
+                  {account.needsReconnect ? "Reconnect" : account.hasAccess ? "Grant read-sync" : "Grant Gmail access"}
                 </a>
               )}
             </div>
