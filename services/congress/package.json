@@ -28,6 +28,7 @@
     "chamber-calendar": "workspace:*",
     "chamber-documents": "workspace:*",
     "chamber-fitness": "workspace:*",
+    "chamber-mail": "workspace:*",
     "chamber-map": "workspace:*",
     "chamber-notes": "workspace:*",
     "chamber-tasks": "workspace:*",

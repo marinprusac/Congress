@@ -94,6 +94,24 @@ export type ManifestEvent = z.infer<typeof manifestEventSchema>;
 // registry.ts's actual publish sites.
 export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
   {
+    type: "google.account_connected",
+    label: "Google account connected",
+    description: "A Google account was connected (or granted more access) through the Google connector.",
+    payloadFields: { accountId: { type: "number" }, label: { type: "string" } },
+  },
+  {
+    type: "google.account_disconnected",
+    label: "Google account disconnected",
+    description: "A Google account was disconnected from the Google connector.",
+    payloadFields: { accountId: { type: "number" }, label: { type: "string" } },
+  },
+  {
+    type: "google.account_needs_reconnect",
+    label: "Google account needs reconnect",
+    description: "A connected Google account's refresh token was revoked and needs to be reconnected.",
+    payloadFields: { accountId: { type: "number" }, label: { type: "string" } },
+  },
+  {
     type: "congress.chamber_offline",
     label: "Chamber went offline",
     description: "A Chamber failed to start and was marked offline.",
@@ -162,6 +180,8 @@ export const manifestSchema = z.object({
   // Domain events this Chamber may publish. Defaulted the same way as
   // views - most Chambers publish none.
   events: z.array(manifestEventSchema).default([]),
+  // Google OAuth scopes this Chamber needs from Congress's Google connector.
+  googleScopes: z.array(z.string()).optional(),
 });
 export type Manifest = z.infer<typeof manifestSchema>;
 

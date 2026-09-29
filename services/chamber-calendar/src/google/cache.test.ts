@@ -1,25 +1,10 @@
 import { migrationsDir } from "@congress/test-support";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, runMigrations } from "../db/client.js";
-import { googleAccounts } from "../db/schema.js";
 import { listCachedEvents, searchCachedEvents, upsertCachedEventFromGoogle, type RawGoogleEvent } from "./cache.js";
 
 beforeAll(() => {
   runMigrations(migrationsDir("chamber-calendar"));
-  db.insert(googleAccounts)
-    .values({
-      id: 1,
-      label: "Test",
-      email: "test@example.com",
-      googleSub: "sub-1",
-      accessToken: "at",
-      refreshToken: "rt",
-      scope: "scope",
-      tokenExpiry: new Date(),
-      connectedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .run();
 });
 
 let nextEventId = 1;

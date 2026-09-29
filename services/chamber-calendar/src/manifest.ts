@@ -1,4 +1,5 @@
 import type { Manifest } from "@congress/shared-types";
+import { CALENDAR_SCOPES } from "./google/accounts.js";
 
 export const calendarManifest: Manifest = {
   name: "calendar",
@@ -16,6 +17,7 @@ export const calendarManifest: Manifest = {
     { id: "week", label: "Week", description: "This week on an hour grid", fullPath: "/week" },
   ],
   exhibitTypes: [{ type: "event", label: "Event", createPath: "/new" }],
+  googleScopes: CALENDAR_SCOPES,
   events: [
     {
       type: "calendar.event_starting_soon",
@@ -76,24 +78,6 @@ export const calendarManifest: Manifest = {
         notAttending: { type: "boolean" },
         url: { type: "string" },
       },
-    },
-    {
-      type: "calendar.account_connected",
-      label: "Account connected",
-      description: "A new Google account was connected.",
-      payloadFields: { accountId: { type: "number" }, label: { type: "string" } },
-    },
-    {
-      type: "calendar.account_disconnected",
-      label: "Account disconnected",
-      description: "A Google account was disconnected.",
-      payloadFields: { accountId: { type: "number" }, label: { type: "string" } },
-    },
-    {
-      type: "calendar.account_needs_reconnect",
-      label: "Account needs reconnect",
-      description: "A connected Google account's refresh token was revoked and needs to be reconnected.",
-      payloadFields: { accountId: { type: "number" }, label: { type: "string" } },
     },
   ],
 };

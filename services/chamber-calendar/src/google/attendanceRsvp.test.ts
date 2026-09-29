@@ -9,7 +9,7 @@ vi.mock("./client.js", async (importOriginal) => ({
 }));
 
 import { db, runMigrations } from "../db/client.js";
-import { googleAccounts } from "../db/schema.js";
+import { setCongressHost } from "@congress/chamber-kit";
 import { googleCalendarFetch } from "./client.js";
 import { setEventAttendance } from "./events.js";
 
@@ -17,20 +17,18 @@ const fetchMock = vi.mocked(googleCalendarFetch);
 
 beforeAll(() => {
   runMigrations(migrationsDir("chamber-calendar"));
-  db.insert(googleAccounts)
-    .values({
-      id: 1,
-      label: "Test",
-      email: "me@example.com",
-      googleSub: "sub-1",
-      accessToken: "at",
-      refreshToken: "rt",
-      scope: "scope",
-      tokenExpiry: new Date(),
-      connectedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .run();
+  setCongressHost({
+    publishEvent: () => {},
+    syncExhibit: () => {},
+    resolveExhibits: async () => [],
+    google: {
+      listAccounts: () => [
+        { id: 1, label: "Test", email: "me@example.com", scopes: [], needsReconnect: false, connectedAt: new Date().toISOString() },
+      ],
+      getAccessToken: async () => "at",
+      importLegacyAccounts: () => new Map(),
+    },
+  });
 });
 
 beforeEach(() => fetchMock.mockReset());

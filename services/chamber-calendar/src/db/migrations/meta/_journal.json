@@ -50,6 +50,13 @@
       "when": 1788874416739,
       "tag": "0006_third_korg",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790684140264,
+      "tag": "0007_google_connector",
+      "breakpoints": true
     }
   ]
 }

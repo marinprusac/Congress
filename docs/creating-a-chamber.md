@@ -346,6 +346,27 @@ and per-property `description`s in your `inputSchema` are what the agent
 sees when deciding how to use your tools, so they're worth the same care
 as your REST API's own request validation.
 
+### 5.5 Talking to Google
+
+Don't run your own OAuth flow. Declare the scopes you need in your manifest
+and ask Congress's Google connector for tokens:
+
+```ts
+// manifest.ts
+googleScopes: ["https://www.googleapis.com/auth/gmail.readonly"],
+
+// anywhere in your backend
+import { listGoogleAccounts, googleAccessToken, hasGoogleScopes } from "@congress/chamber-kit";
+const token = await googleAccessToken(accountId, MY_SCOPES); // refreshed for you
+```
+
+Accounts are shared by every Chamber and managed in Settings → Accounts;
+connecting always requests every Chamber's scopes. Link the owner to
+`congress-ui`'s `googleConnectHref({ returnTo, loginHint })` when an account
+hasn't granted yours yet (`GoogleScopeMissingError`). Subscribe to
+`google.account_disconnected` to drop that account's data. See
+`services/chamber-mail` for a complete example.
+
 ## 6. Local dev workflow
 
 ```

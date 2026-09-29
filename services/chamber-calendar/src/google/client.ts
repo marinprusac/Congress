@@ -1,7 +1,4 @@
-import { ensureFreshAccessToken } from "./accounts.js";
-import type { googleAccounts } from "../db/schema.js";
-
-type AccountRow = typeof googleAccounts.$inferSelect;
+import { ensureFreshAccessToken, type AccountRow } from "./accounts.js";
 
 export class GoogleApiError extends Error {
   status: number;

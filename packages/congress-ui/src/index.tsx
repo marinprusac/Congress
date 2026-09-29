@@ -70,3 +70,4 @@ export { RouteCommitSignal, usePresence, useFlipList } from "./motionHooks.js";
 export { StackLink, StackNavigator, useStackNav, useActiveNavTab, selectNavTab, openInTab, type StackNav } from "./navHooks.js";
 export { NAV_TABS, TAB_ROOT, NAV_TAB_PARAM, tabOfPath, type NavTab } from "./navStack.js";
 export type { NavTransition, PushOptions } from "./navEngine.js";
+export { googleConnectHref, GOOGLE_ACCOUNTS_SETTINGS_PATH } from "./googleConnector.js";

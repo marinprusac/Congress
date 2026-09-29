@@ -1,6 +1,8 @@
 import { sqliteTable, text, integer, index, unique, uniqueIndex } from "drizzle-orm/sqlite-core";
 
-export const googleAccounts = sqliteTable("google_accounts", {
+// Pre-connector accounts, emptied into Congress's Google connector on start
+// (google/accounts.ts). Can be dropped once that has run in production.
+export const legacyGoogleAccounts = sqliteTable("google_accounts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   label: text("label").notNull(),
   email: text("email").notNull(),
@@ -18,9 +20,8 @@ export const selectedCalendars = sqliteTable(
   "selected_calendars",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    accountId: integer("account_id")
-      .notNull()
-      .references(() => googleAccounts.id, { onDelete: "cascade" }),
+    // A Google connector account id (Congress) - no local FK.
+    accountId: integer("account_id").notNull(),
     googleCalendarId: text("google_calendar_id").notNull(),
     summary: text("summary").notNull(),
     colorHex: text("color_hex"),
@@ -67,9 +68,7 @@ export const cachedEvents = sqliteTable(
   "cached_events",
   {
     id: text("id").primaryKey(),
-    accountId: integer("account_id")
-      .notNull()
-      .references(() => googleAccounts.id, { onDelete: "cascade" }),
+    accountId: integer("account_id").notNull(),
     calendarId: text("calendar_id").notNull(),
     eventId: text("event_id").notNull(),
     calendarSummary: text("calendar_summary").notNull(),

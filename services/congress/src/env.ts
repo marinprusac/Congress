@@ -31,6 +31,12 @@ const envSchema = z.object({
   // One-time import of Deputy's AI settings row (context prompt, model,
   // budget) from before the engine moved here - see ai/legacyImport.ts.
   LEGACY_DEPUTY_DB_PATH: z.string().default("../chamber-deputy/data/deputy.sqlite3"),
+  // Google connector (connectors/google). Unset falls back to the Calendar
+  // Chamber's .env, where these lived before the connector existed.
+  GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_OAUTH_REDIRECT_URI: z.string().optional(),
+  GOOGLE_OAUTH_FALLBACK_ENV_PATH: z.string().default("../chamber-calendar/.env"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 

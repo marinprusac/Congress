@@ -11,8 +11,5 @@ export const { env, initEnv } = defineChamberEnv(
   "calendar",
   z.object({
     DB_PATH: z.string().default("./data/calendar.sqlite3").transform(inChamber),
-    GOOGLE_OAUTH_CLIENT_ID: z.string().min(1, "GOOGLE_OAUTH_CLIENT_ID must be set"),
-    GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1, "GOOGLE_OAUTH_CLIENT_SECRET must be set"),
-    GOOGLE_OAUTH_REDIRECT_URI: z.string().url(),
   })
 );

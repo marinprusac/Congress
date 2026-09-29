@@ -1,3 +1,4 @@
+import type { GoogleConnectorHost } from "./google.js";
 import type { EventPublishRequest, ExhibitSyncRequest, CapitolExhibitResolveResult, ExhibitToken } from "@congress/shared-types";
 
 // What Congress provides to the Chambers it hosts in-process. Congress
@@ -7,6 +8,7 @@ export interface CongressHost {
   publishEvent(event: EventPublishRequest): void;
   syncExhibit(push: ExhibitSyncRequest): void;
   resolveExhibits(refs: ExhibitToken[]): Promise<CapitolExhibitResolveResult[]>;
+  google?: GoogleConnectorHost;
 }
 
 let host: CongressHost | null = null;

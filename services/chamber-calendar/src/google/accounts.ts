@@ -1,165 +1,77 @@
 import { eq } from "drizzle-orm";
+import {
+  getGoogleAccount,
+  googleAccessToken,
+  hasGoogleScopes,
+  importLegacyGoogleAccounts,
+  listGoogleAccounts,
+  GoogleAccountNeedsReconnectError,
+  GoogleScopeMissingError,
+} from "@congress/chamber-kit";
 import type { GoogleAccount } from "../types.js";
 import { db } from "../db/client.js";
-import { googleAccounts } from "../db/schema.js";
-import { refreshAccessToken, revokeToken, RevokedTokenError } from "./oauth.js";
-import { publishEvent } from "../events.js";
+import { cachedEvents, legacyGoogleAccounts, selectedCalendars } from "../db/schema.js";
 
-export class AccountNeedsReconnectError extends Error {
-  accountId: number;
-  label: string;
-  constructor(accountId: number, label: string) {
-    super(`Account "${label}" needs to be reconnected`);
-    this.name = "AccountNeedsReconnectError";
-    this.accountId = accountId;
-    this.label = label;
-  }
-}
+// Accounts and tokens live in Congress's Google connector; this Chamber only asks for access.
+export const CALENDAR_SCOPES = [
+  "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/calendar.readonly",
+];
 
-type AccountRow = typeof googleAccounts.$inferSelect;
+export { GoogleAccountNeedsReconnectError as AccountNeedsReconnectError };
 
-function toDTO(row: AccountRow): GoogleAccount {
+export type AccountRow = { id: number; label: string };
+
+function toDTO(account: ReturnType<typeof listGoogleAccounts>[number]): GoogleAccount {
   return {
-    id: row.id,
-    label: row.label,
-    email: row.email,
-    needsReconnect: row.needsReconnect,
-    connectedAt: row.connectedAt.toISOString(),
+    id: account.id,
+    label: account.label,
+    email: account.email,
+    needsReconnect: account.needsReconnect,
+    hasAccess: hasGoogleScopes(account, CALENDAR_SCOPES),
+    connectedAt: account.connectedAt,
   };
 }
 
 export function listAccounts(): GoogleAccount[] {
-  const rows = db.select().from(googleAccounts).all();
-  return rows.map(toDTO);
+  return listGoogleAccounts().map(toDTO);
 }
 
 export function getAccountRow(id: number): AccountRow | undefined {
-  return db.select().from(googleAccounts).where(eq(googleAccounts.id, id)).get();
+  return getGoogleAccount(id);
 }
 
-export function listAccountRows(): AccountRow[] {
-  return db.select().from(googleAccounts).all();
-}
-
-export function upsertAccountFromOAuth(input: {
-  sub: string;
-  email: string;
-  accessToken: string;
-  refreshToken: string | undefined;
-  scope: string;
-  expiryMs: number;
-}): GoogleAccount {
-  const now = new Date();
-  const existing = db
-    .select()
-    .from(googleAccounts)
-    .where(eq(googleAccounts.googleSub, input.sub))
-    .get();
-
-  if (existing) {
-    const row = db
-      .update(googleAccounts)
-      .set({
-        email: input.email,
-        accessToken: input.accessToken,
-        // Google only returns a refresh_token on the very first consent for a
-        // given client+account; keep the previously stored one otherwise.
-        refreshToken: input.refreshToken ?? existing.refreshToken,
-        scope: input.scope,
-        tokenExpiry: new Date(input.expiryMs),
-        needsReconnect: false,
-        updatedAt: now,
-      })
-      .where(eq(googleAccounts.id, existing.id))
-      .returning()
-      .get();
-    return toDTO(row);
-  }
-
-  if (!input.refreshToken) {
-    throw new Error("Google did not return a refresh token on first consent");
-  }
-
-  const row = db
-    .insert(googleAccounts)
-    .values({
-      label: input.email,
-      email: input.email,
-      googleSub: input.sub,
-      accessToken: input.accessToken,
-      refreshToken: input.refreshToken,
-      scope: input.scope,
-      tokenExpiry: new Date(input.expiryMs),
-      needsReconnect: false,
-      connectedAt: now,
-      updatedAt: now,
-    })
-    .returning()
-    .get();
-  void publishEvent({
-    type: "calendar.account_connected",
-    payload: { accountId: row.id, label: row.label },
-  });
-  return toDTO(row);
-}
-
-export function updateAccountLabel(id: number, label: string): GoogleAccount | null {
-  const row = db
-    .update(googleAccounts)
-    .set({ label, updatedAt: new Date() })
-    .where(eq(googleAccounts.id, id))
-    .returning()
-    .get();
-  return row ? toDTO(row) : null;
-}
-
-export async function disconnectAccount(id: number): Promise<boolean> {
-  const existing = getAccountRow(id);
-  if (!existing) return false;
-  await revokeToken(existing.refreshToken);
-  const result = db.delete(googleAccounts).where(eq(googleAccounts.id, id)).run();
-  if (result.changes > 0) {
-    void publishEvent({
-      type: "calendar.account_disconnected",
-      payload: { accountId: id, label: existing.label },
-    });
-  }
-  return result.changes > 0;
-}
-
-const EXPIRY_BUFFER_MS = 60_000;
-
+// A missing Calendar grant is reported the same way as a revoked token:
+// the owner fixes both by reconnecting the account.
 export async function ensureFreshAccessToken(account: AccountRow): Promise<string> {
-  if (account.tokenExpiry.getTime() > Date.now() + EXPIRY_BUFFER_MS) {
-    return account.accessToken;
-  }
-
   try {
-    const refreshed = await refreshAccessToken(account.refreshToken);
-    db.update(googleAccounts)
-      .set({
-        accessToken: refreshed.accessToken,
-        tokenExpiry: new Date(refreshed.expiryMs),
-        needsReconnect: false,
-        updatedAt: new Date(),
-      })
-      .where(eq(googleAccounts.id, account.id))
-      .run();
-    return refreshed.accessToken;
+    return await googleAccessToken(account.id, CALENDAR_SCOPES);
   } catch (err) {
-    if (err instanceof RevokedTokenError) {
-      db.update(googleAccounts)
-        .set({ needsReconnect: true, updatedAt: new Date() })
-        .where(eq(googleAccounts.id, account.id))
-        .run();
-      if (!account.needsReconnect) {
-        void publishEvent({
-          type: "calendar.account_needs_reconnect",
-          payload: { accountId: account.id, label: account.label },
-        });
-      }
-      throw new AccountNeedsReconnectError(account.id, account.label);
-    }
+    if (err instanceof GoogleScopeMissingError) throw new GoogleAccountNeedsReconnectError(account.id, account.label);
     throw err;
   }
+}
+
+// One-time handover of the accounts this Chamber stored before the connector existed.
+export function migrateLegacyAccounts(): void {
+  const rows = db.select().from(legacyGoogleAccounts).all();
+  if (rows.length === 0) return;
+  const idMap = importLegacyGoogleAccounts(rows);
+  db.transaction((tx) => {
+    for (const [oldId, newId] of idMap) {
+      if (oldId === newId) continue;
+      console.warn(`[calendar] Google account ${oldId} became ${newId}; its cached events will resync`);
+      tx.update(selectedCalendars).set({ accountId: newId, syncToken: null }).where(eq(selectedCalendars.accountId, oldId)).run();
+      tx.delete(cachedEvents).where(eq(cachedEvents.accountId, oldId)).run();
+    }
+    tx.delete(legacyGoogleAccounts).run();
+  });
+}
+
+// Drops everything tied to an account the owner disconnected in Congress.
+export function forgetAccount(accountId: number): void {
+  db.transaction((tx) => {
+    tx.delete(selectedCalendars).where(eq(selectedCalendars.accountId, accountId)).run();
+    tx.delete(cachedEvents).where(eq(cachedEvents.accountId, accountId)).run();
+  });
 }

@@ -8,10 +8,16 @@ import { resolveExhibits, syncExhibit } from "../exhibits.js";
 import { markChamberOffline, registerChamber } from "../registry.js";
 import { selfBaseUrl } from "../ai/mcpConfig.js";
 import { addModule, listModules, removeModule } from "./runtime.js";
+import { getAccessToken, importLegacyAccounts, listGoogleAccounts } from "../connectors/google/accounts.js";
 
 // What every loaded Chamber can call back into.
 export function installCongressHost(): void {
-  setCongressHost({ publishEvent, syncExhibit, resolveExhibits });
+  setCongressHost({
+    publishEvent,
+    syncExhibit,
+    resolveExhibits,
+    google: { listAccounts: listGoogleAccounts, getAccessToken, importLegacyAccounts },
+  });
 }
 
 // A Chamber's own config lives in its own .env, never the shared process.env.
