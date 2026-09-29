@@ -1,5 +1,5 @@
 // Shell routes that aren't a Chamber (see App.tsx).
-const SHELL_ROUTES = new Set(["search", "notifications", "settings", "chat", "capitol", "logs"]);
+const SHELL_ROUTES = new Set(["search", "notifications", "settings", "chat", "capitol", "logs", "e"]);
 
 // The Chamber whose bundle a path needs, if any: "/notes/n/1" and
 // "/view/map/today" both need a Chamber's remote entry; "/chat/3" doesn't.
