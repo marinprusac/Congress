@@ -1,16 +1,21 @@
 /* ---- Chat: mobile-first. The page is pinned to the visual viewport so the
    composer sits right above the on-screen keyboard (see useVisualViewport). */
 
+/* Keep a normal 100vh document behind the fixed chat, like every other page:
+   iOS standalone docks `bottom: 0` short of the screen on a zero-height page. */
+html:has(.chat-page) {
+  overscroll-behavior: none;
+}
 html:has(.chat-page) body {
-  overflow: hidden;
+  min-height: 100vh;
 }
 
 .chat-page {
   position: fixed;
   left: 0;
   right: 0;
-  top: var(--vv-top, 0px);
-  height: calc(var(--vv-height, 100dvh) - var(--mobile-nav-height));
+  top: 0;
+  bottom: var(--mobile-nav-height);
   display: flex;
   overflow: hidden;
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
@@ -40,16 +45,13 @@ html:has(.chat-page) body {
 }
 
 @media (max-width: 640px) {
-  /* Dock the bar to the visual viewport like .chat-page, not the layout
-     viewport, which iOS leaves shifted after the keyboard closes. */
-  html:has(.chat-page) .shell-tabbar {
-    top: calc(var(--vv-top, 0px) + var(--vv-height, 100dvh) - var(--mobile-nav-height));
-    bottom: auto;
-  }
   html.chat-composing .shell-tabbar {
     display: none;
   }
+  /* Only while typing: follow the visual viewport to sit above the keyboard. */
   html.chat-composing .chat-page {
+    top: var(--vv-top, 0px);
+    bottom: auto;
     height: var(--vv-height, 100dvh);
   }
 }
@@ -57,8 +59,6 @@ html:has(.chat-page) body {
 @media (min-width: 641px) {
   .chat-page {
     left: var(--chamber-picker-width, 0px);
-    top: 0;
-    height: 100dvh;
     padding-left: 0;
   }
 }
