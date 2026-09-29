@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { NavLink } from "react-router-dom";
+import { useTransitionNavigate } from "@congress/congress-ui";
+import { ChatLink, phoneTransitionClick } from "./chatMotion";
 import type { AiThread } from "@congress/shared-types";
 import { ThreadActions } from "./ThreadActions";
 import { listStamp } from "./chatFormat";
@@ -10,9 +12,11 @@ function stripTokens(text: string): string {
 }
 
 function ThreadRow({ thread }: { thread: AiThread }) {
+  const go = useTransitionNavigate();
+  const to = `/chat/${thread.id}`;
   return (
     <li className="chat-list-item">
-      <NavLink to={`/chat/${thread.id}`} className={({ isActive }) => `chat-list-link${isActive ? " active" : ""}${thread.unread ? " unread" : ""}`}>
+      <NavLink to={to} onClick={phoneTransitionClick(() => go(to))} className={({ isActive }) => `chat-list-link${isActive ? " active" : ""}${thread.unread ? " unread" : ""}`}>
         <span className="chat-list-main">
           <span className="chat-list-title">
             {thread.pinned ? <span className="chat-pin" aria-label="Pinned" /> : null}
@@ -73,15 +77,15 @@ export function ThreadList() {
           <p className="chat-eyebrow">Congress</p>
           <h1 className="chat-title chat-title--large">Chats</h1>
         </div>
-        <Link to="/chat/memory" className="chat-memory-link">
+        <ChatLink to="/chat/memory" className="chat-memory-link">
           Memory
-        </Link>
-        <Link to="/chat/new" className="chat-new" aria-label="New chat">
+        </ChatLink>
+        <ChatLink to="/chat/new" className="chat-new" aria-label="New chat">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
           </svg>
           <span>New</span>
-        </Link>
+        </ChatLink>
       </header>
       <div className="chat-list-scroll">
         {(threads.data?.length ?? 0) > 4 || q ? (
@@ -92,9 +96,9 @@ export function ThreadList() {
         {threads.isSuccess && threads.data.length === 0 ? (
           <div className="chat-list-empty">
             <p>No chats yet.</p>
-            <Link to="/chat/new" className="chat-inline-action">
+            <ChatLink to="/chat/new" className="chat-inline-action">
               Start one
-            </Link>
+            </ChatLink>
           </div>
         ) : null}
         {q && all.length === 0 && threads.isSuccess && threads.data.length > 0 ? <p className="chat-loading">No matches.</p> : null}

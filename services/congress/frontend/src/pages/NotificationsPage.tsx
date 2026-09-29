@@ -1,6 +1,16 @@
-import { useNavigate } from "react-router-dom";
+import { useRef, useState } from "react";
 import type { Notification } from "@congress/shared-types";
-import { ChamberHeader, formatTimestamp, getChamberIcon, resolveChamberPath, useAppliedTheme } from "@congress/congress-ui";
+import {
+  ChamberHeader,
+  formatTimestamp,
+  getChamberIcon,
+  ListLoadingState,
+  prefersReducedMotion,
+  resolveChamberPath,
+  useAppliedTheme,
+  useFlipList,
+  useTransitionNavigate,
+} from "@congress/congress-ui";
 import { useNotifications } from "@/lib/notifications";
 
 function BellIcon() {
@@ -16,8 +26,20 @@ function BellIcon() {
 // Push). A tab of its own now, where it used to be a bell dropdown.
 export function NotificationsPage() {
   useAppliedTheme();
-  const navigate = useNavigate();
+  const navigate = useTransitionNavigate();
   const { notifications, unreadCount, isLoading, markRead, markAllRead, dismiss } = useNotifications();
+  const listRef = useRef<HTMLDivElement>(null);
+  useFlipList(
+    listRef,
+    notifications.map((n) => String(n.id))
+  );
+  // Dismissed rows slide out before they're removed.
+  const [leaving, setLeaving] = useState<ReadonlySet<Notification["id"]>>(new Set());
+
+  function dismissWithExit(id: Notification["id"]) {
+    setLeaving((current) => new Set(current).add(id));
+    setTimeout(() => void dismiss(id), prefersReducedMotion() ? 0 : 180);
+  }
 
   function open(n: Notification) {
     void markRead(n.id);
@@ -43,13 +65,14 @@ export function NotificationsPage() {
         }
       />
       <main className="chamber-main">
-        {isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}
+        {isLoading && <ListLoadingState />}
         {!isLoading && notifications.length === 0 && <p className="font-mono text-sm text-dust">— Nothing here —</p>}
-        <div className="notification-list">
+        <div className="notification-list" ref={listRef}>
           {notifications.map((n) => (
             <div
               key={n.id}
-              className={n.readAt ? "notification-item" : "notification-item notification-item--unread"}
+              data-flip-key={String(n.id)}
+              className={`notification-item${n.readAt ? "" : " notification-item--unread"}${leaving.has(n.id) ? " notification-item--leaving" : ""}`}
               onClick={() => open(n)}
             >
               <span className="notification-item-icon">{getChamberIcon(n.chamber)}</span>
@@ -64,7 +87,7 @@ export function NotificationsPage() {
                 aria-label="Dismiss"
                 onClick={(e) => {
                   e.stopPropagation();
-                  void dismiss(n.id);
+                  dismissWithExit(n.id);
                 }}
               >
                 ×

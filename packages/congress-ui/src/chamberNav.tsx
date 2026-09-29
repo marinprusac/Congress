@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShellHosted } from "./ShellHostContext.js";
+import { runNavigation } from "./motion.js";
 
 // Chambers have no navigation of their own any more - Congress's home feed,
 // Search and "+" are how the owner gets to anything. These two helpers are
@@ -15,8 +16,8 @@ export function useBackNavigation(): () => void {
   const shellHosted = useShellHosted();
   return () => {
     const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
-    if (idx > 0) navigate(-1);
-    else if (shellHosted) navigate("/");
+    if (idx > 0) runNavigation(() => navigate(-1), "pop");
+    else if (shellHosted) runNavigation(() => navigate("/"), "pop", "/");
     else window.location.assign("/");
   };
 }

@@ -1,7 +1,15 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ChamberHeader, ChamberMark, fetchRegistry, resolveChamberPath, useAppliedTheme, useExhibitSearch } from "@congress/congress-ui";
+import {
+  ChamberHeader,
+  ChamberMark,
+  fetchRegistry,
+  resolveChamberPath,
+  TransitionLink,
+  useAppliedTheme,
+  useExhibitSearch,
+  useTransitionNavigate,
+} from "@congress/congress-ui";
 import { viewHref } from "@/components/ViewSlot";
 
 function SearchIcon() {
@@ -19,7 +27,7 @@ function SearchIcon() {
 // exhibits across every Chamber.
 export function SearchPage() {
   useAppliedTheme();
-  const navigate = useNavigate();
+  const navigate = useTransitionNavigate();
   const [query, setQuery] = useState("");
   const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
   const { results, loading } = useExhibitSearch(query, true);
@@ -52,11 +60,11 @@ export function SearchPage() {
           <>
             <h2 className="search-section-title">Views</h2>
             {views.map(({ chamber, view }) => (
-              <Link key={`${chamber.name}:${view.id}`} to={viewHref(chamber.name, view)} className="search-row">
+              <TransitionLink key={`${chamber.name}:${view.id}`} to={viewHref(chamber.name, view)} className="search-row">
                 <ChamberMark name={chamber.name} />
                 <span className="search-row-name">{view.label}</span>
                 <span className="search-row-meta">{chamber.displayName}</span>
-              </Link>
+              </TransitionLink>
             ))}
           </>
         )}

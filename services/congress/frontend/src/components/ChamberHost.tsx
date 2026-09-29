@@ -21,8 +21,19 @@ import { fetchRegistry, loadRemoteModule, evictRemoteModule } from "@congress/co
 // good (see sw.ts's chamber-remotes route), so every visit after the first
 // one, in this session or a future one, renders from cache immediately.
 const componentCache = new Map<string, LazyExoticComponent<ComponentType>>();
+// Filled by preloadChamber: a Chamber loaded ahead of navigation renders
+// directly, skipping lazy()'s one-render suspension (and the loading bar).
+const loadedComponents = new Map<string, ComponentType>();
 
-function getChamberComponent(chamberName: string): LazyExoticComponent<ComponentType> {
+export function preloadChamber(chamberName: string): Promise<unknown> {
+  return loadRemoteModule(chamberName).then((mod) => {
+    loadedComponents.set(chamberName, mod.default);
+  });
+}
+
+function getChamberComponent(chamberName: string): ComponentType {
+  const loaded = loadedComponents.get(chamberName);
+  if (loaded) return loaded;
   let component = componentCache.get(chamberName);
   if (!component) {
     component = lazy(() => loadRemoteModule(chamberName));
@@ -81,6 +92,7 @@ class ChamberErrorBoundary extends Component<ChamberErrorBoundaryProps, ChamberE
     // replaying the same rejected import() promise (or the same broken
     // already-fetched component) forever.
     componentCache.delete(this.props.chamberName);
+    loadedComponents.delete(this.props.chamberName);
     evictRemoteModule(this.props.chamberName);
   }
 

@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useRef, useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ChamberRegistryEntry, FeedItem } from "@congress/shared-types";
 import {
@@ -6,9 +6,14 @@ import {
   CapitolMark,
   ChamberMark,
   fetchRegistry,
+  preloadRoute,
   resolveChamberPath,
+  staggerDelayMs,
+  TransitionLink,
   useAppliedTheme,
   useCapitolSettings,
+  useFlipList,
+  useTransitionNavigate,
 } from "@congress/congress-ui";
 import { ViewSlot, viewHref } from "@/components/ViewSlot";
 import { HomeAsks } from "@/components/HomeAsks";
@@ -31,23 +36,23 @@ function PinnedViews({ registry }: { registry: ChamberRegistryEntry[] | undefine
   return (
     <nav className="home-stories" aria-label="Pinned views">
       {pinned.map(({ entry, view }) => (
-        <Link key={`${entry.name}:${view.id}`} to={viewHref(entry.name, view)} className="home-story">
+        <TransitionLink key={`${entry.name}:${view.id}`} to={viewHref(entry.name, view)} className="home-story">
           <span className="home-story-bubble">
             <ChamberMark name={entry.name} />
           </span>
           <span className="home-story-label">{view.label}</span>
-        </Link>
+        </TransitionLink>
       ))}
-      <Link to="/settings?from=home" className="home-story home-story--add" aria-label="Pin a view">
+      <TransitionLink to="/settings?from=home" className="home-story home-story--add" aria-label="Pin a view">
         <span className="home-story-bubble">+</span>
         <span className="home-story-label">Pin</span>
-      </Link>
+      </TransitionLink>
     </nav>
   );
 }
 
 function FeedEntry({ item, registry }: { item: FeedItem; registry: ChamberRegistryEntry[] | undefined }) {
-  const navigate = useNavigate();
+  const navigate = useTransitionNavigate();
   if (item.kind === "view") {
     const found = findView(registry, item.chamber, item.viewId);
     if (!found) return null;
@@ -59,9 +64,10 @@ function FeedEntry({ item, registry }: { item: FeedItem; registry: ChamberRegist
   // unless it only repeats it (an all-day event's "Today").
   const time = preview?.time ? formatPreviewTime(preview.time) : undefined;
   const reason = item.reason && item.reason !== time ? item.reason : undefined;
+  const href = resolveChamberPath(item.url, item.chamber, true);
   return (
     <section className="feed-card">
-      <button type="button" className="feed-exhibit" onClick={() => navigate(resolveChamberPath(item.url, item.chamber, true))}>
+      <button type="button" className="feed-exhibit" onPointerDown={() => void preloadRoute(href)} onClick={() => navigate(href)}>
         <span className="feed-exhibit-head">
           <ChamberMark name={item.chamber} />
           <span className="feed-exhibit-name">{preview?.title ?? item.name}</span>
@@ -80,6 +86,25 @@ function FeedEntry({ item, registry }: { item: FeedItem; registry: ChamberRegist
   );
 }
 
+function feedKey(item: FeedItem): string {
+  return item.kind === "view" ? `v:${item.chamber}:${item.viewId}` : `e:${item.exhibitId}`;
+}
+
+// Card-shaped placeholders while the feed loads.
+function FeedSkeleton() {
+  return (
+    <div className="home-feed" aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="feed-card feed-skeleton">
+          <div className="list-skeleton-bar list-skeleton-title" />
+          <div className="list-skeleton-bar list-skeleton-subtitle" />
+          <div className="list-skeleton-bar feed-skeleton-body" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Congress's home: a "For You" feed. The owner's pinned views, then every active Chamber's views and exhibits ranked by how
 // much they matter right now (GET /congress/feed - the ranking itself lives
 // server-side, see services/congress/src/feed.ts).
@@ -87,6 +112,14 @@ export function HomePage() {
   useAppliedTheme();
   const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
   const feed = useQuery({ queryKey: feedQueryKey, queryFn: fetchFeed, refetchInterval: 60_000 });
+  const keys = (feed.data ?? []).map(feedKey);
+  const feedRef = useRef<HTMLDivElement>(null);
+  useFlipList(feedRef, keys);
+  // Cards rise in only when the feed arrives after a skeleton, not when it
+  // was already cached (returning Home).
+  const [introPending] = useState(() => !feed.data);
+  const introKeys = useRef<Map<string, number> | null>(null);
+  if (introPending && !introKeys.current && feed.data) introKeys.current = new Map(keys.map((k, i) => [k, i]));
 
   return (
     <div className="chamber-shell">
@@ -95,21 +128,31 @@ export function HomePage() {
         title="Congress"
         titleHref=""
         extraActions={
-          <Link to="/settings" className="home-settings-link" aria-label="Settings">
+          <TransitionLink to="/settings" className="home-settings-link" aria-label="Settings">
             <GearIcon />
-          </Link>
+          </TransitionLink>
         }
       />
       <main className="chamber-main home-main">
         <HomeAsks />
         <PinnedViews registry={registry} />
-        {feed.isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}
+        {feed.isLoading && <FeedSkeleton />}
         {feed.isError && <p className="font-mono text-sm text-alert">Couldn't load the feed.</p>}
         {feed.data && feed.data.length === 0 && <p className="font-mono text-sm text-dust">— Nothing here yet —</p>}
-        <div className="home-feed">
-          {(feed.data ?? []).map((item) => (
-            <FeedEntry key={item.kind === "view" ? `v:${item.chamber}:${item.viewId}` : `e:${item.exhibitId}`} item={item} registry={registry} />
-          ))}
+        <div className="home-feed" ref={feedRef}>
+          {(feed.data ?? []).map((item) => {
+            const key = feedKey(item);
+            const introIndex = introKeys.current?.get(key);
+            return (
+              <div
+                key={key}
+                data-flip-key={key}
+                className={introIndex === undefined ? undefined : "motion-rise"}
+                style={introIndex === undefined ? undefined : ({ "--stagger": `${staggerDelayMs(introIndex)}ms` } as CSSProperties)}>
+                <FeedEntry item={item} registry={registry} />
+              </div>
+            );
+          })}
         </div>
       </main>
     </div>

@@ -582,3 +582,151 @@
 .notification-item-dismiss:hover {
   color: var(--color-alert);
 }
+
+/* ---- Motion (tokens and keyframes live in congress-ui's motion.css) ---- */
+
+/* Sliding active-tab marker along the top edge of the phone tab bar. */
+.shell-tab-indicator {
+  position: absolute;
+  top: -1px;
+  left: env(safe-area-inset-left, 0px);
+  width: calc((100% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / 5);
+  height: 2px;
+  background-color: var(--color-ink);
+  translate: calc(var(--tab-index, 0) * 100%) 0;
+  transition:
+    translate var(--dur-base) var(--ease-sheet),
+    opacity var(--dur-fast) var(--ease-out);
+  pointer-events: none;
+}
+
+@media (min-width: 641px) {
+  .shell-tab-indicator {
+    display: none;
+  }
+}
+
+.shell-tab svg {
+  transition: scale var(--dur-press) var(--ease-out);
+}
+
+.shell-tab:active svg {
+  scale: 0.86;
+}
+
+.shell-tab:active,
+.shell-tab--create:active {
+  scale: none;
+}
+
+.shell-tab--create span.shell-tab-create-mark svg {
+  transition: rotate var(--dur-base) var(--ease-sheet);
+}
+
+.shell-tab--create.open span.shell-tab-create-mark svg {
+  rotate: 45deg;
+}
+
+/* While the "+" sheet is open the bar sits above its backdrop, so the ×
+   closes it. */
+.shell-tabbar:has(.shell-tab--create.open) {
+  z-index: 46;
+}
+
+.shell-tab-badge {
+  animation: motion-badge-pop 320ms var(--ease-out) both;
+}
+
+.create-sheet-backdrop {
+  animation: motion-fade-in var(--dur-base) var(--ease-out) both;
+}
+
+.create-sheet-backdrop[data-state="closing"] {
+  animation: motion-fade-out var(--dur-exit) var(--ease-in) both;
+}
+
+.create-sheet {
+  transform-origin: bottom center;
+  animation: motion-rise var(--dur-base) var(--ease-sheet) both;
+}
+
+.create-sheet[data-state="closing"] {
+  animation: motion-fade-out var(--dur-exit) var(--ease-in) both;
+}
+
+@media (min-width: 641px) {
+  .create-sheet {
+    transform-origin: top left;
+    animation-name: motion-pop-in;
+  }
+}
+
+/* Tappable cards and rows: a tint (rows) or a slight give (cards). */
+.feed-card {
+  transition: scale var(--dur-press) var(--ease-out);
+}
+
+.feed-card:has(> .feed-exhibit:active) {
+  scale: 0.985;
+}
+
+.feed-exhibit:active,
+.search-row:active,
+.create-sheet-option:active {
+  scale: none;
+}
+
+.search-row:active,
+.create-sheet-option:active,
+.notification-item:active {
+  background-color: color-mix(in srgb, var(--color-ink) 6%, transparent);
+}
+
+.home-story-bubble {
+  transition: scale var(--dur-press) var(--ease-out);
+}
+
+.home-story:active .home-story-bubble {
+  scale: 0.92;
+}
+
+/* useFlipList containers are their items' offsetParent. */
+.home-feed,
+.notification-list {
+  position: relative;
+}
+
+/* A feed item whose view has no card renders nothing; drop its gap. */
+.home-feed > div:empty {
+  display: none;
+}
+
+.feed-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.95rem 0.75rem;
+  border-color: color-mix(in srgb, var(--color-dust) 50%, transparent);
+}
+
+.feed-skeleton-body {
+  width: 90%;
+  height: 2.4em;
+}
+
+/* A view card fades in the first time its Chamber component loads. */
+.feed-card-body > .motion-fade-in {
+  height: 100%;
+}
+
+@keyframes notification-leave {
+  to {
+    opacity: 0;
+    translate: 30% 0;
+  }
+}
+
+.notification-item--leaving {
+  pointer-events: none;
+  animation: notification-leave var(--dur-exit) var(--ease-in) both;
+}

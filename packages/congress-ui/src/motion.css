@@ -1,0 +1,272 @@
+/* Motion: tokens, page transitions (motion.ts), press feedback, sheets.
+   prefers-reduced-motion is handled globally in styles.css. */
+
+:root {
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-press: 90ms;
+  --dur-fast: 160ms;
+  --dur-base: 240ms;
+  --dur-page: 340ms;
+  --dur-exit: 180ms;
+}
+
+@keyframes motion-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes motion-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes motion-rise {
+  from {
+    opacity: 0;
+    translate: 0 0.5rem;
+  }
+}
+
+@keyframes motion-pop-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@keyframes motion-pop-out {
+  to {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+
+@keyframes motion-sheet-up {
+  from {
+    translate: 0 calc(100% + var(--mobile-nav-height, 0px) + 1rem);
+  }
+}
+
+@keyframes motion-sheet-down {
+  to {
+    translate: 0 calc(100% + var(--mobile-nav-height, 0px) + 1rem);
+  }
+}
+
+@keyframes motion-backdrop-in {
+  from {
+    background-color: transparent;
+  }
+}
+
+@keyframes motion-backdrop-out {
+  to {
+    background-color: transparent;
+  }
+}
+
+@keyframes motion-badge-pop {
+  0% {
+    scale: 0.4;
+  }
+  60% {
+    scale: 1.15;
+  }
+}
+
+.motion-rise {
+  animation: motion-rise var(--dur-base) var(--ease-out) both;
+  animation-delay: var(--stagger, 0ms);
+}
+
+.motion-fade-in {
+  animation: motion-fade-in var(--dur-base) var(--ease-out) both;
+}
+
+/* ---- Page transitions ----
+   motion.ts sets html[data-nav-transition] for the duration of one. The tab
+   bar is its own group so it stays put while the page moves. */
+
+.shell-tabbar {
+  view-transition-name: shell-tabbar;
+}
+
+::view-transition-group(shell-tabbar) {
+  z-index: 10;
+  animation: none;
+}
+
+::view-transition-old(shell-tabbar) {
+  display: none;
+}
+
+::view-transition-new(shell-tabbar) {
+  animation: none;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  mix-blend-mode: normal;
+}
+
+@keyframes nav-push-new {
+  from {
+    translate: 100% 0;
+  }
+}
+
+@keyframes nav-push-old {
+  to {
+    translate: -25% 0;
+    filter: brightness(0.85);
+  }
+}
+
+@keyframes nav-pop-old {
+  to {
+    translate: 100% 0;
+  }
+}
+
+@keyframes nav-pop-new {
+  from {
+    translate: -25% 0;
+    filter: brightness(0.85);
+  }
+}
+
+html[data-nav-transition="push"]::view-transition-old(root) {
+  animation: nav-push-old var(--dur-page) var(--ease-sheet) both;
+}
+
+html[data-nav-transition="push"]::view-transition-new(root) {
+  animation: nav-push-new var(--dur-page) var(--ease-sheet) both;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
+}
+
+html[data-nav-transition="pop"]::view-transition-old(root) {
+  z-index: 1;
+  animation: nav-pop-old var(--dur-page) var(--ease-sheet) both;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
+}
+
+html[data-nav-transition="pop"]::view-transition-new(root) {
+  animation: nav-pop-new var(--dur-page) var(--ease-sheet) both;
+}
+
+html[data-nav-transition="tab"]::view-transition-old(root) {
+  animation: motion-fade-out 120ms var(--ease-in) both;
+}
+
+html[data-nav-transition="tab"]::view-transition-new(root) {
+  animation: motion-fade-in var(--dur-fast) var(--ease-out) both;
+}
+
+/* A full-width slide reads as too much travel on a wide screen. */
+@keyframes nav-push-new-desktop {
+  from {
+    opacity: 0;
+    translate: 2.5rem 0;
+  }
+}
+
+@keyframes nav-pop-new-desktop {
+  from {
+    opacity: 0;
+    translate: -2.5rem 0;
+  }
+}
+
+@media (min-width: 641px) {
+  html[data-nav-transition="push"]::view-transition-old(root),
+  html[data-nav-transition="pop"]::view-transition-old(root) {
+    z-index: 0;
+    box-shadow: none;
+    animation: motion-fade-out 140ms var(--ease-in) both;
+  }
+
+  html[data-nav-transition="push"]::view-transition-new(root) {
+    box-shadow: none;
+    animation: nav-push-new-desktop 260ms var(--ease-out) both;
+  }
+
+  html[data-nav-transition="pop"]::view-transition-new(root) {
+    animation: nav-pop-new-desktop 260ms var(--ease-out) both;
+  }
+}
+
+/* ---- Press feedback ----
+   iOS only applies :active when a touch listener exists (main.tsx adds one).
+   In @layer base so any utility or component rule still wins. */
+
+@layer base {
+  a,
+  button,
+  summary,
+  label,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  .tap-target,
+  [role="button"] {
+    transition:
+      scale var(--dur-press) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out);
+  }
+
+  button:not(:disabled):active,
+  .tap-target:active,
+  [role="button"]:active {
+    scale: 0.96;
+  }
+}
+
+/* ---- Sheets and toasts (usePresence sets data-state) ---- */
+
+[data-state="closing"] {
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .docked-sheet {
+    animation: motion-sheet-up var(--dur-page) var(--ease-sheet) both;
+  }
+
+  .docked-sheet[data-state="closing"] {
+    animation: motion-sheet-down var(--dur-exit) var(--ease-in) both;
+  }
+}
+
+@media (min-width: 641px) {
+  .docked-sheet {
+    animation: motion-pop-in var(--dur-fast) var(--ease-out) both;
+  }
+
+  .docked-sheet[data-state="closing"] {
+    animation: motion-pop-out 120ms var(--ease-in) both;
+  }
+}
+
+.confirm-sheet-backdrop {
+  animation: motion-backdrop-in var(--dur-base) var(--ease-out) both;
+}
+
+.confirm-sheet-backdrop[data-state="closing"] {
+  animation: motion-backdrop-out var(--dur-exit) var(--ease-in) both;
+}
+
+.toast {
+  animation: motion-rise var(--dur-fast) var(--ease-out) both;
+}
+
+.toast[data-state="closing"] {
+  animation: motion-fade-out var(--dur-exit) var(--ease-in) both;
+}

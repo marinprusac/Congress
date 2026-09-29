@@ -1,5 +1,6 @@
 import type { CapitolExhibitResolveResult } from "@congress/shared-types";
 import { resolveChamberPath } from "./ShellHostContext.js";
+import { runNavigation } from "./motion.js";
 
 // A resolved Exhibit's `url` (e.g. "/e/1/cal/evt") is relative to its OWN
 // Chamber's root, not to whichever Chamber's frontend happens to be
@@ -21,7 +22,12 @@ export function navigateToExhibit(
   // caller for how to get it.
   shellHosted = false
 ): void {
-  if (result.chamber === ownChamber) {
+  if (shellHosted) {
+    // One basename-less router hosts every Chamber here, so even a
+    // cross-Chamber jump stays in-document (and gets a page transition).
+    const path = result.chamber === ownChamber ? resolveChamberPath(result.url, ownChamber, true) : `/${result.chamber}${result.url}`;
+    runNavigation(() => localNavigate(path), "push", path);
+  } else if (result.chamber === ownChamber) {
     localNavigate(resolveChamberPath(result.url, ownChamber, shellHosted));
   } else {
     window.location.href = `/${result.chamber}${result.url}`;

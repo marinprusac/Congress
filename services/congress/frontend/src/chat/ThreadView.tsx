@@ -21,16 +21,17 @@ import { ThreadActions } from "./ThreadActions";
 import { layoutMarkers } from "./chatFormat";
 import { useThread, useThreadLive, useThreadMessages, type MessagesData, type ThreadLiveState } from "./useChatData";
 import { useStickToBottom } from "./useStickToBottom";
+import { ChatLink } from "./chatMotion";
 
 const SUGGESTIONS = ["What's on my plate today?", "Summarise my week so far", "What should I not forget this week?"];
 
 function BackButton() {
   return (
-    <Link to="/chat" className="chat-back" aria-label="All chats">
+    <ChatLink to="/chat" transition="pop" className="chat-back" aria-label="All chats">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="m15 18-6-6 6-6" />
       </svg>
-    </Link>
+    </ChatLink>
   );
 }
 
@@ -50,14 +51,14 @@ function LiveReply({ live }: { live: ThreadLiveState }) {
   if (live.phase === "idle") return null;
   if (live.phase === "queued") {
     return (
-      <div className="chat-msg chat-msg--assistant" aria-live="polite">
+      <div className="chat-msg chat-msg--assistant chat-msg--live" aria-live="polite">
         <p className="chat-waiting">{live.position === 0 ? "Waiting for another run to finish —" : `Queued (${live.position + 1} ahead) —`}</p>
       </div>
     );
   }
   if (live.phase === "starting") {
     return (
-      <div className="chat-msg chat-msg--assistant" aria-live="polite">
+      <div className="chat-msg chat-msg--assistant chat-msg--live" aria-live="polite">
         <p className="chat-thinking">
           <span className="chat-dots" aria-hidden="true" />
           Thinking
@@ -67,7 +68,7 @@ function LiveReply({ live }: { live: ThreadLiveState }) {
   }
   const { run } = live;
   return (
-    <div className="chat-msg chat-msg--assistant" aria-live="polite" aria-busy={!run.finished}>
+    <div className="chat-msg chat-msg--assistant chat-msg--live" aria-live="polite" aria-busy={!run.finished}>
       <LiveActivity activity={run.activity} />
       {run.text ? (
         <ChatMarkdown text={run.text} streaming={!run.finished} className="chat-reply chat-reply--streaming" {...nav} />
@@ -230,7 +231,8 @@ function Conversation({ threadId }: { threadId: number }) {
           {messagesQuery.isFetchingNextPage ? <p className="chat-loading-older">Loading earlier messages —</p> : null}
           {messagesQuery.isLoading ? <p className="chat-loading">Loading —</p> : null}
           {markers.map(({ message, day, stamp }) => (
-            <div key={message.id} className="chat-row">
+            // The owner's just-sent (optimistic, negative id) message rises in.
+            <div key={message.id} className={message.id < 0 ? "chat-row motion-rise" : "chat-row"}>
               {day ? (
                 <p className="chat-day">
                   <span>{day}</span>

@@ -13,6 +13,8 @@ import "./index.css";
 // first render, and before any Chamber's remote entry could possibly mount.
 markShellHosted();
 preventPinchZoom();
+// iOS only applies :active (press feedback, motion.css) with a touch listener.
+document.addEventListener("touchstart", () => {}, { passive: true });
 
 // sw.ts calls skipWaiting()+clients.claim() unconditionally, so a new
 // deploy's service worker takes over as soon as the browser's own
