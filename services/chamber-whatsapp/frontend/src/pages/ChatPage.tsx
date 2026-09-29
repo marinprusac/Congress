@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { StackLink } from "@congress/congress-ui";
-import { fetchChat, fetchMessages, ReaderUnavailableError } from "@/lib/api";
+import { fetchChat, fetchMessages, markReadLocally, ReaderUnavailableError, type Message } from "@/lib/api";
 import { chatTitle, jidLabel, withDayBreaks } from "@/lib/format";
 import { MessageBubble } from "@/components/MessageBubble";
 import { useChatPath } from "@/pages/ChatsPage";
@@ -54,6 +54,7 @@ export function ChatPage() {
 
   const title = chat.data ? chatTitle(chat.data) : jidLabel(jid);
   const all = messages.data?.pages.flatMap((p) => p.messages) ?? [];
+  const firstUnread = useReadLocally(jid, at === "" ? all : [], chat.data?.markedUnread ?? false);
   const isGroup = chat.data?.isGroup ?? jid.endsWith("@g.us");
 
   return (
@@ -82,6 +83,7 @@ export function ChatPage() {
             {withDayBreaks(all).map(({ message, day }) => (
               <div key={message.id}>
                 {day && <p className="wa-day">{day}</p>}
+                {message.id === firstUnread && <p className="wa-unread-divider">Unread</p>}
                 <MessageBubble message={message} showSender={isGroup} highlighted={message.id === highlight} />
               </div>
             ))}
@@ -96,4 +98,41 @@ export function ChatPage() {
       <p className="wa-readonly">Read-only · nothing here is sent to WhatsApp</p>
     </article>
   );
+}
+
+// Seeing the live end of a chat marks it read in Congress's own copy only (no
+// read receipt: the sender and the phone see nothing). Returns the id of the
+// first message that was unread when the chat opened, for a divider.
+function useReadLocally(jid: string, loaded: Message[], markedUnread: boolean) {
+  const queryClient = useQueryClient();
+  const [divider, setDivider] = useState<{ jid: string; id: string } | null>(null);
+  const seen = useRef("");
+
+  const newest = loaded[0]; // pages are newest-first
+  const oldestUnread = [...loaded].reverse().find((m) => m.unread)?.id ?? null;
+  const pending = markedUnread || oldestUnread !== null;
+  // Kept after the messages turn read, so the divider doesn't vanish on refetch.
+  if (oldestUnread && divider?.jid !== jid) setDivider({ jid, id: oldestUnread });
+
+  useEffect(() => {
+    if (!pending || !newest) return;
+    const mark = () => {
+      if (document.visibilityState !== "visible" || seen.current === newest.id) return;
+      seen.current = newest.id;
+      markReadLocally(jid, newest.id)
+        .then(() => {
+          void queryClient.invalidateQueries({ queryKey: ["chats"] });
+          void queryClient.invalidateQueries({ queryKey: ["chat", jid] });
+          void queryClient.invalidateQueries({ queryKey: ["messages", jid] });
+        })
+        .catch(() => {
+          seen.current = "";
+        });
+    };
+    mark();
+    document.addEventListener("visibilitychange", mark);
+    return () => document.removeEventListener("visibilitychange", mark);
+  }, [jid, pending, newest, queryClient]);
+
+  return divider?.jid === jid ? divider.id : null;
 }

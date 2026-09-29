@@ -1,4 +1,4 @@
-import { readerJson, readerPath } from "./readerClient.js";
+import { readerJson, readerMarkReadLocally, readerPath } from "./readerClient.js";
 
 // Read-only views of wa-reader's data, shaped for the AI (MCP tools).
 // Mirrors the reader's JSON (reader/internal/store/queries.go).
@@ -13,6 +13,8 @@ interface Chat {
   lastFromMe?: boolean;
   lastSender?: string;
   lastRevoked?: boolean;
+  unreadCount?: number;
+  markedUnread?: boolean;
 }
 
 interface Message {
@@ -30,6 +32,7 @@ interface Message {
   revokedAt: number | null;
   media: { mimetype: string; size: number; filename?: string; seconds?: number } | null;
   reactions: { emoji: string; senderJid: string; senderName: string }[];
+  unread?: boolean;
 }
 
 export function jidLabel(jid: string): string {
@@ -58,6 +61,8 @@ export function formatChat(c: Chat) {
     name: c.name || jidLabel(c.jid),
     isGroup: c.isGroup,
     lastMessageAt: iso(c.lastMessageAt),
+    ...(c.unreadCount ? { unread: c.unreadCount } : {}),
+    ...(c.markedUnread && { markedUnread: true }),
     ...(c.lastType !== undefined && { last: `${c.lastFromMe ? "You" : c.lastSender || ""}${c.lastFromMe || c.lastSender ? ": " : ""}${clip(last, 160)}` }),
   };
 }
@@ -75,6 +80,7 @@ export function formatMessage(m: Message, withChat = false) {
     ...(m.editedAt !== null && !deleted && { edited: true }),
     ...(m.quoted && !deleted && { replyTo: { from: m.quoted.senderJid || m.quoted.fromMe ? who(m.quoted) : "?", text: clip(m.quoted.text || `[${m.quoted.type || "message"}]`, 200) } }),
     ...(m.reactions.length > 0 && { reactions: m.reactions.map((r) => `${r.emoji} ${r.senderName || jidLabel(r.senderJid)}`) }),
+    ...(m.unread && { unread: true }),
   };
 }
 
@@ -102,15 +108,25 @@ export async function findChats(query: string) {
 }
 
 // A page of a chat, returned oldest-first; `olderCursor` continues backwards.
-export async function readChat(jid: string, limit: number, before?: string) {
+export async function readChat(jid: string, limit: number, before?: string, unreadOnly = false) {
   const [chat, page] = await Promise.all([
     readerJson<Chat>(`/chats/${encodeURIComponent(jid)}`),
     readerJson<{ messages: Message[]; nextCursor: string }>(
-      readerPath(`/chats/${encodeURIComponent(jid)}/messages`, { limit: String(limit), cursor: before }, ["limit", "cursor"])
+      readerPath(
+        `/chats/${encodeURIComponent(jid)}/messages`,
+        { limit: String(limit), cursor: before, unread: unreadOnly ? "1" : undefined },
+        ["limit", "cursor", "unread"]
+      )
     ),
   ]);
   return {
-    chat: { jid: chat.jid, name: chat.name || jidLabel(chat.jid), isGroup: chat.isGroup },
+    chat: {
+      jid: chat.jid,
+      name: chat.name || jidLabel(chat.jid),
+      isGroup: chat.isGroup,
+      unread: chat.unreadCount ?? 0,
+      ...(chat.markedUnread && { markedUnread: true }),
+    },
     messages: [...page.messages].reverse().map((m) => formatMessage(m)),
     olderCursor: page.nextCursor || null,
   };
@@ -121,4 +137,35 @@ export async function searchMessages(query: string, jid: string | undefined, lim
     readerPath("/search", { q: query, chat: jid, limit: String(limit) }, ["q", "chat", "limit"])
   );
   return { messages: r.messages.map((m) => formatMessage(m, true)) };
+}
+
+// Chats with unread messages (or marked unread), each with its newest unread
+// messages oldest-first.
+export async function listUnread(limit: number, perChat: number, cursor?: string) {
+  const r = await readerJson<{
+    chats: (Chat & { messages: Message[] })[];
+    totalMessages: number;
+    totalChats: number;
+    nextCursor: string;
+  }>(readerPath("/unread", { limit: String(limit), messages: String(perChat), cursor }, ["limit", "messages", "cursor"]));
+  return {
+    totalUnreadMessages: r.totalMessages,
+    totalChats: r.totalChats,
+    chats: r.chats.map((c) => {
+      const { last: _last, ...chat } = formatChat(c);
+      const shown = c.messages.length;
+      return {
+        ...chat,
+        messages: [...c.messages].reverse().map((m) => formatMessage(m)),
+        ...(c.unreadCount && c.unreadCount > shown && { olderUnreadNotShown: c.unreadCount - shown }),
+      };
+    }),
+    nextCursor: r.nextCursor || null,
+  };
+}
+
+// Congress-local read state only: no read receipt is sent, senders see nothing.
+export async function markReadLocally(jid: string, upToMessageId?: string) {
+  const chat = await readerJson<Chat>(readerMarkReadLocally(jid, upToMessageId));
+  return { jid: chat.jid, unread: chat.unreadCount ?? 0, markedUnread: chat.markedUnread ?? false };
 }

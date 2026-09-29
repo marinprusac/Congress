@@ -35,13 +35,33 @@ socket isn't reachable by the other services on this VPS.
   member that isn't on its allowlist.
 - Presence is never sent, so you always appear offline from this device.
   Asking the phone to resend undecryptable messages is switched off.
-- The API only answers GET; the Chamber only proxies GET routes.
+- The API only answers GET, plus `POST /pairing` (linking) and
+  `POST /chats/{jid}/read`, which changes only the local DB (see Unread below).
 - Congress's AI can read (never send) through the Chamber's MCP tools:
-  `get_status`, `list_chats`, `find_chats`, `read_chat`, `search_messages`.
+  `get_status`, `list_chats`, `find_chats`, `read_chat`, `search_messages`,
+  `list_unread`, and `mark_read` (local only).
   No exhibits or feed items, so WhatsApp isn't in Congress Search or the home feed.
 - Permanent rule: nothing is ever sent or uploaded to WhatsApp (messages,
   reactions, media, photos, status, receipts beyond the automatic ones,
   account or app-state changes), from the UI or the AI.
+
+## Unread messages
+
+wa-reader keeps its own read state (`messages.read_at`, `chats.marked_unread`).
+It only ever *receives* read state from WhatsApp, never sends any:
+
+- A new incoming message is unread. Your own message in a chat (from any
+  device) marks everything before it read.
+- Reading on the phone, WhatsApp Web or another device arrives as your own
+  read receipt (`read` / `read-self`), which marks up to that message read.
+- The phone's "Mark as read/unread" arrives as an app-state event.
+- History sync carries each chat's unread count; only the newest that-many
+  incoming messages stay unread.
+- Opening a chat in Congress, or the AI's `mark_read`, marks it read in this
+  DB only: no blue ticks, and the phone still shows it unread.
+
+Messages stored before this existed (migration 003) count as read. With read
+receipts turned off, the phone still reports its reads as `read-self`.
 
 ## Keeping the device healthy
 

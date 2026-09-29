@@ -13,7 +13,7 @@ const status = (over: Partial<ReaderStatus>): ReaderStatus => ({
 
 const msg = (id: string, ts: number): Message => ({
   chatJid: "a@s.whatsapp.net", id, senderJid: "", senderName: "", fromMe: false, ts, type: "text", text: id,
-  quoted: null, editedAt: null, revokedAt: null, media: null, reactions: [],
+  quoted: null, editedAt: null, revokedAt: null, media: null, reactions: [], unread: false,
 });
 
 describe("WhatsApp formatting", () => {

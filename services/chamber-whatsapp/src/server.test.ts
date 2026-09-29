@@ -8,13 +8,15 @@ import { app } from "./server.js";
 
 // A fake wa-reader on a real Unix socket.
 const socket = join(mkdtempSync(join(tmpdir(), "wa-reader-")), "api.sock");
-const seen: { method: string; url: string }[] = [];
+const seen: { method: string; url: string; body?: string }[] = [];
 let server: Server;
 
 beforeAll(async () => {
   initEnv({ WA_READER_SOCKET: socket });
-  server = createServer((req: IncomingMessage, res) => {
-    seen.push({ method: req.method ?? "", url: req.url ?? "" });
+  server = createServer(async (req: IncomingMessage, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    seen.push({ method: req.method ?? "", url: req.url ?? "", ...(body ? { body } : {}) });
     if (req.url?.startsWith("/media/")) {
       res.writeHead(200, {
         "Content-Type": "image/jpeg",
@@ -75,6 +77,21 @@ describe("WhatsApp Chamber proxy", () => {
     expect(seen).toEqual([
       { method: "POST", url: "/pairing" },
       { method: "GET", url: "/pairing" },
+    ]);
+  });
+
+  it("relays unread listings and a local-only mark-read", async () => {
+    seen.length = 0;
+    await get("/api/unread?messages=5&limit=10&x=1");
+    await get(`/api/chats/${encodeURIComponent("a@s.whatsapp.net")}/messages?unread=1`);
+    const jid = encodeURIComponent("a@s.whatsapp.net");
+    expect((await get(`/api/chats/${jid}/read`, { method: "POST", body: JSON.stringify({ upTo: "M1", extra: 1 }) })).status).toBe(200);
+    await get(`/api/chats/${jid}/read`, { method: "POST" });
+    expect(seen).toEqual([
+      { method: "GET", url: "/unread?limit=10&messages=5" },
+      { method: "GET", url: "/chats/a%40s.whatsapp.net/messages?unread=1" },
+      { method: "POST", url: "/chats/a%40s.whatsapp.net/read", body: '{"upTo":"M1"}' },
+      { method: "POST", url: "/chats/a%40s.whatsapp.net/read", body: "{}" },
     ]);
   });
 
