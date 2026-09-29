@@ -65,3 +65,5 @@ export { useDraftCreate } from "./useDraftCreate.js";
 export { resolveEditorIdentity } from "./editorIdentity.js";
 export { useSelfNavigateGuard } from "./selfNavigateGuard.js";
 export type { ToastDetail } from "./toast.js";
+export { runNavigation, preloadRoute, setRoutePreloader, prefersReducedMotion, staggerDelayMs, type TransitionKind } from "./motion.js";
+export { RouteCommitSignal, TransitionLink, useTransitionNavigate, usePresence, useFlipList } from "./motionHooks.js";

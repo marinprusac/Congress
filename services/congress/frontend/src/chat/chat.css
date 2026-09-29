@@ -1069,3 +1069,24 @@ html:has(.chat-page) body {
   background-color: var(--color-accent);
   color: var(--color-parchment);
 }
+
+/* ---- Motion ---- */
+
+/* The reply bubble rises in once, then stays put through every phase. */
+.chat-msg--live {
+  animation: motion-rise var(--dur-base) var(--ease-out) both;
+}
+
+.chat-activity--live .chat-tool,
+.chat-activity--live .chat-activity-note {
+  animation: motion-fade-in var(--dur-fast) var(--ease-out) both;
+}
+
+/* Only a slow load ever shows its "Loading" line. */
+.chat-loading {
+  animation: motion-fade-in var(--dur-base) var(--ease-out) 300ms both;
+}
+
+.chat-jump {
+  animation: motion-rise var(--dur-fast) var(--ease-out) both;
+}

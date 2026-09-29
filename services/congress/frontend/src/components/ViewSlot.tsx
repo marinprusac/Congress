@@ -1,6 +1,5 @@
-import { Component, Suspense, lazy, type ComponentType, type LazyExoticComponent, type ReactNode } from "react";
-import { Link } from "react-router-dom";
-import { ChamberMark, loadRemoteModule, evictRemoteModule, resolveChamberPath } from "@congress/congress-ui";
+import { Component, Suspense, lazy, useEffect, useState, type ComponentType, type LazyExoticComponent, type ReactNode } from "react";
+import { ChamberMark, loadRemoteModule, evictRemoteModule, resolveChamberPath, TransitionLink } from "@congress/congress-ui";
 import type { ChamberRegistryEntry, ManifestView } from "@congress/shared-types";
 
 // Keyed by "<chamber>:<viewId>", one lazy() wrapper per view card - a render
@@ -46,6 +45,18 @@ class ViewErrorBoundary extends Component<{ chamber: string; viewId: string; chi
     if (this.state.failed) return <p className="font-mono text-xs text-alert">This view failed to load.</p>;
     return this.props.children;
   }
+}
+
+// Views that have already appeared once this session; only a first
+// appearance fades in, so returning Home doesn't replay it.
+const shownViews = new Set<string>();
+
+function FirstShowFade({ id, children }: { id: string; children: ReactNode }) {
+  const [first] = useState(() => !shownViews.has(id));
+  useEffect(() => {
+    shownViews.add(id);
+  }, [id]);
+  return first ? <div className="motion-fade-in">{children}</div> : <>{children}</>;
 }
 
 function ViewLoading() {
@@ -104,16 +115,18 @@ export function ViewSlot({
         <span className="feed-card-title">{view.label}</span>
         {reason && <span className="feed-card-reason">{reason}</span>}
         {!full && (
-          <Link to={viewHref(chamber.name, view)} className="feed-card-open" aria-label={`Open ${view.label}`}>
+          <TransitionLink to={viewHref(chamber.name, view)} className="feed-card-open" aria-label={`Open ${view.label}`}>
             Open
-          </Link>
+          </TransitionLink>
         )}
       </header>
       <div className={full ? "feed-card-body feed-card-body--full" : "feed-card-body"}>
         {active && View ? (
           <ViewErrorBoundary chamber={chamber.name} viewId={view.id}>
             <Suspense fallback={<ViewLoading />}>
-              <View />
+              <FirstShowFade id={`${chamber.name}:${view.id}`}>
+                <View />
+              </FirstShowFade>
             </Suspense>
           </ViewErrorBoundary>
         ) : (

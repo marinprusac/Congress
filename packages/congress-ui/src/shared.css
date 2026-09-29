@@ -13,6 +13,7 @@
 @import "@fontsource/ibm-plex-sans-condensed/500.css";
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
+@import "./motion.css";
 
 /* Congress-wide: almost every link in this app is client-side SPA routing
    (react-router's Link, never a real page load), so iOS Safari's own
@@ -605,7 +606,7 @@ a[download] {
 /* Shared by every mobile-docked sheet (this dropdown, the exhibit-ref-add
    popover, ConfirmSheet) - rounds only the top corners
    (the bottom edge is the screen edge, rounding it would look like a gap)
-   and slides up on mount, so a bottom-docked panel reads as a native sheet
+   and slides up on mount (motion.css), so a bottom-docked panel reads as a native sheet
    instead of a UI element that just appears mid-frame. Scoped to the mobile
    breakpoint only - desktop keeps every sheet's existing flat, square,
    anchored-dropdown look, since the global `border-radius: 0` reset is a
@@ -614,20 +615,9 @@ a[download] {
   .docked-sheet {
     border-top-left-radius: 1rem;
     border-top-right-radius: 1rem;
-    animation: docked-sheet-in 180ms ease-out;
   }
 }
 
-@keyframes docked-sheet-in {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
 
 /* Caret-anchored on every viewport size - top/bottom/left/width/max-height
    all come from placePicker's inline style (ExhibitPickerDropdown.tsx),
@@ -1039,7 +1029,6 @@ a[download] {
   background: var(--color-ink);
   color: var(--color-parchment);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-  animation: toast-in 180ms ease-out;
 }
 
 .toast-error {
@@ -1047,16 +1036,6 @@ a[download] {
   background: var(--color-alert);
 }
 
-@keyframes toast-in {
-  from {
-    transform: translateY(0.5rem);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
 
 /* ListSearchInput's row (input + the "+" new-item button) - floats fixed to
    the bottom of the viewport, on top of the list content instead of

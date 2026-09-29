@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { TransitionLink } from "@congress/congress-ui";
 import { useNotifications } from "@/lib/notifications";
 import { CreateSheet } from "@/components/CreateSheet";
 import { useThreads } from "@/chat/useChatData";
@@ -81,10 +82,15 @@ function Tab({
   children: ReactNode;
 }) {
   return (
-    <Link to={to} className={`shell-tab${active ? " active" : ""}${className ? ` ${className}` : ""}`} aria-label={ariaLabel} aria-current={active ? "page" : undefined}>
+    <TransitionLink
+      to={to}
+      transition="tab"
+      className={`shell-tab${active ? " active" : ""}${className ? ` ${className}` : ""}`}
+      aria-label={ariaLabel}
+      aria-current={active ? "page" : undefined}>
       {children}
       <span className="shell-tab-label">{label}</span>
-    </Link>
+    </TransitionLink>
   );
 }
 
@@ -101,6 +107,8 @@ export function TabBar() {
   const chatBadge = (threads.data ?? []).filter((t) => t.unread || t.openAskCount > 0).length;
   const inChat = pathname === "/chat" || pathname.startsWith("/chat/");
   const [creating, setCreating] = useState(false);
+  // Slot of the active tab, for the sliding indicator (2 is "+").
+  const activeIndex = pathname === "/" ? 0 : pathname === "/search" ? 1 : inChat ? 3 : pathname === "/notifications" ? 4 : -1;
 
   // "/" jumps to Search from anywhere that isn't a text field (desktop).
   useEffect(() => {
@@ -116,13 +124,21 @@ export function TabBar() {
   return (
     <>
       <nav className="shell-tabbar" aria-label="Congress">
+        <span
+          className="shell-tab-indicator"
+          aria-hidden="true"
+          style={{ "--tab-index": Math.max(activeIndex, 0), opacity: activeIndex < 0 ? 0 : 1 } as CSSProperties}
+        />
         <Tab to="/" label="Home" active={pathname === "/"}>
           <HomeIcon />
         </Tab>
         <Tab to="/search" label="Search" active={pathname === "/search"}>
           <SearchIcon />
         </Tab>
-        <button type="button" className="shell-tab shell-tab--create" aria-label="Create" onClick={() => setCreating(true)}>
+        <button type="button" className={`shell-tab shell-tab--create${creating ? " open" : ""}`}
+          aria-label="Create"
+          aria-expanded={creating}
+          onClick={() => setCreating((open) => !open)}>
           <span className="shell-tab-create-mark">
             <PlusIcon />
           </span>
@@ -130,7 +146,7 @@ export function TabBar() {
         </button>
         <Tab to="/chat" label="Chats" ariaLabel={chatBadge > 0 ? `Chats, ${chatBadge} need you` : "Chats"} active={inChat}>
           <ChatIcon />
-          {chatBadge > 0 && <span className="shell-tab-badge shell-tab-badge--accent">{chatBadge > 9 ? "9+" : chatBadge}</span>}
+          {chatBadge > 0 && <span key={chatBadge} className="shell-tab-badge shell-tab-badge--accent">{chatBadge > 9 ? "9+" : chatBadge}</span>}
         </Tab>
         <Tab
           to="/notifications"
@@ -138,10 +154,10 @@ export function TabBar() {
           ariaLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
           active={pathname === "/notifications"}>
           <BellIcon />
-          {unreadCount > 0 && <span className="shell-tab-badge">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+          {unreadCount > 0 && <span key={unreadCount} className="shell-tab-badge">{unreadCount > 9 ? "9+" : unreadCount}</span>}
         </Tab>
       </nav>
-      {creating && <CreateSheet onClose={() => setCreating(false)} />}
+      <CreateSheet open={creating} onClose={() => setCreating(false)} />
     </>
   );
 }

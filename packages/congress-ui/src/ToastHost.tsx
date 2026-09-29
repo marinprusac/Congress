@@ -3,9 +3,11 @@ import { TOAST_EVENT, type ToastDetail } from "./toast.js";
 
 interface ActiveToast extends ToastDetail {
   id: number;
+  closing?: boolean;
 }
 
 const DISMISS_AFTER_MS = 3200;
+const EXIT_MS = 180;
 
 let nextId = 0;
 
@@ -21,7 +23,10 @@ export function ToastHost() {
       const detail = (e as CustomEvent<ToastDetail>).detail;
       const id = nextId++;
       setToasts((current) => [...current, { ...detail, id }]);
-      setTimeout(() => setToasts((current) => current.filter((t) => t.id !== id)), DISMISS_AFTER_MS);
+      setTimeout(() => {
+        setToasts((current) => current.map((t) => (t.id === id ? { ...t, closing: true } : t)));
+        setTimeout(() => setToasts((current) => current.filter((t) => t.id !== id)), EXIT_MS);
+      }, DISMISS_AFTER_MS);
     }
     window.addEventListener(TOAST_EVENT, onToast);
     return () => window.removeEventListener(TOAST_EVENT, onToast);
@@ -32,7 +37,7 @@ export function ToastHost() {
   return (
     <div className="toast-host" aria-live="polite">
       {toasts.map((t) => (
-        <div key={t.id} className={t.variant === "error" ? "toast toast-error" : "toast"}>
+        <div key={t.id} className={t.variant === "error" ? "toast toast-error" : "toast"} data-state={t.closing ? "closing" : "open"}>
           {t.message}
         </div>
       ))}

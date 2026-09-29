@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { usePresence } from "./motionHooks.js";
 
 export interface ConfirmSheetProps {
   open: boolean;
@@ -24,12 +25,14 @@ export function ConfirmSheet({ open, title, message, confirmLabel = "Delete", on
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, onCancel]);
 
-  if (!open) return null;
+  const { mounted, state } = usePresence(open);
+  if (!mounted) return null;
 
   return (
-    <div className="confirm-sheet-backdrop" onClick={onCancel}>
+    <div className="confirm-sheet-backdrop" data-state={state} onClick={open ? onCancel : undefined}>
       <div
         className="confirm-sheet docked-sheet"
+        data-state={state}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-sheet-title"
