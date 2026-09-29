@@ -411,3 +411,16 @@ describe("getExhibitChip", () => {
     await expect(getExhibitChip("dead", "1")).resolves.toEqual({ error: "chamber_unavailable" });
   });
 });
+
+describe("live resolve re-sync", () => {
+  it("keeps an exhibit's manual connections manual", async () => {
+    syncExhibit({ chamber: "notes", id: "note-77", type: "note", name: "N", url: "/n/77", outgoingRefs: ["task-1", "task-2"], manualRefs: ["task-2"] });
+    db.delete(exhibitCache).where(sql`${exhibitCache.id} = 'note-77'`).run();
+    await resolveExhibits([{ id: "note-77", chamber: "notes" }]);
+    const rows = db.select().from(exhibitRefs).where(sql`${exhibitRefs.sourceId} = 'note-77'`).all();
+    expect(rows.map((r) => [r.targetId, r.isManual]).sort()).toEqual([
+      ["task-1", false],
+      ["task-2", true],
+    ]);
+  });
+});

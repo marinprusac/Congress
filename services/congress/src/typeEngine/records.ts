@@ -153,8 +153,11 @@ export function createRecord(typeSlug: string, values: unknown, opts: CreateOpti
   }
 
   const dto = getRecord(id)!;
-  syncRecordExhibit(t, id);
-  if (!opts.silent) emit(t, "created", dto, opts.actor);
+  // Silent (imports): the caller syncs and announces in bulk afterwards.
+  if (!opts.silent) {
+    syncRecordExhibit(t, id);
+    emit(t, "created", dto, opts.actor);
+  }
   return dto;
 }
 

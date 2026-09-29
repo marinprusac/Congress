@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { ACTOR_HEADER } from "@congress/shared-types";
 import { env } from "../env.js";
 import { listChambers } from "../registry.js";
+import { getLocalSource } from "../exhibitSources.js";
 import { RUN_ID_HEADER, THREAD_ID_HEADER, type RunContextInfo } from "./runContext.js";
 
 // One `type: "http"` MCP server entry per active, MCP-capable Chamber, plus
@@ -40,6 +41,7 @@ export function buildMcpServers(
   const mcpServers: Record<string, { type: "http"; url: string; headers: Record<string, string> }> = {
     congress: { type: "http", url: `${selfBaseUrl()}/mcp`, headers: congressHeaders },
   };
+  if (getLocalSource("e")) mcpServers.types = { type: "http", url: `${selfBaseUrl()}/mcp/types`, headers };
   for (const chamber of listChambers()) {
     if (chamber.status !== "active" || !chamber.mcpUrl) continue;
     mcpServers[chamber.name] = { type: "http", url: chamber.mcpUrl, headers };
