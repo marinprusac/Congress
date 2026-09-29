@@ -229,6 +229,19 @@ func serve(cfg config.Config, log *slog.Logger, offline bool) error {
 		reader.AddEventHandler(h.Handle)
 		reader.AddEventHandler(connectionEvents(reader, status, log))
 		go h.RunGroupLookups(ctx)
+		go func() {
+			h.SyncContacts(ctx)
+			t := time.NewTicker(time.Hour)
+			defer t.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-t.C:
+					h.SyncContacts(ctx)
+				}
+			}
+		}()
 		if !reader.IsPaired() {
 			status.Set("not_paired", "link it from Congress's WhatsApp screen")
 			log.Warn("not paired: link it from Congress's WhatsApp screen (or `wa-reader login` with the service stopped)")

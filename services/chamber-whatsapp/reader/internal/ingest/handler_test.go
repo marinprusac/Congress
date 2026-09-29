@@ -21,9 +21,14 @@ import (
 )
 
 type fakeSource struct {
-	own   types.JID
-	lids  map[types.JID]types.JID
-	parse func(types.JID, *waWeb.WebMessageInfo) (*events.Message, error)
+	own      types.JID
+	lids     map[types.JID]types.JID
+	parse    func(types.JID, *waWeb.WebMessageInfo) (*events.Message, error)
+	contacts map[types.JID]types.ContactInfo
+}
+
+func (f *fakeSource) Contacts(context.Context) (map[types.JID]types.ContactInfo, error) {
+	return f.contacts, nil
 }
 
 func (f *fakeSource) OwnJID() types.JID { return f.own }
@@ -215,6 +220,30 @@ func TestHistorySyncIsIdempotentAndNamesChats(t *testing.T) {
 	}
 	if h.Status.Snapshot().LastPhoneAt == 0 {
 		t.Fatal("history sync should count as a sign of the phone")
+	}
+}
+
+func TestSyncContactsBringsAddressBookNames(t *testing.T) {
+	h, st, src := setup(t)
+	ivo := types.NewJID("385922222222", types.DefaultUserServer)
+	shop := types.NewJID("4930123456", types.DefaultUserServer)
+	h.Handle(event(ana, ana, "m1", 1000, text("hi")))
+	h.Handle(event(ivo, ivo, "m2", 2000, text("yo")))
+	h.Handle(event(shop, shop, "m3", 3000, text("invoice")))
+	src.lids[anaL] = ana
+	src.contacts = map[types.JID]types.ContactInfo{
+		anaL: {Found: true, FullName: "Ana Horvat", PushName: "Ana"}, // keyed by LID
+		ivo:  {Found: true, FirstName: "Ivo"},                         // no full name
+		shop: {Found: true, BusinessName: "Bike Shop"},
+	}
+	h.SyncContacts(ctx)
+	names := map[string]string{}
+	chats, _ := st.ListChats(ctx, 10, "")
+	for _, c := range chats {
+		names[c.JID] = c.Name
+	}
+	if names[ana.String()] != "Ana Horvat" || names[ivo.String()] != "Ivo" || names[shop.String()] != "Bike Shop" {
+		t.Fatalf("%v", names)
 	}
 }
 
