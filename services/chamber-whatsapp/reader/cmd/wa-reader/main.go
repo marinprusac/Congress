@@ -85,7 +85,10 @@ func lock(cfg config.Config) (func(), error) {
 	}
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		f.Close()
-		return nil, errors.New("another wa-reader is already using this session (stop the service first)")
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil, errors.New("another wa-reader is already using this session (stop the service first)")
+		}
+		return nil, fmt.Errorf("lock %s: %w", path, err)
 	}
 	return func() { f.Close() }, nil
 }

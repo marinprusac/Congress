@@ -33,6 +33,15 @@ decision. See "Access control" below for what that means in practice.
   are simply ignored. Each Chamber's SQLite file stays in its own
   `services/chamber-<name>/data/`.
 
+## wa-reader (WhatsApp)
+
+The one extra unit: `congress-wa-reader` (`infra/systemd/congress-wa-reader.service`)
+runs the read-only WhatsApp daemon as its own `wa-reader` user, hardened, writing
+only to `services/chamber-whatsapp/data/`. CI builds its Go binary;
+`remote-apply.sh` restarts it only when the binary changed. One-time setup
+(system user, group membership for `marin`, data dir, unit install) and
+pairing are in `services/chamber-whatsapp/reader/README.md`.
+
 ## Process management
 
 `congress-core` (`infra/systemd/congress-core.service`) is the only unit:
