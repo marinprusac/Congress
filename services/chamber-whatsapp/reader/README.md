@@ -36,8 +36,12 @@ socket isn't reachable by the other services on this VPS.
 - Presence is never sent, so you always appear offline from this device.
   Asking the phone to resend undecryptable messages is switched off.
 - The API only answers GET; the Chamber only proxies GET routes.
-- WhatsApp content stays in its Chamber: no exhibits, feed items, events
-  or MCP tools, so it isn't in Congress Search, the home feed, or the AI.
+- Congress's AI can read (never send) through the Chamber's MCP tools:
+  `get_status`, `list_chats`, `find_chats`, `read_chat`, `search_messages`.
+  No exhibits or feed items, so WhatsApp isn't in Congress Search or the home feed.
+- Permanent rule: nothing is ever sent or uploaded to WhatsApp (messages,
+  reactions, media, photos, status, receipts beyond the automatic ones,
+  account or app-state changes), from the UI or the AI.
 
 ## Keeping the device healthy
 
