@@ -245,9 +245,13 @@ func (s *Store) SetReaction(ctx context.Context, chat, messageID, sender, emoji 
 	return err
 }
 
+// Masked reports WhatsApp's redacted-number placeholders ("+385∙∙∙∙∙∙∙06"),
+// which are not names.
+func Masked(name string) bool { return strings.ContainsRune(name, '∙') }
+
 // SetChatName records a chat's display name (group subject, or a name from history sync).
 func (s *Store) SetChatName(ctx context.Context, jid, name string, isGroup bool) error {
-	if name == "" {
+	if name == "" || Masked(name) {
 		return nil
 	}
 	_, err := s.db.ExecContext(ctx, `INSERT INTO chats (jid, name, is_group) VALUES (?, ?, ?)
@@ -274,6 +278,11 @@ type Contact struct {
 
 // UpsertContact updates only the non-empty fields.
 func (s *Store) UpsertContact(ctx context.Context, c Contact) error {
+	for _, f := range []*string{&c.PushName, &c.FullName, &c.BusinessName} {
+		if Masked(*f) {
+			*f = ""
+		}
+	}
 	if c.JID == "" || (c.PushName == "" && c.FullName == "" && c.BusinessName == "") {
 		return nil
 	}
