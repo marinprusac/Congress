@@ -9,11 +9,11 @@ import {
   preloadRoute,
   resolveChamberPath,
   staggerDelayMs,
-  TransitionLink,
+  StackLink,
   useAppliedTheme,
   useCapitolSettings,
   useFlipList,
-  useTransitionNavigate,
+  useStackNav,
 } from "@congress/congress-ui";
 import { ViewSlot, viewHref } from "@/components/ViewSlot";
 import { HomeAsks } from "@/components/HomeAsks";
@@ -36,23 +36,23 @@ function PinnedViews({ registry }: { registry: ChamberRegistryEntry[] | undefine
   return (
     <nav className="home-stories" aria-label="Pinned views">
       {pinned.map(({ entry, view }) => (
-        <TransitionLink key={`${entry.name}:${view.id}`} to={viewHref(entry.name, view)} className="home-story">
+        <StackLink key={`${entry.name}:${view.id}`} to={viewHref(entry.name, view)} className="home-story">
           <span className="home-story-bubble">
             <ChamberMark name={entry.name} />
           </span>
           <span className="home-story-label">{view.label}</span>
-        </TransitionLink>
+        </StackLink>
       ))}
-      <TransitionLink to="/settings?from=home" className="home-story home-story--add" aria-label="Pin a view">
+      <StackLink to="/settings?from=home" className="home-story home-story--add" aria-label="Pin a view">
         <span className="home-story-bubble">+</span>
         <span className="home-story-label">Pin</span>
-      </TransitionLink>
+      </StackLink>
     </nav>
   );
 }
 
 function FeedEntry({ item, registry }: { item: FeedItem; registry: ChamberRegistryEntry[] | undefined }) {
-  const navigate = useTransitionNavigate();
+  const nav = useStackNav();
   if (item.kind === "view") {
     const found = findView(registry, item.chamber, item.viewId);
     if (!found) return null;
@@ -67,7 +67,7 @@ function FeedEntry({ item, registry }: { item: FeedItem; registry: ChamberRegist
   const href = resolveChamberPath(item.url, item.chamber, true);
   return (
     <section className="feed-card">
-      <button type="button" className="feed-exhibit" onPointerDown={() => void preloadRoute(href)} onClick={() => navigate(href)}>
+      <button type="button" className="feed-exhibit" onPointerDown={() => void preloadRoute(href)} onClick={() => nav.push(href)}>
         <span className="feed-exhibit-head">
           <ChamberMark name={item.chamber} />
           <span className="feed-exhibit-name">{preview?.title ?? item.name}</span>
@@ -128,9 +128,9 @@ export function HomePage() {
         title="Congress"
         titleHref=""
         extraActions={
-          <TransitionLink to="/settings" className="home-settings-link" aria-label="Settings">
+          <StackLink to="/settings" className="home-settings-link" aria-label="Settings">
             <GearIcon />
-          </TransitionLink>
+          </StackLink>
         }
       />
       <main className="chamber-main home-main">

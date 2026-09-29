@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ListLoadingState } from "@congress/congress-ui";
+import { ListLoadingState, StackLink } from "@congress/congress-ui";
 import { fetchEvents } from "@/lib/api";
 import { addDays, buildWeek, isTentative, localDateKey, MIN_BLOCK_MINUTES, startOfWeek } from "@/lib/calendarViews";
 import { formatClockTime, formatWeekMonths } from "@/lib/datetime";
@@ -125,7 +124,7 @@ export function WeekPage() {
                 {days.map((day) => (
                   <div key={day.dateKey} className="min-w-0 space-y-px px-px">
                     {day.allDay.map((event) => (
-                      <Link
+                      <StackLink
                         key={event.id}
                         to={links.href(event)}
                         onMouseEnter={() => links.prefetch(event)}
@@ -135,7 +134,7 @@ export function WeekPage() {
                         title={event.title}
                       >
                         {event.title}
-                      </Link>
+                      </StackLink>
                     ))}
                   </div>
                 ))}
@@ -166,7 +165,7 @@ export function WeekPage() {
                     const tentative = isTentative(event);
                     const height = (Math.max(block.endMin - block.startMin, MIN_BLOCK_MINUTES) / 60) * HOUR_PX - 1;
                     return (
-                      <Link
+                      <StackLink
                         key={event.id}
                         to={links.href(event)}
                         onMouseEnter={() => links.prefetch(event)}
@@ -185,7 +184,7 @@ export function WeekPage() {
                         {height >= 2 * HOUR_PX * 0.75 && (
                           <span className="block font-mono text-[9px] text-dust">{formatClockTime(new Date(event.start).getTime())}</span>
                         )}
-                      </Link>
+                      </StackLink>
                     );
                   })}
                   {isToday && (

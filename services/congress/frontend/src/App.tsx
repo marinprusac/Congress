@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import type { ChamberRegistryEntry } from "@congress/shared-types";
-import { RouteCommitSignal, setRoutePreloader } from "@congress/congress-ui";
+import { RouteCommitSignal, StackNavigator, setRoutePreloader } from "@congress/congress-ui";
 import { LoginGate } from "@/components/LoginGate";
 import { ChamberHost, preloadChamber } from "@/components/ChamberHost";
 import { queryClient } from "@/lib/queryClient";
@@ -36,6 +36,8 @@ export function App() {
     // every route already has.
     <LoginGate>
       <RouteCommitSignal />
+      {/* One stack of pages per tab, kept equal to browser history. */}
+      <StackNavigator />
       {/* The shell's one navigation (Home · Search · + · Notifications ·
           Settings), a sibling of Routes rather than nested in any page, so a
           Chamber that fails to load only loses its own content, never the

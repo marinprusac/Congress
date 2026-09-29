@@ -131,7 +131,7 @@ And `congress-ui`'s frontend surface:
 | Export | What it's for |
 |---|---|
 | `ChamberLayout`, `ChamberHeader`, `ChamberMark`, `getChamberIcon` | Page shell (header with a back button) + the Chamber icon system (see §5 for the fallback behavior). |
-| `ChamberIndexRedirect`, `useBackNavigation` | Your index route when your Chamber has no view at its root (sends the owner home), and "back" for anything custom. |
+| `ChamberIndexRedirect`, `useBackNavigation`, `useStackNav`, `StackLink` | Navigation. The shell keeps one stack of pages per tab (see CLAUDE.md, "Stack navigation"): `StackLink`/`useStackNav().push` drill in, `useStackNav().pop`/`useBackNavigation` go back to wherever the owner came from - use pop, never a navigate to `/`, after a Delete or Cancel. `ChamberIndexRedirect` is your index route when your Chamber has no view at its root (it steps straight back). |
 | `useAppliedTheme` | Applies Congress's dark-mode setting; call once in `App()`. |
 | `useShellHosted`, `resolveChamberPath`, `navigateToExhibit` | Tell whether you're rendered standalone or shell-hosted inside Congress, and build correct links either way — use these instead of hand-writing absolute paths. |
 | `ExhibitTextarea`, `ExhibitAnnotatedText`, `ExhibitChip`, `ExhibitMarkdown` | The `[[` picker/autocomplete, rendering body text with resolved exhibit chips, and (optionally) Markdown rendering. |

@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UpdateAiSettingsRequest } from "@congress/shared-types";
-import { FormLabel, useAutosave, fetchAiSettings, aiSettingsQueryKey } from "@congress/congress-ui";
+import { FormLabel, StackLink, useAutosave, fetchAiSettings, aiSettingsQueryKey } from "@congress/congress-ui";
 import { aiSpendQueryKey, fetchAiSpend, updateAiSettings } from "@/lib/aiApi";
 import { AiActivity } from "./AiActivity";
 
@@ -133,13 +132,13 @@ export function AiSettingsTab() {
           </div>
         </div>
 
-        <Link to="/chat/memory" className="mb-6 flex items-center justify-between border border-dust p-4 text-ink hover:border-accent">
+        <StackLink to="/chat/memory" className="mb-6 flex items-center justify-between border border-dust p-4 text-ink hover:border-accent">
           <span>
             <span className="block font-display text-lg">Memory</span>
             <span className="block font-mono text-xs text-dust">What Congress is tracking and knows about you</span>
           </span>
           <span aria-hidden="true">→</span>
-        </Link>
+        </StackLink>
 
         <h3 className="mb-3 font-mono text-xs uppercase tracking-widest text-dust">Reaching you</h3>
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">

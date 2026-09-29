@@ -9,7 +9,7 @@ import {
   resolveChamberPath,
   useAppliedTheme,
   useFlipList,
-  useTransitionNavigate,
+  useStackNav,
 } from "@congress/congress-ui";
 import { useNotifications } from "@/lib/notifications";
 
@@ -26,7 +26,7 @@ function BellIcon() {
 // Push). A tab of its own now, where it used to be a bell dropdown.
 export function NotificationsPage() {
   useAppliedTheme();
-  const navigate = useTransitionNavigate();
+  const nav = useStackNav();
   const { notifications, unreadCount, isLoading, markRead, markAllRead, dismiss } = useNotifications();
   const listRef = useRef<HTMLDivElement>(null);
   useFlipList(
@@ -47,7 +47,7 @@ export function NotificationsPage() {
     // A notification's url is relative to its emitting Chamber's own root
     // (e.g. "/e/3"); Congress's own events (chamber "congress") are already
     // root-relative.
-    navigate(n.chamber === "congress" ? n.chamberUrl : resolveChamberPath(n.chamberUrl, n.chamber, true));
+    nav.push(n.chamber === "congress" ? n.chamberUrl : resolveChamberPath(n.chamberUrl, n.chamber, true));
   }
 
   return (

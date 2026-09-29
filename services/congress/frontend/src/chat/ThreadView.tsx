@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AiMessage, AiThread } from "@congress/shared-types";
-import { ChatMarkdown, aiSettingsQueryKey, fetchAiSettings, showToast, useAiStream } from "@congress/congress-ui";
+import { ChatMarkdown, StackLink, aiSettingsQueryKey, fetchAiSettings, showToast, useAiStream } from "@congress/congress-ui";
 import {
   aiThreadMessagesQueryKey,
   aiThreadQueryKey,
@@ -21,18 +21,12 @@ import { ThreadActions } from "./ThreadActions";
 import { layoutMarkers } from "./chatFormat";
 import { useThread, useThreadLive, useThreadMessages, type MessagesData, type ThreadLiveState } from "./useChatData";
 import { useStickToBottom } from "./useStickToBottom";
-import { ChatLink } from "./chatMotion";
+import { ChatBackButton, useChatNav } from "./chatMotion";
 
 const SUGGESTIONS = ["What's on my plate today?", "Summarise my week so far", "What should I not forget this week?"];
 
 function BackButton() {
-  return (
-    <ChatLink to="/chat" transition="pop" className="chat-back" aria-label="All chats">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="m15 18-6-6 6-6" />
-      </svg>
-    </ChatLink>
-  );
+  return <ChatBackButton />;
 }
 
 function PausedBanner() {
@@ -41,7 +35,7 @@ function PausedBanner() {
   return (
     <div className="chat-banner" role="status">
       <span>AI is paused{settings.data.pausedReason ? ` — ${settings.data.pausedReason}` : "."}</span>
-      <Link to="/settings?from=ai">Settings</Link>
+      <StackLink to="/settings?from=ai">Settings</StackLink>
     </div>
   );
 }
@@ -126,7 +120,7 @@ function optimisticMessage(threadId: number, text: string): AiMessage {
 
 function Conversation({ threadId }: { threadId: number }) {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
+  const chat = useChatNav();
   const thread = useThread(threadId);
   const messagesQuery = useThreadMessages(threadId);
   const { messages } = messagesQuery;
@@ -202,9 +196,9 @@ function Conversation({ threadId }: { threadId: number }) {
         </header>
         <div className="chat-empty">
           <p className="chat-empty-hint">It may have been deleted.</p>
-          <Link to="/chat" className="chat-inline-action">
+          <StackLink to="/chat" className="chat-inline-action">
             All chats
-          </Link>
+          </StackLink>
         </div>
       </div>
     );
@@ -222,7 +216,7 @@ function Conversation({ threadId }: { threadId: number }) {
           <h1 className="chat-title">{thread.data?.title ?? " "}</h1>
           {!connected ? <p className="chat-subtitle">Reconnecting —</p> : running ? <p className="chat-subtitle">Working —</p> : null}
         </div>
-        {thread.data ? <ThreadActions thread={thread.data} onDeleted={() => navigate("/chat", { replace: true })} /> : null}
+        {thread.data ? <ThreadActions thread={thread.data} onDeleted={chat.back} /> : null}
       </header>
       <PausedBanner />
       <div className="chat-scroll" ref={scrollRef}>

@@ -18,6 +18,7 @@ import {
   useSelfNavigateGuard,
   FormErrorMessage,
   FormLabel,
+  useStackNav,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createPlace, fetchPlace, updatePlace, deletePlace, quickCreatePlaceExhibit } from "@/lib/api";
@@ -40,6 +41,8 @@ export function PlaceEditorPage() {
   const { id: idParam } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  // Delete and Cancel step back to wherever the owner came from.
+  const nav = useStackNav();
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
 
@@ -150,7 +153,7 @@ export function PlaceEditorPage() {
     mutationFn: () => deletePlace(placeId as number),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["places"] });
-      navigate(resolveChamberPath("/", "map", shellHosted));
+      nav.pop();
       showToast("Place deleted");
     },
     onError: () => showToast("Failed to delete place.", "error"),
@@ -250,7 +253,7 @@ export function PlaceEditorPage() {
           <ExhibitActionBar>
             {isDraft ? (
               <button
-                onClick={() => navigate(resolveChamberPath("/", "map", shellHosted))}
+                onClick={() => nav.pop()}
                 className="tap-target text-slate hover:underline"
               >
                 Cancel

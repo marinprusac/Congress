@@ -1,5 +1,5 @@
 import { Component, Suspense, lazy, useEffect, useState, type ComponentType, type LazyExoticComponent, type ReactNode } from "react";
-import { ChamberMark, loadRemoteModule, evictRemoteModule, resolveChamberPath, TransitionLink } from "@congress/congress-ui";
+import { ChamberMark, loadRemoteModule, evictRemoteModule, resolveChamberPath, StackLink } from "@congress/congress-ui";
 import type { ChamberRegistryEntry, ManifestView } from "@congress/shared-types";
 
 // Keyed by "<chamber>:<viewId>", one lazy() wrapper per view card - a render
@@ -115,9 +115,9 @@ export function ViewSlot({
         <span className="feed-card-title">{view.label}</span>
         {reason && <span className="feed-card-reason">{reason}</span>}
         {!full && (
-          <TransitionLink to={viewHref(chamber.name, view)} className="feed-card-open" aria-label={`Open ${view.label}`}>
+          <StackLink to={viewHref(chamber.name, view)} className="feed-card-open" aria-label={`Open ${view.label}`}>
             Open
-          </TransitionLink>
+          </StackLink>
         )}
       </header>
       <div className={full ? "feed-card-body feed-card-body--full" : "feed-card-body"}>

@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
-import { Link } from "react-router-dom";
-import { useShellHosted, resolveChamberPath } from "@congress/congress-ui";
+import { useShellHosted, resolveChamberPath, StackLink } from "@congress/congress-ui";
 import { fetchVisits, fetchTrips, fetchVisit, fetchVisitActiveAt, fetchPollHealth } from "@/lib/api";
 import { trackingFreshness } from "@/lib/freshness";
 import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "@/lib/mapTiles";
@@ -255,12 +254,12 @@ export function MapPage() {
           role="status"
         >
           <span>{freshness.label}</span>
-          <Link
+          <StackLink
             to={resolveChamberPath("/settings", "map", shellHosted)}
             className="underline underline-offset-2 opacity-80 hover:opacity-100"
           >
             tracking status
-          </Link>
+          </StackLink>
         </p>
       )}
 
@@ -305,12 +304,12 @@ export function MapPage() {
             e.kind === "visit" ? (
               <li key={`visit-${e.visit.id}`} className="py-2">
                 {e.visit.placeId !== null ? (
-                  <Link
+                  <StackLink
                     to={resolveChamberPath(`/p/${e.visit.placeId}`, "map", shellHosted)}
                     className="font-display text-ink hover:underline"
                   >
                     {e.visit.placeName ?? e.visit.adhocLabel ?? "Unclassified location"}
-                  </Link>
+                  </StackLink>
                 ) : (
                   <span className="font-display text-ink">{e.visit.placeName ?? e.visit.adhocLabel ?? "Unclassified location"}</span>
                 )}
@@ -320,9 +319,9 @@ export function MapPage() {
                   {e.visit.durationMinutes !== null ? ` (${formatDuration(e.visit.durationMinutes)})` : ""}
                 </span>
                 {e.visit.status === "pending" && (
-                  <Link to={resolveChamberPath("/pending", "map", shellHosted)} className="ml-2 text-sm text-accent hover:underline">
+                  <StackLink to={resolveChamberPath("/pending", "map", shellHosted)} className="ml-2 text-sm text-accent hover:underline">
                     Label it →
-                  </Link>
+                  </StackLink>
                 )}
               </li>
             ) : (

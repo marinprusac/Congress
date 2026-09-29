@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   ChamberHeader,
   ChamberMark,
@@ -19,6 +19,7 @@ import {
   updateCapitolSettings,
   fetchRegistry,
   loadRemoteModule,
+  useBackNavigation,
 } from "@congress/congress-ui";
 import { SignOutControl } from "@/components/LoginGate";
 import { LogsTab } from "@/pages/LogsTab";
@@ -172,7 +173,7 @@ function GeneralTab() {
 // - see useChamberSettingsPanels above and RemoteModule's `settings` field.
 export function SettingsPage() {
   useAppliedTheme();
-  const navigate = useNavigate();
+  const back = useBackNavigation();
 
   // A link can open Settings straight to a tab with "?from=<tab>" (e.g. the
   // AI-paused banners' "?from=ai", Home's pin bubble "?from=home") - a bare
@@ -207,7 +208,8 @@ export function SettingsPage() {
       <ChamberHeader
         icon={<SettingsGearIcon />}
         title="Settings"
-        onBack={() => ((window.history.state as { idx?: number } | null)?.idx ? navigate(-1) : navigate("/"))}
+        titleHref=""
+        onBack={back}
       />
       <main className="chamber-main">
         <div className="settings-tabs" role="tablist" aria-label="Settings categories">

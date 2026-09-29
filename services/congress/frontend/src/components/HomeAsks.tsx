@@ -1,7 +1,6 @@
-import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { askQuestionPayloadSchema, type OpenAsk } from "@congress/shared-types";
-import { ChatMarkdown } from "@congress/congress-ui";
+import { ChatMarkdown, StackLink } from "@congress/congress-ui";
 import { aiAsksQueryKey, aiThreadsQueryKey, fetchOpenAsks, markAiThreadRead } from "@/lib/aiApi";
 import { OneTapAnswer, isOneTap } from "@/chat/QuestionForm";
 import { useChatNavigation } from "@/chat/chatNav";
@@ -28,9 +27,9 @@ function HomeAsk({ ask }: { ask: OpenAsk }) {
         {oneTap ? (
           <OneTapAnswer messageId={ask.messageId} threadId={ask.threadId} field={oneTap} />
         ) : (
-          <Link to={href} className="ask-submit home-ask-open">
+          <StackLink to={href} className="ask-submit home-ask-open">
             {ask.kind === "question" ? "Answer" : ask.kind === "proposal" ? "Review" : "Open"}
-          </Link>
+          </StackLink>
         )}
         {ask.kind === "message" ? (
           <button
@@ -45,9 +44,9 @@ function HomeAsk({ ask }: { ask: OpenAsk }) {
             Dismiss
           </button>
         ) : oneTap ? (
-          <Link to={href} className="chat-meta-action">
+          <StackLink to={href} className="chat-meta-action">
             Open chat
-          </Link>
+          </StackLink>
         ) : null}
       </div>
     </li>

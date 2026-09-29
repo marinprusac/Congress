@@ -16,6 +16,7 @@ import {
   useDraftCreate,
   resolveEditorIdentity,
   useSelfNavigateGuard,
+  useStackNav,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createTask, fetchTask, updateTask, deleteTask, quickCreateTaskExhibit } from "@/lib/api";
@@ -38,6 +39,8 @@ export function TaskEditorPage() {
   const { id: idParam } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  // Delete and Cancel step back to wherever the owner came from.
+  const nav = useStackNav();
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
 
@@ -132,7 +135,7 @@ export function TaskEditorPage() {
     mutationFn: () => deleteTask(taskId as number),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      navigate(resolveChamberPath("/", "tasks", shellHosted));
+      nav.pop();
       showToast("Task deleted");
     },
     onError: () => showToast("Failed to delete task.", "error"),
@@ -224,7 +227,7 @@ export function TaskEditorPage() {
           <ExhibitActionBar>
             {isDraft ? (
               <button
-                onClick={() => navigate(resolveChamberPath("/", "tasks", shellHosted))}
+                onClick={() => nav.pop()}
                 className="tap-target text-slate hover:underline"
               >
                 Cancel

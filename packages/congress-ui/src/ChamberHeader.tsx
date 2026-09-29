@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { StackLink } from "./navHooks.js";
 import { useShellHosted, resolveChamberPath } from "./ShellHostContext.js";
 
 interface ChamberHeaderProps {
@@ -47,9 +47,9 @@ export function ChamberHeader({ icon, title, ownChamber = "", titleHref = "/", o
           <div>
             <p className="chamber-eyebrow">Congress</p>
             {resolvedTitleHref ? (
-              <Link to={resolvedTitleHref} className="chamber-title-link">
+              <StackLink to={resolvedTitleHref} className="chamber-title-link">
                 {titleContent}
-              </Link>
+              </StackLink>
             ) : (
               <div className="chamber-title-link">{titleContent}</div>
             )}

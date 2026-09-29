@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
-import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { resolveChamberPath, useShellHosted } from "@congress/congress-ui";
+import { resolveChamberPath, useShellHosted, StackLink } from "@congress/congress-ui";
 import { fetchEvent } from "@/lib/api";
 import type { AccountError, CalendarEvent } from "../../../src/types";
 
@@ -21,7 +20,7 @@ export function CalendarViewHeader({ active, accountErrors }: { active: Calendar
     <>
       <div className="mb-4 flex gap-4 font-mono text-xs uppercase tracking-wide" role="tablist">
         {VIEWS.map((view) => (
-          <Link
+          <StackLink
             key={view.id}
             to={resolveChamberPath(view.path, "calendar", shellHosted)}
             replace
@@ -30,16 +29,16 @@ export function CalendarViewHeader({ active, accountErrors }: { active: Calendar
             className={view.id === active ? "border-b-2 border-accent pb-1 text-ink" : "pb-1 text-dust hover:text-ink"}
           >
             {view.label}
-          </Link>
+          </StackLink>
         ))}
       </div>
       {accountErrors.map((err) => (
         <div key={err.accountId} className="mb-4 border border-alert px-3 py-2 font-mono text-sm text-alert">
           "{err.label}" needs to be reconnected —{" "}
           {shellHosted ? (
-            <Link to="/settings?from=calendar" className="underline">
+            <StackLink to="/settings?from=calendar" className="underline">
               reconnect in Settings
-            </Link>
+            </StackLink>
           ) : (
             <a href="/settings?from=calendar" className="underline">
               reconnect in Settings

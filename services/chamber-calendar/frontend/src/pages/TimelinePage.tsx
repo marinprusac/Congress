@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ListLoadingState } from "@congress/congress-ui";
+import { ListLoadingState, StackLink } from "@congress/congress-ui";
 import { fetchEvents } from "@/lib/api";
 import { addDays, buildTimeline, isTentative } from "@/lib/calendarViews";
 import { formatClockTime, formatDayLabel } from "@/lib/datetime";
@@ -49,7 +48,7 @@ export function TimelinePage() {
             {day.allDay.length > 0 && (
               <div className="mb-1 flex flex-wrap gap-1.5 py-1">
                 {day.allDay.map((event) => (
-                  <Link
+                  <StackLink
                     key={event.id}
                     to={links.href(event)}
                     onMouseEnter={() => links.prefetch(event)}
@@ -58,7 +57,7 @@ export function TimelinePage() {
                     style={eventSwatchStyle(event, isTentative(event))}
                   >
                     {event.title}
-                  </Link>
+                  </StackLink>
                 ))}
               </div>
             )}
@@ -81,7 +80,7 @@ export function TimelinePage() {
               const tentative = isTentative(event);
               const place = event.location?.trim() ?? "";
               return (
-                <Link
+                <StackLink
                   key={event.id}
                   to={links.href(event)}
                   onMouseEnter={() => links.prefetch(event)}
@@ -101,7 +100,7 @@ export function TimelinePage() {
                     </span>
                     {place && <span className="block truncate font-mono text-[11px] text-dust">{place}</span>}
                   </span>
-                </Link>
+                </StackLink>
               );
             })}
           </div>

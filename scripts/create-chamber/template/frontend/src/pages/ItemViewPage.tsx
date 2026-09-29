@@ -11,6 +11,7 @@ import {
   resolveChamberPath,
   ConfirmSheet,
   showToast,
+  useStackNav,
 } from "@congress/congress-ui";
 import { fetchItem, updateItem, deleteItem, quickCreateItemExhibit } from "@/lib/api";
 
@@ -18,6 +19,8 @@ export function ItemViewPage() {
   const { id } = useParams<{ id: string }>();
   const itemId = Number(id);
   const navigate = useNavigate();
+  // Delete steps back to wherever the owner came from.
+  const nav = useStackNav();
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -43,7 +46,7 @@ export function ItemViewPage() {
     mutationFn: () => deleteItem(itemId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["items"] });
-      navigate(resolveChamberPath("/", "__CHAMBER_NAME__", shellHosted));
+      nav.pop();
       showToast("Item deleted");
     },
     onError: () => showToast("Failed to delete item.", "error"),

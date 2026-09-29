@@ -1,6 +1,6 @@
-import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type MouseEvent, type RefObject } from "react";
-import { Link, useLocation, useNavigate, type To } from "react-router-dom";
-import { flipDeltas, isPlainClick, markRouteCommitted, prefersReducedMotion, presenceStep, runNavigation, type Box, type TransitionKind } from "./motion.js";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useLocation } from "react-router-dom";
+import { flipDeltas, markRouteCommitted, prefersReducedMotion, presenceStep, type Box } from "./motion.js";
 
 // Mounted once inside the shell's Router: tells a pending page transition
 // that the new route has committed to the DOM.
@@ -11,58 +11,6 @@ export function RouteCommitSignal() {
   }, [location.key]);
   return null;
 }
-
-function toPath(to: To): string {
-  if (typeof to === "string") return to;
-  return `${to.pathname ?? ""}${to.search ?? ""}${to.hash ?? ""}`;
-}
-
-export interface TransitionNavigateOptions {
-  kind?: TransitionKind;
-  replace?: boolean;
-}
-
-// navigate() with a page transition (push by default).
-export function useTransitionNavigate(): (to: To, options?: TransitionNavigateOptions) => void {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const here = `${location.pathname}${location.search}`;
-  return useCallback(
-    (to: To, { kind = "push", replace }: TransitionNavigateOptions = {}) => {
-      const target = toPath(to);
-      if (target === here) {
-        navigate(to, { replace });
-        return;
-      }
-      runNavigation(() => navigate(to, { replace }), kind, target);
-    },
-    [navigate, here]
-  );
-}
-
-type TransitionLinkProps = ComponentProps<typeof Link> & { transition?: TransitionKind };
-
-// A <Link> that navigates with a page transition.
-export const TransitionLink = forwardRef<HTMLAnchorElement, TransitionLinkProps>(function TransitionLink(
-  { transition = "push", onClick, to, replace, ...rest },
-  ref
-) {
-  const go = useTransitionNavigate();
-  return (
-    <Link
-      ref={ref}
-      to={to}
-      replace={replace}
-      onClick={(e: MouseEvent<HTMLAnchorElement>) => {
-        onClick?.(e);
-        if (!isPlainClick(e) || rest.target) return;
-        e.preventDefault();
-        go(to, { kind: transition, replace });
-      }}
-      {...rest}
-    />
-  );
-});
 
 // Keeps something mounted through its exit animation: render while `mounted`,
 // put `state` on `data-state` and let CSS animate "open"/"closing".
