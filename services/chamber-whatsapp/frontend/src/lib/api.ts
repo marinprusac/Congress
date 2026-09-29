@@ -76,6 +76,22 @@ export const fetchMessages = (jid: string, cursor?: string) =>
 
 export const searchAll = (q: string) => get<{ chats: ChatSummary[]; messages: Message[] }>(`/search?q=${enc(q)}`);
 
+export interface PairingSnapshot {
+  state: "idle" | "waiting" | "success" | "expired" | "error";
+  expiresAt?: number;
+  qr?: string[];
+  error?: string;
+}
+
+export const fetchPairing = () => get<PairingSnapshot>("/pairing");
+
+// Starts (or rejoins) a QR session on the reader - linking, never sending.
+export async function startPairing(): Promise<PairingSnapshot> {
+  const res = await fetch(`${API_BASE}/pairing`, { method: "POST" });
+  if (res.status === 503) throw new ReaderUnavailableError("reader_unavailable");
+  return json<PairingSnapshot>(res);
+}
+
 export const mediaUrl = (m: Pick<Message, "chatJid" | "id">) => `${API_BASE}/media/${enc(m.chatJid)}/${enc(m.id)}`;
 
 // Cursor that makes a page start at (and include) a given message.

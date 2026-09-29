@@ -13,12 +13,20 @@ const PASS_HEADERS = [
 ];
 
 // GETs a path from wa-reader over its Unix socket and relays the response.
-// There is no other method: the reader API is read-only and so is this.
 export function readerGet(path: string, timeoutMs = 10_000): Promise<Response> {
+  return readerRequest("GET", path, timeoutMs);
+}
+
+// The only POST is starting a pairing session (linking, never sending).
+export function readerStartPairing(): Promise<Response> {
+  return readerRequest("POST", "/pairing", 15_000);
+}
+
+function readerRequest(method: "GET" | "POST", path: string, timeoutMs: number): Promise<Response> {
   return new Promise((resolvePromise) => {
     const unavailable = (detail: string) =>
       resolvePromise(Response.json({ error: "reader_unavailable", detail }, { status: 503 }));
-    const req = request({ socketPath: env.WA_READER_SOCKET, path, method: "GET", timeout: timeoutMs }, (res) => {
+    const req = request({ socketPath: env.WA_READER_SOCKET, path, method, timeout: timeoutMs }, (res) => {
       const headers = new Headers();
       for (const name of PASS_HEADERS) {
         const value = res.headers[name];

@@ -97,7 +97,17 @@ deploy restarts of `congress-wa-reader`.
 
 ## Pairing (once)
 
-The service must be stopped; the lock refuses a second process.
+**From Congress (normal way):** open WhatsApp in Congress (Search → WhatsApp)
+on a computer or tablet, tap **Link WhatsApp**, and scan the code with your
+phone (WhatsApp → Settings → Linked devices → Link a device). The code
+refreshes by itself while it's shown. Behind it: `POST /pairing` starts a QR
+session in the running daemon (the API's only non-GET) and `GET /pairing`
+returns the current code as a module matrix the page draws. If the device
+is ever unlinked, the daemon exits, systemd restarts it unpaired, and the
+Link button appears again.
+
+**From a terminal (fallback):** the service must be stopped; the lock
+refuses a second process.
 
 ```
 sudo systemctl stop congress-wa-reader

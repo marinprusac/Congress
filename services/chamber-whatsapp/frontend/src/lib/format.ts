@@ -100,6 +100,22 @@ export function withDayBreaks(newestFirst: Message[]): { message: Message; day: 
   return out;
 }
 
+// SVG path for a QR matrix ("1" = dark), offset by a quiet zone; one unit per module.
+export function qrPath(rows: string[], quiet: number): string {
+  let d = "";
+  rows.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] === "1") d += `M${x + quiet} ${y + quiet}h1v1h-1z`;
+    }
+  });
+  return d;
+}
+
+// Offer linking only once unpaired ("logged_out" restarts into this within seconds).
+export function needsPairing(status: ReaderStatus | null): boolean {
+  return status?.state === "not_paired";
+}
+
 export const PHONE_WARN_DAYS = 10;
 
 // What (if anything) the owner should be told about the reader's state.
@@ -109,9 +125,9 @@ export function statusNotice(status: ReaderStatus | null, unavailable: boolean, 
     case "connected":
       break;
     case "not_paired":
-      return { tone: "alert", text: "Not linked to WhatsApp yet. Pair it once with `wa-reader login` on the server." };
+      return null; // the pairing panel says it
     case "logged_out":
-      return { tone: "alert", text: "This device was unlinked from WhatsApp. Re-pair with `wa-reader login`." };
+      return { tone: "alert", text: "This device was unlinked from WhatsApp. It restarts in a moment so you can link it again." };
     case "stream_replaced":
       return { tone: "alert", text: "Another client took over this WhatsApp session. Restart the reader once it's gone." };
     case "client_outdated":

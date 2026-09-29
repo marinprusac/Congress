@@ -161,6 +161,33 @@
   width: min(16rem, 100%);
   margin-bottom: 0.25rem;
 }
+/* Linking */
+.wa-pairing {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-dust);
+}
+.wa-pairing-lead {
+  color: var(--color-ink);
+  font-size: 1rem;
+}
+.wa-pairing-steps {
+  margin: 0.5rem 0 0 1.25rem;
+  list-style: decimal;
+  color: var(--color-slate);
+  font-size: 0.9rem;
+}
+.wa-pairing-note {
+  margin-top: 0.5rem;
+  color: var(--color-dust);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+}
+.wa-qr {
+  display: block;
+  width: min(18rem, 100%);
+  margin: 0.75rem auto 0;
+}
 .wa-readonly {
   margin: 1rem 0 0.5rem;
   color: var(--color-dust);

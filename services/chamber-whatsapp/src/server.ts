@@ -1,14 +1,18 @@
 import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
-import { readerGet, readerPath } from "./readerClient.js";
+import { readerGet, readerPath, readerStartPairing } from "./readerClient.js";
 
-// Read-only proxy to wa-reader. GET routes only; no feed, exhibits or MCP,
+// Read-only proxy to wa-reader (GET, plus POST /api/pairing to link); no feed, exhibits or MCP,
 // so WhatsApp content never leaves this Chamber.
 export const app = new Hono<{ Bindings: HttpBindings }>();
 
 const seg = (s: string) => encodeURIComponent(s);
 
 app.get("/api/status", () => readerGet("/status"));
+
+// Linking this device from the app: start a QR session, then poll it.
+app.get("/api/pairing", () => readerGet("/pairing"));
+app.post("/api/pairing", () => readerStartPairing());
 
 app.get("/api/chats", (c) => readerGet(readerPath("/chats", c.req.query(), ["cursor", "limit"])));
 

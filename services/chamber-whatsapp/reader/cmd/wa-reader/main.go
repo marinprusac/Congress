@@ -24,6 +24,7 @@ import (
 	"congress/wa-reader/internal/api"
 	"congress/wa-reader/internal/config"
 	"congress/wa-reader/internal/ingest"
+	"congress/wa-reader/internal/pairing"
 	"congress/wa-reader/internal/store"
 	"congress/wa-reader/internal/waclient"
 )
@@ -218,14 +219,19 @@ func serve(cfg config.Config, log *slog.Logger, offline bool) error {
 		}
 		defer closeSession()
 		srv.Media = reader
+		srv.Ctx = ctx
+		srv.Pairing = pairing.New(reader, func() {
+			status.Set("connecting", "linked; receiving history")
+			log.Info("paired", "jid", reader.OwnJID())
+		})
 		h := ingest.NewHandler(st, reader, log, status)
 		h.Restore(ctx)
 		reader.AddEventHandler(h.Handle)
 		reader.AddEventHandler(connectionEvents(reader, status, log))
 		go h.RunGroupLookups(ctx)
 		if !reader.IsPaired() {
-			status.Set("not_paired", "run `wa-reader login`")
-			log.Warn("not paired: run `wa-reader login` (with the service stopped)")
+			status.Set("not_paired", "link it from Congress's WhatsApp screen")
+			log.Warn("not paired: link it from Congress's WhatsApp screen (or `wa-reader login` with the service stopped)")
 		} else {
 			status.Set("connecting", "")
 			if err := reader.Connect(); err != nil {
@@ -308,8 +314,13 @@ func connectionEvents(reader waclient.Reader, status *ingest.Status, log *slog.L
 			log.Error("stream replaced: another process is using this session; not reconnecting")
 			go reader.Disconnect()
 		case *events.LoggedOut:
-			set("logged_out", fmt.Sprintf("unlinked (reason %v); re-pair with `wa-reader login`", e.Reason))
-			log.Error("logged out", "reason", e.Reason, "onConnect", e.OnConnect)
+			set("logged_out", fmt.Sprintf("unlinked (reason %v); restarting so it can be linked again", e.Reason))
+			log.Error("logged out; exiting so systemd restarts with a fresh session", "reason", e.Reason, "onConnect", e.OnConnect)
+			// whatsmeow has deleted the device; a new process starts unpaired and pairable.
+			go func() {
+				time.Sleep(5 * time.Second)
+				os.Exit(3)
+			}()
 		case *events.ClientOutdated:
 			set("client_outdated", "WhatsApp rejected this client version; update whatsmeow and redeploy")
 			log.Error("client outdated: update go.mau.fi/whatsmeow")
