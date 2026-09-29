@@ -1,14 +1,14 @@
-import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   ChamberHeader,
   ChamberMark,
   fetchRegistry,
   resolveChamberPath,
-  TransitionLink,
+  StackLink,
   useAppliedTheme,
   useExhibitSearch,
-  useTransitionNavigate,
+  useStackNav,
 } from "@congress/congress-ui";
 import { viewHref } from "@/components/ViewSlot";
 
@@ -27,8 +27,12 @@ function SearchIcon() {
 // exhibits across every Chamber.
 export function SearchPage() {
   useAppliedTheme();
-  const navigate = useTransitionNavigate();
-  const [query, setQuery] = useState("");
+  const nav = useStackNav();
+  // In the URL, so coming back to Search (a pop, or the tab restored)
+  // finds the same query.
+  const [params, setParams] = useSearchParams();
+  const query = params.get("q") ?? "";
+  const setQuery = (next: string) => setParams(next ? { q: next } : {}, { replace: true });
   const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
   const { results, loading } = useExhibitSearch(query, true);
 
@@ -60,11 +64,11 @@ export function SearchPage() {
           <>
             <h2 className="search-section-title">Views</h2>
             {views.map(({ chamber, view }) => (
-              <TransitionLink key={`${chamber.name}:${view.id}`} to={viewHref(chamber.name, view)} className="search-row">
+              <StackLink key={`${chamber.name}:${view.id}`} to={viewHref(chamber.name, view)} className="search-row">
                 <ChamberMark name={chamber.name} />
                 <span className="search-row-name">{view.label}</span>
                 <span className="search-row-meta">{chamber.displayName}</span>
-              </TransitionLink>
+              </StackLink>
             ))}
           </>
         )}
@@ -77,7 +81,7 @@ export function SearchPage() {
             key={`${result.chamber}:${result.id}`}
             type="button"
             className="search-row"
-            onClick={() => navigate(resolveChamberPath(result.url, result.chamber, true))}
+            onClick={() => nav.push(resolveChamberPath(result.url, result.chamber, true))}
           >
             <ChamberMark name={result.chamber} />
             <span className="search-row-name">{result.name}</span>

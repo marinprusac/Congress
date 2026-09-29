@@ -17,6 +17,7 @@ import {
   resolveEditorIdentity,
   useSelfNavigateGuard,
   FormErrorMessage,
+  useStackNav,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { uploadDocument, fetchDocument, updateDocument, deleteDocument, downloadUrl } from "@/lib/api";
@@ -43,6 +44,8 @@ function parseDocumentId(raw: string | undefined): number | null {
 export function DocumentEditorPage() {
   const { id: idParam } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // Delete and Cancel step back to wherever the owner came from.
+  const nav = useStackNav();
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
 
@@ -147,7 +150,7 @@ export function DocumentEditorPage() {
     mutationFn: () => deleteDocument(documentId as number),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
-      navigate(resolveChamberPath("/", "documents", shellHosted));
+      nav.pop();
       showToast("Document deleted");
     },
     onError: () => showToast("Failed to delete document.", "error"),
@@ -240,7 +243,7 @@ export function DocumentEditorPage() {
           <ExhibitActionBar>
             {isDraft ? (
               <button
-                onClick={() => navigate(resolveChamberPath("/", "documents", shellHosted))}
+                onClick={() => nav.pop()}
                 className="tap-target text-slate hover:underline"
               >
                 Cancel

@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { markShellHosted, preventPinchZoom, PersistedQueryProvider, ToastHost } from "@congress/congress-ui";
+import { markShellHosted, openInTab, preventPinchZoom, PersistedQueryProvider, ToastHost, NAV_TABS, type NavTab } from "@congress/congress-ui";
 import { queryClient } from "@/lib/queryClient";
 import { notifyAppUpdated } from "@/lib/api";
 import { App } from "@/App";
@@ -48,6 +48,14 @@ if ("serviceWorker" in navigator) {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;
     void navigator.serviceWorker.getRegistration().then((reg) => reg?.update());
+  });
+
+  // A notification tapped while the app is open (sw.ts's notificationclick).
+  navigator.serviceWorker.addEventListener("message", (event: MessageEvent) => {
+    const data = event.data as { type?: unknown; url?: unknown; tab?: unknown } | null;
+    if (data?.type !== "congress:open" || typeof data.url !== "string" || !data.url.startsWith("/")) return;
+    const tab = NAV_TABS.includes(data.tab as NavTab) ? (data.tab as NavTab) : "notifications";
+    openInTab(data.url, tab);
   });
 }
 

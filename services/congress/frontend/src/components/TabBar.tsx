@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { TransitionLink } from "@congress/congress-ui";
+import { Link, useLocation } from "react-router-dom";
+import { isPlainClick, selectNavTab, tabOfPath, useActiveNavTab, type NavTab } from "@congress/congress-ui";
 import { useNotifications } from "@/lib/notifications";
 import { CreateSheet } from "@/components/CreateSheet";
 import { useThreads } from "@/chat/useChatData";
@@ -67,6 +67,7 @@ function isEditable(el: Element | null): boolean {
 }
 
 function Tab({
+  tab,
   to,
   label,
   ariaLabel = label,
@@ -74,6 +75,7 @@ function Tab({
   className,
   children,
 }: {
+  tab: NavTab;
   to: string;
   label: string;
   ariaLabel?: string;
@@ -82,15 +84,21 @@ function Tab({
   children: ReactNode;
 }) {
   return (
-    <TransitionLink
+    // A tap restores that tab's own stack, or pops the active tab to its
+    // root - never a plain push (see navStack.ts).
+    <Link
       to={to}
-      transition="tab"
+      onClick={(e) => {
+        if (!isPlainClick(e)) return;
+        e.preventDefault();
+        selectNavTab(tab);
+      }}
       className={`shell-tab${active ? " active" : ""}${className ? ` ${className}` : ""}`}
       aria-label={ariaLabel}
       aria-current={active ? "page" : undefined}>
       {children}
       <span className="shell-tab-label">{label}</span>
-    </TransitionLink>
+    </Link>
   );
 }
 
@@ -100,26 +108,26 @@ function Tab({
 // the feed, Search, and the "+" sheet.
 export function TabBar() {
   const { pathname } = useLocation();
-  const navigate = useNavigate();
   const { unreadCount } = useNotifications();
   // Chats needing a look: unread, or waiting on an answer.
   const threads = useThreads(false);
   const chatBadge = (threads.data ?? []).filter((t) => t.unread || t.openAskCount > 0).length;
-  const inChat = pathname === "/chat" || pathname.startsWith("/chat/");
+  // The tab whose stack is showing - a note opened from Search keeps Search lit.
+  const active = useActiveNavTab() ?? tabOfPath(pathname);
   const [creating, setCreating] = useState(false);
   // Slot of the active tab, for the sliding indicator (2 is "+").
-  const activeIndex = pathname === "/" ? 0 : pathname === "/search" ? 1 : inChat ? 3 : pathname === "/notifications" ? 4 : -1;
+  const activeIndex = active === "home" ? 0 : active === "search" ? 1 : active === "chats" ? 3 : active === "notifications" ? 4 : -1;
 
   // "/" jumps to Search from anywhere that isn't a text field (desktop).
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey || isEditable(document.activeElement)) return;
       e.preventDefault();
-      navigate("/search");
+      selectNavTab("search");
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [navigate]);
+  }, []);
 
   return (
     <>
@@ -129,10 +137,10 @@ export function TabBar() {
           aria-hidden="true"
           style={{ "--tab-index": Math.max(activeIndex, 0), opacity: activeIndex < 0 ? 0 : 1 } as CSSProperties}
         />
-        <Tab to="/" label="Home" active={pathname === "/"}>
+        <Tab tab="home" to="/" label="Home" active={active === "home"}>
           <HomeIcon />
         </Tab>
-        <Tab to="/search" label="Search" active={pathname === "/search"}>
+        <Tab tab="search" to="/search" label="Search" active={active === "search"}>
           <SearchIcon />
         </Tab>
         <button type="button" className={`shell-tab shell-tab--create${creating ? " open" : ""}`}
@@ -144,15 +152,16 @@ export function TabBar() {
           </span>
           <span className="shell-tab-label">New</span>
         </button>
-        <Tab to="/chat" label="Chats" ariaLabel={chatBadge > 0 ? `Chats, ${chatBadge} need you` : "Chats"} active={inChat}>
+        <Tab tab="chats" to="/chat" label="Chats" ariaLabel={chatBadge > 0 ? `Chats, ${chatBadge} need you` : "Chats"} active={active === "chats"}>
           <ChatIcon />
           {chatBadge > 0 && <span key={chatBadge} className="shell-tab-badge shell-tab-badge--accent">{chatBadge > 9 ? "9+" : chatBadge}</span>}
         </Tab>
         <Tab
+          tab="notifications"
           to="/notifications"
           label="Inbox"
           ariaLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
-          active={pathname === "/notifications"}>
+          active={active === "notifications"}>
           <BellIcon />
           {unreadCount > 0 && <span key={unreadCount} className="shell-tab-badge">{unreadCount > 9 ? "9+" : unreadCount}</span>}
         </Tab>

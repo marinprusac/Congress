@@ -158,11 +158,16 @@ self.addEventListener("notificationclick", (event) => {
       for (const client of openClients) {
         if ("focus" in client) {
           await client.focus();
-          if ("navigate" in client) await (client as WindowClient).navigate(url);
+          // The open app pushes it onto its Notifications tab in-document
+          // (main.tsx) instead of reloading onto it.
+          client.postMessage({ type: "congress:open", url, tab: "notifications" });
           return;
         }
       }
-      await self.clients.openWindow(url);
+      // A fresh window: the page's cold start reads the tab from the URL
+      // (navStack.ts's NAV_TAB_PARAM) and strips it.
+      const [path, hash = ""] = url.split("#");
+      await self.clients.openWindow(`${path}${path!.includes("?") ? "&" : "?"}navtab=notifications${hash ? `#${hash}` : ""}`);
     })()
   );
 });

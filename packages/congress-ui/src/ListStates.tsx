@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { StackLink } from "./navHooks.js";
 
 export function ListSearchInput({
   value,
@@ -36,9 +36,9 @@ export function ListSearchInput({
         className="list-search-input border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
       />
       {newHref && (
-        <Link to={newHref} className="list-search-new" aria-label={newLabel} title={newLabel}>
+        <StackLink to={newHref} className="list-search-new" aria-label={newLabel} title={newLabel}>
           +
-        </Link>
+        </StackLink>
       )}
     </div>
   );

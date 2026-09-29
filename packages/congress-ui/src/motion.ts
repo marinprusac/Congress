@@ -93,38 +93,56 @@ function withTimeout(promise: Promise<unknown> | undefined, ms: number): Promise
 }
 
 // Runs `go` (a router navigation) inside a view transition of the given kind.
-// `html[data-nav-transition]` selects the animation in motion.css.
-export function runNavigation(go: () => void, kind: TransitionKind, target?: string): void {
+// `html[data-nav-transition]` selects the animation in motion.css. `go` may
+// be async (a tab switch steps back through history first); the returned
+// promise settles once it has run.
+export function runNavigation(go: () => void | Promise<void>, kind: TransitionKind, target?: string): Promise<void> {
   const doc = document as TransitionDocument;
-  if (!canTransition(doc)) {
-    go();
-    return;
+  if (!canTransition(doc)) return settle(go);
+  return withTimeout(target ? preloadRoute(target) : undefined, PRELOAD_TIMEOUT_MS).then(
+    () =>
+      new Promise<void>((resolve) => {
+        const state = motionState();
+        state.current?.skipTransition();
+        const root = doc.documentElement;
+        root.dataset.navTransition = kind;
+        let vt!: ViewTransitionLike;
+        try {
+          vt = doc.startViewTransition!(async () => {
+            const committed = waitForCommit(COMMIT_TIMEOUT_MS);
+            try {
+              await go();
+            } finally {
+              resolve();
+            }
+            // Snapshotting a page that never changed would slide it onto itself.
+            if (!(await committed)) queueMicrotask(() => vt.skipTransition());
+          });
+        } catch {
+          delete root.dataset.navTransition;
+          void settle(go).then(resolve);
+          return;
+        }
+        state.current = vt;
+        vt.finished.finally(() => {
+          if (state.current !== vt) return;
+          state.current = null;
+          delete root.dataset.navTransition;
+        });
+      })
+  );
+}
+
+// Calls `go` right away (synchronously), resolving once it's done.
+function settle(go: () => void | Promise<void>): Promise<void> {
+  try {
+    return Promise.resolve(go()).then(
+      () => undefined,
+      () => undefined
+    );
+  } catch {
+    return Promise.resolve();
   }
-  void withTimeout(target ? preloadRoute(target) : undefined, PRELOAD_TIMEOUT_MS).then(() => {
-    const state = motionState();
-    state.current?.skipTransition();
-    const root = doc.documentElement;
-    root.dataset.navTransition = kind;
-    let vt!: ViewTransitionLike;
-    try {
-      vt = doc.startViewTransition!(async () => {
-        const committed = waitForCommit(COMMIT_TIMEOUT_MS);
-        go();
-        // Snapshotting a page that never changed would slide it onto itself.
-        if (!(await committed)) queueMicrotask(() => vt.skipTransition());
-      });
-    } catch {
-      delete root.dataset.navTransition;
-      go();
-      return;
-    }
-    state.current = vt;
-    vt.finished.finally(() => {
-      if (state.current !== vt) return;
-      state.current = null;
-      delete root.dataset.navTransition;
-    });
-  });
 }
 
 // Plain left clicks only - modifier clicks keep the browser's own behavior.

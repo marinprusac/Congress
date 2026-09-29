@@ -1,4 +1,5 @@
-import { Link, Outlet, useMatch } from "react-router-dom";
+import { Outlet, useMatch } from "react-router-dom";
+import { ChatLink } from "./chatMotion";
 import { CapitolMark, useAppliedTheme } from "@congress/congress-ui";
 import { ThreadList } from "./ThreadList";
 import { useVisualViewportVars } from "./useVisualViewport";
@@ -27,9 +28,9 @@ export function ChatIndex() {
     <div className="chat-placeholder">
       <CapitolMark className="chat-placeholder-mark" />
       <p>Pick a chat, or start a new one.</p>
-      <Link to="/chat/new" className="chat-inline-action">
+      <ChatLink to="/chat/new" className="chat-inline-action">
         New chat
-      </Link>
+      </ChatLink>
     </div>
   );
 }

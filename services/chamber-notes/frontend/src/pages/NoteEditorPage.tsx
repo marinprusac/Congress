@@ -16,6 +16,7 @@ import {
   useDraftCreate,
   resolveEditorIdentity,
   useSelfNavigateGuard,
+  useStackNav,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { createNote, fetchNote, updateNote, deleteNote, setPinned, quickCreateNoteExhibit } from "@/lib/api";
@@ -41,6 +42,8 @@ export function NoteEditorPage() {
   const { id: idParam } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  // Delete and Cancel step back to wherever the owner came from.
+  const nav = useStackNav();
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
 
@@ -176,7 +179,7 @@ export function NoteEditorPage() {
     mutationFn: () => deleteNote(noteId as number),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notes"] });
-      navigate(resolveChamberPath("/", "notes", shellHosted));
+      nav.pop();
       showToast("Note deleted");
     },
     onError: () => showToast("Failed to delete note.", "error"),
@@ -271,7 +274,7 @@ export function NoteEditorPage() {
           <ExhibitActionBar>
             {isDraft ? (
               <button
-                onClick={() => navigate(resolveChamberPath("/", "notes", shellHosted))}
+                onClick={() => nav.pop()}
                 className="tap-target text-slate hover:underline"
               >
                 Cancel

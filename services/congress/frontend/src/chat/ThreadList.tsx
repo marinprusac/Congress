@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { useTransitionNavigate } from "@congress/congress-ui";
-import { ChatLink, phoneTransitionClick } from "./chatMotion";
+import { isPlainClick } from "@congress/congress-ui";
+import { ChatLink, useChatNav } from "./chatMotion";
 import type { AiThread } from "@congress/shared-types";
 import { ThreadActions } from "./ThreadActions";
 import { listStamp } from "./chatFormat";
@@ -12,11 +12,15 @@ function stripTokens(text: string): string {
 }
 
 function ThreadRow({ thread }: { thread: AiThread }) {
-  const go = useTransitionNavigate();
+  const chat = useChatNav();
   const to = `/chat/${thread.id}`;
   return (
     <li className="chat-list-item">
-      <NavLink to={to} onClick={phoneTransitionClick(() => go(to))} className={({ isActive }) => `chat-list-link${isActive ? " active" : ""}${thread.unread ? " unread" : ""}`}>
+      <NavLink to={to} onClick={(e) => {
+          if (!isPlainClick(e)) return;
+          e.preventDefault();
+          chat.open(to);
+        }} className={({ isActive }) => `chat-list-link${isActive ? " active" : ""}${thread.unread ? " unread" : ""}`}>
         <span className="chat-list-main">
           <span className="chat-list-title">
             {thread.pinned ? <span className="chat-pin" aria-label="Pinned" /> : null}

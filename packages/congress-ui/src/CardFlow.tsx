@@ -1,5 +1,5 @@
 import type { ReactNode, MouseEventHandler, FocusEventHandler } from "react";
-import { Link } from "react-router-dom";
+import { StackLink } from "./navHooks.js";
 
 // The shared replacement for the old full-width row-list idiom (still in
 // ListStates.tsx, being phased out chamber-by-chamber). Layout mechanics are
@@ -31,9 +31,9 @@ export function CompactCard({ title, subtitle, detail, href, onClick, onMouseEnt
 
   if (href) {
     return (
-      <Link to={href} className="compact-card" onMouseEnter={onMouseEnter} onFocus={onFocus}>
+      <StackLink to={href} className="compact-card" onMouseEnter={onMouseEnter} onFocus={onFocus}>
         {content}
-      </Link>
+      </StackLink>
     );
   }
 

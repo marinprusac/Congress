@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { AiRunDetail } from "@congress/shared-types";
+import { StackLink } from "@congress/congress-ui";
 import { aiRunsQueryKey, fetchAiRuns } from "@/lib/aiApi";
 import { ActivityList } from "@/chat/RunActivity";
 import { durationLabel, listStamp } from "@/chat/chatFormat";
@@ -45,9 +45,9 @@ function RunRow({ run }: { run: AiRunDetail }) {
       {open ? (
         <div className="mt-2">
           {run.threadId ? (
-            <Link to={`/chat/${run.threadId}`} className="font-mono text-xs text-accent underline">
+            <StackLink to={`/chat/${run.threadId}`} className="font-mono text-xs text-accent underline">
               Open the chat
-            </Link>
+            </StackLink>
           ) : null}
           {run.activity.length ? <ActivityList activity={run.activity} /> : <p className="font-mono text-xs text-dust">No tools used.</p>}
         </div>

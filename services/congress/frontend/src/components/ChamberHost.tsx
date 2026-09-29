@@ -1,7 +1,7 @@
 import { Component, Suspense, lazy, useMemo, type ComponentType, type LazyExoticComponent, type ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { fetchRegistry, loadRemoteModule, evictRemoteModule } from "@congress/congress-ui";
+import { fetchRegistry, loadRemoteModule, evictRemoteModule, useStackNav } from "@congress/congress-ui";
 
 // Keyed by Chamber name and lives for the tab's lifetime - once a Chamber
 // has been visited once, switching back to it is instant (no re-fetch of
@@ -50,6 +50,15 @@ function ChamberLoadingBar() {
 // some Chamber's own page, rendering its own (registry-driven) picker. A
 // Chamber that fails to load never gets that far, so this is the one
 // chamber-route state that needs its own way back.
+function BackButton() {
+  const nav = useStackNav();
+  return (
+    <button type="button" className="chamber-host-unavailable-link" onClick={() => nav.pop()}>
+      Go back
+    </button>
+  );
+}
+
 function ChamberUnavailable({ chamberName, reason }: { chamberName: string; reason: "not-found" | "offline" }) {
   return (
     <div className="chamber-host-unavailable">
@@ -58,9 +67,7 @@ function ChamberUnavailable({ chamberName, reason }: { chamberName: string; reas
           ? `${chamberName} is offline right now.`
           : `No Chamber named "${chamberName}".`}
       </p>
-      <Link to="/" className="chamber-host-unavailable-link">
-        Back home
-      </Link>
+      <BackButton />
     </div>
   );
 }

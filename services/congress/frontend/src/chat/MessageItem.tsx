@@ -1,7 +1,6 @@
 import { memo, useState } from "react";
-import { Link } from "react-router-dom";
 import type { AiMessage } from "@congress/shared-types";
-import { ChatMarkdown, showToast } from "@congress/congress-ui";
+import { ChatMarkdown, StackLink, showToast } from "@congress/congress-ui";
 import { StoredActivity } from "./RunActivity";
 import { AskCard } from "./AskCards";
 import { useChatNavigation } from "./chatNav";
@@ -70,9 +69,9 @@ export const MessageItem = memo(function MessageItem({ message, stamp, onRetry, 
         <div className="chat-state chat-state--refused" role="status">
           <p>{message.text}</p>
           <div className="chat-state-actions">
-            <Link to="/settings?from=ai" className="chat-inline-action">
+            <StackLink to="/settings?from=ai" className="chat-inline-action">
               AI settings
-            </Link>
+            </StackLink>
             {retry}
           </div>
         </div>

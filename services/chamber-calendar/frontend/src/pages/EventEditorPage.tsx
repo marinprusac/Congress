@@ -15,6 +15,7 @@ import {
   resolveEditorIdentity,
   useSelfNavigateGuard,
   FormErrorMessage,
+  useStackNav,
 } from "@congress/congress-ui";
 import type { CapitolExhibitSearchResult } from "@congress/shared-types";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
@@ -131,6 +132,8 @@ export function EventEditorPage() {
   const params = useParams<{ accountId: string; calendarId: string; eventId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  // Delete and Cancel step back to wherever the owner came from.
+  const nav = useStackNav();
   const shellHosted = useShellHosted();
   const queryClient = useQueryClient();
 
@@ -277,7 +280,7 @@ export function EventEditorPage() {
     mutationFn: () => deleteEvent(eventIdentity!.accountId, eventIdentity!.calendarId, eventIdentity!.eventId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["events"] });
-      navigate(resolveChamberPath("/", "calendar", shellHosted));
+      nav.pop();
       showToast("Event deleted");
     },
     onError: () => showToast("Failed to delete event.", "error"),
@@ -369,7 +372,7 @@ export function EventEditorPage() {
           <ExhibitActionBar>
             {isDraft ? (
               <button
-                onClick={() => navigate(resolveChamberPath("/", "calendar", shellHosted))}
+                onClick={() => nav.pop()}
                 className="tap-target text-slate hover:underline"
               >
                 Cancel

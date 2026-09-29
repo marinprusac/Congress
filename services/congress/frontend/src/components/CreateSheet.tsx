@@ -1,12 +1,12 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChamberMark, fetchRegistry, resolveChamberPath, usePresence, useTransitionNavigate } from "@congress/congress-ui";
+import { ChamberMark, fetchRegistry, resolveChamberPath, usePresence, useStackNav } from "@congress/congress-ui";
 
 // The "+" sheet: every kind of Exhibit the active Chambers let the owner
 // create (manifest.exhibitTypes). Picking one opens that Chamber's own
 // editor on a new, unsaved Exhibit - the Chamber still owns creation.
 export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const navigate = useTransitionNavigate();
+  const nav = useStackNav();
   const { mounted, state } = usePresence(open);
   const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
 
@@ -38,7 +38,7 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
             className="create-sheet-option"
             onClick={() => {
               onClose();
-              navigate(resolveChamberPath(option.createPath, option.chamber, true));
+              nav.push(resolveChamberPath(option.createPath, option.chamber, true));
             }}
           >
             <ChamberMark name={option.chamber} />
