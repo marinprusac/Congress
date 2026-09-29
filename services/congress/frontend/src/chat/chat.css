@@ -40,6 +40,12 @@ html:has(.chat-page) body {
 }
 
 @media (max-width: 640px) {
+  /* Dock the bar to the visual viewport like .chat-page, not the layout
+     viewport, which iOS leaves shifted after the keyboard closes. */
+  html:has(.chat-page) .shell-tabbar {
+    top: calc(var(--vv-top, 0px) + var(--vv-height, 100dvh) - var(--mobile-nav-height));
+    bottom: auto;
+  }
   html.chat-composing .shell-tabbar {
     display: none;
   }

@@ -144,7 +144,7 @@
   }
 }
 
-/* ---- Home: composer, pinned "stories" row, feed ---- */
+/* ---- Home: pinned "stories" row, feed ---- */
 
 .home-main {
   padding-top: 0.5rem;
@@ -154,12 +154,6 @@
   .home-main {
     padding-top: 1.5rem;
   }
-}
-
-.home-composer {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.25rem;
 }
 
 /* Home's one header action (Settings) stays on the title row on phones. */
@@ -185,61 +179,6 @@
 .home-settings-link svg {
   width: 1.35rem;
   height: 1.35rem;
-}
-
-.home-composer-wrap {
-  min-width: 0;
-  flex: 1;
-}
-
-.home-composer-field {
-  border: 1px solid var(--color-dust);
-  background: var(--color-parchment);
-  padding: 0.55rem 0.75rem;
-  color: var(--color-ink);
-}
-
-/* 16px keeps iOS from zooming in on focus. */
-.home-composer-field .cm-editor,
-.home-composer-field .cm-content {
-  font-size: 16px;
-}
-
-.home-composer-field:focus-within {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -1px;
-}
-
-.home-composer-field .cm-editor.cm-focused {
-  outline: none;
-}
-
-.home-composer-send {
-  flex: 0 0 auto;
-  width: 2.75rem;
-  background-color: var(--color-accent);
-  color: var(--color-parchment);
-  font-size: 1.15rem;
-}
-
-.home-composer-send:disabled {
-  opacity: 0.6;
-}
-
-.home-composer-spinner {
-  display: inline-block;
-  width: 0.9rem;
-  height: 0.9rem;
-  border: 1.5px solid color-mix(in srgb, var(--color-parchment) 45%, transparent);
-  border-top-color: var(--color-parchment);
-  border-radius: 999px;
-  animation: home-composer-spin 0.8s linear infinite;
-}
-
-@keyframes home-composer-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .home-stories {

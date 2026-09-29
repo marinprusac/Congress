@@ -1,16 +1,12 @@
-import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { ChamberRegistryEntry, FeedItem } from "@congress/shared-types";
 import {
   ChamberHeader,
   CapitolMark,
   ChamberMark,
-  ExhibitInlineField,
   fetchRegistry,
-  getChamberIcon,
   resolveChamberPath,
-  showToast,
   useAppliedTheme,
   useCapitolSettings,
 } from "@congress/congress-ui";
@@ -19,61 +15,11 @@ import { HomeAsks } from "@/components/HomeAsks";
 import { GearIcon } from "@/components/TabBar";
 import { feedQueryKey, fetchFeed } from "@/lib/feedApi";
 import { formatPreviewTime } from "@/lib/formatPreviewTime";
-import { aiThreadQueryKey, aiThreadsQueryKey, createAiThread } from "@/lib/aiApi";
 
 function findView(registry: ChamberRegistryEntry[] | undefined, chamber: string, viewId: string) {
   const entry = registry?.find((c) => c.name === chamber);
   const view = entry?.views?.find((v) => v.id === viewId);
   return entry && view ? { entry, view } : null;
-}
-
-// "Ask Congress" - starts a new chat thread with the message and opens it;
-// "@" references an exhibit, same as in the chat itself.
-function Composer() {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
-  const submit = async () => {
-    const trimmed = text.trim();
-    if (!trimmed) return navigate("/chat");
-    if (sending) return;
-    setSending(true);
-    try {
-      const { thread, runId } = await createAiThread({ text: trimmed });
-      queryClient.setQueryData(aiThreadQueryKey(thread.id), { ...thread, pendingRunId: runId });
-      // The run may already be over (an instant refusal); confirm with the server.
-      void queryClient.invalidateQueries({ queryKey: aiThreadQueryKey(thread.id) });
-      void queryClient.invalidateQueries({ queryKey: aiThreadsQueryKey });
-      setText("");
-      navigate(`/chat/${thread.id}`);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Couldn't reach Congress", "error");
-      setSending(false);
-    }
-  };
-  return (
-    <form
-      className="home-composer"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void submit();
-      }}
-    >
-      <ExhibitInlineField
-        value={text}
-        onChange={setText}
-        placeholder="Ask Congress —"
-        className="home-composer-field"
-        wrapperClassName="exhibit-field home-composer-wrap"
-        renderIcon={(chamber) => getChamberIcon(chamber)}
-        onEnter={() => void submit()}
-      />
-      <button type="submit" className="home-composer-send" disabled={sending} aria-label={text.trim() ? "Ask" : "Open chats"}>
-        {sending ? <span className="home-composer-spinner" aria-hidden="true" /> : "→"}
-      </button>
-    </form>
-  );
 }
 
 // The owner's pinned views - fixed shortcuts above the ranked feed, the way
@@ -134,8 +80,7 @@ function FeedEntry({ item, registry }: { item: FeedItem; registry: ChamberRegist
   );
 }
 
-// Congress's home: a "For You" feed. The AI composer on top, the owner's
-// pinned views, then every active Chamber's views and exhibits ranked by how
+// Congress's home: a "For You" feed. The owner's pinned views, then every active Chamber's views and exhibits ranked by how
 // much they matter right now (GET /congress/feed - the ranking itself lives
 // server-side, see services/congress/src/feed.ts).
 export function HomePage() {
@@ -156,7 +101,6 @@ export function HomePage() {
         }
       />
       <main className="chamber-main home-main">
-        <Composer />
         <HomeAsks />
         <PinnedViews registry={registry} />
         {feed.isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}

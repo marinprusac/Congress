@@ -33,4 +33,6 @@ export function useVisualViewportVars(): void {
 // covers it anyway), handing its space to the conversation.
 export function setComposing(on: boolean): void {
   document.documentElement.classList.toggle("chat-composing", on);
+  // iOS can leave the page scrolled after the keyboard closes; the chat never scrolls the window.
+  if (!on && window.scrollY !== 0) window.scrollTo(0, 0);
 }
