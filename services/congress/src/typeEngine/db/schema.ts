@@ -88,6 +88,27 @@ export const files = sqliteTable(
   (t) => [index("files_orphaned_idx").on(t.orphanedAt)]
 );
 
+// Builder mode's unpublished changes: ops against base_version (or a rollback),
+// owned by the AI thread that holds the grant.
+export const typeDrafts = sqliteTable(
+  "type_drafts",
+  {
+    id: text("id").primaryKey(),
+    typeId: text("type_id"),
+    baseVersion: integer("base_version").notNull(),
+    rollbackTo: integer("rollback_to"),
+    opsJson: text("ops_json").notNull(),
+    threadId: integer("thread_id").notNull(),
+    state: text("state", { enum: ["open", "published", "discarded"] }).notNull(),
+    // Last publish failure, shown to the AI.
+    problemsJson: text("problems_json"),
+    publishedVersion: integer("published_version"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [index("type_drafts_thread_idx").on(t.threadId, t.state)]
+);
+
 // The step each record last reached on each time-trigger ladder (keyed by field id).
 export const recordTriggerState = sqliteTable(
   "record_trigger_state",

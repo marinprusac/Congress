@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import { requireSession } from "../sessionAuth.js";
-import { getTypeBySlug, listTypes, listVersions } from "./store.js";
+import { getTypeBySlug, listTypes, listVersions, recordCount } from "./store.js";
 import {
   createRecord,
   deleteRecord,
@@ -23,7 +23,14 @@ import { createStreamBody } from "@hono/node-server/utils/stream";
 // Session-gated REST for types and records, mounted at /congress.
 export const typeRoutes = new Hono<{ Bindings: HttpBindings }>();
 
-const summary = (t: ReturnType<typeof listTypes>[number]) => ({ id: t.id, version: t.version, origin: t.origin, definition: t.definition });
+const summary = (t: ReturnType<typeof listTypes>[number]) => ({
+  id: t.id,
+  version: t.version,
+  origin: t.origin,
+  definition: t.definition,
+  forked: t.forked,
+  recordCount: recordCount(t.id),
+});
 
 typeRoutes.get("/types", requireSession, (c) => c.json(listTypes({ includeHidden: c.req.query("all") === "1" }).map(summary)));
 

@@ -4,7 +4,7 @@ import type { Operation } from "@congress/shared-types";
 import { env } from "../env.js";
 import { exhibitsSqlite, runExhibitsMigrations } from "./db/client.js";
 import { backupDir } from "./backups.js";
-import { getTypeBySlug, listTypes, listVersions, publish, PublishError, reloadTypes, rollback } from "./store.js";
+import { getTypeBySlug, listTypes, listVersions, previewPublish, previewRollback, publish, PublishError, reloadTypes, rollback } from "./store.js";
 
 const create: Operation[] = [
   { op: "create_type", slug: "book", label: "Book" },
@@ -97,5 +97,52 @@ describe("rollback", () => {
     expect(read.retired).toBe(false);
     expect(back.type.definition.fields.find((f) => f.slug === "pages")?.kind).toBe("text");
     expect(exhibitsSqlite.prepare("SELECT read, pages FROM x_book WHERE id = 'a'").get()).toEqual({ read: 1, pages: "412" });
+  });
+});
+
+describe("preview", () => {
+  const dbState = () => ({
+    version: getTypeBySlug("book")!.version,
+    rows: rows(),
+    columns: exhibitsSqlite.prepare("SELECT name FROM pragma_table_info('x_book')").all(),
+  });
+
+  it("reports the same warning counts as publishing, and writes nothing", () => {
+    exhibitsSqlite.prepare("UPDATE x_book SET title = 'x' WHERE id = 'c'").run();
+    exhibitsSqlite.prepare("UPDATE x_book SET pages = 'lots' WHERE id = 'b'").run();
+    publish({ typeId, ops: [{ op: "change_field_kind", field: "pages", kind: "text" }], actor: "test" });
+    const before = dbState();
+    const ops: Operation[] = [{ op: "change_field_kind", field: "pages", kind: "number" }, { op: "add_field", slug: "isbn", label: "ISBN", kind: "text" }];
+    const preview = previewPublish(typeId, ops);
+    expect(preview.errors).toEqual([]);
+    expect(preview.plan?.rebuild).toBe(true);
+    expect(preview.changes.map((c) => c.text)).toEqual(["Change “Pages” from text to number", 'Add field “ISBN” (text)']);
+    expect(dbState()).toEqual(before);
+
+    const published = publish({ typeId, ops, actor: "test" });
+    expect(published.warnings).toEqual(preview.warnings.map((w) => `${w.label} (${w.count})`));
+    expect(preview.warnings[0]?.count).toBeGreaterThan(0);
+  });
+
+  it("reports blockers and op errors without throwing", () => {
+    insert("d", "Dune", "1");
+    expect(previewPublish(typeId, [{ op: "set_field_options", field: "title", options: { unique: true } }]).blockers).toEqual([
+      expect.objectContaining({ count: 1 }),
+    ]);
+    expect(previewPublish(typeId, [{ op: "retire_field", field: "nope" }]).errors).toEqual([expect.stringMatching(/no field/)]);
+    expect(previewPublish(undefined, [{ op: "add_field", slug: "x", label: "X", kind: "text" }]).errors).toHaveLength(1);
+  });
+
+  it("previews a rollback as a diff", () => {
+    const preview = previewRollback(typeId, 1);
+    expect(preview.errors).toEqual([]);
+    expect(preview.changes.some((c) => c.text.startsWith("Retire"))).toBe(true);
+    expect(previewRollback(typeId, 999).errors).toHaveLength(1);
+  });
+
+  it("lists versions with their changes, newest first", () => {
+    const versions = listVersions(typeId);
+    expect(versions[0]!.version).toBe(getTypeBySlug("book")!.version);
+    expect(versions.at(-1)!.changes[0]).toEqual({ area: "type", text: "Create type “Book” (Books)" });
   });
 });
