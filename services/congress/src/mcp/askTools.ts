@@ -4,6 +4,7 @@ import { mcpTextResult } from "@congress/chamber-kit";
 import { askFieldSchema, proposedActionSchema } from "@congress/shared-types";
 import { currentRunContext } from "../ai/runContext.js";
 import { AskClosedError, AskInvalidError, AskNotFoundError, askQuestion, listAsksForAi, proposeActions, sendMessage, withdrawAsk } from "../ai/asks.js";
+import { requestBuilderMode } from "../ai/builder.js";
 
 const urgency = z
   .enum(["quiet", "push"])
@@ -99,6 +100,26 @@ export function registerAskTools(server: McpServer) {
     ({ title, rationale, actions, urgency }) =>
       guarded(async () => {
         const { message, delivery } = await proposeActions({ title, rationale, actions, urgency }, currentRunContext());
+        return { ok: true, messageId: message.id, threadId: message.threadId, delivery };
+      })
+  );
+
+  server.registerTool(
+    "request_builder_mode",
+    {
+      title: "Request Builder Mode",
+      description:
+        "Ask the owner for builder mode, needed to create or change exhibit types (their fields, feed rules, time triggers) or roll one back. You can't change types without it. The owner grants it for a while in this thread; the builder tools then appear in the follow-up run, and every publish still needs their approval.",
+      inputSchema: {
+        title: z.string().min(1).max(120).describe('Short headline, e.g. "Add a Book type".'),
+        reason: z.string().min(1).max(2000).describe("To the owner, in Markdown: what you want to build or change and why."),
+        scope: z.string().max(300).optional().describe("The types you expect to create or change."),
+        urgency,
+      },
+    },
+    ({ title, reason, scope, urgency }) =>
+      guarded(async () => {
+        const { message, delivery } = await requestBuilderMode({ title, reason, scope, urgency }, currentRunContext());
         return { ok: true, messageId: message.id, threadId: message.threadId, delivery };
       })
   );

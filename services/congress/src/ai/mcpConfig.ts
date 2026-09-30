@@ -32,7 +32,8 @@ export function selfBaseUrl(): string {
 // land in the right thread (see runContext.ts).
 export function buildMcpServers(
   actor: string,
-  run: RunContextInfo = { runId: null, threadId: null }
+  run: RunContextInfo = { runId: null, threadId: null },
+  opts: { builder?: boolean } = {}
 ): Record<string, { type: "http"; url: string; headers: Record<string, string> }> {
   const headers = { "X-Congress-Internal-Token": env.CONGRESS_INTERNAL_TOKEN, [ACTOR_HEADER]: actor };
   const congressHeaders: Record<string, string> = { ...headers };
@@ -41,7 +42,9 @@ export function buildMcpServers(
   const mcpServers: Record<string, { type: "http"; url: string; headers: Record<string, string> }> = {
     congress: { type: "http", url: `${selfBaseUrl()}/mcp`, headers: congressHeaders },
   };
-  if (getLocalSource("e")) mcpServers.types = { type: "http", url: `${selfBaseUrl()}/mcp/types`, headers };
+  if (getLocalSource("e")) mcpServers.types = { type: "http", url: `${selfBaseUrl()}/mcp/types`, headers: congressHeaders };
+  // Only for a thread with a builder-mode grant (the server re-checks it).
+  if (opts.builder) mcpServers.builder = { type: "http", url: `${selfBaseUrl()}/mcp/builder`, headers: congressHeaders };
   for (const chamber of listChambers()) {
     if (chamber.status !== "active" || !chamber.mcpUrl) continue;
     mcpServers[chamber.name] = { type: "http", url: chamber.mcpUrl, headers };
@@ -51,9 +54,9 @@ export function buildMcpServers(
 
 // `empty`: a config with no servers at all (the gate), so the CLI can't fall
 // back to whatever MCP servers this machine's user has configured.
-export async function writeMcpConfigFile(actor: string, run?: RunContextInfo, opts: { empty?: boolean } = {}): Promise<McpConfigFile> {
+export async function writeMcpConfigFile(actor: string, run?: RunContextInfo, opts: { empty?: boolean; builder?: boolean } = {}): Promise<McpConfigFile> {
   const dir = await mkdtemp(join(tmpdir(), "congress-ai-mcp-"));
   const path = join(dir, "mcp.json");
-  await writeFile(path, JSON.stringify({ mcpServers: opts.empty ? {} : buildMcpServers(actor, run) }, null, 2));
+  await writeFile(path, JSON.stringify({ mcpServers: opts.empty ? {} : buildMcpServers(actor, run, opts) }, null, 2));
   return { path, cleanup: () => rm(dir, { recursive: true, force: true }) };
 }

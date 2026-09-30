@@ -55,7 +55,7 @@ export function forwardToChamber(c: Context): Promise<Response> {
 const RECORD_ICON = fileURLToPath(new URL("../frontend/public/icons/record.svg", import.meta.url));
 
 export async function serveChamberIcon(c: Context, chamberName: string): Promise<Response> {
-  if (chamberName === "e" || chamberName === "types") {
+  if (chamberName === "e" || chamberName === "types" || chamberName === "builder") {
     const svg = await readFile(RECORD_ICON);
     return c.body(svg, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=3600" });
   }

@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import {
   answerSchemaFor,
   askProposalPayloadSchema,
@@ -62,7 +62,11 @@ export function threadForRun(runId: string): number | null {
   return runThreads.get(runId) ?? null;
 }
 
-const dedupeKey = (messageId: number) => `ask-${messageId}`;
+export const dedupeKey = (messageId: number) => `ask-${messageId}`;
+
+// Asks that wait on the owner (a message only informs).
+export const DECISION_KINDS = ["question", "proposal", "builder_request", "type_publish"] as const;
+type DecisionKind = (typeof DECISION_KINDS)[number];
 
 async function pushesToday(now: Date, timeZone: string | null): Promise<number> {
   return db
@@ -97,13 +101,13 @@ async function deliver(messageId: number, now = new Date()): Promise<PushDecisio
   return decision;
 }
 
-function askTitle(message: AiMessage): string {
+export function askTitle(message: AiMessage): string {
   const payload = message.payload as { title?: string | null } | null;
   return payload?.title ?? "";
 }
 
-interface NewAsk {
-  kind: "message" | "question" | "proposal";
+export interface NewAsk {
+  kind: "message" | DecisionKind;
   title: string;
   text: string;
   payload: unknown;
@@ -117,7 +121,7 @@ export function unescapeNewlines(text: string): string {
   return text.includes("\n") ? text : text.replace(/\\n/g, "\n").replace(/\\t/g, "  ");
 }
 
-async function createAsk(ask: NewAsk, origin: AskOrigin): Promise<{ message: AiMessage; delivery: PushDecision | "scheduled" }> {
+export async function createAsk(ask: NewAsk, origin: AskOrigin): Promise<{ message: AiMessage; delivery: PushDecision | "scheduled" }> {
   ask = { ...ask, text: unescapeNewlines(ask.text) };
   const threadId = targetThread(origin, ask.title);
   const delayed = ask.deliverAt && ask.deliverAt.getTime() > Date.now();
@@ -186,10 +190,10 @@ function formatIssues(issues: { path: (string | number)[]; message: string }[]):
   return issues.map((i) => `${i.path.join(".") || "input"}: ${i.message}`).join("; ");
 }
 
-function requireOpenAsk(messageId: number, kind: "question" | "proposal"): AiMessage {
+export function requireOpenAsk(messageId: number, kind: DecisionKind): AiMessage {
   const message = getMessage(messageId);
   if (!message || message.kind !== kind) throw new AskNotFoundError();
-  if (message.askState !== "open") throw new AskClosedError(`This ${kind} is ${message.askState}.`);
+  if (message.askState !== "open") throw new AskClosedError(`This ${kind.replace("_", " ")} is ${message.askState}.`);
   return message;
 }
 
@@ -197,7 +201,7 @@ function requireOpenAsk(messageId: number, kind: "question" | "proposal"): AiMes
 // A delivered message can't be unsent.
 export function withdrawAsk(messageId: number): AiMessage {
   const message = getMessage(messageId);
-  if (!message || !["message", "question", "proposal"].includes(message.kind)) throw new AskNotFoundError();
+  if (!message || !["message", ...DECISION_KINDS].includes(message.kind)) throw new AskNotFoundError();
   if (message.kind === "message") {
     if (isDelivered(messageId)) throw new AskClosedError("It was already delivered and can't be unsent.");
     db.delete(aiMessages).where(eq(aiMessages.id, messageId)).run();
@@ -341,7 +345,7 @@ export function listOpenAsks(now = new Date()): OpenAsk[] {
       and(
         isNotNull(aiMessages.deliveredAt),
         or(
-          and(or(eq(aiMessages.kind, "question"), eq(aiMessages.kind, "proposal")), eq(aiMessages.askState, "open")),
+          and(inArray(aiMessages.kind, [...DECISION_KINDS]), eq(aiMessages.askState, "open")),
           and(eq(aiMessages.kind, "message"), gte(aiMessages.deliveredAt, recent))
         )
       )
@@ -467,7 +471,7 @@ export async function listAsksForAi(now = new Date()) {
     .from(aiMessages)
     .where(
       or(
-        and(or(eq(aiMessages.kind, "question"), eq(aiMessages.kind, "proposal")), eq(aiMessages.askState, "open")),
+        and(inArray(aiMessages.kind, [...DECISION_KINDS]), eq(aiMessages.askState, "open")),
         and(eq(aiMessages.kind, "message"), or(isNull(aiMessages.deliveredAt), gte(aiMessages.deliveredAt, dayAgo)))
       )
     )

@@ -37,6 +37,7 @@ import { getFeed } from "./feed.js";
 import { googleConnectorRoutes } from "./connectors/google/routes.js";
 import { typeRoutes } from "./typeEngine/routes.js";
 import { registerTypeTools } from "./typeEngine/mcpTools.js";
+import { registerBuilderTools } from "./mcp/builderTools.js";
 
 // Chamber included per-ref since an id that never synced has no cache row to
 // infer the owning chamber from.
@@ -221,6 +222,10 @@ app.use("/mcp/*", (c, next) => withRunContext(parseRunContext((h) => c.req.heade
 // Runtime exhibit types' tools (typeEngine/mcpTools.ts), rebuilt per request.
 const typesMcpApp = createMcpApp("types", registerTypeTools, env.CONGRESS_INTERNAL_TOKEN);
 app.all("/mcp/types", (c) => typesMcpApp.fetch(c.req.raw, c.env));
+
+// Builder mode's tools (mcp/builderTools.ts), only for granted threads.
+const builderMcpApp = createMcpApp("builder", registerBuilderTools, env.CONGRESS_INTERNAL_TOKEN);
+app.all("/mcp/builder", (c) => builderMcpApp.fetch(c.req.raw, c.env));
 
 // Each Chamber's MCP server - still real HTTP, since the CLI is a subprocess.
 const chamberMcpApps = new Map<string, ReturnType<typeof createMcpApp>>();
