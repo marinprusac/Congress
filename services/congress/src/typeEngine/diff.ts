@@ -1,0 +1,141 @@
+import type {
+  DefinitionChange,
+  FeedRule,
+  FieldDefinition,
+  FieldOptions,
+  TimeTrigger,
+  TypeAction,
+  TypeDefinition,
+} from "@congress/shared-types";
+
+// Pure: a definition change as short sentences for the owner to review.
+
+type Area = DefinitionChange["area"];
+
+export function diffDefinitions(before: TypeDefinition | null, after: TypeDefinition): DefinitionChange[] {
+  const out: DefinitionChange[] = [];
+  const add = (area: Area, text: string) => out.push({ area, text });
+  const name = (def: TypeDefinition, id: string | null) => {
+    const f = id ? def.fields.find((x) => x.id === id) : undefined;
+    return f ? `“${f.label}”` : "none";
+  };
+
+  if (!before) {
+    add("type", `Create type “${after.label}” (${after.pluralLabel})${after.hidden ? ", hidden" : ""}`);
+  } else {
+    if (before.slug !== after.slug) add("type", `Rename type slug ${before.slug} → ${after.slug}`);
+    if (before.label !== after.label || before.pluralLabel !== after.pluralLabel) {
+      add("type", `Rename type “${before.label}” (${before.pluralLabel}) → “${after.label}” (${after.pluralLabel})`);
+    }
+    if (before.icon !== after.icon) add("type", `Change icon to ${after.icon || "none"}`);
+    if (before.eventPrefix !== after.eventPrefix) add("type", `Event prefix ${before.eventPrefix} → ${after.eventPrefix}`);
+    if (before.hidden !== after.hidden) add("type", after.hidden ? "Hide type" : "Show type");
+  }
+
+  const prev = new Map((before?.fields ?? []).map((f) => [f.id, f]));
+  for (const f of after.fields) {
+    const p = prev.get(f.id);
+    if (!p) {
+      add("fields", `${f.retired ? "Add retired field" : "Add field"} “${f.label}” (${describeField(f)})`);
+      continue;
+    }
+    if (p.slug !== f.slug || p.label !== f.label) add("fields", `Rename “${p.label}” (${p.slug}) → “${f.label}” (${f.slug})`);
+    if (p.kind !== f.kind) add("fields", `Change “${f.label}” from ${p.kind} to ${f.kind}`);
+    const opts = optionChanges(p.options, f.options);
+    if (opts.length) add("fields", `“${f.label}”: ${opts.join(", ")}`);
+    if (p.retired !== f.retired) add("fields", `${f.retired ? "Retire" : "Restore"} “${f.label}”`);
+  }
+  if (before) {
+    // Order of the fields active on both sides.
+    const both = new Set(after.fields.filter((f) => !f.retired && prev.get(f.id)?.retired === false).map((f) => f.id));
+    const order = (def: TypeDefinition) => def.fields.filter((f) => both.has(f.id)).map((f) => f.id).join();
+    if (order(before) !== order(after)) add("fields", "Reorder fields");
+  }
+
+  if ((before?.titleField ?? null) !== after.titleField) add("layout", `Title field: ${name(after, after.titleField)}`);
+  if ((before?.layout.body ?? null) !== after.layout.body) add("layout", `Body field: ${name(after, after.layout.body)}`);
+
+  const changed = <T>(a: T[] | undefined, b: T[]) => JSON.stringify(a ?? []) !== JSON.stringify(b);
+  if (changed(before?.actions, after.actions)) {
+    if (!after.actions.length) add("actions", "Remove all actions");
+    for (const a of after.actions) add("actions", `Action: ${describeAction(after, a)}`);
+  }
+  if (changed(before?.feedRules, after.feedRules)) {
+    if (!after.feedRules.length) add("feed", "Remove all feed rules");
+    for (const r of after.feedRules) add("feed", `Feed rule: ${describeRule(after, r)}`);
+  }
+  if (changed(before?.timeTriggers, after.timeTriggers)) {
+    if (!after.timeTriggers.length) add("triggers", "Remove all time triggers");
+    for (const t of after.timeTriggers) add("triggers", `Time trigger: ${describeTrigger(after, t)}`);
+  }
+  return out;
+}
+
+function describeField(f: FieldDefinition): string {
+  const bits: string[] = [f.kind];
+  const o = f.options;
+  if (o.target) bits[0] = `${o.many ? "many " : ""}${o.target}`;
+  if (o.options) bits.push(o.options.map((x) => x.label).join("/"));
+  for (const key of ["required", "unique", "searchable", "indexed", "integer", "readonly"] as const) if (o[key]) bits.push(key);
+  return bits.join(", ");
+}
+
+function optionChanges(a: FieldOptions, b: FieldOptions): string[] {
+  const out: string[] = [];
+  for (const key of ["required", "unique", "searchable", "indexed", "integer", "readonly", "many"] as const) {
+    if (Boolean(a[key]) !== Boolean(b[key])) out.push(`${key} ${b[key] ? "on" : "off"}`);
+  }
+  if (a.target !== b.target) out.push(`target ${b.target ?? "none"}`);
+  const before = new Map((a.options ?? []).map((o) => [o.value, o.label]));
+  const after = new Map((b.options ?? []).map((o) => [o.value, o.label]));
+  for (const [v, label] of after) {
+    if (!before.has(v)) out.push(`+option ${label}`);
+    else if (before.get(v) !== label) out.push(`option ${before.get(v)} → ${label}`);
+  }
+  for (const [v, label] of before) if (!after.has(v)) out.push(`−option ${label}`);
+  return out;
+}
+
+const fieldLabel = (def: TypeDefinition, ref: string) => {
+  const f = def.fields.find((x) => x.id === ref) ?? def.fields.find((x) => x.slug === ref);
+  return f ? f.slug : ref;
+};
+
+function describeConditions(def: TypeDefinition, and: { field: string; value: unknown }[] | undefined): string {
+  return (and ?? []).map((c) => ` and ${fieldLabel(def, c.field)} = ${JSON.stringify(c.value)}`).join("");
+}
+
+function describeAction(def: TypeDefinition, a: TypeAction): string {
+  const events = [a.onEvent && `on → ${a.onEvent}`, a.offEvent && `off → ${a.offEvent}`].filter(Boolean).join(", ");
+  const stamp = a.stampField ? `, stamps ${fieldLabel(def, a.stampField)}` : "";
+  return `${a.off}/${a.on} toggles ${fieldLabel(def, a.field)}${events ? ` (${events})` : ""}${stamp}`;
+}
+
+function describeRule(def: TypeDefinition, r: FeedRule): string {
+  const w = r.when;
+  const when =
+    w.op === "within_next"
+      ? `${fieldLabel(def, w.field)} within ${w.hours}h`
+      : w.op === "overdue"
+        ? `${fieldLabel(def, w.field)} overdue`
+        : w.op === "eq"
+          ? `${fieldLabel(def, w.field)} = ${JSON.stringify(w.value)}`
+          : w.op === "is_set"
+            ? `${fieldLabel(def, w.field)} is set`
+            : `updated within ${w.hours}h`;
+  return `${when}${describeConditions(def, r.and)} → score ${r.score}${r.reason ? ` “${r.reason}”` : ""}`;
+}
+
+function formatOffset(minutes: number): string {
+  if (minutes === 0) return "at the time";
+  const abs = Math.abs(minutes);
+  const unit = abs % 1440 === 0 ? `${abs / 1440}d` : abs % 60 === 0 ? `${abs / 60}h` : `${abs}m`;
+  return `${unit} ${minutes < 0 ? "before" : "after"}`;
+}
+
+function describeTrigger(def: TypeDefinition, t: TimeTrigger): string {
+  const steps = t.steps.map((s) => `${s.event} ${formatOffset(s.offsetMinutes)}`).join(", ");
+  const anchor = t.anchor ? ` (${t.anchor.replace(/_/g, " ")})` : "";
+  const clear = t.clearEvent ? `; clears with ${t.clearEvent.event}` : "";
+  return `${fieldLabel(def, t.field)}${anchor}${describeConditions(def, t.and)}: ${steps}${clear}`;
+}

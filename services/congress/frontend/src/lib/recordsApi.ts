@@ -1,4 +1,4 @@
-import type { CapitolExhibitSearchResult, FileRef, RecordDto, RecordValue, TypeSummary } from "@congress/shared-types";
+import type { CapitolExhibitSearchResult, FileRef, RecordDto, RecordValue, TypeOverview, TypeSummary, TypeVersion } from "@congress/shared-types";
 
 // Runtime exhibit types and their records (server: src/typeEngine/routes.ts).
 
@@ -23,6 +23,14 @@ async function check<T>(res: Response): Promise<T> {
 // Hidden types are included: a direct /e/... link to one still renders.
 export async function fetchTypes(): Promise<TypeSummary[]> {
   return check(await fetch("/congress/types?all=1"));
+}
+
+export async function fetchTypeOverviews(): Promise<TypeOverview[]> {
+  return check(await fetch("/congress/types?all=1"));
+}
+
+export async function fetchTypeVersions(slug: string): Promise<TypeVersion[]> {
+  return check(await fetch(`/congress/types/${encodeURIComponent(slug)}/versions`));
 }
 
 export async function fetchRecord(id: string): Promise<RecordDto> {

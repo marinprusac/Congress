@@ -166,3 +166,25 @@ export const recordDtoSchema = z.object({
   provenance: z.object({ binding: z.string(), key: z.string() }).nullable(),
 });
 export type RecordDto = z.infer<typeof recordDtoSchema>;
+
+// One human-readable line of a definition diff (Settings → Types, publish asks).
+export const definitionChangeSchema = z.object({
+  area: z.enum(["type", "fields", "layout", "actions", "feed", "triggers"]),
+  text: z.string(),
+});
+export type DefinitionChange = z.infer<typeof definitionChangeSchema>;
+
+export const typeVersionSchema = z.object({
+  version: z.number().int(),
+  actor: z.string(),
+  createdAt: z.string(),
+  changes: z.array(definitionChangeSchema),
+});
+export type TypeVersion = z.infer<typeof typeVersionSchema>;
+
+// Settings → Types list entry.
+export const typeOverviewSchema = typeSummarySchema.extend({
+  forked: z.boolean(),
+  recordCount: z.number().int(),
+});
+export type TypeOverview = z.infer<typeof typeOverviewSchema>;

@@ -1,15 +1,17 @@
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
-import type { Operation, TypeDefinition, TypeSummary } from "@congress/shared-types";
+import type { Operation, TypeDefinition, TypeSummary, TypeVersion } from "@congress/shared-types";
+import { count } from "drizzle-orm";
 import { typeDefinitionSchema } from "@congress/shared-types";
 import { env } from "../env.js";
 import { exhibitsDb, exhibitsSqlite } from "./db/client.js";
-import { types, typeVersions } from "./db/schema.js";
+import { records, types, typeVersions } from "./db/schema.js";
 import { applyOperations, OperationError, rollbackDefinition } from "./operations.js";
 import { planMigration, type MigrationPlan } from "./planner.js";
 import { isJoinField } from "./ddl.js";
 import { backupDir, snapshot } from "./backups.js";
 import { ulid } from "./ulid.js";
+import { diffDefinitions } from "./diff.js";
 
 // Owns every type definition: publishing applies ops, plans the migration
 // and runs it together with the version row in one transaction.
@@ -104,42 +106,110 @@ function tablesUsedExcept(typeId: string | undefined): Set<string> {
   return taken;
 }
 
-export function publish(input: PublishInput): PublishResult {
+// Applies ops to the current definition; throws PublishError on any problem.
+function prepare(typeId: string | undefined, ops: Operation[]): { current: StoredType | undefined; def: TypeDefinition } {
   ensureLoaded();
-  const current = input.typeId ? cache.get(input.typeId) : undefined;
-  if (input.typeId && !current) throw new PublishError([`no type ${input.typeId}`]);
+  const current = typeId ? cache.get(typeId) : undefined;
+  if (typeId && !current) throw new PublishError([`no type ${typeId}`]);
   let applied: ReturnType<typeof applyOperations>;
   try {
-    applied = applyOperations(current?.definition ?? null, input.ops, { takenTables: tablesUsedExcept(input.typeId) });
+    applied = applyOperations(current?.definition ?? null, ops, { takenTables: tablesUsedExcept(typeId) });
   } catch (err) {
     if (err instanceof OperationError) throw new PublishError([err.message]);
     throw err;
   }
-  const { def, errors } = applied;
-  if (errors.length) throw new PublishError(errors);
+  if (applied.errors.length) throw new PublishError(applied.errors);
+  const clash = [...cache.values()].find((t) => t.id !== current?.id && t.definition.slug === applied.def.slug);
+  if (clash) throw new PublishError([`a type "${applied.def.slug}" already exists`]);
+  return { current, def: applied.def };
+}
+
+function prepareRollback(typeId: string, toVersion: number): { current: StoredType; def: TypeDefinition } {
+  ensureLoaded();
+  const current = cache.get(typeId);
+  if (!current) throw new PublishError([`no type ${typeId}`]);
+  const row = exhibitsDb.select().from(typeVersions).where(eq(typeVersions.typeId, typeId)).all().find((v) => v.version === toVersion);
+  if (!row || toVersion >= current.version) throw new PublishError([`no earlier version ${toVersion}`]);
+  const target = typeDefinitionSchema.parse(JSON.parse(row.definitionJson));
+  return { current, def: rollbackDefinition(current.definition, target) };
+}
+
+export function publish(input: PublishInput): PublishResult {
+  const { current, def } = prepare(input.typeId, input.ops);
   return commit(current, def, input.ops, input);
 }
 
 // Restores an earlier version's definition; fields added since stay, retired.
 export function rollback(typeId: string, toVersion: number, actor: string): PublishResult {
-  ensureLoaded();
-  const current = cache.get(typeId);
-  if (!current) throw new PublishError([`no type ${typeId}`]);
-  const row = exhibitsDb.select().from(typeVersions).where(eq(typeVersions.typeId, typeId)).all().find((v) => v.version === toVersion);
-  if (!row) throw new PublishError([`no version ${toVersion}`]);
-  const target = typeDefinitionSchema.parse(JSON.parse(row.definitionJson));
-  const def = rollbackDefinition(current.definition, target);
+  const { current, def } = prepareRollback(typeId, toVersion);
   return commit(current, def, [], { actor, ops: [] }, { rollbackTo: toVersion });
 }
 
-export function listVersions(typeId: string) {
-  return exhibitsDb
-    .select({ version: typeVersions.version, actor: typeVersions.actor, createdAt: typeVersions.createdAt, opsJson: typeVersions.opsJson })
+export interface PreflightCount {
+  label: string;
+  count: number;
+}
+
+export interface PublishPreview {
+  definition: TypeDefinition | null;
+  changes: ReturnType<typeof diffDefinitions>;
+  plan: MigrationPlan | null;
+  warnings: PreflightCount[];
+  blockers: PreflightCount[];
+  errors: string[];
+}
+
+function runPreflight(plan: MigrationPlan): { warnings: PreflightCount[]; blockers: PreflightCount[] } {
+  const warnings: PreflightCount[] = [];
+  const blockers: PreflightCount[] = [];
+  for (const check of plan.preflight) {
+    const n = Number((exhibitsSqlite.prepare(check.sql).get() as { n: number }).n);
+    if (n > 0) (check.block ? blockers : warnings).push({ label: check.label, count: n });
+  }
+  return { warnings, blockers };
+}
+
+// Read-only: what publishing these ops (or this rollback) would do right now.
+export function previewPublish(typeId: string | undefined, ops: Operation[]): PublishPreview {
+  return preview(() => prepare(typeId, ops));
+}
+
+export function previewRollback(typeId: string, toVersion: number): PublishPreview {
+  return preview(() => prepareRollback(typeId, toVersion));
+}
+
+function preview(prep: () => { current: StoredType | undefined; def: TypeDefinition }): PublishPreview {
+  let prepared: ReturnType<typeof prep>;
+  try {
+    prepared = prep();
+  } catch (err) {
+    if (err instanceof PublishError) return { definition: null, changes: [], plan: null, warnings: [], blockers: [], errors: err.problems };
+    throw err;
+  }
+  const before = prepared.current?.definition ?? null;
+  const plan = planMigration(before, prepared.def);
+  return { definition: prepared.def, changes: diffDefinitions(before, prepared.def), plan, ...runPreflight(plan), errors: [] };
+}
+
+export function listVersions(typeId: string): TypeVersion[] {
+  const rows = exhibitsDb
+    .select({ version: typeVersions.version, actor: typeVersions.actor, createdAt: typeVersions.createdAt, definitionJson: typeVersions.definitionJson })
     .from(typeVersions)
     .where(eq(typeVersions.typeId, typeId))
     .all()
-    .sort((a, b) => b.version - a.version)
-    .map((v) => ({ version: v.version, actor: v.actor, createdAt: v.createdAt.toISOString(), ops: JSON.parse(v.opsJson) as unknown }));
+    .sort((a, b) => a.version - b.version);
+  let prev: TypeDefinition | null = null;
+  const out: TypeVersion[] = [];
+  for (const row of rows) {
+    const def = typeDefinitionSchema.parse(JSON.parse(row.definitionJson));
+    out.push({ version: row.version, actor: row.actor, createdAt: row.createdAt.toISOString(), changes: diffDefinitions(prev, def) });
+    prev = def;
+  }
+  return out.reverse();
+}
+
+export function recordCount(typeId: string): number {
+  return exhibitsDb.select({ n: count() }).from(records).where(eq(records.typeId, typeId)).get()?.n ?? 0;
 }
 
 function commit(
@@ -149,9 +219,6 @@ function commit(
   input: PublishInput,
   meta: { rollbackTo?: number } = {}
 ): PublishResult {
-  const clash = [...cache.values()].find((t) => t.id !== current?.id && t.definition.slug === def.slug);
-  if (clash) throw new PublishError([`a type "${def.slug}" already exists`]);
-
   const plan = planMigration(current?.definition ?? null, def);
   if (plan.rebuild) {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -164,14 +231,9 @@ function commit(
   const warnings: string[] = [];
 
   exhibitsSqlite.transaction(() => {
-    const blocking: string[] = [];
-    for (const check of plan.preflight) {
-      const n = Number((exhibitsSqlite.prepare(check.sql).get() as { n: number }).n);
-      if (n === 0) continue;
-      if (check.block) blocking.push(`${check.label} (${n})`);
-      else warnings.push(`${check.label} (${n})`);
-    }
-    if (blocking.length) throw new PublishError(blocking);
+    const counts = runPreflight(plan);
+    if (counts.blockers.length) throw new PublishError(counts.blockers.map((b) => `${b.label} (${b.count})`));
+    warnings.push(...counts.warnings.map((w) => `${w.label} (${w.count})`));
     for (const step of plan.steps) exhibitsSqlite.exec(step);
 
     const definitionJson = JSON.stringify(def);

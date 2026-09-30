@@ -46,6 +46,17 @@ describe("type routes", () => {
     expect(await slugs("/congress/types?all=1")).toEqual(["note", "task", "document", "secret"]);
   });
 
+  it("describe types for Settings: counts, forks and versions as changes", async () => {
+    await call("/congress/records", { method: "POST", body: JSON.stringify({ type: "secret", values: { title: "One" } }) });
+    const list = (await (await call("/congress/types?all=1")).json()) as { definition: { slug: string }; recordCount: number; forked: boolean }[];
+    expect(list.find((t) => t.definition.slug === "secret")).toMatchObject({ recordCount: 1, forked: false });
+
+    const versions = (await (await call("/congress/types/task/versions")).json()) as { version: number; changes: { text: string }[] }[];
+    expect(versions.map((v) => v.version)).toEqual([2, 1]);
+    expect(versions[0]!.changes).toEqual([{ area: "type", text: "Show type" }]);
+    expect(versions[1]!.changes[0]).toEqual({ area: "type", text: "Create type “Task” (Tasks), hidden" });
+  });
+
   it("upload a file raw and serve it back inline, ranged and as a download", async () => {
     const put = await call("/congress/files?name=scan%20%C3%A9.pdf", { method: "PUT", body: "%PDF-hello", headers: { "Content-Type": "application/pdf" } });
     expect(put.status).toBe(201);

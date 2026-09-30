@@ -26,6 +26,7 @@ import { LogsTab } from "@/pages/LogsTab";
 import { AiSettingsTab } from "@/pages/AiSettingsTab";
 import { HomeSettingsTab } from "@/pages/HomeSettingsTab";
 import { AccountsTab } from "@/pages/AccountsTab";
+import { TypesSettingsTab } from "@/pages/TypesSettingsTab";
 
 function SettingsGearIcon() {
   return (
@@ -197,7 +198,7 @@ export function SettingsPage() {
   // will never appear (see the fallback render below for the loading gap
   // in between).
   useEffect(() => {
-    if (!panels || tab === "general" || tab === "home" || tab === "logs" || tab === "ai" || tab === "accounts") return;
+    if (!panels || tab === "general" || tab === "home" || tab === "logs" || tab === "ai" || tab === "accounts" || tab === "types") return;
     if (!panels.some((panel) => panel.name === tab)) setTab("general");
   }, [panels, tab]);
 
@@ -259,6 +260,15 @@ export function SettingsPage() {
           >
             Accounts
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "types"}
+            className={tab === "types" ? "settings-tab active" : "settings-tab"}
+            onClick={() => setTab("types")}
+          >
+            Types
+          </button>
           {(panels ?? []).map((panel) => (
             <button
               key={panel.name}
@@ -284,6 +294,8 @@ export function SettingsPage() {
             <AiSettingsTab />
           ) : tab === "accounts" ? (
             <AccountsTab />
+          ) : tab === "types" ? (
+            <TypesSettingsTab />
           ) : ActivePanelComponent && activePanel ? (
             <SettingsPanelErrorBoundary key={activePanel.name} chamberName={activePanel.displayName}>
               <Suspense fallback={<p className="font-mono text-sm text-dust">Loading —</p>}>
