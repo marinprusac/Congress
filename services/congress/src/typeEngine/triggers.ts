@@ -80,22 +80,23 @@ function publish(t: StoredType, event: string, id: string, title: string): void 
 }
 
 // Moves one record from `prev` to `cur`, publishing and storing the change.
-function transition(t: StoredType, trigger: TimeTrigger, id: string, title: string, cur: Step | null, prev: string | undefined, now: number): void {
+// `silent` stores the state without publishing (a backfill of past records).
+function transition(t: StoredType, trigger: TimeTrigger, id: string, title: string, cur: Step | null, prev: string | undefined, now: number, silent = false): void {
   if (cur && cur.event !== prev) {
     exhibitsDb
       .insert(recordTriggerState)
       .values({ recordId: id, typeId: t.id, ladder: trigger.field, state: cur.event, firedAt: new Date(now) })
       .onConflictDoUpdate({ target: [recordTriggerState.recordId, recordTriggerState.ladder], set: { state: cur.event, firedAt: new Date(now) } })
       .run();
-    publish(t, cur.event, id, title);
+    if (!silent) publish(t, cur.event, id, title);
   } else if (!cur && prev !== undefined) {
     exhibitsDb.delete(recordTriggerState).where(and(eq(recordTriggerState.recordId, id), eq(recordTriggerState.ladder, trigger.field))).run();
-    if (trigger.clearEvent) publish(t, trigger.clearEvent.event, id, title);
+    if (trigger.clearEvent && !silent) publish(t, trigger.clearEvent.event, id, title);
   }
 }
 
 // One record, right after a write (or its delete).
-export function evaluateRecord(t: StoredType, id: string, deleted?: RecordDto, now = Date.now()): void {
+export function evaluateRecord(t: StoredType, id: string, deleted?: RecordDto, now = Date.now(), silent = false): void {
   const def = t.definition;
   const zone = ownerZone();
   for (const trigger of def.timeTriggers) {
@@ -105,7 +106,7 @@ export function evaluateRecord(t: StoredType, id: string, deleted?: RecordDto, n
     if (!cur && prev === undefined) continue;
     const titleRow = row ?? (deleted ? undefined : (exhibitsSqlite.prepare(`SELECT * FROM ${quoteIdent(def.tableName)} WHERE "id" = ?`).get(id) as Row | undefined));
     const title = deleted ? titleFromDto(def, deleted) : titleRow ? titleOf(def, titleRow) : "";
-    transition(t, trigger, id, title, cur, prev, now);
+    transition(t, trigger, id, title, cur, prev, now, silent);
   }
 }
 
@@ -206,9 +207,9 @@ export async function startTimeTriggers(): Promise<void> {
   running = true;
   await refreshOwnerZone().catch((err) => console.warn("[types] owner time zone unavailable:", err));
   unsubscribers.push(
-    onRecordWrite((t, id, deleted) => {
+    onRecordWrite((t, id, deleted, info) => {
       if (t.definition.timeTriggers.length === 0) return;
-      evaluateRecord(t, id, deleted);
+      evaluateRecord(t, id, deleted, Date.now(), info?.quiet);
       rearm();
     }),
     onTypesChanged(() => tick())

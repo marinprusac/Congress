@@ -9,10 +9,13 @@ import {
   relatedRecords,
   listRecords,
   RecordConflictError,
+  RecordLockedError,
   RecordNotFoundError,
   RecordValidationError,
   updateRecord,
 } from "./records.js";
+import { bindingTargets, runBindingAction, withBinding } from "./bindings/runtime.js";
+import { ConnectorRefusedError } from "../connectors/contract.js";
 import { resolveLegacyAlias } from "./aliases.js";
 import { searchType } from "./source.js";
 import { contentDisposition, filePath, FileTooLargeError, getFile, isInlineMime, resolveByteRange, storeUpload } from "./files.js";
@@ -41,6 +44,12 @@ typeRoutes.get("/types/:slug", requireSession, (c) => {
   return t ? c.json(summary(t)) : c.json({ error: "not_found" }, 404);
 });
 
+// Where new records can go (e.g. which calendar), per binding that creates.
+typeRoutes.get("/types/:slug/targets", requireSession, (c) => {
+  const t = getTypeBySlug(c.req.param("slug"));
+  return t ? c.json(bindingTargets(t)) : c.json({ error: "not_found" }, 404);
+});
+
 typeRoutes.get("/types/:slug/versions", requireSession, (c) => {
   const t = getTypeBySlug(c.req.param("slug"));
   return t ? c.json(listVersions(t.id)) : c.json({ error: "not_found" }, 404);
@@ -50,6 +59,8 @@ function fail(c: Context, err: unknown) {
   if (err instanceof RecordNotFoundError) return c.json({ error: "not_found", message: err.message }, 404);
   if (err instanceof RecordValidationError) return c.json({ error: "invalid_request", issues: err.issues }, 400);
   if (err instanceof RecordConflictError) return c.json({ error: "unique_conflict", field: err.field, message: err.message }, 409);
+  if (err instanceof RecordLockedError) return c.json({ error: "locked", fields: err.fields, message: err.message }, 409);
+  if (err instanceof ConnectorRefusedError) return c.json({ error: "refused", message: err.message }, 409);
   throw err;
 }
 
@@ -74,7 +85,18 @@ typeRoutes.get("/records/search", requireSession, (c) => {
 
 typeRoutes.get("/records/:id", requireSession, (c) => {
   const record = getRecord(c.req.param("id"));
-  return record ? c.json(record) : c.json({ error: "not_found" }, 404);
+  return record ? c.json(withBinding(record)) : c.json({ error: "not_found" }, 404);
+});
+
+typeRoutes.post("/records/:id/actions/:action", requireSession, async (c) => {
+  try {
+    return c.json(await runBindingAction(c.req.param("id"), c.req.param("action")));
+  } catch (err) {
+    if (!(err instanceof ConnectorRefusedError) && !(err instanceof RecordLockedError) && !(err instanceof RecordNotFoundError)) {
+      return c.json({ error: "source_failed", message: (err as Error).message }, 502);
+    }
+    return fail(c, err);
+  }
 });
 
 typeRoutes.get("/records/:id/related", requireSession, (c) => {
@@ -86,7 +108,7 @@ typeRoutes.post("/records", requireSession, async (c) => {
   const body = (await c.req.json().catch(() => null)) as { type?: unknown; values?: unknown } | null;
   if (!body || typeof body.type !== "string") return c.json({ error: "invalid_request", message: "type is required" }, 400);
   try {
-    return c.json(createRecord(body.type, body.values ?? {}, { actor: "me" }), 201);
+    return c.json(withBinding(createRecord(body.type, body.values ?? {}, { actor: "me" })), 201);
   } catch (err) {
     return fail(c, err);
   }
@@ -95,7 +117,7 @@ typeRoutes.post("/records", requireSession, async (c) => {
 typeRoutes.patch("/records/:id", requireSession, async (c) => {
   const body = (await c.req.json().catch(() => null)) as { values?: unknown } | null;
   try {
-    return c.json(updateRecord(c.req.param("id"), body?.values ?? {}, { actor: "me" }));
+    return c.json(withBinding(updateRecord(c.req.param("id"), body?.values ?? {}, { actor: "me" })));
   } catch (err) {
     return fail(c, err);
   }

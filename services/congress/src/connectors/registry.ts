@@ -1,6 +1,6 @@
 import type { Connector, ConnectorContext } from "./contract.js";
 import { createSyncScheduler, type SyncStatus } from "./scheduler.js";
-import { addConnector, emitSourceChange, removeConnector } from "./runtime.js";
+import { addConnector, emitConnectorSynced, emitSourceChange, removeConnector } from "./runtime.js";
 import { googleApiFetch } from "./googleApi.js";
 import { listGoogleAccounts } from "./google/accounts.js";
 import { onEventPublished } from "../events.js";
@@ -77,7 +77,11 @@ export async function startConnectors(list: Connector[], opts: { context?: (c: C
     };
     const ctx = (opts.context ?? makeContext)(connector, hooks);
     const scheduler = createSyncScheduler({
-      sync: async () => (await connector.sync(ctx)).error,
+      sync: async () => {
+        const result = await connector.sync(ctx);
+        emitConnectorSynced(connector.name);
+        return result.error;
+      },
       intervalMs: () => connector.intervalMs?.() ?? DEFAULT_INTERVAL_MS,
     });
     const entry: Running = { connector, ctx, scheduler, state: "active", startError: null };

@@ -94,6 +94,41 @@ export const timeTriggerSchema = z.object({
 });
 export type TimeTrigger = z.infer<typeof timeTriggerSchema>;
 
+// A binding wires a connector's source records into this type. `sync` fields
+// are pulled and pushed back; `pull` fields are only pulled (read-only when bound).
+const connectorName = z.string().regex(/^[a-z][a-z0-9-]{0,40}$/);
+const sourceSlug = z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,40}$/);
+const scalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+// A per-record fact holds (truthy, or equal to `equals`).
+export const factConditionSchema = z.object({ fact: sourceSlug, equals: scalar.optional() });
+export type FactCondition = z.infer<typeof factConditionSchema>;
+export const bindingFieldSchema = z.object({ source: sourceSlug, target: z.string(), mode: z.enum(["sync", "pull"]) });
+export const bindingActionSchema = z.object({
+  id: slugSchema,
+  label: z.string().min(1).max(40),
+  // The connector's push.act action and its arguments.
+  act: z.string().min(1).max(40),
+  args: z.record(scalar).default({}),
+  when: z.array(factConditionSchema).max(3).default([]),
+  unless: z.array(factConditionSchema).max(3).default([]),
+});
+export type BindingAction = z.infer<typeof bindingActionSchema>;
+export const bindingSchema = z.object({
+  id: z.string(),
+  connector: connectorName,
+  kind: sourceSlug,
+  label: z.string().min(1).max(60),
+  fields: z.array(bindingFieldSchema).min(1).max(40),
+  // Sync fields turn read-only on records where this fact doesn't hold.
+  lock: factConditionSchema.optional(),
+  // New records push to the source; this sync field's value picks where ("" = stay local).
+  create: z.object({ targetField: z.string() }).optional(),
+  delete: z.enum(["push", "never"]),
+  actions: z.array(bindingActionSchema).max(8).default([]),
+});
+export type Binding = z.infer<typeof bindingSchema>;
+export type BindingInput = Omit<z.input<typeof bindingSchema>, "id">;
+
 export const typeDefinitionSchema = z.object({
   slug: slugSchema,
   label: z.string().min(1).max(60),
@@ -109,6 +144,7 @@ export const typeDefinitionSchema = z.object({
   eventPrefix: slugSchema,
   hidden: z.boolean(),
   autoCreate: z.enum(AUTO_CREATE).default("never"),
+  bindings: z.array(bindingSchema).default([]),
 });
 export type TypeDefinition = z.infer<typeof typeDefinitionSchema>;
 
@@ -151,6 +187,9 @@ export const operationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("set_actions"), actions: z.array(typeActionSchema).max(5) }),
   z.object({ op: z.literal("set_feed_rules"), rules: z.array(feedRuleSchema).max(10) }),
   z.object({ op: z.literal("set_time_triggers"), triggers: z.array(timeTriggerSchema).max(3) }),
+  // Adds or replaces the binding for this connector + source kind.
+  z.object({ op: z.literal("set_binding"), binding: bindingSchema.omit({ id: true }) }),
+  z.object({ op: z.literal("remove_binding"), connector: connectorName, kind: sourceSlug }),
 ]);
 export type Operation = z.infer<typeof operationSchema>;
 
@@ -176,12 +215,28 @@ export const recordDtoSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   provenance: z.object({ binding: z.string(), key: z.string() }).nullable(),
+  // Single-record reads of a bound record: what the binding allows right now.
+  binding: z
+    .object({
+      id: z.string(),
+      connector: z.string(),
+      label: z.string(),
+      // Field slugs the owner can't edit on this record.
+      locked: z.array(z.string()),
+      lockReason: z.string().nullable(),
+      actions: z.array(z.object({ id: z.string(), label: z.string() })),
+      // Source values no field holds (hybrid storage), read live.
+      live: z.record(z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())])),
+      pending: z.object({ error: z.string().nullable(), failed: z.boolean(), since: z.string() }).nullable(),
+    })
+    .nullable()
+    .optional(),
 });
 export type RecordDto = z.infer<typeof recordDtoSchema>;
 
 // One human-readable line of a definition diff (Settings → Types, publish asks).
 export const definitionChangeSchema = z.object({
-  area: z.enum(["type", "fields", "layout", "actions", "feed", "triggers"]),
+  area: z.enum(["type", "fields", "layout", "actions", "feed", "triggers", "bindings"]),
   text: z.string(),
 });
 export type DefinitionChange = z.infer<typeof definitionChangeSchema>;

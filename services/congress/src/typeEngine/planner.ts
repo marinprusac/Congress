@@ -75,6 +75,15 @@ export function planMigration(before: TypeDefinition | null, after: TypeDefiniti
     });
   }
 
+  const detach = detachSteps(before, after);
+  for (const b of removedBindings(before, after)) {
+    preflight.push({
+      label: `records from ${b.label} will stop syncing and stay as they are`,
+      sql: `SELECT count(*) AS n FROM ${t} WHERE "source_binding" = ${sqlString(b.id)}`,
+      block: false,
+    });
+  }
+
   const rebuild = recast.length > 0;
   if (rebuild) {
     const temp = `${after.tableName}__new`;
@@ -92,7 +101,8 @@ export function planMigration(before: TypeDefinition | null, after: TypeDefiniti
       `DROP TABLE ${t}`,
       `ALTER TABLE ${quoteIdent(temp)} RENAME TO ${t}`,
       ...added.filter(isJoinField).flatMap(createJoinTableSql),
-      ...indexSpecs(after).map((i) => i.sql)
+      ...indexSpecs(after).map((i) => i.sql),
+      ...detach
     );
     return { steps, preflight, rebuild };
   }
@@ -113,7 +123,26 @@ export function planMigration(before: TypeDefinition | null, after: TypeDefiniti
     if (f && beforeById.has(f.id)) preflight.push(duplicateCheck(after.tableName, f));
     steps.push(sql);
   }
+  steps.push(...detach);
   return { steps, preflight, rebuild };
+}
+
+function removedBindings(before: TypeDefinition, after: TypeDefinition) {
+  const kept = new Set(after.bindings.map((b) => b.id));
+  return before.bindings.filter((b) => !kept.has(b.id));
+}
+
+// A removed binding's records become local: link, shadow and outbox go.
+function detachSteps(before: TypeDefinition, after: TypeDefinition): string[] {
+  const t = quoteIdent(after.tableName);
+  return removedBindings(before, after).flatMap((b) => {
+    const mine = `SELECT "id" FROM ${t} WHERE "source_binding" = ${sqlString(b.id)}`;
+    return [
+      `DELETE FROM "binding_shadows" WHERE "record_id" IN (${mine})`,
+      `DELETE FROM "binding_outbox" WHERE "binding_id" = ${sqlString(b.id)} AND "record_id" IN (SELECT "id" FROM ${t})`,
+      `UPDATE ${t} SET "source_binding" = NULL, "source_key" = NULL WHERE "source_binding" = ${sqlString(b.id)}`,
+    ];
+  });
 }
 
 function castExpr(from: FieldDefinition, to: FieldDefinition): string {

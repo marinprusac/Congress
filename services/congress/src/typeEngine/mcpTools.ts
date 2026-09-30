@@ -14,11 +14,13 @@ import {
   NAMESPACE,
   relatedRecords,
   RecordConflictError,
+  RecordLockedError,
   RecordNotFoundError,
   RecordValidationError,
   typeOfRecord,
   updateRecord,
 } from "./records.js";
+import { withBinding } from "./bindings/runtime.js";
 import { typeEngineSource } from "./source.js";
 import { lookupOrCreate } from "./lookups.js";
 import { FileTooLargeError, storeUpload } from "./files.js";
@@ -69,6 +71,7 @@ async function guarded(fn: () => unknown) {
     if (err instanceof RecordNotFoundError) return mcpTextResult({ error: "not_found", message: err.message });
     if (err instanceof RecordValidationError) return mcpTextResult({ error: "invalid", issues: err.issues });
     if (err instanceof RecordConflictError) return mcpTextResult({ error: "conflict", field: err.field, message: err.message });
+    if (err instanceof RecordLockedError) return mcpTextResult({ error: "locked", fields: err.fields, message: err.message });
     throw err;
   }
 }
@@ -131,7 +134,7 @@ export function registerTypeTools(server: McpServer): void {
             total: g.total,
             records: g.records.map((r) => ({ id: r.id, token: buildChipToken({ chamber: NAMESPACE, id: r.id, name: r.name }) })),
           }));
-          return { ...withChip(t, record), ...(related.length ? { linkedFrom: related } : {}) };
+          return { ...withChip(t, withBinding(record)), ...(related.length ? { linkedFrom: related } : {}) };
         })
     );
 

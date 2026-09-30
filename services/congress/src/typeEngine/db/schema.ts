@@ -134,3 +134,33 @@ export const recordKeys = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.typeId, t.kind, t.value] }), index("record_keys_record_idx").on(t.recordId)]
 );
+
+// Bindings: the source values each bound record last saw, so a pull only
+// applies what the source changed (and push echoes are no-ops).
+export const bindingShadows = sqliteTable("binding_shadows", {
+  recordId: text("record_id").primaryKey(),
+  bindingId: text("binding_id").notNull(),
+  valuesJson: text("values_json").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+// Local edits waiting to reach the source, one row per record. `sourceKey` is
+// the key to delete for delete/detach (the record may already be gone).
+export const bindingOutbox = sqliteTable(
+  "binding_outbox",
+  {
+    recordId: text("record_id").primaryKey(),
+    bindingId: text("binding_id").notNull(),
+    op: text("op", { enum: ["create", "update", "delete", "move"] }).notNull(),
+    sourceKey: text("source_key"),
+    // Field slugs changed since the last push (update).
+    fieldsJson: text("fields_json").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    nextAt: integer("next_at", { mode: "timestamp_ms" }).notNull(),
+    lastError: text("last_error"),
+    // Refused by the source: kept to show the error, never retried.
+    failed: integer("failed", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [index("binding_outbox_next_idx").on(t.failed, t.nextAt)]
+);
