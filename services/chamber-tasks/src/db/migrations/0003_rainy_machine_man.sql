@@ -1,1 +1,0 @@
-ALTER TABLE `settings` DROP COLUMN `check_interval_ms`;

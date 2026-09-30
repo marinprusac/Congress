@@ -1,1 +1,0 @@
-ALTER TABLE `settings` ADD `check_interval_ms` integer DEFAULT 900000 NOT NULL;

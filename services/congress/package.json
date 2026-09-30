@@ -11,8 +11,7 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p frontend/tsconfig.json",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/db/migrate.ts",
-    "import:legacy": "tsx src/typeEngine/legacy/importLegacyCli.ts"
+    "db:migrate": "tsx src/db/migrate.ts"
   },
   "dependencies": {
     "@congress/chamber-kit": "workspace:*",
@@ -27,11 +26,9 @@
     "@tanstack/react-query-persist-client": "^5.101.4",
     "better-sqlite3": "^13.0.3",
     "chamber-calendar": "workspace:*",
-    "chamber-documents": "workspace:*",
     "chamber-fitness": "workspace:*",
     "chamber-mail": "workspace:*",
     "chamber-map": "workspace:*",
-    "chamber-tasks": "workspace:*",
     "chamber-whatsapp": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

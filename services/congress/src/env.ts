@@ -17,8 +17,6 @@ const envSchema = z.object({
   // Files of `file` fields, one per upload, named by file id.
   EXHIBIT_FILES_DIR: z.string().default("./data/files"),
   MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(25 * 1024 * 1024),
-  // One-time Tasks/Documents Chamber -> type imports (typeEngine/legacy/).
-  LEGACY_IMPORT_ENABLED: z.enum(["true", "false"]).default("true"),
   // Day boundaries for `date` fields when AI settings have no time zone.
   OWNER_TIMEZONE: z
     .string()
