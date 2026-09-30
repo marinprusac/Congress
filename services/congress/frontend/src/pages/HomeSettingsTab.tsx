@@ -1,6 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { PinnedView } from "@congress/shared-types";
-import { ChamberMark, capitolSettingsQueryKey, fetchRegistry, updateCapitolSettings, useCapitolSettings } from "@congress/congress-ui";
+import { ChamberMark, capitolSettingsQueryKey, updateCapitolSettings, useCapitolSettings } from "@congress/congress-ui";
+import { useViewSources } from "@/views/coreViews";
 
 const same = (a: PinnedView, b: PinnedView) => a.chamber === b.chamber && a.viewId === b.viewId;
 
@@ -9,7 +10,7 @@ const same = (a: PinnedView, b: PinnedView) => a.chamber === b.chamber && a.view
 export function HomeSettingsTab() {
   const queryClient = useQueryClient();
   const { data: settings } = useCapitolSettings();
-  const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
+  const sources = useViewSources();
   const pinned = settings?.pinnedViews ?? [];
 
   const mutation = useMutation({
@@ -17,7 +18,7 @@ export function HomeSettingsTab() {
     onSuccess: (updated) => queryClient.setQueryData(capitolSettingsQueryKey(), updated),
   });
 
-  const all = (registry ?? []).flatMap((c) => (c.views ?? []).map((v) => ({ chamber: c, view: v, key: { chamber: c.name, viewId: v.id } })));
+  const all = sources.flatMap((c) => c.views.map((v) => ({ chamber: c, view: v, key: { chamber: c.name, viewId: v.id } })));
   const labelFor = (p: PinnedView) => all.find((a) => same(a.key, p));
 
   function move(index: number, delta: number) {

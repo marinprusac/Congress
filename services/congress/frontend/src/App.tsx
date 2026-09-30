@@ -17,6 +17,7 @@ import { NotificationsPage } from "@/pages/NotificationsPage";
 import { ViewPage } from "@/pages/ViewPage";
 import { RecordPage } from "@/records/RecordPage";
 import { LegacyRedirect } from "@/records/LegacyRedirect";
+import { TimelinePage, WeekPage } from "@/views/calendar/CalendarViews";
 
 // Page transitions wait for a Chamber's bundle so they animate the real page.
 setRoutePreloader((path) => {
@@ -61,6 +62,9 @@ export function App() {
         {/* A view card with no full-screen page of its own, given the whole
             screen. */}
         <Route path="/view/:chamber/:viewId" element={<ViewPage />} />
+        {/* The calendar's views over Event records. */}
+        <Route path="/events" element={<TimelinePage />} />
+        <Route path="/events/week" element={<WeekPage />} />
         {/* Every runtime exhibit type's records (typeEngine). */}
         <Route path="/e/new/:type" element={<RecordPage />} />
         <Route path="/e/:id" element={<RecordPage />} />

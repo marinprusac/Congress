@@ -36,7 +36,7 @@ precacheAndRoute(self.__WB_MANIFEST);
 // step with App.tsx's SHELL_ROUTES.
 registerRoute(
   new NavigationRoute(createHandlerBoundToURL("index.html"), {
-    denylist: [/^\/(?!$|search$|notifications$|settings$|chat$|chat\/|view\/|e\/)/],
+    denylist: [/^\/(?!$|search$|notifications$|settings$|chat$|chat\/|view\/|e\/|events$|events\/)/],
   })
 );
 
