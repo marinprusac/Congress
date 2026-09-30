@@ -38,7 +38,9 @@ export interface ConnectorContext {
     fetch(accountId: number, url: string, init?: RequestInit): Promise<unknown>;
   };
   people: {
-    // Finds or creates a Person by email; null when none exists and policy says no.
+    // An existing Person with this email, or null. Never creates.
+    find(email: string): string | null;
+    // Finds or creates by email; only direct contact (evidence "corresponded") should create.
     resolve(input: { email: string; name?: string | null }, evidence: Evidence): string | null;
   };
   emitChange(kind: string, key: string, deleted?: boolean): void;

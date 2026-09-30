@@ -1,0 +1,1 @@
+ALTER TABLE `event_attendees` DROP COLUMN `tried_evidence`;

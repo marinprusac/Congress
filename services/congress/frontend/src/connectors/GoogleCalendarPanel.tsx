@@ -59,7 +59,7 @@ export function GoogleCalendarPanel({ status }: { status: ConnectorStatus }) {
       {status.lastError && !data?.accounts.some((a) => a.lastError) && <p className="break-words font-mono text-xs text-alert">{status.lastError}</p>}
       {data && (
         <p className="font-mono text-xs text-dust">
-          {data.counts.events} events · {data.counts.attendees} guests · {data.counts.people} people
+          {data.counts.events} events · {data.counts.attendees} guests · {data.counts.people} linked to People
         </p>
       )}
 
@@ -98,12 +98,7 @@ export function GoogleCalendarPanel({ status }: { status: ConnectorStatus }) {
         </div>
       ))}
 
-      {data?.settings.peopleAvailable && (
-        <label className="flex items-center gap-2 border-t border-dust py-2 font-mono text-sm text-ink">
-          <input type="checkbox" className="checkbox" checked={data.settings.people} onChange={(e) => settings.mutate({ people: e.target.checked })} />
-          Add people from events I organized or accepted
-        </label>
-      )}
+      <p className="border-t border-dust pt-2 font-mono text-xs text-dust">Guests are linked to People you already have, by email. Calendar never adds People.</p>
     </div>
   );
 }

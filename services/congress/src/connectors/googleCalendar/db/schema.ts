@@ -67,9 +67,8 @@ export const eventAttendees = sqliteTable(
     self: integer("self", { mode: "boolean" }).notNull().default(false),
     resource: integer("resource", { mode: "boolean" }).notNull().default(false),
     optional: integer("optional", { mode: "boolean" }).notNull().default(false),
-    // The Person this attendee resolved to, and the evidence last tried.
+    // The existing Person with this email, once one exists.
     personId: text("person_id"),
-    triedEvidence: text("tried_evidence"),
   },
   (t) => [primaryKey({ columns: [t.eventKey, t.email] }), index("event_attendees_email_idx").on(t.email)]
 );

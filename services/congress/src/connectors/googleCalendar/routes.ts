@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { ConnectorContext } from "../contract.js";
 import { accountRows, fetchCalendarList, listCalendars, setSelected, storeCalendarList } from "./calendars.js";
 import { cacheCounts, getSetting, setSetting } from "./cache.js";
-import { features, friendlyError } from "./sync.js";
+import { friendlyError } from "./sync.js";
 
 export const INTERVALS = [1, 5, 15, 30, 60] as const;
 export const DEFAULT_INTERVAL = 5;
@@ -14,12 +14,11 @@ export function intervalMinutes(): number {
 }
 
 function settingsDto() {
-  return { intervalMinutes: intervalMinutes(), people: getSetting("people", true), peopleAvailable: features.people };
+  return { intervalMinutes: intervalMinutes() };
 }
 
 const settingsInput = z.object({
   intervalMinutes: z.number().refine((v) => (INTERVALS as readonly number[]).includes(v)).optional(),
-  people: z.boolean().optional(),
 });
 
 // The setup panel's API (Settings → Connectors).
@@ -72,10 +71,6 @@ export function calendarPanelRoutes(ctx: ConnectorContext): Hono {
     if (body.data.intervalMinutes !== undefined) {
       setSetting("intervalMinutes", body.data.intervalMinutes);
       ctx.reschedule();
-    }
-    if (body.data.people !== undefined) {
-      setSetting("people", body.data.people);
-      if (body.data.people) ctx.syncNow();
     }
     return c.json(settingsDto());
   });
