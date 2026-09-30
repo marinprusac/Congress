@@ -4,7 +4,6 @@ import { app } from "./server.js";
 import { runMigrations, closeDb, sqlite } from "./db/client.js";
 import { closeExhibitsDb, exhibitsSqlite } from "./typeEngine/db/client.js";
 import { startTypeEngine } from "./typeEngine/index.js";
-import { importPersonNotes } from "./typeEngine/legacy/personNotes.js";
 import { startBackups, stopBackups } from "./typeEngine/backups.js";
 import { collectOrphans } from "./typeEngine/files.js";
 import { startTimeTriggers, stopTimeTriggers } from "./typeEngine/triggers.js";
@@ -23,12 +22,10 @@ import { loadChambers, stopChambers } from "./chambers/loader.js";
 import { CHAMBER_MODULES } from "./chambers/modules.js";
 import { startConnectors, stopConnectors } from "./connectors/registry.js";
 import { startBindings, stopBindings } from "./typeEngine/bindings/runtime.js";
-import { importLegacyCalendar } from "./typeEngine/legacy/calendarImport.js";
 import { CONNECTORS } from "./connectors/list.js";
 
 runMigrations();
 startTypeEngine();
-importPersonNotes();
 importLegacyChamberData();
 importLegacyDeputySettings();
 recoverInterruptedThreads();
@@ -38,10 +35,6 @@ await loadChambers(CHAMBER_MODULES);
 // Bindings listen first, so the connectors' first sync is pulled in.
 startBindings();
 await startConnectors(CONNECTORS);
-// One-time: the retired Calendar Chamber's own data becomes Event records.
-void importLegacyCalendar()
-  .then((stats) => console.log("Calendar import:", JSON.stringify(stats)))
-  .catch((err) => console.error("Calendar import failed:", err));
 
 const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (info) => {
   console.log(`Congress listening on http://${info.address}:${info.port}`);
