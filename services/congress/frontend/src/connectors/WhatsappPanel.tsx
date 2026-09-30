@@ -1,7 +1,10 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchPairing, startPairing, type PairingSnapshot } from "@/lib/api";
-import { qrPath } from "@/lib/format";
+import { showToast } from "@congress/congress-ui";
+import type { ConnectorStatus } from "@/lib/connectorsListApi";
+import { fetchPairing, fetchSettings, fetchStatus, saveSettings, startPairing, type PairingSnapshot } from "@/views/whatsapp/api";
+import { qrPath } from "@/views/whatsapp/format";
+import "@/views/whatsapp/whatsapp.css";
 
 // Always dark-on-white with a quiet zone, whatever the theme: scanners need it.
 function QrCode({ rows }: { rows: string[] }) {
@@ -66,6 +69,38 @@ export function PairingPanel() {
             {start.isPending ? "Starting —" : state === "expired" ? "Show a new code" : "Link WhatsApp"}
           </button>
         </>
+      )}
+    </div>
+  );
+}
+
+// Settings → Connectors: the link, and whether chats you write in create People.
+export function WhatsappPanel({ status }: { status: ConnectorStatus }) {
+  const queryClient = useQueryClient();
+  const reader = useQuery({ queryKey: ["status"], queryFn: fetchStatus, refetchInterval: 15_000, retry: false });
+  const settings = useQuery({ queryKey: ["whatsapp", "settings"], queryFn: fetchSettings, enabled: status.state === "active" });
+  const save = useMutation({
+    mutationFn: saveSettings,
+    onSuccess: (s) => queryClient.setQueryData(["whatsapp", "settings"], s),
+    onError: (err: Error) => showToast(err.message, "error"),
+  });
+  if (status.state === "offline") return <p className="font-mono text-sm text-alert">Offline: {status.lastError}</p>;
+  const s = settings.data;
+  return (
+    <div className="space-y-3 font-mono text-xs text-slate">
+      {reader.data?.state === "not_paired" ? (
+        <PairingPanel />
+      ) : (
+        <p>{reader.isError ? "The WhatsApp reader isn't running." : reader.data ? `Reader: ${reader.data.state.replace("_", " ")}` : "Checking the reader —"}</p>
+      )}
+      {s && (
+        <label className="flex items-start gap-2">
+          <input type="checkbox" checked={s.createPeople} disabled={save.isPending} onChange={(e) => save.mutate(e.target.checked)} className="mt-0.5" />
+          <span>
+            Make a Person from each 1:1 chat you've written in at least {s.minOwnerMessages} times
+            {s.pending > 0 && ` (${s.pending} waiting)`}. Groups and everyone else only link to existing People.
+          </span>
+        </label>
       )}
     </div>
   );

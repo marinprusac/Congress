@@ -22,6 +22,8 @@ import { HealthPage } from "@/views/health/HealthViews";
 import { NewRoutinePage } from "@/views/fitness/NewRoutinePage";
 import { MapPage } from "@/views/map/MapPage";
 import { PendingVisitsPage } from "@/views/map/PendingVisitsPage";
+import { ChatPage } from "@/views/whatsapp/ChatPage";
+import { ChatsPage } from "@/views/whatsapp/ChatsPage";
 
 // Page transitions wait for a Chamber's bundle so they animate the real page.
 setRoutePreloader((path) => {
@@ -79,6 +81,11 @@ export function App() {
         <Route path="/map/places/new" element={<Navigate to="/e/new/place" replace />} />
         <Route path="/map/settings" element={<Navigate to="/settings?from=accounts" replace />} />
         <Route path="/map/*" element={<Navigate to="/map" replace />} />
+        {/* WhatsApp: the chat list and a chat's messages (whatsapp connector; read-only). */}
+        <Route path="/whatsapp" element={<ChatsPage />} />
+        <Route path="/whatsapp/c/:jid" element={<ChatPage />} />
+        <Route path="/whatsapp/settings" element={<Navigate to="/settings?from=accounts" replace />} />
+        <Route path="/whatsapp/*" element={<Navigate to="/whatsapp" replace />} />
         {/* Every runtime exhibit type's records (typeEngine). */}
         <Route path="/e/new/:type" element={<RecordPage />} />
         <Route path="/e/:id" element={<RecordPage />} />

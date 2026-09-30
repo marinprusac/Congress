@@ -37,6 +37,7 @@ pnpm --filter congress build:vendor
 
 for dir in "$REPO_DIR"/services/chamber-*/; do
   name="$(basename "$dir")"
+  [ -f "$dir/package.json" ] || continue
   pnpm --filter "$name" build:web
   pnpm --filter "$name" build:remote
 done

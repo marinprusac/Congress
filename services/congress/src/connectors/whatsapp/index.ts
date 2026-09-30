@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { ConnectorRefusedError, defineConnector } from "../contract.js";
 import { closeWhatsappDb, runWhatsappMigrations } from "./db/client.js";
-import { chatRecord, getChatRow, listChatRows, storeChat, syncWhatsapp, type ReaderChat } from "./cache.js";
+import { chatRecord, getChatRow, getWhatsappSettings, listChatRows, MIN_OWNER_MESSAGES, peopleToCreate, setCreatePeople, storeChat, syncWhatsapp, type ReaderChat } from "./cache.js";
 import { readerGet, readerJson, readerMarkReadLocally, readerPath, readerStartPairing } from "./readerClient.js";
 import { readChat } from "./aiRead.js";
 import { registerWhatsappTools } from "./tools.js";
@@ -67,6 +67,14 @@ export const whatsappConnector = defineConnector({
   // The Chats view's API: the reader's GET routes as the Chamber served them, pairing, and local mark-read.
   routes(ctx) {
     const app = new Hono();
+    const settingsDto = () => ({ createPeople: getWhatsappSettings().createPeople, minOwnerMessages: MIN_OWNER_MESSAGES, pending: peopleToCreate().length });
+    app.get("/settings", (c) => c.json(settingsDto()));
+    app.put("/settings", async (c) => {
+      const body = (await c.req.json().catch(() => ({}))) as { createPeople?: unknown };
+      if (typeof body.createPeople !== "boolean") return c.json({ error: "createPeople must be a boolean" }, 400);
+      setCreatePeople(body.createPeople);
+      return c.json(settingsDto());
+    });
     app.get("/status", () => readerGet("/status"));
     app.get("/pairing", () => readerGet("/pairing"));
     app.post("/pairing", () => readerStartPairing());

@@ -4,6 +4,7 @@ import { GoogleCalendarPanel } from "./GoogleCalendarPanel";
 import { GmailPanel } from "./GmailPanel";
 import { HealthPanel, HevyPanel } from "./FitnessPanels";
 import { LocationPanel } from "./LocationPanel";
+import { WhatsappPanel } from "./WhatsappPanel";
 
 // Connectors are hand-written, so their setup panels are too.
 export const CONNECTOR_PANELS: Record<string, ComponentType<{ status: ConnectorStatus }>> = {
@@ -12,4 +13,5 @@ export const CONNECTOR_PANELS: Record<string, ComponentType<{ status: ConnectorS
   hevy: HevyPanel,
   health: HealthPanel,
   location: LocationPanel,
+  whatsapp: WhatsappPanel,
 };

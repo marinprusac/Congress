@@ -2,10 +2,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { StackLink } from "@congress/congress-ui";
-import { fetchChat, fetchMessages, markReadLocally, ReaderUnavailableError, type Message } from "@/lib/api";
-import { chatTitle, jidLabel, withDayBreaks } from "@/lib/format";
-import { MessageBubble } from "@/components/MessageBubble";
-import { useChatPath } from "@/pages/ChatsPage";
+import { fetchChat, fetchChatRecord, fetchMessages, markReadLocally, ReaderUnavailableError, type Message } from "@/views/whatsapp/api";
+import { chatTitle, jidLabel, withDayBreaks } from "@/views/whatsapp/format";
+import { MessageBubble } from "@/views/whatsapp/MessageBubble";
+import { useChatPath } from "@/views/whatsapp/ChatsPage";
+import "./whatsapp.css";
 
 export function ChatPage() {
   const jid = decodeURIComponent(useParams<{ jid: string }>().jid ?? "");
@@ -52,6 +53,7 @@ export function ChatPage() {
     void messages.fetchNextPage();
   };
 
+  const record = useQuery({ queryKey: ["chat-record", jid], queryFn: () => fetchChatRecord(jid), enabled: jid !== "" });
   const title = chat.data ? chatTitle(chat.data) : jidLabel(jid);
   const all = messages.data?.pages.flatMap((p) => p.messages) ?? [];
   const firstUnread = useReadLocally(jid, at === "" ? all : [], chat.data?.markedUnread ?? false);
@@ -62,6 +64,11 @@ export function ChatPage() {
       <header className="mb-3 border-b border-dust pb-3">
         <h2 className="break-words font-display text-2xl text-ink">{title}</h2>
         {!isGroup && chat.data?.name && <p className="font-mono text-xs text-dust">{jidLabel(jid)}</p>}
+        {record.data?.id && (
+          <StackLink to={`/e/${record.data.id}`} className="font-mono text-xs uppercase tracking-wide text-accent">
+            Open record
+          </StackLink>
+        )}
       </header>
 
       {messages.isLoading ? (

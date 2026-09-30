@@ -23,6 +23,6 @@ export const chats = sqliteTable("chats", {
 
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
-  // Off until the owner saw the dry-run count; then 1:1 chats they wrote in create People.
+  // On unless the owner turned it off (Settings → Connectors): 1:1 chats they wrote in create People.
   createPeople: integer("create_people", { mode: "boolean" }).notNull().default(false),
 });
