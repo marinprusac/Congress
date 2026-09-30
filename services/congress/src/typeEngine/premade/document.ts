@@ -13,5 +13,7 @@ export const DOCUMENT: Premade = {
       { op: "set_layout", body: "description" },
       { op: "set_type_meta", hidden: true },
     ],
+    // Cutover: visible once the Documents Chamber's data is imported.
+    [{ op: "set_type_meta", hidden: false }],
   ],
 };

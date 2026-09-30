@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-// A bookmarked /notes/n/:id opens the note's record instead.
-export function LegacyNoteRedirect() {
+// A bookmarked retired-Chamber URL (/notes/n/5, /tasks/t/5, /documents/d/5)
+// opens the record its import made instead.
+export function LegacyRedirect({ chamber, idPrefix, noun }: { chamber: string; idPrefix: string; noun: string }) {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const [missing, setMissing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    void fetch(`/congress/exhibits/legacy/notes/note-${encodeURIComponent(id)}`)
+    void fetch(`/congress/exhibits/legacy/${chamber}/${idPrefix}${encodeURIComponent(id)}`)
       .then(async (res) => {
         if (cancelled) return;
         if (!res.ok) return setMissing(true);
@@ -20,11 +21,11 @@ export function LegacyNoteRedirect() {
     return () => {
       cancelled = true;
     };
-  }, [id, navigate]);
+  }, [chamber, idPrefix, id, navigate]);
 
   return (
     <main className="chamber-main">
-      <p className="font-mono text-sm text-dust">{missing ? "— This note no longer exists —" : "Opening note —"}</p>
+      <p className="font-mono text-sm text-dust">{missing ? `— This ${noun} no longer exists —` : `Opening ${noun} —`}</p>
     </main>
   );
 }

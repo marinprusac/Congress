@@ -179,7 +179,7 @@ export interface CreateOptions {
   id?: string;
   at?: Date;
   updatedAt?: Date;
-  // Imports: announce nothing (the caller syncs in bulk) and may set readonly fields.
+  // Imports: announce nothing (the caller syncs in bulk); trusted may set readonly fields.
   silent?: boolean;
   trusted?: boolean;
 }
@@ -188,7 +188,8 @@ export function createRecord(typeSlug: string, values: unknown, opts: CreateOpti
   const t = getTypeBySlug(typeSlug);
   if (!t) throw new RecordNotFoundError(`no type "${typeSlug}"`);
   const def = t.definition;
-  const input = parseInput(def, "create", values, opts.trusted);
+  // Trusted imports may leave a required field empty (e.g. a file lost on disk).
+  const input = parseInput(def, opts.trusted ? "patch" : "create", values, opts.trusted);
   const at = opts.at ?? new Date();
   const id = opts.id ?? ulid(at.getTime());
   const updatedAt = opts.updatedAt ?? at;

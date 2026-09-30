@@ -34,9 +34,10 @@ describe("the types MCP server", () => {
     expect(buildMcpServers("congress").types?.url).toMatch(/\/mcp\/types$/);
   });
 
-  const NOTE_TOOLS = ["create_note", "delete_note", "get_note", "list_notes", "search_notes", "update_note"];
+  const toolsFor = (slug: string) => [`create_${slug}`, `delete_${slug}`, `get_${slug}`, `list_${slug}s`, `search_${slug}s`, `update_${slug}`];
+  const PREMADE_TOOLS = ["note", "task", "document"].flatMap(toolsFor);
 
-  it("offers Note's tools, none for hidden types", async () => {
+  it("offers the premade types' tools, none for hidden types", async () => {
     publish({
       actor: "test",
       ops: [
@@ -46,7 +47,7 @@ describe("the types MCP server", () => {
         { op: "set_type_meta", hidden: true },
       ],
     });
-    expect(await names()).toEqual(["describe_type", "list_types", "upload_file", ...NOTE_TOOLS].sort());
+    expect(await names()).toEqual(["describe_type", "list_types", "upload_file", ...PREMADE_TOOLS].sort());
   });
 
   it("follows the live definitions, per request", async () => {
@@ -60,7 +61,7 @@ describe("the types MCP server", () => {
       ],
     });
     expect(await names()).toEqual(
-      ["create_book", "delete_book", "describe_type", "get_book", "list_books", "list_types", "search_books", "update_book", "upload_file", ...NOTE_TOOLS].sort()
+      ["create_book", "delete_book", "describe_type", "get_book", "list_books", "list_types", "search_books", "update_book", "upload_file", ...PREMADE_TOOLS].sort()
     );
     publish({ typeId: getTypeBySlug("book")!.id, ops: [{ op: "set_type_meta", slug: "novel", label: "Novel" }], actor: "test" });
     expect(await names()).toContain("create_novel");
