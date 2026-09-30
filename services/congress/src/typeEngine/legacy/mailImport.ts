@@ -15,7 +15,8 @@ import { addLegacyAlias, aliasesForIds } from "../aliases.js";
 import { quoteIdent } from "../ddl.js";
 import { bindingId } from "../operations.js";
 import { materialize } from "../bindings/runtime.js";
-import { updateSettings } from "../../connectors/gmail/cache.js";
+import { skipPeople, unlinkedSentTo, updateSettings } from "../../connectors/gmail/cache.js";
+import { listRecords, updateRecord } from "../records.js";
 
 // One-time cutover of the Mail Chamber into Email records, read-only on its
 // DB. Threads already exist (bound); this adds what only the Chamber knew and
@@ -43,6 +44,9 @@ export interface MailImportStats {
   exhibitRefsRewritten: number;
   includeAllCategories: boolean;
   feedWindowHours: number;
+  // People the owner wrote to before the cutover: added to a Person of the same name, else never created.
+  peopleLinkedByName: number;
+  peopleSkipped: number;
 }
 
 export interface MailImportOptions {
@@ -52,7 +56,7 @@ export interface MailImportOptions {
 }
 
 export async function importLegacyMail(opts: MailImportOptions = {}): Promise<MailImportStats> {
-  const stats: MailImportStats = { aliases: 0, fetched: 0, missing: [], olderFetched: 0, olderMissing: 0, refs: 0, exhibitRefsRewritten: 0, includeAllCategories: false, feedWindowHours: 24 };
+  const stats: MailImportStats = { aliases: 0, fetched: 0, missing: [], olderFetched: 0, olderMissing: 0, refs: 0, exhibitRefsRewritten: 0, includeAllCategories: false, feedWindowHours: 24, peopleLinkedByName: 0, peopleSkipped: 0 };
   if (exhibitsDb.select().from(imports).where(eq(imports.key, KEY)).get()) return { ...stats, skipped: "already_ran" };
   const from = opts.from ?? defaultMailDbPath();
   if (!existsSync(from)) return { ...stats, skipped: "no_source" };
@@ -129,8 +133,23 @@ export async function importLegacyMail(opts: MailImportOptions = {}): Promise<Ma
     tx.delete(exhibitCache).where(eq(exhibitCache.chamber, CHAMBER)).run();
   });
 
-  // 6. What the Chamber did, the connector does now: mail.received, and People
-  // from the To of mail the owner sent (the owner saw the count first).
+  // 6. The owner reviewed who mail they sent would add: a same-named Person
+  // gets the address, the rest are never created. New recipients from here on are.
+  const people = listRecords("person", { limit: 5000 });
+  const skip: string[] = [];
+  for (const a of unlinkedSentTo()) {
+    const name = a.name?.trim().toLowerCase();
+    const same = name ? people.filter((p) => String(p.values.name ?? "").trim().toLowerCase() === name) : [];
+    if (same.length === 1) {
+      const emails = String(same[0]!.values.emails ?? "").trim();
+      updateRecord(same[0]!.id, { emails: emails ? `${emails}\n${a.email}` : a.email }, { actor: "import" });
+      stats.peopleLinkedByName++;
+    } else skip.push(a.email);
+  }
+  skipPeople(skip);
+  stats.peopleSkipped = skip.length;
+
+  // 7. What the Chamber did, the connector does now: mail.received and People.
   updateSettings({ includeAllCategories: stats.includeAllCategories, publishEvents: true, createPeople: true });
 
   forgetChamber(CHAMBER);

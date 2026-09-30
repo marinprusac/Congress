@@ -107,5 +107,5 @@ export function fakeGmail() {
 }
 
 export function resetGmailCache(): void {
-  for (const table of ["accounts", "threads", "thread_addresses", "settings"]) gmailDb.run(sql.raw(`delete from ${table}`));
+  for (const table of ["accounts", "threads", "thread_addresses", "settings", "people_skip"]) gmailDb.run(sql.raw(`delete from ${table}`));
 }

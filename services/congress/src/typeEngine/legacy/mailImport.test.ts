@@ -9,16 +9,18 @@ import { getChamber, registerChamber } from "../../registry.js";
 import { db, runMigrations } from "../../db/client.js";
 import { exhibitCache, exhibitRefs } from "../../db/schema.js";
 import { startTypeEngine } from "../index.js";
-import { createRecord, manualRefs } from "../records.js";
+import { createRecord, getRecord, manualRefs } from "../records.js";
 import { resolveLegacyAlias } from "../aliases.js";
 import { getTypeBySlug } from "../store.js";
-import { runGmailMigrations } from "../../connectors/gmail/db/client.js";
+import { gmailDb, runGmailMigrations } from "../../connectors/gmail/db/client.js";
+import { peopleSkip, threadAddresses } from "../../connectors/gmail/db/schema.js";
 import { getSettings } from "../../connectors/gmail/cache.js";
 import { importLegacyMail } from "./mailImport.js";
 
 const source = (key: string) => ({ source: { binding: "bnd_gmail_thread", key }, fromSource: true });
 let from = "";
 let recent = "";
+let david = "";
 const fetched: string[] = [];
 
 beforeAll(() => {
@@ -26,6 +28,12 @@ beforeAll(() => {
   runGmailMigrations();
   startTypeEngine();
   recent = createRecord("email", { subject: "Lunch?" }, source("1:t1")).id;
+  // Mail the owner sent: to a Person known by another address, and to an organisation.
+  david = createRecord("person", { name: "David Svensson", emails: "david@old.com" }).id;
+  gmailDb.insert(threadAddresses).values([
+    { threadKey: "1:t1", email: "david@new.com", name: "David Svensson", sentTo: true },
+    { threadKey: "1:t1", email: "jobs@org.com", name: "ORG", sentTo: true },
+  ]).run();
 
   from = join(mkdtempSync(join(tmpdir(), "mail-import-")), "mail.sqlite3");
   const mail = new Database(from);
@@ -65,6 +73,9 @@ describe("the Mail cutover", () => {
     expect(db.select().from(exhibitRefs).where(eq(exhibitRefs.sourceId, "note-1")).get()?.targetId).toBe(resolveLegacyAlias("mail", "thread-2:old"));
     expect(db.select().from(exhibitCache).where(eq(exhibitCache.chamber, "mail")).all()).toEqual([]);
     expect(getSettings()).toEqual({ includeAllCategories: true, publishEvents: true, createPeople: true });
+    expect(stats).toMatchObject({ peopleLinkedByName: 1, peopleSkipped: 1 });
+    expect(getRecord(david)?.values.emails).toBe("david@old.com\ndavid@new.com");
+    expect(gmailDb.select().from(peopleSkip).all()).toEqual([{ email: "jobs@org.com" }]);
     expect(getChamber("mail")).toBeNull();
     expect(getTypeBySlug("email")!.definition.hidden).toBe(false);
   });

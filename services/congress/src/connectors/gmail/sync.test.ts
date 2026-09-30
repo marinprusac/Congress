@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { runGmailMigrations } from "./db/client.js";
-import { addressesOf, getAccountState, getThreadRow, toSourceRecord, updateSettings } from "./cache.js";
+import { addressesOf, getAccountState, getThreadRow, skipPeople, toSourceRecord, unlinkedSentTo, updateSettings } from "./cache.js";
 import { fakeGmail, msg, resetGmailCache } from "./fakeGmail.js";
 import { syncAll } from "./sync.js";
 import { threadDetail } from "./detail.js";
@@ -92,11 +92,12 @@ describe("people from mail", () => {
       ["dan@example.com", null, false, null],
     ]);
 
+    expect(unlinkedSentTo().map((a) => a.email).sort()).toEqual(["ana@example.com", "bea@example.com"]);
+    skipPeople(["bea@example.com"]);
     updateSettings({ createPeople: true });
     await syncAll(ctx);
-    expect(state.resolved.map((r) => r.email).sort()).toEqual(["ana@example.com", "bea@example.com"]);
-    expect(state.resolved.every((r) => r.evidence === "corresponded")).toBe(true);
-    expect((toSourceRecord(getThreadRow("1:t1")!).values.people as string[]).sort()).toEqual(["person-ana@example.com", "person-bea@example.com", "person-carl"]);
+    expect(state.resolved).toEqual([{ email: "ana@example.com", evidence: "corresponded" }]);
+    expect((toSourceRecord(getThreadRow("1:t1")!).values.people as string[]).sort()).toEqual(["person-ana@example.com", "person-carl"]);
     expect(state.found).not.toContain("me@example.com");
   });
 });

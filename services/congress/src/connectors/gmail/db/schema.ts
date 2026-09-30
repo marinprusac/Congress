@@ -50,6 +50,11 @@ export const threadAddresses = sqliteTable(
   (t) => [primaryKey({ columns: [t.threadKey, t.email] })]
 );
 
+// Addresses that never become People on their own (the owner said no), only link.
+export const peopleSkip = sqliteTable("people_skip", {
+  email: text("email").primaryKey(),
+});
+
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
   // Promotions/Social/Updates/Forums too, not just Primary, for mail.received.
