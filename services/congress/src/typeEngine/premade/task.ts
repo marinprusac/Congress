@@ -44,5 +44,7 @@ export const TASK: Premade = {
       },
       { op: "set_type_meta", hidden: true },
     ],
+    // Cutover: visible once the Tasks Chamber's data is imported.
+    [{ op: "set_type_meta", hidden: false }],
   ],
 };

@@ -16,7 +16,7 @@ import { SearchPage } from "@/pages/SearchPage";
 import { NotificationsPage } from "@/pages/NotificationsPage";
 import { ViewPage } from "@/pages/ViewPage";
 import { RecordPage } from "@/records/RecordPage";
-import { LegacyNoteRedirect } from "@/records/LegacyNoteRedirect";
+import { LegacyRedirect } from "@/records/LegacyRedirect";
 
 // Page transitions wait for a Chamber's bundle so they animate the real page.
 setRoutePreloader((path) => {
@@ -64,10 +64,16 @@ export function App() {
         {/* Every runtime exhibit type's records (typeEngine). */}
         <Route path="/e/new/:type" element={<RecordPage />} />
         <Route path="/e/:id" element={<RecordPage />} />
-        {/* The Notes Chamber's old URLs, now the Note type. */}
-        <Route path="/notes/n/:id" element={<LegacyNoteRedirect />} />
+        {/* Retired Chambers' old URLs, now premade types. */}
+        <Route path="/notes/n/:id" element={<LegacyRedirect chamber="notes" idPrefix="note-" noun="note" />} />
         <Route path="/notes/new" element={<Navigate to="/e/new/note" replace />} />
         <Route path="/notes/*" element={<Navigate to="/" replace />} />
+        <Route path="/tasks/t/:id" element={<LegacyRedirect chamber="tasks" idPrefix="task-" noun="task" />} />
+        <Route path="/tasks/new" element={<Navigate to="/e/new/task" replace />} />
+        <Route path="/tasks/*" element={<Navigate to="/" replace />} />
+        <Route path="/documents/d/:id" element={<LegacyRedirect chamber="documents" idPrefix="document-" noun="document" />} />
+        <Route path="/documents/new" element={<Navigate to="/e/new/document" replace />} />
+        <Route path="/documents/*" element={<Navigate to="/" replace />} />
         {/* Old URLs of Chambers folded into Congress - bookmarks and the
             installed PWA's saved URL land here. */}
         <Route path="/capitol/*" element={<Navigate to="/" replace />} />

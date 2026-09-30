@@ -30,6 +30,8 @@ process.env.DB_PATH = join(tempDir, "test.sqlite3");
 process.env.EXHIBITS_DB_PATH = join(tempDir, "exhibits.sqlite3");
 process.env.EXHIBIT_FILES_DIR = join(tempDir, "exhibit-files");
 process.env.OWNER_TIMEZONE = "Europe/Zagreb";
+// Tests call the Chamber importers directly when they want them.
+process.env.LEGACY_IMPORT_ENABLED = "false";
 
 process.env.NODE_ENV = "test";
 process.env.HOST = "127.0.0.1";
