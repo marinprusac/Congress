@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { runGcalMigrations } from "./db/client.js";
-import { attendeesOf, eventKey, getEventRow, listEventRows } from "./cache.js";
+import { attendeesOf, eventKey, getEventRow, listEventRows, sourceTime } from "./cache.js";
 import { listCalendars, setSelected } from "./calendars.js";
 import { ev, fakeGoogle, resetGcalCache } from "./fakeGoogle.js";
 import { syncAll } from "./sync.js";
@@ -47,6 +47,14 @@ describe("google calendar sync", () => {
     state.changes["1/primary"] = [ev("a"), ev("far", { day: 400, updated: "u2" })];
     expect((await syncAll(ctx)).changed).toBe(0);
     expect(listEventRows().map((r) => r.eventId)).toEqual(["a"]);
+    // Leaving the window isn't a delete: bound records outlive the cache.
+    expect(state.changesSeen.some((c) => c.deleted)).toBe(false);
+  });
+
+  it("gives times as instants, all-day ones at midnight in the owner's zone", () => {
+    expect(sourceTime("2026-10-01", true, "Europe/Zagreb")).toBe("2026-09-30T22:00:00.000Z");
+    expect(sourceTime("2026-10-01T09:00:00+02:00", false)).toBe("2026-10-01T07:00:00.000Z");
+    expect(sourceTime("", false)).toBeNull();
   });
 
   it("falls back to a full sync when the token expired", async () => {
@@ -64,16 +72,19 @@ describe("google calendar sync", () => {
     state.full["1/primary"] = [ev("a")];
     state.full["1/work"] = [ev("w")];
     await syncAll(ctx);
-    setSelected(1, "work", true);
+    setSelected(ctx, 1, "work", true);
     await syncAll(ctx);
     expect(getEventRow(key("w", "work"))).toBeDefined();
 
-    setSelected(1, "work", false);
+    state.changesSeen = [];
+    setSelected(ctx, 1, "work", false);
     expect(getEventRow(key("w", "work"))).toBeUndefined();
+    expect(state.changesSeen).toEqual([{ kind: "event", key: key("w", "work"), deleted: true }]);
 
     state.accounts = [];
     await syncAll(ctx);
     expect(listEventRows()).toEqual([]);
+    expect(state.changesSeen.slice(1)).toEqual([{ kind: "event", key: key("a"), deleted: true }]);
     expect(listCalendars(1)).toEqual([]);
   });
 
@@ -92,7 +103,7 @@ describe("google calendar sync", () => {
   it("reports one line when every calendar of an account fails the same way", async () => {
     const { state, ctx } = fakeGoogle();
     await syncAll(ctx);
-    setSelected(1, "work", true);
+    setSelected(ctx, 1, "work", true);
     state.full["1/primary"] = [];
     const fetch = ctx.google.fetch;
     ctx.google.fetch = async (id, url, init) => {

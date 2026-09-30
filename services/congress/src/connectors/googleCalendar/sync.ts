@@ -59,9 +59,13 @@ export async function syncCalendar(ctx: ConnectorContext, cal: CalendarRow, now 
     unseen.delete(key);
     const prev = existing.get(key);
     const start = timeMs(raw.start);
-    const outside = incremental && (start < from || start > to);
-    if (raw.status === "cancelled" || outside) {
+    // Only a cancellation is a delete; leaving the window just drops it from the cache.
+    if (raw.status === "cancelled") {
       if (prev && removeEvent(key)) deleted.push(key);
+      continue;
+    }
+    if (incremental && (start < from || start > to)) {
+      if (prev) removeEvent(key);
       continue;
     }
     if (prev && prev.googleUpdated === (raw.updated ?? null)) continue;
@@ -72,10 +76,7 @@ export async function syncCalendar(ctx: ConnectorContext, cal: CalendarRow, now 
   if (!incremental) {
     for (const key of unseen) {
       const row = existing.get(key)!;
-      if (row.startMs < from || row.startMs > to) {
-        removeEvent(key);
-        deleted.push(key);
-      }
+      if (row.startMs < from || row.startMs > to) removeEvent(key);
     }
   }
   if (result.syncToken) setSyncToken(accountId, calendarId, result.syncToken);
@@ -108,7 +109,9 @@ export function friendlyError(err: unknown, label: string): string {
 export async function syncAll(ctx: ConnectorContext): Promise<SyncResult> {
   const connected = ctx.google.accounts();
   const ids = new Set(connected.map((a) => a.id));
-  for (const row of accountRows()) if (!ids.has(row.accountId)) forgetAccount(row.accountId);
+  for (const row of accountRows()) {
+    if (!ids.has(row.accountId)) for (const key of forgetAccount(row.accountId)) ctx.emitChange("event", key, true);
+  }
 
   const ownEmails = new Set(connected.map((a) => normalizeEmail(a.email)));
   const failures: string[] = [];

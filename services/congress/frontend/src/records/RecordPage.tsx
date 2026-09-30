@@ -21,9 +21,24 @@ import {
   useStackNav,
 } from "@congress/congress-ui";
 import type { CapitolExhibitResolveResult, CapitolExhibitSearchResult, FieldDefinition, RecordValue, TypeDefinition } from "@congress/shared-types";
-import { createRecord, deleteRecord, fetchRecord, fetchRelated, fetchTypes, quickCreateRecord, RecordConflict, TYPES_KEY, updateRecord } from "@/lib/recordsApi";
+import {
+  createRecord,
+  deleteRecord,
+  fetchRecord,
+  fetchRelated,
+  fetchTargets,
+  fetchTypes,
+  quickCreateRecord,
+  RecordConflict,
+  runRecordAction,
+  TYPES_KEY,
+  updateRecord,
+} from "@/lib/recordsApi";
 export { TYPES_KEY };
-import { FieldControl, isFileRef, PropertyRow, ReadonlyValue } from "./fields";
+import { DestinationControl, FieldControl, isFileRef, PropertyRow, ReadonlyValue } from "./fields";
+import { BindingNotice, LiveValues } from "./BindingPanel";
+import { TimeRangeControl, type RangeValue } from "./TimeRangeControl";
+import { DEFAULT_MINUTES, plusMinutes } from "./timeRange";
 import { RelatedSection } from "./RelatedSection";
 import { titleFromFilename } from "./format";
 
@@ -62,6 +77,8 @@ function isFilled(f: FieldDefinition, v: RecordValue | undefined): boolean {
   return v !== null && v !== undefined;
 }
 
+const isEmptyValue = (v: RecordValue | undefined) => v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
+
 function diff(prev: Values, next: Values): Values {
   return Object.fromEntries(Object.entries(next).filter(([k, v]) => JSON.stringify(prev[k]) !== JSON.stringify(v)));
 }
@@ -87,7 +104,13 @@ export function RecordPage() {
   const titleRef = useRef<HTMLInputElement | null>(null);
 
   const typesQuery = useQuery({ queryKey: TYPES_KEY, queryFn: fetchTypes });
-  const recordQuery = useQuery({ queryKey: ["record", recordId], queryFn: () => fetchRecord(recordId as string), enabled: recordId !== null && !deleted });
+  const recordQuery = useQuery({
+    queryKey: ["record", recordId],
+    queryFn: () => fetchRecord(recordId as string),
+    enabled: recordId !== null && !deleted,
+    // Until a push reaches the source.
+    refetchInterval: (q) => (q.state.data?.binding?.pending && !q.state.data.binding.pending.failed ? 3000 : false),
+  });
   const relatedQuery = useQuery({ queryKey: ["record", recordId, "related"], queryFn: () => fetchRelated(recordId as string), enabled: recordId !== null && !deleted });
 
   const typeSlug = recordQuery.data?.type ?? typeParam;
@@ -96,7 +119,17 @@ export function RecordPage() {
   const titleField = def?.fields.find((f) => f.id === def.titleField);
   const bodyField = def?.layout.body ? def.fields.find((f) => f.id === def.layout.body && !f.retired) : undefined;
   const actionFields = new Set(def?.actions.map((a) => a.field) ?? []);
-  const properties = def?.fields.filter((f) => !f.retired && f !== titleField && f !== bodyField && !actionFields.has(f.id)) ?? [];
+  const range = def?.layout.timeRange ?? null;
+  const live = (id: string | null | undefined) => (id ? def?.fields.find((f) => f.id === id && !f.retired) : undefined);
+  const [startField, endField, allDayField] = [live(range?.start), live(range?.end), live(range?.allDay)];
+  const rangeIds = new Set([startField?.id, endField?.id, allDayField?.id].filter(Boolean));
+  const properties =
+    def?.fields.filter((f) => !f.retired && f !== titleField && f !== bodyField && !actionFields.has(f.id) && !rangeIds.has(f.id)) ?? [];
+  const binding = recordQuery.data?.binding ?? null;
+  const locked = new Set(binding?.locked ?? []);
+  const createsAtSource = Boolean(def?.bindings.some((b) => b.create));
+  const targetsQuery = useQuery({ queryKey: ["types", typeSlug, "targets"], queryFn: () => fetchTargets(typeSlug as string), enabled: createsAtSource && Boolean(typeSlug) });
+  const destination = targetsQuery.data?.[0];
   const requiredFields = def?.fields.filter((f) => !f.retired && !f.options.readonly && f.options.required) ?? [];
   // Set when a draft gains a value off-blur (an upload), to try creating after render.
   const attemptPendingRef = useRef(false);
@@ -115,12 +148,22 @@ export function RecordPage() {
     return ids;
   }, [related, def, current]);
 
-  // Seeds a new record's title from ?title= (the "@" picker's create flow).
+  // Seeds a new record's title from ?title= (the "@" picker's create flow),
+  // and its time range from ?start= and ?duration= (minutes), else the next hour.
   useEffect(() => {
     const seeded = searchParams.get("title");
     if (isDraft && seeded && titleField) setValues((v) => ({ ...v, [titleField.slug]: seeded }));
+    if (isDraft && startField && endField) {
+      const given = Date.parse(searchParams.get("start") ?? "");
+      const next = new Date();
+      next.setMinutes(0, 0, 0);
+      next.setHours(next.getHours() + 1);
+      const start = new Date(Number.isFinite(given) ? given : next.getTime()).toISOString();
+      const minutes = Number(searchParams.get("duration")) || DEFAULT_MINUTES;
+      setValues((v) => ({ ...v, [startField.slug]: start, [endField.slug]: plusMinutes(start, minutes) }));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [titleField?.slug]);
+  }, [titleField?.slug, startField?.slug]);
 
   const onNavigate = (r: Extract<CapitolExhibitResolveResult, { url: string }>) => navigateToExhibit("e", r, navigate, true);
 
@@ -214,6 +257,17 @@ export function RecordPage() {
     onError: () => showToast("Failed to delete.", "error"),
   });
 
+  const actionMutation = useMutation({
+    mutationFn: (action: string) => runRecordAction(recordId as string, action),
+    onSuccess: (updated) => queryClient.setQueryData(["record", updated.id], updated),
+    onError: (err) => showToast(err instanceof Error ? err.message : "Couldn't do that.", "error"),
+  });
+
+  const setRange = (next: RangeValue) => {
+    if (!startField || !endField) return;
+    setValues((v) => ({ ...v, [startField.slug]: next.start, [endField.slug]: next.end, ...(allDayField ? { [allDayField.slug]: next.allDay } : {}) }));
+  };
+
   const toggle = (field: string) => {
     const f = def?.fields.find((x) => x.id === field);
     if (!f) return;
@@ -263,6 +317,7 @@ export function RecordPage() {
               <div className="mb-6 border-b border-dust pb-4">
                 <input
                   ref={titleRef}
+                  readOnly={locked.has(titleField.slug)}
                   autoFocus={isDraft}
                   value={String(current[titleField.slug] ?? "")}
                   onChange={(e) => set(titleField.slug, e.target.value)}
@@ -273,14 +328,43 @@ export function RecordPage() {
               </div>
             )}
 
+            {binding && <BindingNotice binding={binding} />}
+
+            {startField && endField && (
+              <div className="mb-4">
+                <TimeRangeControl
+                  value={{
+                    start: (current[startField.slug] as string | null) ?? null,
+                    end: (current[endField.slug] as string | null) ?? null,
+                    allDay: allDayField ? current[allDayField.slug] === true : false,
+                  }}
+                  onChange={setRange}
+                  hasAllDay={Boolean(allDayField)}
+                  readOnly={locked.has(startField.slug)}
+                />
+              </div>
+            )}
+
             {properties.length > 0 && (
               <div className="mb-6 grid grid-cols-1 gap-4">
                 {properties
-                  .filter((f) => !(f.options.readonly && isDraft))
+                  // Engine-written fields show once they hold something.
+                  .filter((f) => !(f.options.readonly && (isDraft || isEmptyValue(recordQuery.data?.values[f.slug]))))
                   .map((f) => (
                     <PropertyRow key={f.id} field={f}>
-                      {f.options.readonly ? (
-                        <ReadonlyValue field={f} value={recordQuery.data?.values[f.slug]} />
+                      {f.slug === destination?.field && !locked.has(f.slug) ? (
+                        <DestinationControl
+                          value={String(current[f.slug] ?? "")}
+                          onChange={(v) => set(f.slug, v)}
+                          targets={destination.targets}
+                          currentLabel={typeof binding?.live.calendarLabel === "string" ? binding.live.calendarLabel : undefined}
+                        />
+                      ) : f.slug === destination?.field ? (
+                        <p className="font-mono text-base text-slate">
+                          {destination.targets.find((t) => t.value === current[f.slug])?.label ?? (String(current[f.slug] ?? "") || "Local only")}
+                        </p>
+                      ) : f.options.readonly || locked.has(f.slug) ? (
+                        <ReadonlyValue field={f} value={f.options.readonly ? recordQuery.data?.values[f.slug] : current[f.slug]} onNavigate={onNavigate} />
                       ) : (
                         <FieldControl
                           field={f}
@@ -293,6 +377,8 @@ export function RecordPage() {
                   ))}
               </div>
             )}
+
+            {binding && <LiveValues binding={binding} />}
 
             {related.length > 0 && <RelatedSection groups={related} onNavigate={onNavigate} />}
 
@@ -313,6 +399,16 @@ export function RecordPage() {
                     </button>
                   ) : (
                     <>
+                      {binding?.actions.map((a) => (
+                        <button
+                          key={a.id}
+                          disabled={actionMutation.isPending}
+                          onClick={() => actionMutation.mutate(a.id)}
+                          className="tap-target text-accent hover:underline disabled:text-dust"
+                        >
+                          {a.label}
+                        </button>
+                      ))}
                       {def.actions.map((a) => {
                         const f = def.fields.find((x) => x.id === a.field);
                         return (
@@ -321,15 +417,19 @@ export function RecordPage() {
                           </button>
                         );
                       })}
-                      <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
-                        Delete
-                      </button>
+                      {!binding?.lockReason && (
+                        <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
+                          Delete
+                        </button>
+                      )}
                     </>
                   )}
                 </ExhibitActionBar>
               }
             >
-              {bodyField ? (
+              {bodyField && locked.has(bodyField.slug) ? (
+                <ReadonlyValue field={bodyField} value={current[bodyField.slug]} onNavigate={onNavigate} />
+              ) : bodyField ? (
                 <ExhibitFieldEditor
                   value={String(current[bodyField.slug] ?? "")}
                   onChange={(v) => set(bodyField.slug, v)}

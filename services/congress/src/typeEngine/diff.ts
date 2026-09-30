@@ -63,6 +63,10 @@ export function diffDefinitions(before: TypeDefinition | null, after: TypeDefini
 
   if ((before?.titleField ?? null) !== after.titleField) add("layout", `Title field: ${name(after, after.titleField)}`);
   if ((before?.layout.body ?? null) !== after.layout.body) add("layout", `Body field: ${name(after, after.layout.body)}`);
+  if (JSON.stringify(before?.layout.timeRange ?? null) !== JSON.stringify(after.layout.timeRange ?? null)) {
+    const r = after.layout.timeRange;
+    add("layout", r ? `Time range: ${name(after, r.start)} to ${name(after, r.end)}${r.allDay ? `, all day by ${name(after, r.allDay)}` : ""}` : "No time range");
+  }
 
   const changed = <T>(a: T[] | undefined, b: T[]) => JSON.stringify(a ?? []) !== JSON.stringify(b);
   if (changed(before?.actions, after.actions)) {
@@ -157,7 +161,9 @@ function describeRule(def: TypeDefinition, r: FeedRule): string {
       ? `${fieldLabel(def, w.field)} within ${w.hours}h`
       : w.op === "overdue"
         ? `${fieldLabel(def, w.field)} overdue`
-        : w.op === "eq"
+        : w.op === "ongoing"
+          ? `under way (${fieldLabel(def, w.field)} to ${fieldLabel(def, w.end)})`
+          : w.op === "eq"
           ? `${fieldLabel(def, w.field)} = ${JSON.stringify(w.value)}`
           : w.op === "is_set"
             ? `${fieldLabel(def, w.field)} is set`

@@ -142,19 +142,93 @@ function FileControl({ value, onChange }: FieldProps) {
   );
 }
 
-// Engine-written values: shown, never edited.
-export function ReadonlyValue({ field, value }: { field: FieldDefinition; value: RecordValue | undefined }) {
-  const text =
-    value === null || value === undefined || value === ""
-      ? "—"
-      : field.kind === "datetime" && typeof value === "string"
-        ? new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+// Values the owner can't edit here (engine-written, or kept by a source).
+export function ReadonlyValue({ field, value, onNavigate }: { field: FieldDefinition; value: RecordValue | undefined; onNavigate?: FieldProps["onNavigate"] }) {
+  if (field.kind === "relation" && onNavigate) return <ReadonlyRelation value={value} onNavigate={onNavigate} />;
+  if (field.kind === "richtext" && typeof value === "string" && value) {
+    return (
+      <ExhibitFieldEditor
+        value={value}
+        onChange={() => {}}
+        readOnly
+        minRows={1}
+        className="w-full font-body text-base text-slate"
+        renderIcon={(chamber) => getChamberIcon(chamber)}
+        onNavigate={onNavigate}
+      />
+    );
+  }
+  const empty = value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0);
+  const text = empty
+    ? "—"
+    : field.kind === "datetime" && typeof value === "string"
+      ? new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+      : field.kind === "date" && typeof value === "string"
+        ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { dateStyle: "medium" })
         : field.kind === "boolean"
           ? value
             ? "Yes"
             : "No"
-          : String(value);
+          : field.kind === "enum"
+            ? (field.options.options?.find((o) => o.value === value)?.label ?? String(value))
+            : isFileRef(value)
+              ? value.name
+              : String(value);
   return <p className="font-mono text-base text-slate">{text}</p>;
+}
+
+function ReadonlyRelation({ value, onNavigate }: { value: RecordValue | undefined; onNavigate: FieldProps["onNavigate"] }) {
+  const ids = Array.isArray(value) ? value : typeof value === "string" && value ? [value] : [];
+  const { resultsByToken } = useResolvedExhibits(ids.map((id) => `exhibit:e:${id}`));
+  if (ids.length === 0) return <p className="font-mono text-base text-slate">—</p>;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {ids.map((id) => {
+        const hit = resultsByToken.get(`exhibit:e:${id}`);
+        return hit ? <ExhibitChip key={id} result={hit} renderIcon={(c) => getChamberIcon(c)} onNavigate={onNavigate} /> : <span key={id} className="font-mono text-xs text-dust">…</span>;
+      })}
+    </div>
+  );
+}
+
+// A binding's create target (e.g. which calendar): its destinations, or local only.
+export function DestinationControl({
+  value,
+  onChange,
+  targets,
+  currentLabel,
+}: {
+  value: string;
+  onChange: (value: RecordValue) => void;
+  targets: { value: string; label: string; group?: string }[];
+  currentLabel?: string;
+}) {
+  const groups = new Map<string, typeof targets>();
+  for (const t of targets) groups.set(t.group ?? "", [...(groups.get(t.group ?? "") ?? []), t]);
+  const known = value === "" || targets.some((t) => t.value === value);
+  return (
+    <select className="field-plain w-full font-mono text-base" value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">Local only (not synced)</option>
+      {!known && <option value={value}>{currentLabel ?? value}</option>}
+      {[...groups].map(([group, items]) =>
+        group ? (
+          <optgroup key={group} label={group}>
+            {items.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </optgroup>
+        ) : (
+          items.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))
+        )
+      )}
+    </select>
+  );
 }
 
 // Emails/phones, one row each; only valid rows are saved.

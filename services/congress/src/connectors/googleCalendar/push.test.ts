@@ -25,13 +25,14 @@ async function synced() {
 
 describe("google calendar push", () => {
   it("maps values to Google's body", () => {
-    expect(toGoogleBody({ title: "T", allDay: true, start: "2026-10-01T00:00:00Z", end: "2026-10-02" })).toEqual({
+    // Midnight in Zagreb is 22:00Z the day before: the day comes from the zone.
+    expect(toGoogleBody({ title: "T", allDay: true, start: "2026-09-30T22:00:00Z", end: "2026-10-01T22:00:00Z" }, "Europe/Zagreb")).toEqual({
       summary: "T",
       start: { date: "2026-10-01", dateTime: null },
       end: { date: "2026-10-02", dateTime: null },
     });
-    expect(toGoogleBody({ start: "2026-10-01T09:00:00+02:00", end: "2026-10-01T10:00:00+02:00", timeZone: "Europe/Zagreb" }).start).toEqual({
-      dateTime: "2026-10-01T09:00:00+02:00",
+    expect(toGoogleBody({ start: "2026-10-01T09:00:00+02:00", end: "2026-10-01T10:00:00+02:00" }, "Europe/Zagreb").start).toEqual({
+      dateTime: "2026-10-01T07:00:00.000Z",
       date: null,
       timeZone: "Europe/Zagreb",
     });

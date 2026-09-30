@@ -43,7 +43,7 @@ describe("type routes", () => {
     });
     const slugs = async (path: string) => ((await (await call(path)).json()) as { definition: { slug: string } }[]).map((t) => t.definition.slug);
     expect(await slugs("/congress/types")).toEqual(["note", "task", "document", "person"]);
-    expect(await slugs("/congress/types?all=1")).toEqual(["note", "task", "document", "person", "secret"]);
+    expect(await slugs("/congress/types?all=1")).toEqual(["note", "task", "document", "person", "event", "secret"]);
   });
 
   it("describe types for Settings: counts, forks and versions as changes", async () => {

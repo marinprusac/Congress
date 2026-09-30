@@ -3,6 +3,7 @@ import type { SourceRecord } from "../contract.js";
 import { gcalDb as db } from "./db/client.js";
 import { accounts, calendars, eventAttendees, events, settings } from "./db/schema.js";
 import { eventFacts, rawFacts, timeMs, type RawGoogleEvent } from "./facts.js";
+import { ownerZone, startOfDay } from "../../typeEngine/zone.js";
 
 type EventRow = typeof events.$inferSelect;
 type AttendeeRow = typeof eventAttendees.$inferSelect;
@@ -122,15 +123,17 @@ export function pendingAttendees() {
     .all();
 }
 
-export function purgeCalendar(accountId: number, calendarId: string): void {
+// Both return the removed event keys, so the caller can emit their deletes.
+export function purgeCalendar(accountId: number, calendarId: string): string[] {
   const keys = eventsOfCalendar(accountId, calendarId).map((e) => e.key);
   db.transaction((tx) => {
     if (keys.length > 0) tx.delete(eventAttendees).where(inArray(eventAttendees.eventKey, keys)).run();
     tx.delete(events).where(and(eq(events.accountId, accountId), eq(events.calendarId, calendarId))).run();
   });
+  return keys;
 }
 
-export function forgetAccount(accountId: number): void {
+export function forgetAccount(accountId: number): string[] {
   const keys = db.select({ key: events.key }).from(events).where(eq(events.accountId, accountId)).all().map((e) => e.key);
   db.transaction((tx) => {
     if (keys.length > 0) tx.delete(eventAttendees).where(inArray(eventAttendees.eventKey, keys)).run();
@@ -138,9 +141,24 @@ export function forgetAccount(accountId: number): void {
     tx.delete(calendars).where(eq(calendars.accountId, accountId)).run();
     tx.delete(accounts).where(eq(accounts.accountId, accountId)).run();
   });
+  return keys;
 }
 
-export function toSourceRecord(row: EventRow, attendees: AttendeeRow[] = attendeesOf(row.key)): SourceRecord {
+// A Google time as an instant; an all-day date is midnight in the owner's zone
+// (the end date stays exclusive, like Google's).
+export function sourceTime(value: string, allDay: boolean, zone = ownerZone()): string | null {
+  if (!value) return null;
+  const ms = allDay ? startOfDay(value.slice(0, 10), zone) : Date.parse(value);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
+
+type CalendarMeta = { summary: string; color: string | null };
+
+function calendarMeta(): Map<string, CalendarMeta> {
+  return new Map(db.select().from(calendars).all().map((c) => [`${c.accountId}:${c.calendarId}`, { summary: c.summary, color: c.color }]));
+}
+
+export function toSourceRecord(row: EventRow, attendees: AttendeeRow[] = attendeesOf(row.key), cals: Map<string, CalendarMeta> = calendarMeta()): SourceRecord {
   const self = attendees.find((a) => a.self);
   const facts = eventFacts({
     organizerSelf: row.organizerSelf,
@@ -149,6 +167,8 @@ export function toSourceRecord(row: EventRow, attendees: AttendeeRow[] = attende
     selfResponse: row.selfResponse,
     hasSelfAttendee: self !== undefined,
   });
+  const calendar = `${row.accountId}:${row.calendarId}`;
+  const cal = cals.get(calendar);
   return {
     kind: "event",
     key: row.key,
@@ -157,11 +177,15 @@ export function toSourceRecord(row: EventRow, attendees: AttendeeRow[] = attende
       description: row.description,
       location: row.location,
       allDay: row.allDay,
-      start: row.start,
-      end: row.end,
+      start: sourceTime(row.start, row.allDay),
+      end: sourceTime(row.end, row.allDay),
       htmlLink: row.htmlLink,
-      calendar: `${row.accountId}:${row.calendarId}`,
+      calendar,
+      calendarLabel: cal?.summary ?? row.calendarId,
+      calendarColor: cal?.color ?? null,
+      response: facts.selfResponse,
       attendees: attendees.filter((a) => !a.resource).map((a) => a.email),
+      people: [...new Set(attendees.flatMap((a) => (a.personId ? [a.personId] : [])))],
     },
     facts: { editable: facts.editable, isInvitation: facts.isInvitation, canRsvp: facts.canRsvp, selfResponse: facts.selfResponse },
     updatedAt: row.googleUpdated,

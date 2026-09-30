@@ -100,6 +100,9 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       if (d.titleField === f.id) throw new OperationError("can't retire the title field");
       f.retired = true;
       if (d.layout.body === f.id) d.layout.body = null;
+      const range = d.layout.timeRange;
+      if (range && (range.start === f.id || range.end === f.id)) d.layout.timeRange = null;
+      else if (range?.allDay === f.id) d.layout.timeRange = { ...range, allDay: null };
       d.actions = d.actions
         .filter((a) => a.field !== f.id)
         .map((a) => (a.stampField === f.id ? { ...a, stampField: undefined } : a));
@@ -160,6 +163,20 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       d.layout.body = f.id;
       return d;
     }
+    case "set_time_range": {
+      if (!op.range) {
+        d.layout.timeRange = null;
+        return d;
+      }
+      const start = findField(d, op.range.start);
+      const end = findField(d, op.range.end);
+      for (const f of [start, end]) if (f.kind !== "datetime" && f.kind !== "date") throw new OperationError(`"${f.slug}" must be a date or datetime`);
+      if (start.id === end.id) throw new OperationError("start and end must differ");
+      const allDay = op.range.allDay ? findField(d, op.range.allDay) : null;
+      if (allDay && allDay.kind !== "boolean") throw new OperationError(`all-day field "${allDay.slug}" must be boolean`);
+      d.layout.timeRange = { start: start.id, end: end.id, allDay: allDay?.id ?? null };
+      return d;
+    }
     case "set_actions": {
       d.actions = op.actions.map((a) => {
         const f = findField(d, a.field);
@@ -180,7 +197,13 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
     }
     case "set_feed_rules": {
       d.feedRules = op.rules.map((rule) => {
-        const when = "field" in rule.when ? { ...rule.when, field: findField(d, rule.when.field).id } : rule.when;
+        const w = rule.when;
+        const when =
+          w.op === "ongoing"
+            ? { ...w, field: findField(d, w.field).id, end: findField(d, w.end).id }
+            : "field" in w
+              ? { ...w, field: findField(d, w.field).id }
+              : w;
         return {
           ...rule,
           when,
@@ -256,9 +279,11 @@ export function validateDefinition(def: TypeDefinition): string[] {
   }
   const isTime = (f: FieldDefinition) => f.kind === "datetime" || f.kind === "date";
   for (const { when } of def.feedRules) {
-    if (when.op !== "within_next" && when.op !== "overdue") continue;
-    const f = def.fields.find((x) => x.id === when.field);
-    if (f && !isTime(f)) errors.push(`feed rule ${when.op} needs a date or datetime field, "${f.slug}" is ${f.kind}`);
+    if (when.op !== "within_next" && when.op !== "overdue" && when.op !== "ongoing") continue;
+    for (const id of when.op === "ongoing" ? [when.field, when.end] : [when.field]) {
+      const f = def.fields.find((x) => x.id === id);
+      if (f && !isTime(f)) errors.push(`feed rule ${when.op} needs a date or datetime field, "${f.slug}" is ${f.kind}`);
+    }
   }
   const ladderFields = new Set<string>();
   for (const t of def.timeTriggers) {
