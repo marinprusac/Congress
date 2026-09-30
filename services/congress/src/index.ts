@@ -4,6 +4,7 @@ import { app } from "./server.js";
 import { runMigrations, closeDb, sqlite } from "./db/client.js";
 import { closeExhibitsDb, exhibitsSqlite } from "./typeEngine/db/client.js";
 import { startTypeEngine } from "./typeEngine/index.js";
+import { importPersonNotes } from "./typeEngine/legacy/personNotes.js";
 import { startBackups, stopBackups } from "./typeEngine/backups.js";
 import { collectOrphans } from "./typeEngine/files.js";
 import { startTimeTriggers, stopTimeTriggers } from "./typeEngine/triggers.js";
@@ -25,6 +26,7 @@ import { CONNECTORS } from "./connectors/list.js";
 
 runMigrations();
 startTypeEngine();
+importPersonNotes();
 importLegacyChamberData();
 importLegacyDeputySettings();
 recoverInterruptedThreads();
