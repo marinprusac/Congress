@@ -99,7 +99,7 @@ export function fakeGmail() {
     },
     emitChange: (kind, key, deleted = false, quiet = false) => state.changes.push({ kind, key, deleted, quiet }),
     publish: (type, payload) => state.published.push({ type, payload }),
-    records: { idFor: (_kind, key) => state.records[key] ?? null },
+    records: { idFor: (_kind, key) => state.records[key] ?? null, list: () => [] },
     syncNow: () => {},
     reschedule: () => {},
   };

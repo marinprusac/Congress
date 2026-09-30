@@ -145,6 +145,8 @@ export const typeDefinitionSchema = z.object({
   layout: z.object({
     body: z.string().nullable(),
     timeRange: z.object({ start: z.string(), end: z.string(), allDay: z.string().nullable() }).nullable().optional(),
+    // mapPoint pairs latitude/longitude (and a radius in metres) number fields into one map picker.
+    mapPoint: z.object({ latitude: z.string(), longitude: z.string(), radius: z.string().nullable() }).nullable().optional(),
   }),
   actions: z.array(typeActionSchema),
   feedRules: z.array(feedRuleSchema),
@@ -193,6 +195,7 @@ export const operationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("set_title_field"), field: fieldRef }),
   z.object({ op: z.literal("set_layout"), body: fieldRef.nullable() }),
   z.object({ op: z.literal("set_time_range"), range: z.object({ start: fieldRef, end: fieldRef, allDay: fieldRef.nullable().optional() }).nullable() }),
+  z.object({ op: z.literal("set_map_point"), point: z.object({ latitude: fieldRef, longitude: fieldRef, radius: fieldRef.nullable().optional() }).nullable() }),
   z.object({ op: z.literal("set_actions"), actions: z.array(typeActionSchema).max(5) }),
   z.object({ op: z.literal("set_feed_rules"), rules: z.array(feedRuleSchema).max(10) }),
   z.object({ op: z.literal("set_time_triggers"), triggers: z.array(timeTriggerSchema).max(3) }),

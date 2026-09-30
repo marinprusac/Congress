@@ -5,7 +5,7 @@ import { googleApiFetch } from "./googleApi.js";
 import { listGoogleAccounts } from "./google/accounts.js";
 import { onEventPublished, publishEvent } from "../events.js";
 import { getTypeBySlug, listTypes } from "../typeEngine/store.js";
-import { findBySource } from "../typeEngine/records.js";
+import { findBySource, getRecord, listRecords, onRecordWrite } from "../typeEngine/records.js";
 import { activeFields } from "../typeEngine/operations.js";
 import { lookupOrCreate, type Evidence } from "../typeEngine/lookups.js";
 import { findByKey } from "../typeEngine/keys.js";
@@ -29,6 +29,7 @@ interface Running {
 
 const running = new Map<string, Running>();
 let unsubscribe: (() => void) | null = null;
+let unsubscribeRecords: (() => void) | null = null;
 
 export function resolvePerson(input: { email: string; name?: string | null }, evidence: Evidence, actor: string): string | null {
   const t = getTypeBySlug("person");
@@ -67,6 +68,11 @@ export function recordFor(connector: string, kind: string, key: string): string 
   return null;
 }
 
+export function listTypeRecords(type: string): { id: string; values: Record<string, unknown> }[] {
+  if (!getTypeBySlug(type)) return [];
+  return listRecords(type, { limit: 100_000 }).map((r) => ({ id: r.id, values: r.values }));
+}
+
 export function makeContext(connector: Connector, hooks: { syncNow(): void; reschedule(): void }): ConnectorContext {
   return {
     name: connector.name,
@@ -76,7 +82,7 @@ export function makeContext(connector: Connector, hooks: { syncNow(): void; resc
     },
     people: { find: findPerson, resolve: (input, evidence) => resolvePerson(input, evidence, connector.name) },
     emitChange: (kind, key, deleted = false, quiet = false) => emitSourceChange({ connector: connector.name, kind, key, deleted, quiet }),
-    records: { idFor: (kind, key) => recordFor(connector.name, kind, key) },
+    records: { idFor: (kind, key) => recordFor(connector.name, kind, key), list: listTypeRecords },
     publish: (type, payload) => publishEvent({ chamber: connector.name, type, payload }),
     ...hooks,
   };
@@ -110,6 +116,20 @@ export async function startConnectors(list: Connector[], opts: { context?: (c: C
       console.error(`Connector ${connector.name} failed to start: ${entry.startError}`);
     }
   }
+  // Record writes reach connectors that read records as input.
+  unsubscribeRecords ??= onRecordWrite((t, id, deleted, info) => {
+    const values = deleted ? undefined : getRecord(id)?.values;
+    const op = deleted ? ("delete" as const) : info?.op === "create" ? ("create" as const) : ("update" as const);
+    const change = { type: t.definition.slug, id, op, values };
+    for (const r of running.values()) {
+      if (r.state !== "active" || !r.connector.onRecordChange) continue;
+      try {
+        r.connector.onRecordChange(r.ctx, change);
+      } catch (err) {
+        console.warn(`Connector ${r.connector.name} failed on a ${change.type} change: ${(err as Error).message}`);
+      }
+    }
+  });
   unsubscribe ??= onEventPublished((event) => {
     for (const r of running.values()) {
       if (r.state !== "active" || !r.connector.onEvent) continue;
@@ -125,6 +145,8 @@ export async function startConnectors(list: Connector[], opts: { context?: (c: C
 export async function stopConnectors(): Promise<void> {
   unsubscribe?.();
   unsubscribe = null;
+  unsubscribeRecords?.();
+  unsubscribeRecords = null;
   for (const r of running.values()) {
     r.scheduler.stop();
     try {
