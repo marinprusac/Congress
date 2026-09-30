@@ -121,7 +121,28 @@ function prepare(typeId: string | undefined, ops: Operation[]): { current: Store
   if (applied.errors.length) throw new PublishError(applied.errors);
   const clash = [...cache.values()].find((t) => t.id !== current?.id && t.definition.slug === applied.def.slug);
   if (clash) throw new PublishError([`a type "${applied.def.slug}" already exists`]);
+  const problems = relationProblems(current, applied.def);
+  if (problems.length) throw new PublishError(problems);
   return { current, def: applied.def };
+}
+
+// Relations name their target by slug: it must exist, and a linked-to type keeps its slug.
+function relationProblems(current: StoredType | undefined, def: TypeDefinition): string[] {
+  const problems: string[] = [];
+  const others = [...cache.values()].filter((t) => t.id !== current?.id);
+  const slugs = new Set([def.slug, ...others.map((t) => t.definition.slug)]);
+  for (const f of def.fields) {
+    if (f.retired || f.kind !== "relation" || !f.options.target) continue;
+    if (!slugs.has(f.options.target)) problems.push(`relation "${f.slug}": no type "${f.options.target}"`);
+  }
+  const oldSlug = current?.definition.slug;
+  if (oldSlug && oldSlug !== def.slug) {
+    const linking = others.flatMap((t) =>
+      t.definition.fields.filter((f) => f.kind === "relation" && f.options.target === oldSlug).map((f) => `${t.definition.slug}.${f.slug}`)
+    );
+    if (linking.length) problems.push(`"${oldSlug}" can't be renamed while other types link to it (${linking.join(", ")})`);
+  }
+  return problems;
 }
 
 function prepareRollback(typeId: string, toVersion: number): { current: StoredType; def: TypeDefinition } {
@@ -131,7 +152,10 @@ function prepareRollback(typeId: string, toVersion: number): { current: StoredTy
   const row = exhibitsDb.select().from(typeVersions).where(eq(typeVersions.typeId, typeId)).all().find((v) => v.version === toVersion);
   if (!row || toVersion >= current.version) throw new PublishError([`no earlier version ${toVersion}`]);
   const target = typeDefinitionSchema.parse(JSON.parse(row.definitionJson));
-  return { current, def: rollbackDefinition(current.definition, target) };
+  const def = rollbackDefinition(current.definition, target);
+  const problems = relationProblems(current, def);
+  if (problems.length) throw new PublishError(problems);
+  return { current, def };
 }
 
 export function publish(input: PublishInput): PublishResult {

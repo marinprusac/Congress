@@ -104,6 +104,33 @@ describe("type routes", () => {
     expect((await call("/congress/records/missing", { method: "PATCH", body: "{}" })).status).toBe(404);
   });
 
+  it("search one type for the relation picker and list reverse relations", async () => {
+    publish({
+      actor: "test",
+      ops: [
+        { op: "create_type", slug: "trip", label: "Trip" },
+        { op: "add_field", slug: "title", label: "Title", kind: "text" },
+        { op: "set_title_field", field: "title" },
+        { op: "add_field", slug: "notes", label: "Notes", kind: "relation", options: { target: "note", many: true } },
+      ],
+    });
+    const post = async (type: string, values: object) =>
+      (await (await call("/congress/records", { method: "POST", body: JSON.stringify({ type, values }) })).json()) as { id: string };
+    const note = await post("note", { title: "Packing list" });
+    await post("note", { title: "Unrelated" });
+    const trip = await post("trip", { title: "Rome", notes: [note.id] });
+
+    const found = (await (await call("/congress/records/search?type=note&q=pack")).json()) as { id: string }[];
+    expect(found.map((r) => r.id)).toEqual([note.id]);
+    expect((await call("/congress/records/search?type=nope&q=x")).status).toBe(404);
+
+    const related = await (await call(`/congress/records/${note.id}/related`)).json();
+    expect(related).toEqual([
+      { type: "trip", typeLabel: "Trips", field: "notes", fieldLabel: "Notes", total: 1, records: [{ id: trip.id, name: "Rome", url: `/${trip.id}` }] },
+    ]);
+    expect((await call("/congress/records/missing/related")).status).toBe(404);
+  });
+
   it("leave the Google OAuth callback public", async () => {
     expect((await call("/congress/connectors/google/callback?state=x", {}, false)).status).not.toBe(401);
   });

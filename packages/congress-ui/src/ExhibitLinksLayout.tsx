@@ -264,6 +264,8 @@ interface ExhibitLinksLayoutProps {
   // and flush them for real via flushDraftConnections once it has a real id.
   draftConnections?: CapitolExhibitSearchResult[];
   onDraftConnectionsChange?: (next: CapitolExhibitSearchResult[]) => void;
+  // Connections the page already shows elsewhere (e.g. relation fields).
+  hideIds?: ReadonlySet<string>;
 }
 
 // Flanks its children with a single panel backed by Capitol's exhibit_refs
@@ -282,13 +284,15 @@ export function ExhibitLinksLayout({
   onCreateReference,
   draftConnections,
   onDraftConnectionsChange,
+  hideIds,
 }: ExhibitLinksLayoutProps) {
   const queryClient = useQueryClient();
   const persistedConnections = useExhibitConnections(exhibitId);
-  const connections: ExhibitRefEntry[] =
+  const all: ExhibitRefEntry[] =
     exhibitId === null
       ? (draftConnections ?? []).map((r) => ({ id: r.id, chamber: r.chamber, name: r.name, url: r.url, isManual: true }))
       : persistedConnections;
+  const connections = hideIds?.size ? all.filter((r) => !hideIds.has(r.id)) : all;
 
   function refresh() {
     queryClient.invalidateQueries({ queryKey: ["exhibit-connections", exhibitId] });
@@ -333,7 +337,7 @@ export function ExhibitLinksLayout({
           editable && (
             <AddReferenceControl
               exhibitId={exhibitId}
-              existingIds={new Set(connections.map((r) => r.id))}
+              existingIds={new Set(all.map((r) => r.id))}
               onAdd={addConnection}
               onCreate={onCreateReference}
               renderIcon={renderIcon}

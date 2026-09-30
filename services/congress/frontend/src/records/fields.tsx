@@ -6,10 +6,10 @@ import {
   FormLabel,
   getChamberIcon,
   showToast,
-  useExhibitSearch,
   useResolvedExhibits,
 } from "@congress/congress-ui";
-import { fileUrl, uploadFile } from "@/lib/recordsApi";
+import { useQuery } from "@tanstack/react-query";
+import { fetchTypes, fileUrl, quickCreateRecord, searchRecords, TYPES_KEY, uploadFile } from "@/lib/recordsApi";
 import { fromLocalInput, toLocalInput } from "./datetime";
 import { formatBytes } from "./format";
 
@@ -158,43 +158,83 @@ export function ReadonlyValue({ field, value }: { field: FieldDefinition; value:
 function RelationControl({ field, value, onChange, onNavigate }: FieldProps) {
   const ids = Array.isArray(value) ? value : typeof value === "string" && value ? [value] : [];
   const { resultsByToken } = useResolvedExhibits(ids.map((id) => `exhibit:e:${id}`));
+  const { data: types } = useQuery({ queryKey: TYPES_KEY, queryFn: fetchTypes });
+  const target = types?.find((t) => t.definition.slug === field.options.target);
   const [query, setQuery] = useState("");
-  const { results } = useExhibitSearch(query, query.trim().length > 0);
-  const matches = results.filter((r) => r.chamber === "e" && r.type === field.options.target && !ids.includes(r.id)).slice(0, 5);
+  const [picking, setPicking] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const q = query.trim();
+  const { data: results = [] } = useQuery({
+    queryKey: ["records", "search", field.options.target, q],
+    queryFn: () => searchRecords(field.options.target ?? "", q),
+    enabled: Boolean(field.options.target) && q.length > 0,
+  });
+  const matches = results.filter((r) => !ids.includes(r.id)).slice(0, 6);
+  const exact = results.some((r) => r.name.trim().toLowerCase() === q.toLowerCase());
+  const noun = target?.definition.label.toLowerCase() ?? "record";
 
   const set = (next: string[]) => onChange(field.options.many ? next : (next[0] ?? null));
+  const pick = (id: string) => {
+    set(field.options.many ? [...ids, id] : [id]);
+    setQuery("");
+    setPicking(false);
+  };
+  const create = async () => {
+    if (!target) return;
+    setCreating(true);
+    try {
+      pick((await quickCreateRecord(target, q)).id);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : `Couldn't create the ${noun}.`, "error");
+    } finally {
+      setCreating(false);
+    }
+  };
+  const showInput = field.options.many || ids.length === 0 || picking;
 
   return (
     <div className="space-y-1">
-      <div className="flex flex-wrap gap-2">
-        {ids.map((id) => {
-          const hit = resultsByToken.get(`exhibit:e:${id}`);
-          return (
-            <span key={id} className="inline-flex items-center gap-1">
-              {hit ? <ExhibitChip result={hit} renderIcon={(c) => getChamberIcon(c)} onNavigate={onNavigate} /> : <span className="font-mono text-xs text-dust">…</span>}
-              <button type="button" aria-label="Remove" className="font-mono text-xs text-dust" onClick={() => set(ids.filter((x) => x !== id))}>
-                ×
-              </button>
-            </span>
-          );
-        })}
-      </div>
-      {(field.options.many || ids.length === 0) && (
-        <input className="field-plain w-full font-mono text-sm" placeholder={`Link a ${field.options.target ?? "record"}…`} value={query} onChange={(e) => setQuery(e.target.value)} />
+      {ids.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {ids.map((id) => {
+            const hit = resultsByToken.get(`exhibit:e:${id}`);
+            return (
+              <span key={id} className="inline-flex min-w-0 items-center gap-1">
+                {hit ? <ExhibitChip result={hit} renderIcon={(c) => getChamberIcon(c)} onNavigate={onNavigate} /> : <span className="font-mono text-xs text-dust">…</span>}
+                <button type="button" aria-label="Remove" className="tap-target font-mono text-xs text-dust" onClick={() => set(ids.filter((x) => x !== id))}>
+                  ×
+                </button>
+              </span>
+            );
+          })}
+          {!field.options.many && !picking && (
+            <button type="button" className="tap-target font-mono text-xs text-slate hover:underline" onClick={() => setPicking(true)}>
+              Change
+            </button>
+          )}
+        </div>
       )}
-      {matches.map((m) => (
-        <button
-          key={m.id}
-          type="button"
-          className="block font-mono text-sm text-accent hover:underline"
-          onClick={() => {
-            set([...ids, m.id]);
-            setQuery("");
-          }}
-        >
-          {m.name}
+      {showInput && (
+        <input
+          className="field-plain w-full font-mono text-sm"
+          placeholder={`Add ${noun}…`}
+          value={query}
+          autoFocus={picking}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Escape" && (setQuery(""), setPicking(false))}
+        />
+      )}
+      {q.length > 0 &&
+        matches.map((m) => (
+          <button key={m.id} type="button" className="tap-target block max-w-full truncate font-mono text-sm text-accent hover:underline" onClick={() => pick(m.id)}>
+            {m.name}
+          </button>
+        ))}
+      {q.length > 0 && !exact && target && (
+        <button type="button" disabled={creating} className="tap-target block max-w-full truncate font-mono text-sm text-slate hover:underline disabled:text-dust" onClick={() => void create()}>
+          {creating ? "Creating —" : `Create ${noun} “${q}”`}
         </button>
-      ))}
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
-import type { CapitolExhibitSearchResult, FileRef, RecordDto, RecordValue, TypeOverview, TypeSummary, TypeVersion } from "@congress/shared-types";
+import type { CapitolExhibitSearchResult, ExhibitSearchResult, FileRef, RecordDto, RecordValue, RelatedGroup, TypeOverview, TypeSummary, TypeVersion } from "@congress/shared-types";
 
 // Runtime exhibit types and their records (server: src/typeEngine/routes.ts).
+
+export const TYPES_KEY = ["congress", "types"] as const;
 
 export class RecordConflict extends Error {
   constructor(public readonly field: string) {
@@ -35,6 +37,15 @@ export async function fetchTypeVersions(slug: string): Promise<TypeVersion[]> {
 
 export async function fetchRecord(id: string): Promise<RecordDto> {
   return check(await fetch(`/congress/records/${encodeURIComponent(id)}`));
+}
+
+export async function fetchRelated(id: string): Promise<RelatedGroup[]> {
+  return check(await fetch(`/congress/records/${encodeURIComponent(id)}/related`));
+}
+
+// One type's records matching q (recent ones when q is empty).
+export async function searchRecords(type: string, q: string): Promise<ExhibitSearchResult[]> {
+  return check(await fetch(`/congress/records/search?type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}`));
 }
 
 export async function createRecord(type: string, values: Record<string, RecordValue>): Promise<RecordDto> {
