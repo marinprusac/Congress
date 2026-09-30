@@ -86,20 +86,23 @@ export function storeChat(c: ReaderChat): boolean {
   const row = rowOf(c);
   const changed = !before || (Object.keys(row) as (keyof typeof row)[]).some((k) => before[k] !== row[k]);
   if (changed) {
-    const wroteIn = before?.wroteIn === true || row.lastFromMe ? true : (before?.wroteIn ?? null);
+    // Below the bar the count is stale once the chat moves: recount.
+    const ownerMessages = before?.ownerMessages != null && before.ownerMessages >= MIN_OWNER_MESSAGES ? before.ownerMessages : null;
     db.insert(chats)
-      .values({ ...row, wroteIn, personId: before?.personId ?? null, syncedAt: new Date() })
-      .onConflictDoUpdate({ target: chats.jid, set: { ...row, wroteIn, syncedAt: new Date() } })
+      .values({ ...row, ownerMessages, personId: before?.personId ?? null, syncedAt: new Date() })
+      .onConflictDoUpdate({ target: chats.jid, set: { ...row, ownerMessages, syncedAt: new Date() } })
       .run();
   }
   return changed;
 }
 
-// Has the owner written in this 1:1 chat? The last message says so, else one page of history.
-async function ownerWroteIn(c: ChatRow): Promise<boolean> {
-  if (c.lastFromMe) return true;
+// A chat makes a Person only once the owner wrote at least this many messages in it (one-offs don't count).
+export const MIN_OWNER_MESSAGES = 5;
+
+// The owner's messages among the chat's last 100.
+async function countOwnerMessages(c: ChatRow): Promise<number> {
   const page = await readerJson<{ messages: { fromMe: boolean }[] }>(readerPath(`/chats/${encodeURIComponent(c.jid)}/messages`, { limit: "100" }, ["limit"]));
-  return page.messages.some((m) => m.fromMe);
+  return page.messages.filter((m) => m.fromMe).length;
 }
 
 // Links a 1:1 chat to a Person by phone: creates one only if the owner wrote in it (and creation is on).
@@ -107,13 +110,13 @@ export async function linkPerson(ctx: ConnectorContext, jid: string): Promise<bo
   const c = getChatRow(jid);
   const phone = c && !c.isGroup ? phoneOf(c.jid) : null;
   if (!c || !phone || c.personId) return false;
-  let wroteIn = c.wroteIn;
-  if (wroteIn === null) {
-    wroteIn = await ownerWroteIn(c);
-    db.update(chats).set({ wroteIn }).where(eq(chats.jid, jid)).run();
+  let owned = c.ownerMessages;
+  if (owned === null) {
+    owned = await countOwnerMessages(c);
+    db.update(chats).set({ ownerMessages: owned }).where(eq(chats.jid, jid)).run();
   }
   const name = c.name.trim() || null;
-  const id = wroteIn && getWhatsappSettings().createPeople ? ctx.people.resolve({ phone, name }, "corresponded") : ctx.people.find({ phone });
+  const id = owned >= MIN_OWNER_MESSAGES && getWhatsappSettings().createPeople ? ctx.people.resolve({ phone, name }, "corresponded") : ctx.people.find({ phone });
   if (!id) return false;
   db.update(chats).set({ personId: id }).where(eq(chats.jid, jid)).run();
   return true;
@@ -150,5 +153,5 @@ export function syncWhatsapp(ctx: ConnectorContext): Promise<SyncResult> {
   return running;
 }
 
-// The 1:1 chats the owner wrote in that no Person matches yet (the dry-run count).
-export const peopleToCreate = () => listChatRows().filter((c) => !c.isGroup && phoneOf(c.jid) && c.wroteIn && !c.personId);
+// The 1:1 chats the owner wrote enough in that no Person matches yet (the dry-run count).
+export const peopleToCreate = () => listChatRows().filter((c) => !c.isGroup && phoneOf(c.jid) && (c.ownerMessages ?? 0) >= MIN_OWNER_MESSAGES && !c.personId);

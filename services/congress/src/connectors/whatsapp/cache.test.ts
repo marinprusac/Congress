@@ -20,8 +20,9 @@ const chats = [
   { jid: BOB, name: "Bob", isGroup: false, lastMessageAt: T - 1000, lastText: "hi", lastFromMe: false, unreadCount: 0 },
   { jid: GROUP, name: "Climbing", isGroup: true, lastMessageAt: T - 2000, lastText: "ok", lastFromMe: false, lastSender: "Eve", unreadCount: 0 },
 ];
-// Only in Ana's chat did the owner ever write.
-const messages: Record<string, { fromMe: boolean }[]> = { [ANA]: [{ fromMe: false }, { fromMe: true }], [BOB]: [{ fromMe: false }] };
+// Only in Ana's chat did the owner write enough; Bob got a single reply.
+const mine = (n: number) => Array.from({ length: n }, () => ({ fromMe: true }));
+const messages: Record<string, { fromMe: boolean }[]> = { [ANA]: [{ fromMe: false }, ...mine(5)], [BOB]: [{ fromMe: false }, ...mine(1)] };
 const requests: string[] = [];
 let server: Server;
 
@@ -81,7 +82,7 @@ describe("the WhatsApp connector's chats", () => {
     expect(peopleToCreate().map((c) => c.jid)).toEqual([ANA]);
   });
 
-  it("creates a Person only for the 1:1 chat the owner wrote in", async () => {
+  it("creates a Person only for the 1:1 chat the owner wrote in at least five times", async () => {
     setCreatePeople(true);
     await syncWhatsapp(ctx);
     expect(resolved).toEqual(["+385911111111"]);

@@ -1,0 +1,1 @@
+ALTER TABLE `chats` ADD `owner_messages` integer;
