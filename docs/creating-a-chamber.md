@@ -364,8 +364,8 @@ Accounts are shared by every Chamber and managed in Settings → Accounts;
 connecting always requests every Chamber's scopes. Link the owner to
 `congress-ui`'s `googleConnectHref({ returnTo, loginHint })` when an account
 hasn't granted yours yet (`GoogleScopeMissingError`). Subscribe to
-`google.account_disconnected` to drop that account's data. See
-`services/chamber-mail` for a complete example.
+`google.account_disconnected` to drop that account's data. See the Gmail
+connector (`services/congress/src/connectors/gmail/`) for a complete example.
 
 ## 6. Local dev workflow
 

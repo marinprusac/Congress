@@ -42,11 +42,12 @@ describe("gmail sync", () => {
     expect(state.published).toEqual([]);
 
     updateSettings({ publishEvents: true });
+    state.records["1:t1"] = "rec1";
     grow("m3");
     grow("m4", ["SENT"]);
     await syncAll(ctx);
     expect(state.published.map((p) => p.payload.messageId)).toEqual(["m3"]);
-    expect(state.published[0]).toMatchObject({ type: "mail.received", payload: { exhibitId: "thread-1:t1", url: "/mail/t/1/t1", from: "Jane Doe" } });
+    expect(state.published[0]).toMatchObject({ type: "mail.received", payload: { exhibitId: "rec1", url: "/e/rec1", from: "Jane Doe" } });
   });
 
   it("skips label changes on threads it doesn't keep, and drops a trashed thread", async () => {

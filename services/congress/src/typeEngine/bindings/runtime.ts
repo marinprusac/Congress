@@ -537,14 +537,14 @@ export async function liveDetail(recordId: string, opts: Record<string, string> 
 }
 
 // Pulls one source record in now (fetching it into the connector's cache first); the record id.
-export async function materialize(t: StoredType, b: Binding, key: string): Promise<string | null> {
+export async function materialize(t: StoredType, b: Binding, key: string, opts: { quiet?: boolean } = {}): Promise<string | null> {
   const existing = findBySource(t, b.id, key);
   if (existing) return existing;
   const running = runningConnector(b.connector);
   const c = running?.connector;
   if (!c) return null;
-  const src = c.read.get(b.kind, key) ?? (c.read.fetch ? await c.read.fetch(running.ctx, b.kind, key) : null);
-  return src ? pullRecord(t, b, src) : null;
+  const src = c.read.get(b.kind, key) ?? (c.read.fetch ? await c.read.fetch(running.ctx, b.kind, key, opts) : null);
+  return src ? pullRecord(t, b, src, opts) : null;
 }
 
 // Searches the whole source behind a type; each hit says whether it's a record yet.

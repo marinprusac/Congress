@@ -49,6 +49,8 @@ export function fakeGmail() {
     resolved: [] as { email: string; evidence: string }[],
     found: [] as string[],
     people: {} as Record<string, string>,
+    // Record ids by thread key, as bindings would have made them.
+    records: {} as Record<string, string>,
   };
 
   async function fetch(_accountId: number, url: string, init?: RequestInit, scopes?: string[]): Promise<unknown> {
@@ -97,6 +99,7 @@ export function fakeGmail() {
     },
     emitChange: (kind, key, deleted = false, quiet = false) => state.changes.push({ kind, key, deleted, quiet }),
     publish: (type, payload) => state.published.push({ type, payload }),
+    records: { idFor: (_kind, key) => state.records[key] ?? null },
     syncNow: () => {},
     reschedule: () => {},
   };

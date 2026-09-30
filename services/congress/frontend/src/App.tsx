@@ -92,6 +92,12 @@ export function App() {
         <Route path="/documents/d/:id" element={<LegacyRedirect chamber="documents" idPrefix="document-" noun="document" />} />
         <Route path="/documents/new" element={<Navigate to="/e/new/document" replace />} />
         <Route path="/documents/*" element={<Navigate to="/" replace />} />
+        <Route
+          path="/mail/t/:acct/:thread"
+          element={<LegacyRedirect chamber="mail" idPrefix="thread-" noun="email" idFrom={(p) => `${p.acct}:${p.thread}`} />}
+        />
+        <Route path="/mail/settings" element={<Navigate to="/settings?from=accounts" replace />} />
+        <Route path="/mail/*" element={<Navigate to="/" replace />} />
         {/* Old URLs of Chambers folded into Congress - bookmarks and the
             installed PWA's saved URL land here. */}
         <Route path="/capitol/*" element={<Navigate to="/" replace />} />
