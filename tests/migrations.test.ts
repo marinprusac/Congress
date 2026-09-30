@@ -16,8 +16,6 @@ import { migrationsDir } from "@congress/test-support";
 const SERVICES: { name: string; load: () => Promise<DbClientModule> }[] = [
   { name: "congress", load: () => import("../services/congress/src/db/client.js") },
   { name: "chamber-calendar", load: () => import("../services/chamber-calendar/src/db/client.js") },
-  { name: "chamber-documents", load: () => import("../services/chamber-documents/src/db/client.js") },
-  { name: "chamber-tasks", load: () => import("../services/chamber-tasks/src/db/client.js") },
   { name: "chamber-map", load: () => import("../services/chamber-map/src/db/client.js") },
 ];
 
