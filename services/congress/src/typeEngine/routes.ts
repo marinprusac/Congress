@@ -14,7 +14,7 @@ import {
   RecordValidationError,
   updateRecord,
 } from "./records.js";
-import { bindingTargets, runBindingAction, withBinding } from "./bindings/runtime.js";
+import { bindingTargets, liveDetail, runBindingAction, withBinding } from "./bindings/runtime.js";
 import { ConnectorRefusedError } from "../connectors/contract.js";
 import { resolveLegacyAlias } from "./aliases.js";
 import { searchType } from "./source.js";
@@ -103,6 +103,17 @@ typeRoutes.post("/records/:id/actions/:action", requireSession, async (c) => {
       return c.json({ error: "source_failed", message: (err as Error).message }, 502);
     }
     return fail(c, err);
+  }
+});
+
+// The source's live content (a thread's messages, ...); null when there's none.
+typeRoutes.get("/records/:id/live", requireSession, async (c) => {
+  try {
+    const opts = Object.fromEntries(new URL(c.req.url).searchParams);
+    return c.json({ content: await liveDetail(c.req.param("id"), opts) });
+  } catch (err) {
+    if (err instanceof RecordNotFoundError) return fail(c, err);
+    return c.json({ error: "source_failed", message: (err as Error).message }, 502);
   }
 });
 

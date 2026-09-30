@@ -158,7 +158,7 @@ function applyChange(change: SourceChange): void {
       continue;
     }
     const src = getConnector(change.connector)?.read.get(change.kind, change.key);
-    if (src) pullRecord(t, b, src);
+    if (src) pullRecord(t, b, src, { quiet: change.quiet });
   }
 }
 
@@ -499,6 +499,7 @@ export function withBinding(dto: RecordDto): RecordDto {
       lockReason: locks.reason,
       actions: availableActions(b, src?.facts ?? null).map((a) => ({ id: a.id, label: a.label })),
       live,
+      detail: Boolean(getConnector(b.connector)?.read.detail),
       pending: pendingDto,
     },
   };
@@ -517,6 +518,46 @@ export async function runBindingAction(recordId: string, actionId: string): Prom
   const src = await running.connector.push.act(running.ctx, b.kind, rec.provenance.key, action.act, action.args);
   pullRecord(t, b, src);
   return withBinding(getRecord(recordId)!);
+}
+
+function boundRecord(recordId: string) {
+  const t = typeOfRecord(recordId);
+  const rec = getRecord(recordId);
+  if (!t || !rec) throw new RecordNotFoundError(`no record ${recordId}`);
+  const b = rec.provenance ? t.definition.bindings.find((x) => x.id === rec.provenance!.binding) : undefined;
+  const running = b ? runningConnector(b.connector) : null;
+  return { t, rec, b, key: rec.provenance?.key, running };
+}
+
+// The source's live content for a record (e.g. a thread's messages), or null when it has none.
+export async function liveDetail(recordId: string, opts: Record<string, string> = {}): Promise<unknown> {
+  const { b, key, running } = boundRecord(recordId);
+  if (!b || !key || !running?.connector.read.detail) return null;
+  return running.connector.read.detail(running.ctx, b.kind, key, opts);
+}
+
+// Pulls one source record in now (fetching it into the connector's cache first); the record id.
+export async function materialize(t: StoredType, b: Binding, key: string): Promise<string | null> {
+  const existing = findBySource(t, b.id, key);
+  if (existing) return existing;
+  const running = runningConnector(b.connector);
+  const c = running?.connector;
+  if (!c) return null;
+  const src = c.read.get(b.kind, key) ?? (c.read.fetch ? await c.read.fetch(running.ctx, b.kind, key) : null);
+  return src ? pullRecord(t, b, src) : null;
+}
+
+// Searches the whole source behind a type; each hit says whether it's a record yet.
+export async function searchSource(t: StoredType, query: string, limit: number) {
+  const hits: { recordId: string | null; key: string; binding: string; values: Record<string, SourceValue> }[] = [];
+  for (const b of t.definition.bindings) {
+    const running = runningConnector(b.connector);
+    if (!running?.connector.read.search) continue;
+    for (const src of await running.connector.read.search(running.ctx, b.kind, query, limit)) {
+      hits.push({ recordId: findBySource(t, b.id, src.key) ?? null, key: src.key, binding: b.id, values: src.values });
+    }
+  }
+  return hits;
 }
 
 // Where new records of a type can go (the create target field's options).

@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
-import type { FieldKind, KeyKind } from "@congress/shared-types";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { FieldKind, KeyKind, ManifestEvent } from "@congress/shared-types";
 import type { PublishedEvent } from "../events.js";
 import type { Evidence } from "../typeEngine/lookups.js";
 
@@ -35,8 +36,9 @@ export interface SyncResult {
 export interface ConnectorContext {
   name: string;
   google: {
-    accounts(): { id: number; label: string; email: string; needsReconnect: boolean }[];
-    fetch(accountId: number, url: string, init?: RequestInit): Promise<unknown>;
+    accounts(): { id: number; label: string; email: string; needsReconnect: boolean; scopes: string[] }[];
+    // Scopes default to the connector's googleScopes.
+    fetch(accountId: number, url: string, init?: RequestInit, scopes?: string[]): Promise<unknown>;
   };
   people: {
     // An existing Person with this email, or null. Never creates.
@@ -44,7 +46,10 @@ export interface ConnectorContext {
     // Finds or creates by email; only direct contact (evidence "corresponded") should create.
     resolve(input: { email: string; name?: string | null }, evidence: Evidence): string | null;
   };
-  emitChange(kind: string, key: string, deleted?: boolean): void;
+  // quiet: pulled without events (a backfill).
+  emitChange(kind: string, key: string, deleted?: boolean, quiet?: boolean): void;
+  // Publishes a domain event (declared in the connector's `events`).
+  publish(type: string, payload: Record<string, unknown>): void;
   syncNow(): void;
   reschedule(): void;
 }
@@ -54,6 +59,8 @@ export interface Connector {
   label: string;
   googleScopes?: string[];
   source: SourceKind[];
+  // Events it publishes, for Settings → Logs' catalog.
+  events?: ManifestEvent[];
   start(ctx: ConnectorContext): Promise<void> | void;
   stop?(): Promise<void> | void;
   sync(ctx: ConnectorContext): Promise<SyncResult>;
@@ -63,6 +70,12 @@ export interface Connector {
     list(kind: string, opts?: { from?: string; to?: string }): SourceRecord[];
     // Where a new record can go (e.g. writable calendars): values for the create target field.
     targets?(kind: string): { value: string; label: string; group?: string }[];
+    // Live content that isn't mirrored (e.g. a thread's bodies), shaped for its hand-written renderer.
+    detail?(ctx: ConnectorContext, kind: string, key: string, opts: Record<string, string>): Promise<unknown>;
+    // Searches the whole source, not only what's cached; nothing is stored.
+    search?(ctx: ConnectorContext, kind: string, query: string, limit: number): Promise<SourceRecord[]>;
+    // Fetches one record into the cache (so a binding can pull it), or null.
+    fetch?(ctx: ConnectorContext, kind: string, key: string): Promise<SourceRecord | null>;
   };
   push?: {
     create(ctx: ConnectorContext, kind: string, values: Record<string, SourceValue>): Promise<SourceRecord>;
@@ -73,6 +86,8 @@ export interface Connector {
   // Setup-panel API, mounted at /congress/connectors/<name>/*.
   routes?(ctx: ConnectorContext): Hono;
   onEvent?(ctx: ConnectorContext, event: PublishedEvent): void;
+  // Extra AI tools on /mcp/types (named <prefix>_*), for what isn't per record.
+  tools?(ctx: ConnectorContext, server: McpServer): void;
 }
 
 export function defineConnector(connector: Connector): Connector {

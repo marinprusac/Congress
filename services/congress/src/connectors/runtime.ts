@@ -26,6 +26,7 @@ export interface SourceChange {
   kind: string;
   key: string;
   deleted: boolean;
+  quiet?: boolean;
 }
 
 const changeListeners = new Set<(change: SourceChange) => void>();

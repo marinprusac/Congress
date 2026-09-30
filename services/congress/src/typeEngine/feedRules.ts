@@ -47,6 +47,17 @@ export function compileFeedRule(def: TypeDefinition, rule: FeedRule, now: Date):
       score = (row) => Math.round(rule.score * (0.7 + 0.3 * closeness(instant(row) - t, windowMs)));
       break;
     }
+    case "within_last": {
+      const f = field(w.field);
+      const col = quoteIdent(f.column);
+      const windowMs = w.hours * HOUR;
+      clauses.push(`${col} IS NOT NULL AND ${col} <= ? AND ${col} >= ?`);
+      if (f.kind === "date") params.push(dayOf(t), dayOf(t - windowMs));
+      else params.push(t, t - windowMs);
+      const instant = (row: Record<string, Stored>) => (f.kind === "date" ? endOfDay(String(row[f.column])) : Number(row[f.column]));
+      score = (row) => Math.round(rule.score * (0.7 + 0.3 * closeness(t - instant(row), windowMs)));
+      break;
+    }
     case "overdue": {
       const f = field(w.field);
       const col = quoteIdent(f.column);

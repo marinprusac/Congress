@@ -21,7 +21,10 @@ import {
   typeOfRecord,
   updateRecord,
 } from "./records.js";
-import { bindingTargets, runBindingAction, withBinding } from "./bindings/runtime.js";
+import { bindingTargets, liveDetail, materialize, runBindingAction, searchSource, withBinding } from "./bindings/runtime.js";
+import { canCreate } from "./records.js";
+import { getConnector, listConnectors } from "../connectors/runtime.js";
+import { runningConnector } from "../connectors/registry.js";
 import { typeEngineSource } from "./source.js";
 import { lookupOrCreate } from "./lookups.js";
 import { FileTooLargeError, storeUpload } from "./files.js";
@@ -175,7 +178,49 @@ export function registerTypeTools(server: McpServer): void {
         })
     );
 
-    server.registerTool(
+    const sources = def.bindings.map((b) => ({ b, c: getConnector(b.connector) }));
+    const detailed = sources.find(({ c }) => c?.read.detail);
+    if (detailed) {
+      server.registerTool(
+        `read_${slug}`,
+        {
+          title: `Read ${def.label}`,
+          description: `A ${label}'s full content, live from ${detailed.b.label}. Pass its id, or the sourceKey search_all_${plural(slug)} gave (that makes it a record).`,
+          inputSchema: {
+            id: z.string().optional(),
+            sourceKey: z.string().optional(),
+            options: z.record(z.string()).optional().describe("Source-specific reading options"),
+          },
+        },
+        ({ id, sourceKey, options }: { id?: string; sourceKey?: string; options?: Record<string, string> }) =>
+          guarded(async () => {
+            const recordId = id ?? (sourceKey ? await materialize(t, detailed.b, sourceKey) : null);
+            if (!recordId || typeOfRecord(recordId)?.definition.slug !== slug) throw new RecordNotFoundError(`no ${label} ${id ?? sourceKey ?? ""}`);
+            const record = withChip(t, withBinding(getRecord(recordId)!));
+            return { ...record, content: await liveDetail(recordId, { ai: "1", ...options }) };
+          })
+      );
+    }
+    const searchable = sources.find(({ c }) => c?.read.search);
+    if (searchable) {
+      server.registerTool(
+        `search_all_${plural(slug)}`,
+        {
+          title: `Search all ${def.pluralLabel}`,
+          description: `Search all of ${searchable.b.label}, not only the ${def.pluralLabel.toLowerCase()} synced here. A hit without recordId isn't a record yet; read_${slug} with its sourceKey makes it one.`,
+          inputSchema: { query: z.string().min(1), limit: z.number().int().min(1).max(50).optional() },
+        },
+        ({ query, limit }: { query: string; limit?: number }) =>
+          guarded(async () =>
+            (await searchSource(t, query, limit ?? 20)).map((h) => ({
+              ...(h.recordId ? { recordId: h.recordId } : { sourceKey: h.key }),
+              ...h.values,
+            }))
+          )
+      );
+    }
+
+    if (canCreate(def)) server.registerTool(
       `create_${slug}`,
       {
         title: `Create ${def.label}`,
@@ -235,6 +280,11 @@ export function registerTypeTools(server: McpServer): void {
           return { ok: true, id };
         })
     );
+  }
+
+  for (const c of listConnectors()) {
+    const running = runningConnector(c.name);
+    if (running?.connector.tools) running.connector.tools(running.ctx, server);
   }
 
   server.registerTool(

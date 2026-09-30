@@ -5,6 +5,7 @@ import { eventSettings } from "./db/schema.js";
 import { listChambers } from "./registry.js";
 import { typeEventCatalog } from "./typeEngine/source.js";
 import { getLocalSource } from "./exhibitSources.js";
+import { listConnectors } from "./connectors/runtime.js";
 
 // Keeps Congress's known event-type catalog current with its own live
 // Chamber registry, so every event type any registered Chamber declares in
@@ -28,7 +29,8 @@ export function syncEventCatalog(): void {
   const syntheticChambers = [{ name: "congress", events: CONGRESS_SYNTHETIC_EVENTS }];
 
   const typeCatalog = getLocalSource("e") ? typeEventCatalog() : [];
-  for (const chamber of [...registry, ...syntheticChambers, ...typeCatalog]) {
+  const connectorCatalog = listConnectors().flatMap((c) => (c.events?.length ? [{ name: c.name, events: c.events }] : []));
+  for (const chamber of [...registry, ...syntheticChambers, ...typeCatalog, ...connectorCatalog]) {
     for (const event of chamber.events) {
       const payloadFieldsJson = event.payloadFields ? JSON.stringify(event.payloadFields) : null;
       if (knownTypes.has(event.type)) {
