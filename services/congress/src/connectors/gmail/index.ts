@@ -93,10 +93,10 @@ export const gmailConnector = defineConnector({
       onlyThreads(kind);
       return searchThreads(ctx, query, limit);
     },
-    async fetch(ctx, kind, key) {
+    async fetch(ctx, kind, key, opts) {
       onlyThreads(kind);
       const { account, threadId } = accountOf(ctx, key);
-      const stored = await refreshThread(ctx, account, threadId);
+      const stored = await refreshThread(ctx, account, threadId, { quiet: opts?.quiet });
       const row = stored ? getThreadRow(stored) : undefined;
       return row ? toSourceRecord(row) : null;
     },

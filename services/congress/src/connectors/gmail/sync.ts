@@ -57,6 +57,7 @@ function publishReceived(ctx: ConnectorContext, account: Account, raw: RawThread
   const { publishEvents, includeAllCategories } = getSettings();
   if (!publishEvents) return;
   const now = Date.now();
+  const recordId = ctx.records.idFor("thread", threadKey(account.id, raw.id));
   for (const m of liveMessages(raw)) {
     const labels = m.labelIds ?? [];
     if (seen.has(m.id) || !labels.includes("INBOX") || labels.includes("SENT")) continue;
@@ -69,14 +70,14 @@ function publishReceived(ctx: ConnectorContext, account: Account, raw: RawThread
       account: account.email,
       messageId: m.id,
       threadId: raw.id,
-      // The Mail Chamber's ids: they keep resolving (aliases, redirects).
-      exhibitId: `thread-${account.id}:${raw.id}`,
+      // The record's id and page once bound; else the Mail Chamber's (aliases, redirects).
+      exhibitId: recordId ?? `thread-${account.id}:${raw.id}`,
       from: displayFrom(from),
       fromEmail: from.email ?? "",
       subject: headerValue(m.payload?.headers, "Subject")?.trim() || "(no subject)",
       snippet: m.snippet ?? "",
       category,
-      url: `/mail/t/${account.id}/${raw.id}`,
+      url: recordId ? `/e/${recordId}` : `/mail/t/${account.id}/${raw.id}`,
     });
   }
 }

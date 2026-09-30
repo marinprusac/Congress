@@ -88,10 +88,10 @@ To connect accounts (or grant Mail its Gmail access), once:
 3. Optionally move the three `GOOGLE_OAUTH_*` lines into
    `services/congress/.env` (with the new redirect URI) and drop them from
    Calendar's `.env`; restart `congress-core`.
-4. Settings → Accounts → "Grant" (or Mail's settings → "Grant Gmail
-   access" / "Grant read-sync") for each account.
+4. Settings → Connectors → "Grant" (or the Gmail panel's "Grant access")
+   for each account.
 
-Mail needs no `.env` of its own (it defaults to `./data/mail.sqlite3`).
+The Gmail connector keeps its cache in `data/connectors/gmail.sqlite3`.
 
 ## Chambers moved into Congress (one-time)
 

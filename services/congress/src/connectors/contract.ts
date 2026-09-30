@@ -48,6 +48,10 @@ export interface ConnectorContext {
   };
   // quiet: pulled without events (a backfill).
   emitChange(kind: string, key: string, deleted?: boolean, quiet?: boolean): void;
+  records: {
+    // The record a source item became (through any binding of this connector), or null.
+    idFor(kind: string, key: string): string | null;
+  };
   // Publishes a domain event (declared in the connector's `events`).
   publish(type: string, payload: Record<string, unknown>): void;
   syncNow(): void;
@@ -74,8 +78,8 @@ export interface Connector {
     detail?(ctx: ConnectorContext, kind: string, key: string, opts: Record<string, string>): Promise<unknown>;
     // Searches the whole source, not only what's cached; nothing is stored.
     search?(ctx: ConnectorContext, kind: string, query: string, limit: number): Promise<SourceRecord[]>;
-    // Fetches one record into the cache (so a binding can pull it), or null.
-    fetch?(ctx: ConnectorContext, kind: string, key: string): Promise<SourceRecord | null>;
+    // Fetches one record into the cache (so a binding can pull it), or null. quiet: no events.
+    fetch?(ctx: ConnectorContext, kind: string, key: string, opts?: { quiet?: boolean }): Promise<SourceRecord | null>;
   };
   push?: {
     create(ctx: ConnectorContext, kind: string, values: Record<string, SourceValue>): Promise<SourceRecord>;

@@ -41,8 +41,8 @@ afterAll(async () => {
 });
 
 describe("the Email premade bound to Gmail", () => {
-  it("mirrors each thread quietly, hidden until the cutover", () => {
-    expect(getTypeBySlug("email")!.definition.hidden).toBe(true);
+  it("mirrors each thread quietly", () => {
+    expect(getTypeBySlug("email")!.definition.hidden).toBe(false);
     expect(byThread("t1").values).toMatchObject({ subject: "Invoice", from: "Ana <ana@example.com>", unread: true, inbox: true, category: "primary", messages: 1 });
     expect(events.filter((e) => e.type.startsWith("email."))).toEqual([]);
   });

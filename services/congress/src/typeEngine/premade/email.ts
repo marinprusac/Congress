@@ -75,5 +75,7 @@ export const EMAIL: Premade = {
       // Hidden, bound and silent until the Mail Chamber's cutover (phase 7a).
       { op: "set_type_meta", hidden: true },
     ],
+    // Cutover: in use.
+    [{ op: "set_type_meta", hidden: false }],
   ],
 };

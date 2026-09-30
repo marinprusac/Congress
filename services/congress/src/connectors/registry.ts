@@ -4,7 +4,8 @@ import { addConnector, emitConnectorSynced, emitSourceChange, removeConnector } 
 import { googleApiFetch } from "./googleApi.js";
 import { listGoogleAccounts } from "./google/accounts.js";
 import { onEventPublished, publishEvent } from "../events.js";
-import { getTypeBySlug } from "../typeEngine/store.js";
+import { getTypeBySlug, listTypes } from "../typeEngine/store.js";
+import { findBySource } from "../typeEngine/records.js";
 import { activeFields } from "../typeEngine/operations.js";
 import { lookupOrCreate, type Evidence } from "../typeEngine/lookups.js";
 import { findByKey } from "../typeEngine/keys.js";
@@ -55,6 +56,17 @@ export function findPerson(email: string): string | null {
   return findByKey(t.id, "email", value) ?? null;
 }
 
+export function recordFor(connector: string, kind: string, key: string): string | null {
+  for (const t of listTypes({ includeHidden: true })) {
+    for (const b of t.definition.bindings) {
+      if (b.connector !== connector || b.kind !== kind) continue;
+      const id = findBySource(t, b.id, key);
+      if (id) return id;
+    }
+  }
+  return null;
+}
+
 export function makeContext(connector: Connector, hooks: { syncNow(): void; reschedule(): void }): ConnectorContext {
   return {
     name: connector.name,
@@ -64,6 +76,7 @@ export function makeContext(connector: Connector, hooks: { syncNow(): void; resc
     },
     people: { find: findPerson, resolve: (input, evidence) => resolvePerson(input, evidence, connector.name) },
     emitChange: (kind, key, deleted = false, quiet = false) => emitSourceChange({ connector: connector.name, kind, key, deleted, quiet }),
+    records: { idFor: (kind, key) => recordFor(connector.name, kind, key) },
     publish: (type, payload) => publishEvent({ chamber: connector.name, type, payload }),
     ...hooks,
   };

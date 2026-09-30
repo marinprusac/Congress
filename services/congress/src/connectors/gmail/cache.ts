@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, isNull, lte } from "drizzle-orm";
 import type { ConnectorContext, SourceRecord } from "../contract.js";
 import { gmailDb as db } from "./db/client.js";
-import { accounts, settings, threadAddresses, threads } from "./db/schema.js";
+import { accounts, peopleSkip, settings, threadAddresses, threads } from "./db/schema.js";
 import { categoryOf, headerValue, parseAddress, type RawGmailMessage } from "./mime.js";
 import type { RawThread } from "./api.js";
 
@@ -116,12 +116,26 @@ export function linkPeople(ctx: ConnectorContext, key: string): boolean {
   const create = getSettings().createPeople;
   let changed = false;
   for (const a of db.select().from(threadAddresses).where(and(eq(threadAddresses.threadKey, key), isNull(threadAddresses.personId))).all()) {
-    const id = a.sentTo && create ? ctx.people.resolve({ email: a.email, name: a.name }, "corresponded") : ctx.people.find(a.email);
+    const mayCreate = a.sentTo && create && !db.select().from(peopleSkip).where(eq(peopleSkip.email, a.email)).get();
+    const id = mayCreate ? ctx.people.resolve({ email: a.email, name: a.name }, "corresponded") : ctx.people.find(a.email);
     if (!id) continue;
     db.update(threadAddresses).set({ personId: id }).where(and(eq(threadAddresses.threadKey, key), eq(threadAddresses.email, a.email))).run();
     changed = true;
   }
   return changed;
+}
+
+// Addresses the owner wrote to that aren't linked to a Person yet.
+export function unlinkedSentTo(): { email: string; name: string | null }[] {
+  return db
+    .selectDistinct({ email: threadAddresses.email, name: threadAddresses.name })
+    .from(threadAddresses)
+    .where(and(eq(threadAddresses.sentTo, true), isNull(threadAddresses.personId)))
+    .all();
+}
+
+export function skipPeople(emails: string[]): void {
+  for (const email of emails) db.insert(peopleSkip).values({ email }).onConflictDoNothing().run();
 }
 
 // Each account's scopes and label, refreshed every sync (facts need them without a ctx).
