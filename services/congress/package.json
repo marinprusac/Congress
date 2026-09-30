@@ -11,7 +11,8 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.server.json && tsc --noEmit -p frontend/tsconfig.json",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/db/migrate.ts"
+    "db:migrate": "tsx src/db/migrate.ts",
+    "import:legacy": "tsx src/typeEngine/legacy/importLegacyCli.ts"
   },
   "dependencies": {
     "@congress/chamber-kit": "workspace:*",
