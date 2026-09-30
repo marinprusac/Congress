@@ -1,4 +1,4 @@
-import type { FieldDefinition, FieldKind, FieldOptions, Operation, TypeDefinition } from "@congress/shared-types";
+import type { Binding, FieldDefinition, FieldKind, FieldOptions, Operation, TypeDefinition } from "@congress/shared-types";
 
 // Pure: applies builder operations to a definition. Field ids and columns are
 // fixed at creation, so renames never touch SQL (see planner.ts).
@@ -55,6 +55,7 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       eventPrefix: op.slug,
       hidden: false,
       autoCreate: "never",
+      bindings: [],
     };
   }
   if (!def) throw new OperationError("the first operation must be create_type");
@@ -103,6 +104,9 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
         .filter((a) => a.field !== f.id)
         .map((a) => (a.stampField === f.id ? { ...a, stampField: undefined } : a));
       d.timeTriggers = d.timeTriggers.filter((t) => t.field !== f.id && !t.and?.some((c) => c.field === f.id));
+      d.bindings = d.bindings
+        .map((b) => ({ ...b, fields: b.fields.filter((m) => m.target !== f.id), create: b.create?.targetField === f.id ? undefined : b.create }))
+        .filter((b) => b.fields.length > 0);
       return d;
     }
     case "restore_field": {
@@ -186,7 +190,58 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       });
       return d;
     }
+    case "set_binding": {
+      const b = op.binding;
+      const seen = new Set<string>();
+      const fields = b.fields.map((m) => {
+        const f = findField(d, m.target);
+        if (seen.has(f.id)) throw new OperationError(`field "${f.slug}" is bound twice`);
+        seen.add(f.id);
+        if (m.mode === "sync" && f.options.readonly) throw new OperationError(`readonly field "${f.slug}" can only be pulled`);
+        if (m.mode === "sync" && (f.kind === "relation" || f.kind === "file")) throw new OperationError(`${f.kind} field "${f.slug}" can only be pulled`);
+        return { ...m, target: f.id };
+      });
+      let create: Binding["create"];
+      if (b.create) {
+        const target = findField(d, b.create.targetField);
+        if (!fields.some((m) => m.target === target.id && m.mode === "sync")) {
+          throw new OperationError(`create target "${target.slug}" must be a synced field`);
+        }
+        create = { targetField: target.id };
+      }
+      const actionIds = new Set<string>();
+      for (const a of b.actions ?? []) {
+        if (actionIds.has(a.id)) throw new OperationError(`action "${a.id}" is used twice`);
+        actionIds.add(a.id);
+      }
+      const binding: Binding = {
+        id: bindingId(b.connector, b.kind),
+        connector: b.connector,
+        kind: b.kind,
+        label: b.label,
+        fields,
+        ...(b.lock ? { lock: b.lock } : {}),
+        ...(create ? { create } : {}),
+        delete: b.delete,
+        actions: (b.actions ?? []).map((a) => ({ ...a, args: a.args ?? {}, when: a.when ?? [], unless: a.unless ?? [] })),
+      };
+      const at = d.bindings.findIndex((x) => x.id === binding.id);
+      if (at >= 0) d.bindings[at] = binding;
+      else d.bindings.push(binding);
+      return d;
+    }
+    case "remove_binding": {
+      const id = bindingId(op.connector, op.kind);
+      if (!d.bindings.some((b) => b.id === id)) throw new OperationError(`no binding for ${op.connector} ${op.kind}`);
+      d.bindings = d.bindings.filter((b) => b.id !== id);
+      return d;
+    }
   }
+}
+
+// Fixed per connector + source kind; stored in each bound record's source_binding.
+export function bindingId(connector: string, kind: string): string {
+  return `bnd_${connector}_${kind}`;
 }
 
 // Whole-definition checks that individual ops can't see on their own.

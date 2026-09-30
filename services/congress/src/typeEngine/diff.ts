@@ -1,5 +1,7 @@
 import type {
+  Binding,
   DefinitionChange,
+  FactCondition,
   FeedRule,
   FieldDefinition,
   FieldOptions,
@@ -75,7 +77,35 @@ export function diffDefinitions(before: TypeDefinition | null, after: TypeDefini
     if (!after.timeTriggers.length) add("triggers", "Remove all time triggers");
     for (const t of after.timeTriggers) add("triggers", `Time trigger: ${describeTrigger(after, t)}`);
   }
+  const prevBindings = new Map((before?.bindings ?? []).map((b) => [b.id, b]));
+  for (const b of after.bindings) {
+    const p = prevBindings.get(b.id);
+    prevBindings.delete(b.id);
+    if (p && JSON.stringify(p) === JSON.stringify(b)) continue;
+    add("bindings", `${p ? "Change" : "Add"} binding to ${b.label} (${b.connector} ${b.kind}): ${describeBinding(after, b)}`);
+  }
+  for (const b of prevBindings.values()) add("bindings", `Remove binding to ${b.label}; its records stay, no longer synced`);
   return out;
+}
+
+function describeBinding(def: TypeDefinition, b: Binding): string {
+  const group = (mode: "sync" | "pull") =>
+    b.fields.filter((m) => m.mode === mode).map((m) => (m.source === fieldLabel(def, m.target) ? m.source : `${m.source} → ${fieldLabel(def, m.target)}`));
+  const synced = group("sync");
+  const pulled = group("pull");
+  const parts = [
+    synced.length ? `syncs ${synced.join(", ")}` : "",
+    pulled.length ? `reads ${pulled.join(", ")}` : "",
+    b.lock ? `read-only unless ${describeFact(b.lock)}` : "",
+    b.create ? `new records go to the source (by ${fieldLabel(def, b.create.targetField)})` : "",
+    b.delete === "push" ? "deletes reach the source" : "can't be deleted here",
+    b.actions.length ? `actions ${b.actions.map((a) => a.label).join(", ")}` : "",
+  ];
+  return parts.filter(Boolean).join("; ");
+}
+
+function describeFact(c: FactCondition): string {
+  return c.equals === undefined ? c.fact : `${c.fact} = ${JSON.stringify(c.equals)}`;
 }
 
 function describeField(f: FieldDefinition): string {

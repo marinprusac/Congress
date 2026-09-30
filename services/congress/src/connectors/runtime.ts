@@ -30,10 +30,28 @@ export interface SourceChange {
 
 const changeListeners = new Set<(change: SourceChange) => void>();
 
-// Phase 6 bindings subscribe here; no event goes on the relay.
+// Bindings subscribe here; no event goes on the relay.
 export function onSourceChange(listener: (change: SourceChange) => void): () => void {
   changeListeners.add(listener);
   return () => changeListeners.delete(listener);
+}
+
+const syncListeners = new Set<(connector: string) => void>();
+
+// After every sync run (bindings reconcile what changed without an emit).
+export function onConnectorSynced(listener: (connector: string) => void): () => void {
+  syncListeners.add(listener);
+  return () => syncListeners.delete(listener);
+}
+
+export function emitConnectorSynced(connector: string): void {
+  for (const listener of syncListeners) {
+    try {
+      listener(connector);
+    } catch (err) {
+      console.warn(`Sync listener failed: ${(err as Error).message}`);
+    }
+  }
 }
 
 export function emitSourceChange(change: SourceChange): void {

@@ -7,11 +7,12 @@ import { activeGrant, requestPublish } from "../ai/builder.js";
 import { AskInvalidError } from "../ai/asks.js";
 import { DraftError, discardDraft, getDraft, listDrafts, previewDraft, setDraftOps, startDraft, type Draft } from "../typeEngine/drafts.js";
 import { getTypeBySlug, listTypes, listVersions, recordCount } from "../typeEngine/store.js";
+import { listConnectors } from "../connectors/runtime.js";
 
 // /mcp/builder: drafting exhibit-type changes, only in a thread the owner
 // granted builder mode (re-checked on every call; a grant can end mid-run).
 
-const OPS_GUIDE = `Ops, applied in order: create_type (a new type's first op), set_type_meta, add_field, rename_field, retire_field, restore_field, change_field_kind, set_field_options, reorder_fields, set_title_field (a text field; every type needs one), set_layout (a richtext body field), set_actions, set_feed_rules, set_time_triggers. Fields are referenced by id or current slug. Renames are free; retiring keeps the data (restore_field brings it back); change_field_kind rebuilds the table and clears values that can't convert (preview_draft counts them). Nothing is ever dropped. Relations: kind "relation" with options.target (an existing type's slug, e.g. "person") and options.many for several; target and many are fixed once added, and a type other types link to keeps its slug. Keys: a text field with options.key "email" or "phone" holds one value per line, each unique across the type (used to find records, e.g. people). set_type_meta autoCreate ("never" | "corresponded" | "any") says whether connected sources may create records on their own.`;
+const OPS_GUIDE = `Ops, applied in order: create_type (a new type's first op), set_type_meta, add_field, rename_field, retire_field, restore_field, change_field_kind, set_field_options, reorder_fields, set_title_field (a text field; every type needs one), set_layout (a richtext body field), set_actions, set_feed_rules, set_time_triggers. Fields are referenced by id or current slug. Renames are free; retiring keeps the data (restore_field brings it back); change_field_kind rebuilds the table and clears values that can't convert (preview_draft counts them). Nothing is ever dropped. Relations: kind "relation" with options.target (an existing type's slug, e.g. "person") and options.many for several; target and many are fixed once added, and a type other types link to keeps its slug. Keys: a text field with options.key "email" or "phone" holds one value per line, each unique across the type (used to find records, e.g. people). set_type_meta autoCreate ("never" | "corresponded" | "any") says whether connected sources may create records on their own. Bindings wire a connector's source records into a type (describe_types lists connectors and their source kinds): set_binding { connector, kind, label, fields: [{ source, target, mode: "sync" | "pull" }], lock?: { fact, equals? } (synced fields turn read-only where the fact doesn't hold), create?: { targetField } (a synced field whose value picks where new records go; "" keeps a record local), delete: "push" | "never", actions: [{ id, label, act, args, when, unless }] } adds or replaces the binding for that connector + kind; remove_binding { connector, kind } detaches its records (they stay, no longer synced). Unbound fields stay local. Pull-only for relations and readonly fields.`;
 
 class NotGranted extends Error {}
 
@@ -74,14 +75,14 @@ export function registerBuilderTools(server: McpServer) {
     "describe_types",
     {
       title: "Describe Types",
-      description: "Every exhibit type, hidden ones included: full definition (fields with ids, feed rules, actions, time triggers), version, record count, and whether it's premade.",
+      description: "Every exhibit type, hidden ones included: full definition (fields with ids, feed rules, actions, time triggers, bindings), version, record count, and whether it's premade; plus the running connectors and their source kinds (fields, facts) for bindings.",
       inputSchema: {},
     },
     () =>
       guarded(() => {
         threadWithGrant();
         const all = listTypes({ includeHidden: true });
-        return all.map((t) => ({
+        const types = all.map((t) => ({
           version: t.version,
           origin: t.origin,
           customized: t.forked,
@@ -93,6 +94,8 @@ export function registerBuilderTools(server: McpServer) {
           ),
           definition: t.definition,
         }));
+        const connectors = listConnectors().map((c) => ({ name: c.name, label: c.label, canWrite: Boolean(c.push), source: c.source }));
+        return { types, connectors };
       })
   );
 

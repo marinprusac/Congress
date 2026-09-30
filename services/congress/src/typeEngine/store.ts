@@ -13,6 +13,8 @@ import { backupDir, snapshot } from "./backups.js";
 import { ulid } from "./ulid.js";
 import { diffDefinitions } from "./diff.js";
 import { keyClashes, keySignature, rebuildKeys } from "./keys.js";
+import { bindingProblems } from "./bindings/mapping.js";
+import { getConnector } from "../connectors/runtime.js";
 
 // Owns every type definition: publishing applies ops, plans the migration
 // and runs it together with the version row in one transaction.
@@ -108,7 +110,7 @@ function tablesUsedExcept(typeId: string | undefined): Set<string> {
 }
 
 // Applies ops to the current definition; throws PublishError on any problem.
-function prepare(typeId: string | undefined, ops: Operation[]): { current: StoredType | undefined; def: TypeDefinition } {
+function prepare(typeId: string | undefined, ops: Operation[], opts: { premade?: boolean } = {}): { current: StoredType | undefined; def: TypeDefinition } {
   ensureLoaded();
   const current = typeId ? cache.get(typeId) : undefined;
   if (typeId && !current) throw new PublishError([`no type ${typeId}`]);
@@ -122,9 +124,26 @@ function prepare(typeId: string | undefined, ops: Operation[]): { current: Store
   if (applied.errors.length) throw new PublishError(applied.errors);
   const clash = [...cache.values()].find((t) => t.id !== current?.id && t.definition.slug === applied.def.slug);
   if (clash) throw new PublishError([`a type "${applied.def.slug}" already exists`]);
-  const problems = relationProblems(current, applied.def);
+  const problems = [...relationProblems(current, applied.def), ...sourceProblems(current, applied.def, opts.premade === true)];
   if (problems.length) throw new PublishError(problems);
   return { current, def: applied.def };
+}
+
+// New or changed bindings must fit their connector's source schema. Premades
+// install before connectors start, so an unknown connector is fine for them.
+function sourceProblems(current: StoredType | undefined, def: TypeDefinition, premade: boolean): string[] {
+  const before = new Map((current?.definition.bindings ?? []).map((b) => [b.id, JSON.stringify(b)]));
+  const problems: string[] = [];
+  for (const b of def.bindings) {
+    if (before.get(b.id) === JSON.stringify(b)) continue;
+    const connector = getConnector(b.connector);
+    if (!connector) {
+      if (!premade) problems.push(`no connector "${b.connector}" is running`);
+      continue;
+    }
+    problems.push(...bindingProblems(def, b, connector.source.find((k) => k.kind === b.kind), Boolean(connector.push)));
+  }
+  return problems;
 }
 
 // Relations name their target by slug: it must exist, and a linked-to type keeps its slug.
@@ -160,7 +179,7 @@ function prepareRollback(typeId: string, toVersion: number): { current: StoredTy
 }
 
 export function publish(input: PublishInput): PublishResult {
-  const { current, def } = prepare(input.typeId, input.ops);
+  const { current, def } = prepare(input.typeId, input.ops, { premade: input.origin === "premade" || input.actor === "premade" });
   return commit(current, def, input.ops, input);
 }
 

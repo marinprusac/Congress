@@ -35,10 +35,31 @@ export class RecordConflictError extends Error {
   }
 }
 
-type Row = Record<string, Stored>;
+export type Row = Record<string, Stored>;
+
+// Refused because a binding keeps these fields (or the record) read-only.
+export class RecordLockedError extends Error {
+  constructor(
+    public readonly fields: string[],
+    message: string
+  ) {
+    super(message);
+  }
+}
+
+export interface WriteInfo {
+  op: "create" | "update" | "delete" | "cleanup";
+  // Field slugs the write set (create: every given field).
+  changed: string[];
+  actor?: string;
+  // Written by a binding from its source (never pushed back).
+  fromSource?: boolean;
+  // A backfill: no events were published.
+  quiet?: boolean;
+}
 
 // After every committed write; `deleted` carries the record as it was.
-export type RecordWriteListener = (t: StoredType, id: string, deleted?: RecordDto) => void;
+export type RecordWriteListener = (t: StoredType, id: string, deleted?: RecordDto, info?: WriteInfo) => void;
 const writeListeners = new Set<RecordWriteListener>();
 
 export function onRecordWrite(fn: RecordWriteListener): () => void {
@@ -46,14 +67,23 @@ export function onRecordWrite(fn: RecordWriteListener): () => void {
   return () => writeListeners.delete(fn);
 }
 
-function notifyWrite(t: StoredType, id: string, deleted?: RecordDto): void {
+function notifyWrite(t: StoredType, id: string, deleted: RecordDto | undefined, info: WriteInfo): void {
   for (const fn of writeListeners) {
     try {
-      fn(t, id, deleted);
+      fn(t, id, deleted, info);
     } catch (err) {
       console.error("[types] record write listener failed:", err);
     }
   }
+}
+
+// Runs before an owner/AI update or delete (not source writes); throws to refuse.
+export type RecordWriteGuard = (t: StoredType, row: Row, op: "update" | "delete", changed: string[]) => void;
+const guards = new Set<RecordWriteGuard>();
+
+export function beforeRecordWrite(fn: RecordWriteGuard): () => void {
+  guards.add(fn);
+  return () => guards.delete(fn);
 }
 
 export function recordUrl(id: string): string {
@@ -269,6 +299,18 @@ export interface CreateOptions {
   // Imports: announce nothing (the caller syncs in bulk); trusted may set readonly fields.
   silent?: boolean;
   trusted?: boolean;
+  // Bindings: the source record this one mirrors.
+  source?: { binding: string; key: string };
+  fromSource?: boolean;
+  // Syncs and notifies listeners but publishes no events (a backfill).
+  quiet?: boolean;
+}
+
+export interface UpdateOptions {
+  actor?: string;
+  trusted?: boolean;
+  fromSource?: boolean;
+  quiet?: boolean;
 }
 
 export function createRecord(typeSlug: string, values: unknown, opts: CreateOptions = {}): RecordDto {
@@ -276,14 +318,14 @@ export function createRecord(typeSlug: string, values: unknown, opts: CreateOpti
   if (!t) throw new RecordNotFoundError(`no type "${typeSlug}"`);
   const def = t.definition;
   // Trusted imports may leave a required field empty (e.g. a file lost on disk).
-  const input = parseInput(def, opts.trusted ? "patch" : "create", values, opts.trusted);
+  const input = parseInput(def, opts.trusted || opts.fromSource ? "patch" : "create", values, opts.trusted || opts.fromSource);
   const at = opts.at ?? new Date();
   const id = opts.id ?? ulid(at.getTime());
   const updatedAt = opts.updatedAt ?? at;
   const stamps = stampsFor(def, flippedToggles(def, null, input), input, at.getTime());
 
-  const cols = ["id", "created_at", "updated_at"];
-  const params: Stored[] = [id, at.getTime(), updatedAt.getTime()];
+  const cols = ["id", "created_at", "updated_at", "source_binding", "source_key"];
+  const params: Stored[] = [id, at.getTime(), updatedAt.getTime(), opts.source?.binding ?? null, opts.source?.key ?? null];
   const fields = activeFields(def);
   for (const f of fields) {
     if (isJoinField(f)) continue;
@@ -308,20 +350,21 @@ export function createRecord(typeSlug: string, values: unknown, opts: CreateOpti
   const dto = getRecord(id)!;
   if (!opts.silent) {
     syncRecordExhibit(t, id);
-    emit(t, "created", dto, opts.actor);
-    notifyWrite(t, id);
+    if (!opts.quiet) emit(t, "created", dto, opts.actor);
+    notifyWrite(t, id, undefined, { op: "create", changed: Object.keys(input), actor: opts.actor, fromSource: opts.fromSource, quiet: opts.quiet });
   }
   return dto;
 }
 
-export function updateRecord(id: string, patch: unknown, opts: { actor?: string; trusted?: boolean } = {}): RecordDto {
+export function updateRecord(id: string, patch: unknown, opts: UpdateOptions = {}): RecordDto {
   const t = typeOfRecord(id);
   if (!t) throw new RecordNotFoundError(`no record ${id}`);
   const def = t.definition;
-  const input = parseInput(def, "patch", patch, opts.trusted);
+  const input = parseInput(def, "patch", patch, opts.trusted || opts.fromSource);
   const fields = activeFields(def).filter((f) => f.slug in input);
   const before = readRow(def, id);
   if (!before) throw new RecordNotFoundError(`no record ${id}`);
+  if (!opts.fromSource) for (const g of guards) g(t, before, "update", Object.keys(input));
   const now = Date.now();
   const flipped = flippedToggles(def, before, input);
   const stamps = stampsFor(def, flipped, input, now);
@@ -355,20 +398,23 @@ export function updateRecord(id: string, patch: unknown, opts: { actor?: string;
 
   const dto = toDto(t, after);
   syncRecordExhibit(t, id);
-  emit(t, "updated", dto, opts.actor, fields.map((f) => f.slug));
-  for (const { action, on } of flipped) {
-    const verb = on ? action.onEvent : action.offEvent;
-    if (verb) emit(t, verb, dto, opts.actor);
+  if (!opts.quiet) {
+    emit(t, "updated", dto, opts.actor, fields.map((f) => f.slug));
+    for (const { action, on } of flipped) {
+      const verb = on ? action.onEvent : action.offEvent;
+      if (verb) emit(t, verb, dto, opts.actor);
+    }
   }
-  notifyWrite(t, id);
+  notifyWrite(t, id, undefined, { op: "update", changed: fields.map((f) => f.slug), actor: opts.actor, fromSource: opts.fromSource, quiet: opts.quiet });
   return dto;
 }
 
-export function deleteRecord(id: string, opts: { actor?: string } = {}): void {
+export function deleteRecord(id: string, opts: { actor?: string; fromSource?: boolean } = {}): void {
   const t = typeOfRecord(id);
   if (!t) throw new RecordNotFoundError(`no record ${id}`);
   const def = t.definition;
   const row = readRow(def, id);
+  if (row && !opts.fromSource) for (const g of guards) g(t, row, "delete", []);
   const dto = row ? toDto(t, row) : null;
   let unlinked: { t: StoredType; id: string }[] = [];
   exhibitsSqlite.transaction(() => {
@@ -384,11 +430,11 @@ export function deleteRecord(id: string, opts: { actor?: string } = {}): void {
   // A cleanup, not an edit: re-sync the records that lost a link, without events.
   for (const u of unlinked) {
     syncRecordExhibit(u.t, u.id);
-    notifyWrite(u.t, u.id);
+    notifyWrite(u.t, u.id, undefined, { op: "cleanup", changed: [] });
   }
   if (dto) {
     emit(t, "deleted", dto, opts.actor);
-    notifyWrite(t, id, dto);
+    notifyWrite(t, id, dto, { op: "delete", changed: [], actor: opts.actor, fromSource: opts.fromSource });
   }
 }
 
@@ -433,8 +479,22 @@ export function retypeRecord(id: string, targetSlug: string, values: unknown): R
   attachFiles(fileIdsIn(def, readRow(def, id)!));
   syncRecordExhibit(to, id);
   for (const u of unlinked) syncRecordExhibit(u.t, u.id);
-  notifyWrite(to, id);
+  notifyWrite(to, id, undefined, { op: "cleanup", changed: [] });
   return getRecord(id)!;
+}
+
+// Bindings: the record mirroring a source record, and (re)linking one.
+export function findBySource(t: StoredType, binding: string, key: string): string | undefined {
+  const row = exhibitsSqlite
+    .prepare(`SELECT "id" FROM ${quoteIdent(t.definition.tableName)} WHERE "source_binding" = ? AND "source_key" = ?`)
+    .get(binding, key) as { id: string } | undefined;
+  return row?.id;
+}
+
+export function setRecordSource(t: StoredType, id: string, source: { binding: string; key: string } | null): void {
+  exhibitsSqlite
+    .prepare(`UPDATE ${quoteIdent(t.definition.tableName)} SET "source_binding" = ?, "source_key" = ? WHERE "id" = ?`)
+    .run(source?.binding ?? null, source?.key ?? null, id);
 }
 
 export function manualRefs(id: string): string[] {

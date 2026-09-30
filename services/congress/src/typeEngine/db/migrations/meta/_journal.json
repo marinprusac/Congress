@@ -29,6 +29,13 @@
       "when": 1790764017964,
       "tag": "0003_record_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790776236132,
+      "tag": "0004_bindings",
+      "breakpoints": true
     }
   ]
 }

@@ -3,13 +3,14 @@ import type { FieldKind, KeyKind } from "@congress/shared-types";
 import type { PublishedEvent } from "../events.js";
 import type { Evidence } from "../typeEngine/lookups.js";
 
-// A connector: hand-written sync code with its own cache DB. Bindings (phase 6)
-// map its source records into types; it never writes type records itself.
+// A connector: hand-written sync code with its own cache DB. Bindings map its
+// source records into types; it never writes type records itself.
 
 export interface SourceKind {
   kind: string;
   label: string;
-  fields: { slug: string; kind: FieldKind; label: string; many?: boolean }[];
+  // A relation field holds record ids of `target` (e.g. linked People).
+  fields: { slug: string; kind: FieldKind; label: string; many?: boolean; target?: string }[];
   keys?: { field: string; kind: KeyKind }[];
   // Per-record capabilities the connector computes, e.g. editable.
   facts: { slug: string; label: string }[];
@@ -60,6 +61,8 @@ export interface Connector {
   read: {
     get(kind: string, key: string): SourceRecord | null;
     list(kind: string, opts?: { from?: string; to?: string }): SourceRecord[];
+    // Where a new record can go (e.g. writable calendars): values for the create target field.
+    targets?(kind: string): { value: string; label: string; group?: string }[];
   };
   push?: {
     create(ctx: ConnectorContext, kind: string, values: Record<string, SourceValue>): Promise<SourceRecord>;
