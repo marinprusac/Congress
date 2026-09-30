@@ -9,6 +9,7 @@ import { isJoinField, quoteIdent } from "./ddl.js";
 import { decodeValue, defaultValue, encodeValue, recordInputSchema } from "./codec.js";
 import { attachFiles, fileRefs, releaseFiles } from "./files.js";
 import { ulid } from "./ulid.js";
+import { deleteKeys, hasKeys, KeyConflictError, writeKeys } from "./keys.js";
 import { syncExhibit } from "../exhibits.js";
 import { publishEvent } from "../events.js";
 import type { Stored } from "./casts.js";
@@ -26,8 +27,11 @@ export class RecordValidationError extends Error {
   }
 }
 export class RecordConflictError extends Error {
-  constructor(public readonly field: string) {
-    super(`another record already has this ${field}`);
+  constructor(
+    public readonly field: string,
+    message = `another record already has this ${field}`
+  ) {
+    super(message);
   }
 }
 
@@ -218,6 +222,7 @@ export function relatedRecords(id: string): RelatedGroup[] | null {
 }
 
 function rethrowConflict(def: TypeDefinition, err: unknown): never {
+  if (err instanceof KeyConflictError) throw new RecordConflictError(err.field, err.message);
   const e = err as { code?: string; message?: string };
   if (e.code === "SQLITE_CONSTRAINT_UNIQUE") {
     const column = /\.(\w+)$/.exec(e.message ?? "")?.[1];
@@ -293,6 +298,7 @@ export function createRecord(typeSlug: string, values: unknown, opts: CreateOpti
         .prepare(`INSERT INTO ${quoteIdent(def.tableName)} (${cols.map(quoteIdent).join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`)
         .run(...params);
       for (const f of fields) if (isJoinField(f)) writeJoin(f, id, (input[f.slug] as string[] | undefined) ?? []);
+      if (hasKeys(def)) writeKeys(t.id, def, id, readRow(def, id)!);
     })();
   } catch (err) {
     rethrowConflict(def, err);
@@ -337,6 +343,7 @@ export function updateRecord(id: string, patch: unknown, opts: { actor?: string;
       const res = exhibitsSqlite.prepare(`UPDATE ${quoteIdent(def.tableName)} SET ${sets.join(", ")} WHERE "id" = ?`).run(...params, id);
       if (res.changes === 0) throw new RecordNotFoundError(`no record ${id}`);
       for (const f of fields) if (isJoinField(f)) writeJoin(f, id, input[f.slug] as string[]);
+      if (fields.some((f) => f.options.key)) writeKeys(t.id, def, id, readRow(def, id)!);
     })();
   } catch (err) {
     rethrowConflict(def, err);
@@ -369,6 +376,7 @@ export function deleteRecord(id: string, opts: { actor?: string } = {}): void {
     exhibitsSqlite.prepare(`DELETE FROM ${quoteIdent(def.tableName)} WHERE "id" = ?`).run(id);
     for (const f of def.fields) if (isJoinField(f)) exhibitsSqlite.prepare(`DELETE FROM ${quoteIdent(f.column)} WHERE "from_id" = ?`).run(id);
     exhibitsDb.delete(recordRefs).where(eq(recordRefs.recordId, id)).run();
+    deleteKeys(id);
     exhibitsDb.delete(records).where(eq(records.id, id)).run();
   })();
   if (row) releaseFiles(fileIdsIn(def, row));

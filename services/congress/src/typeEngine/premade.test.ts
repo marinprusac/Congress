@@ -3,6 +3,7 @@ import { runExhibitsMigrations } from "./db/client.js";
 import { getTypeByPremadeKey, publish } from "./store.js";
 import { installPremades, type Premade } from "./premade/index.js";
 import { NOTE } from "./premade/note.js";
+import { PERSON } from "./premade/person.js";
 
 beforeAll(() => runExhibitsMigrations());
 
@@ -39,5 +40,19 @@ describe("installPremades", () => {
     expect(() => installPremades([next])).not.toThrow();
     expect(getTypeByPremadeKey("note")).toMatchObject({ forked: true, premadeBatch: 3 });
     warn.mockRestore();
+  });
+
+  it("installs Person with email/phone keys and the corresponded auto-create policy", () => {
+    installPremades([PERSON]);
+    const person = getTypeByPremadeKey("person")!;
+    expect(person).toMatchObject({ version: 1, origin: "premade", forked: false });
+    expect(person.definition).toMatchObject({ slug: "person", pluralLabel: "People", autoCreate: "corresponded", hidden: false });
+    expect(person.definition.fields.map((f) => [f.slug, f.kind, f.options.key ?? null])).toEqual([
+      ["name", "text", null],
+      ["emails", "text", "email"],
+      ["phones", "text", "phone"],
+      ["birthday", "date", null],
+      ["notes", "richtext", null],
+    ]);
   });
 });

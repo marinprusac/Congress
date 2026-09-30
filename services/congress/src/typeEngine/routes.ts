@@ -49,7 +49,7 @@ typeRoutes.get("/types/:slug/versions", requireSession, (c) => {
 function fail(c: Context, err: unknown) {
   if (err instanceof RecordNotFoundError) return c.json({ error: "not_found", message: err.message }, 404);
   if (err instanceof RecordValidationError) return c.json({ error: "invalid_request", issues: err.issues }, 400);
-  if (err instanceof RecordConflictError) return c.json({ error: "unique_conflict", field: err.field }, 409);
+  if (err instanceof RecordConflictError) return c.json({ error: "unique_conflict", field: err.field, message: err.message }, 409);
   throw err;
 }
 

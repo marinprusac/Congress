@@ -54,6 +54,7 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       timeTriggers: [],
       eventPrefix: op.slug,
       hidden: false,
+      autoCreate: "never",
     };
   }
   if (!def) throw new OperationError("the first operation must be create_type");
@@ -70,6 +71,7 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       if (op.icon !== undefined) d.icon = op.icon;
       if (op.eventPrefix !== undefined) d.eventPrefix = op.eventPrefix;
       if (op.hidden !== undefined) d.hidden = op.hidden;
+      if (op.autoCreate !== undefined) d.autoCreate = op.autoCreate;
       return d;
     }
     case "add_field": {
@@ -257,6 +259,7 @@ function normalizeOptions(kind: FieldKind, options: FieldOptions): FieldOptions 
   if (options.unique && kind !== "boolean" && kind !== "richtext" && kind !== "file" && !(kind === "relation" && options.many)) out.unique = true;
   if (options.searchable && (kind === "text" || kind === "richtext")) out.searchable = true;
   if (kind === "number" && options.integer) out.integer = true;
+  if (kind === "text" && options.key) out.key = options.key;
   if (kind === "enum") out.options = dedupeOptions(options.options ?? []);
   if (kind === "relation") {
     if (options.target) out.target = options.target;

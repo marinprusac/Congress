@@ -10,6 +10,14 @@ export const FIELD_KINDS = ["text", "richtext", "boolean", "datetime", "date", "
 export const fieldKindSchema = z.enum(FIELD_KINDS);
 export type FieldKind = z.infer<typeof fieldKindSchema>;
 
+export const KEY_KINDS = ["email", "phone"] as const;
+export type KeyKind = (typeof KEY_KINDS)[number];
+
+// Who may make a record appear on its own (lookupOrCreate): nobody, only
+// people the owner corresponded with, or anything a source sees.
+export const AUTO_CREATE = ["never", "corresponded", "any"] as const;
+export type AutoCreate = (typeof AUTO_CREATE)[number];
+
 export const enumOptionSchema = z.object({ value: z.string().min(1).max(80), label: z.string().min(1).max(80) });
 export type EnumOption = z.infer<typeof enumOptionSchema>;
 
@@ -26,6 +34,8 @@ export const fieldOptionsSchema = z
     many: z.boolean().optional(),
     // Written only by the engine (e.g. a toggle's stamp), never by input.
     readonly: z.boolean().optional(),
+    // Text only: one value per line, each a lookup key (lookupOrCreate).
+    key: z.enum(KEY_KINDS).nullable().optional(),
   })
   .strict();
 export type FieldOptions = z.infer<typeof fieldOptionsSchema>;
@@ -98,6 +108,7 @@ export const typeDefinitionSchema = z.object({
   timeTriggers: z.array(timeTriggerSchema).default([]),
   eventPrefix: slugSchema,
   hidden: z.boolean(),
+  autoCreate: z.enum(AUTO_CREATE).default("never"),
 });
 export type TypeDefinition = z.infer<typeof typeDefinitionSchema>;
 
@@ -120,6 +131,7 @@ export const operationSchema = z.discriminatedUnion("op", [
     icon: z.string().max(40).optional(),
     eventPrefix: slugSchema.optional(),
     hidden: z.boolean().optional(),
+    autoCreate: z.enum(AUTO_CREATE).optional(),
   }),
   z.object({
     op: z.literal("add_field"),

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { TypeDefinition } from "@congress/shared-types";
+import type { RecordValue, TypeDefinition } from "@congress/shared-types";
 import { buildChipToken } from "@congress/shared-types";
 import { mcpTextResult } from "@congress/chamber-kit";
 import { listTypes, getTypeBySlug, type StoredType } from "./store.js";
@@ -12,6 +12,7 @@ import {
   getRecord,
   listRecords,
   NAMESPACE,
+  relatedRecords,
   RecordConflictError,
   RecordNotFoundError,
   RecordValidationError,
@@ -19,6 +20,7 @@ import {
   updateRecord,
 } from "./records.js";
 import { typeEngineSource } from "./source.js";
+import { lookupOrCreate } from "./lookups.js";
 import { FileTooLargeError, storeUpload } from "./files.js";
 import { env } from "../env.js";
 
@@ -36,7 +38,7 @@ function describeFields(def: TypeDefinition): string {
         f.kind === "enum"
           ? ` (one of: ${(f.options.options ?? []).map((o) => o.value).join(", ")})`
           : f.kind === "relation"
-            ? ` (${f.options.many ? "ids of" : "id of a"} ${f.options.target} record${f.options.many ? "s" : ""})`
+            ? ` (${f.options.many ? "ids of" : "id of a"} ${f.options.target} record${f.options.many ? "s" : ""}; find them with search_${plural(f.options.target ?? "")})`
             : f.kind === "datetime"
               ? " (ISO 8601)"
               : f.kind === "date"
@@ -45,7 +47,9 @@ function describeFields(def: TypeDefinition): string {
                   ? " (write the id upload_file returns)"
                   : f.kind === "richtext"
                     ? " (markdown; may contain [[exhibit:chamber:id|Name]] tokens)"
-                    : "";
+                    : f.options.key
+                      ? ` (${f.options.key === "email" ? "emails" : "phone numbers"}, one per line; a lookup key)`
+                      : "";
       const flags = `${f.options.required ? ", required" : ""}${f.options.readonly ? ", read-only" : ""}`;
       return `${f.slug}: ${f.kind}${flags}${extra}`;
     })
@@ -122,7 +126,12 @@ export function registerTypeTools(server: McpServer): void {
         guarded(() => {
           const record = getRecord(id);
           if (!record || record.type !== slug) throw new RecordNotFoundError(`no ${label} ${id}`);
-          return withChip(t, record);
+          const related = (relatedRecords(id) ?? []).map((g) => ({
+            from: `${g.typeLabel} · ${g.fieldLabel}`,
+            total: g.total,
+            records: g.records.map((r) => ({ id: r.id, token: buildChipToken({ chamber: NAMESPACE, id: r.id, name: r.name }) })),
+          }));
+          return { ...withChip(t, record), ...(related.length ? { linkedFrom: related } : {}) };
         })
     );
 
@@ -149,6 +158,32 @@ export function registerTypeTools(server: McpServer): void {
           return withChip(t, updateRecord(id, values, { actor: "congress" }));
         })
     );
+
+    const keyKinds = [...new Set(activeFields(def).flatMap((f) => (f.kind === "text" && f.options.key ? [f.options.key] : [])))];
+    if (keyKinds.length) {
+      server.registerTool(
+        `find_or_create_${slug}`,
+        {
+          title: `Find or Create ${def.label}`,
+          description: `Find a ${label} by ${keyKinds.join(" or ")}, or create one with these values if none matches. Prefer this over create_${slug} so there are no duplicates.`,
+          inputSchema: {
+            ...(keyKinds.includes("email") ? { email: z.string().optional() } : {}),
+            ...(keyKinds.includes("phone") ? { phone: z.string().optional() } : {}),
+            values: recordInputSchema(def, "patch").optional(),
+          },
+        },
+        ({ email, phone, values }: { email?: string; phone?: string; values?: Record<string, RecordValue> }) =>
+          guarded(() => {
+            const keys = [
+              ...(email ? [{ kind: "email" as const, value: email }] : []),
+              ...(phone ? [{ kind: "phone" as const, value: phone }] : []),
+            ];
+            const res = lookupOrCreate(slug, { keys, values, evidence: "owner", actor: "congress" });
+            if (!res.id) return res;
+            return { created: res.created, ...withChip(t, getRecord(res.id)!) };
+          })
+      );
+    }
 
     server.registerTool(
       `delete_${slug}`,
