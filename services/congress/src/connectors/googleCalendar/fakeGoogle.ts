@@ -27,6 +27,9 @@ export function fakeGoogle() {
     calls: [] as { method: string; url: string; body?: unknown }[],
     changesSeen: [] as { kind: string; key: string; deleted: boolean }[],
     resolved: [] as { email: string; evidence: string }[],
+    // Existing People by email, and every find() asked.
+    people: {} as Record<string, string>,
+    found: [] as string[],
   };
 
   async function fetch(accountId: number, url: string, init?: RequestInit): Promise<unknown> {
@@ -58,6 +61,10 @@ export function fakeGoogle() {
     name: "google-calendar",
     google: { accounts: () => state.accounts, fetch },
     people: {
+      find: (email) => {
+        state.found.push(email);
+        return state.people[email] ?? null;
+      },
       resolve: (input, evidence) => {
         state.resolved.push({ email: input.email, evidence });
         return evidence === "corresponded" ? `person-${input.email}` : null;

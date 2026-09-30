@@ -26,8 +26,6 @@ export interface CalendarPanelStatus {
 
 export interface CalendarSettings {
   intervalMinutes: number;
-  people: boolean;
-  peopleAvailable: boolean;
 }
 
 async function send<T>(path: string, init?: RequestInit): Promise<T> {
@@ -45,5 +43,5 @@ export const fetchCalendarPanel = () => send<CalendarPanelStatus>(`${GCAL}/statu
 export const refreshCalendarList = (accountId: number) => send<{ ok: true }>(`${GCAL}/accounts/${accountId}/calendars/refresh`, { method: "POST" });
 export const selectCalendar = (accountId: number, calendarId: string, selected: boolean) =>
   send<{ ok: true }>(`${GCAL}/accounts/${accountId}/calendars/${encodeURIComponent(calendarId)}`, { method: "PUT", body: JSON.stringify({ selected }) });
-export const saveCalendarSettings = (patch: Partial<Pick<CalendarSettings, "intervalMinutes" | "people">>) =>
+export const saveCalendarSettings = (patch: Partial<CalendarSettings>) =>
   send<CalendarSettings>(`${GCAL}/settings`, { method: "PUT", body: JSON.stringify(patch) });

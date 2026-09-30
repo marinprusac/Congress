@@ -19,7 +19,7 @@ describe("calendar panel routes", () => {
     expect(body).toMatchObject({
       accounts: [{ id: 1, label: "Me", lastError: null, calendars: [{ id: "primary", selected: true, primary: true }, { id: "work", selected: false }] }],
       counts: { events: 1, attendees: 1, people: 0 },
-      settings: { intervalMinutes: 5, people: true, peopleAvailable: false },
+      settings: { intervalMinutes: 5 },
     });
   });
 
@@ -50,19 +50,14 @@ describe("calendar panel routes", () => {
     expect((await routes.request("/accounts/9/calendars/refresh", { method: "POST" })).status).toBe(404);
   });
 
-  it("save the interval and the people switch", async () => {
+  it("save the interval", async () => {
     const { ctx } = fakeGoogle();
     ctx.reschedule = vi.fn();
-    ctx.syncNow = vi.fn();
     const routes = calendarPanelRoutes(ctx);
     const put = (body: unknown) => routes.request("/settings", { method: "PUT", headers: json, body: JSON.stringify(body) });
-    expect(await (await put({ intervalMinutes: 15 })).json()).toMatchObject({ intervalMinutes: 15 });
+    expect(await (await put({ intervalMinutes: 15 })).json()).toEqual({ intervalMinutes: 15 });
     expect(intervalMinutes()).toBe(15);
     expect(ctx.reschedule).toHaveBeenCalled();
     expect((await put({ intervalMinutes: 7 })).status).toBe(400);
-    expect(await (await put({ people: false })).json()).toMatchObject({ people: false });
-    expect(ctx.syncNow).not.toHaveBeenCalled();
-    await put({ people: true });
-    expect(ctx.syncNow).toHaveBeenCalledTimes(1);
   });
 });

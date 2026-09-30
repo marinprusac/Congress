@@ -2,19 +2,12 @@ import { GoogleAccountNeedsReconnectError, GoogleScopeMissingError } from "@cong
 import type { ConnectorContext, SyncResult } from "../contract.js";
 import { GoogleApiError } from "../googleApi.js";
 import { accountRows, API, ensureSeeded, recordAccountSync, selectedCalendars, setSyncToken, type CalendarRow } from "./calendars.js";
-import { eventKey, eventsOfCalendar, forgetAccount, getSetting, markAttendee, normalizeEmail, pendingAttendees, removeEvent, writeEvent } from "./cache.js";
+import { eventKey, eventsOfCalendar, forgetAccount, linkAttendee, normalizeEmail, pendingAttendees, removeEvent, writeEvent } from "./cache.js";
 import { timeMs, type RawGoogleEvent } from "./facts.js";
-import { attendeeEvidence, attendeesToResolve } from "./people.js";
+import { guestsToLink } from "./people.js";
 
 const WINDOW_DAYS = 180;
 const DAY_MS = 86_400_000;
-
-// People from attendees ship switched off until the dry-run count is checked.
-export const features = { people: false };
-
-export function peopleActive(): boolean {
-  return features.people && getSetting("people", true);
-}
 
 async function fetchAll(ctx: ConnectorContext, accountId: number, calendarId: string, params: Record<string, string>) {
   const items: RawGoogleEvent[] = [];
@@ -91,21 +84,19 @@ export async function syncCalendar(ctx: ConnectorContext, cal: CalendarRow, now 
   return changed;
 }
 
-// Links guests to People, creating them as the evidence allows. Covers every
-// pending guest, so switching it on also reaches events synced before.
-export function resolvePeople(ctx: ConnectorContext, ownEmails: Set<string>): number {
-  let resolved = 0;
+// Links unlinked guests to existing People. Runs every sync, so a Person
+// added later picks up their past and future events.
+export function linkPeople(ctx: ConnectorContext, ownEmails: Set<string>): number {
+  let linked = 0;
   const memo = new Map<string, string | null>();
-  for (const a of pendingAttendees()) {
-    const evidence = attendeeEvidence(a);
-    if (attendeesToResolve([a], evidence, ownEmails).length === 0) continue;
-    const memoKey = `${a.email} ${evidence}`;
-    if (!memo.has(memoKey)) memo.set(memoKey, ctx.people.resolve({ email: a.email, name: a.displayName }, evidence));
-    const personId = memo.get(memoKey)!;
-    markAttendee(a.eventKey, a.email, personId, evidence);
-    if (personId) resolved++;
+  for (const g of guestsToLink(pendingAttendees(), ownEmails)) {
+    if (!memo.has(g.email)) memo.set(g.email, ctx.people.find(g.email));
+    const personId = memo.get(g.email)!;
+    if (!personId) continue;
+    linkAttendee(g.eventKey, g.email, personId);
+    linked++;
   }
-  return resolved;
+  return linked;
 }
 
 export function friendlyError(err: unknown, label: string): string {
@@ -153,6 +144,6 @@ export async function syncAll(ctx: ConnectorContext): Promise<SyncResult> {
     recordAccountSync(account.id, errors.join("; ") || null);
     failures.push(...errors);
   }
-  if (peopleActive()) resolvePeople(ctx, ownEmails);
+  linkPeople(ctx, ownEmails);
   return { changed, error: failures.join("; ") || null };
 }

@@ -74,7 +74,6 @@ export function writeEvent(raw: RawGoogleEvent, accountId: number, calendarId: s
           resource: a.resource === true,
           optional: a.optional === true,
           personId: prev?.personId ?? null,
-          triedEvidence: prev?.triedEvidence ?? null,
         })
         .run();
     }
@@ -101,29 +100,24 @@ export function attendeesOf(key: string): AttendeeRow[] {
   return db.select().from(eventAttendees).where(eq(eventAttendees.eventKey, key)).all();
 }
 
-export function markAttendee(key: string, email: string, personId: string | null, triedEvidence: string): void {
+export function linkAttendee(key: string, email: string, personId: string): void {
   db.update(eventAttendees)
-    .set({ personId, triedEvidence })
+    .set({ personId })
     .where(and(eq(eventAttendees.eventKey, key), eq(eventAttendees.email, email)))
     .run();
 }
 
-// Guests not yet linked to a Person, with their event's organizer/response.
+// Guests not yet linked to a Person.
 export function pendingAttendees() {
   return db
     .select({
       eventKey: eventAttendees.eventKey,
       email: eventAttendees.email,
-      displayName: eventAttendees.displayName,
       self: eventAttendees.self,
       resource: eventAttendees.resource,
       personId: eventAttendees.personId,
-      triedEvidence: eventAttendees.triedEvidence,
-      organizerSelf: events.organizerSelf,
-      selfResponse: events.selfResponse,
     })
     .from(eventAttendees)
-    .innerJoin(events, eq(events.key, eventAttendees.eventKey))
     .where(and(isNull(eventAttendees.personId), eq(eventAttendees.self, false), eq(eventAttendees.resource, false)))
     .all();
 }

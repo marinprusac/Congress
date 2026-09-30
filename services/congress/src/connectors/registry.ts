@@ -7,6 +7,8 @@ import { onEventPublished } from "../events.js";
 import { getTypeBySlug } from "../typeEngine/store.js";
 import { activeFields } from "../typeEngine/operations.js";
 import { lookupOrCreate, type Evidence } from "../typeEngine/lookups.js";
+import { findByKey } from "../typeEngine/keys.js";
+import { normalizeKey } from "../typeEngine/keyValues.js";
 
 const DEFAULT_INTERVAL_MS = 5 * 60_000;
 
@@ -46,6 +48,13 @@ export function resolvePerson(input: { email: string; name?: string | null }, ev
   }
 }
 
+export function findPerson(email: string): string | null {
+  const t = getTypeBySlug("person");
+  const value = normalizeKey("email", email);
+  if (!t || t.definition.hidden || !value) return null;
+  return findByKey(t.id, "email", value) ?? null;
+}
+
 export function makeContext(connector: Connector, hooks: { syncNow(): void; reschedule(): void }): ConnectorContext {
   return {
     name: connector.name,
@@ -53,7 +62,7 @@ export function makeContext(connector: Connector, hooks: { syncNow(): void; resc
       accounts: () => listGoogleAccounts().map((a) => ({ id: a.id, label: a.label, email: a.email, needsReconnect: a.needsReconnect })),
       fetch: (accountId, url, init) => googleApiFetch(accountId, connector.googleScopes ?? [], url, init),
     },
-    people: { resolve: (input, evidence) => resolvePerson(input, evidence, connector.name) },
+    people: { find: findPerson, resolve: (input, evidence) => resolvePerson(input, evidence, connector.name) },
     emitChange: (kind, key, deleted = false) => emitSourceChange({ connector: connector.name, kind, key, deleted }),
     ...hooks,
   };

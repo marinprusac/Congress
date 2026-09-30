@@ -1,30 +1,23 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { migrationsDir } from "@congress/test-support";
 import { runMigrations } from "../../db/client.js";
 import { startTypeEngine } from "../../typeEngine/index.js";
 import { getTypeBySlug, publish } from "../../typeEngine/store.js";
-import { findByKey } from "../../typeEngine/keys.js";
-import { getRecord } from "../../typeEngine/records.js";
-import { resolvePerson } from "../registry.js";
+import { createRecord } from "../../typeEngine/records.js";
+import { findPerson } from "../registry.js";
 import { runGcalMigrations } from "./db/client.js";
-import { attendeesOf, eventKey, setSetting } from "./cache.js";
+import { attendeesOf, eventKey } from "./cache.js";
 import { ev, fakeGoogle, resetGcalCache } from "./fakeGoogle.js";
 import { eventFacts } from "./facts.js";
-import { attendeeEvidence, attendeesToResolve } from "./people.js";
-import { features, syncAll } from "./sync.js";
+import { guestsToLink } from "./people.js";
+import { syncAll } from "./sync.js";
 
 beforeAll(() => {
   runMigrations(migrationsDir("congress"));
   startTypeEngine();
   runGcalMigrations();
 });
-beforeEach(() => {
-  resetGcalCache();
-  features.people = true;
-});
-afterEach(() => {
-  features.people = false;
-});
+beforeEach(() => resetGcalCache());
 
 const guest = (email: string, extra: object = {}) => ({ email, ...extra });
 const me = (responseStatus: string) => ({ email: "me@example.com", self: true, responseStatus });
@@ -40,85 +33,73 @@ describe("event facts", () => {
   });
 });
 
-describe("attendee evidence", () => {
-  it("is corresponded only for events the owner organized or accepted", () => {
-    expect(attendeeEvidence({ organizerSelf: true, selfResponse: null })).toBe("corresponded");
-    expect(attendeeEvidence({ organizerSelf: false, selfResponse: "accepted" })).toBe("corresponded");
-    for (const r of ["needsAction", "declined", "tentative", null]) expect(attendeeEvidence({ organizerSelf: false, selfResponse: r })).toBe("seen");
-  });
-
-  it("skips self, rooms, own accounts, linked and already-tried guests", () => {
-    const row = { displayName: null, self: false, resource: false, personId: null, triedEvidence: null };
+describe("guests to link", () => {
+  it("skips self, rooms, own accounts and already-linked guests", () => {
+    const row = { self: false, resource: false, personId: null };
     const rows = [
       { ...row, email: "a@x.io" },
       { ...row, email: "me@x.io", self: true },
       { ...row, email: "room@x.io", resource: true },
       { ...row, email: "alt@x.io" },
       { ...row, email: "b@x.io", personId: "p1" },
-      { ...row, email: "c@x.io", triedEvidence: "corresponded" },
-      { ...row, email: "d@x.io", triedEvidence: "seen" },
     ];
-    expect(attendeesToResolve(rows, "corresponded", new Set(["alt@x.io"])).map((r) => r.email)).toEqual(["a@x.io", "d@x.io"]);
-    expect(attendeesToResolve(rows, "seen", new Set()).map((r) => r.email)).toEqual(["a@x.io", "alt@x.io"]);
+    expect(guestsToLink(rows, new Set(["alt@x.io"])).map((r) => r.email)).toEqual(["a@x.io"]);
   });
 });
 
-describe("people from calendar guests", () => {
-  it("creates People only from events the owner organized or accepted", async () => {
+describe("calendar guests and People", () => {
+  it("never creates People, even from events the owner organized", async () => {
     const { state, ctx } = fakeGoogle();
-    ctx.people.resolve = (input, evidence) => resolvePerson(input, evidence, "google-calendar");
-    state.accounts.push({ id: 2, label: "Work", email: "me@work.io", needsReconnect: false });
-    state.calendarList[2] = [];
     state.full["1/primary"] = [
-      ev("mine", { attendees: [guest("ana@example.com", { displayName: "Ana Kovač" }), guest("room@x.io", { resource: true }), guest("me@work.io")] }),
-      ev("invite", { organizerSelf: false, attendees: [me("needsAction"), guest("boss@example.com"), guest("bo@example.com")] }),
+      ev("mine", { attendees: [guest("ana@example.com", { displayName: "Ana" })] }),
       ev("yes", { organizerSelf: false, attendees: [me("accepted"), guest("cy@example.com")] }),
     ];
     await syncAll(ctx);
-
-    const person = getTypeBySlug("person")!;
-    const ana = findByKey(person.id, "email", "ana@example.com");
-    expect(getRecord(ana!)!.values).toMatchObject({ name: "Ana Kovač", emails: "ana@example.com" });
-    expect(getRecord(findByKey(person.id, "email", "cy@example.com")!)!.values.name).toBe("cy@example.com");
-    for (const email of ["room@x.io", "me@work.io", "me@example.com", "boss@example.com", "bo@example.com"]) {
-      expect(findByKey(person.id, "email", email)).toBeUndefined();
-    }
-    expect(attendeesOf(eventKey(1, "primary", "mine")).find((a) => a.email === "ana@example.com")!.personId).toBe(ana);
-  });
-
-  it("links a seen guest to an existing Person, and retries when the owner accepts", async () => {
-    const { state, ctx } = fakeGoogle();
-    state.full["1/primary"] = [ev("invite", { organizerSelf: false, attendees: [me("needsAction"), guest("dee@example.com")] })];
-    await syncAll(ctx);
-    await syncAll(ctx);
-    expect(state.resolved).toEqual([{ email: "dee@example.com", evidence: "seen" }]);
-
-    state.changes["1/primary"] = [ev("invite", { organizerSelf: false, updated: "u2", attendees: [me("accepted"), guest("dee@example.com")] })];
-    await syncAll(ctx);
-    expect(state.resolved.at(-1)).toEqual({ email: "dee@example.com", evidence: "corresponded" });
-    expect(attendeesOf(eventKey(1, "primary", "invite")).find((a) => a.email === "dee@example.com")!.personId).toBe("person-dee@example.com");
-    await syncAll(ctx);
-    expect(state.resolved).toHaveLength(2);
-  });
-
-  it("does nothing while switched off, then covers events synced before", async () => {
-    const { state, ctx } = fakeGoogle();
-    state.full["1/primary"] = [ev("mine", { attendees: [guest("eve@example.com")] })];
-    setSetting("people", false);
-    await syncAll(ctx);
-    features.people = false;
-    setSetting("people", true);
-    await syncAll(ctx);
     expect(state.resolved).toEqual([]);
-    features.people = true;
-    await syncAll(ctx);
-    expect(state.resolved).toEqual([{ email: "eve@example.com", evidence: "corresponded" }]);
+    expect(state.found.sort()).toEqual(["ana@example.com", "cy@example.com"]);
   });
 
-  it("is a no-op when the Person type is hidden", () => {
-    const person = getTypeBySlug("person")!;
-    publish({ typeId: person.id, actor: "test", ops: [{ op: "set_type_meta", hidden: true }] });
-    expect(resolvePerson({ email: "zed@example.com" }, "owner", "google-calendar")).toBeNull();
-    expect(findByKey(person.id, "email", "zed@example.com")).toBeUndefined();
+  it("links guests to People that exist, including ones added later", async () => {
+    const { state, ctx } = fakeGoogle();
+    state.full["1/primary"] = [
+      ev("a", { attendees: [guest("dee@example.com"), guest("eve@example.com")] }),
+      ev("b", { organizerSelf: false, attendees: [me("needsAction"), guest("dee@example.com")] }),
+    ];
+    state.people["dee@example.com"] = "p-dee";
+    await syncAll(ctx);
+    const personOf = (id: string, email: string) => attendeesOf(eventKey(1, "primary", id)).find((a) => a.email === email)!.personId;
+    expect(personOf("a", "dee@example.com")).toBe("p-dee");
+    expect(personOf("b", "dee@example.com")).toBe("p-dee");
+    expect(personOf("a", "eve@example.com")).toBeNull();
+    // One lookup per email per sync.
+    expect(state.found.filter((e) => e === "dee@example.com")).toHaveLength(1);
+
+    state.people["eve@example.com"] = "p-eve";
+    state.found = [];
+    await syncAll(ctx);
+    expect(personOf("a", "eve@example.com")).toBe("p-eve");
+    expect(state.found).toEqual(["eve@example.com"]);
+  });
+
+  it("keeps a link when the event changes", async () => {
+    const { state, ctx } = fakeGoogle();
+    state.people["dee@example.com"] = "p-dee";
+    state.full["1/primary"] = [ev("a", { attendees: [guest("dee@example.com")] })];
+    await syncAll(ctx);
+    state.changes["1/primary"] = [ev("a", { updated: "u2", title: "Moved", attendees: [guest("Dee@Example.com")] })];
+    state.found = [];
+    await syncAll(ctx);
+    expect(attendeesOf(eventKey(1, "primary", "a"))[0]!.personId).toBe("p-dee");
+    expect(state.found).toEqual([]);
+  });
+});
+
+describe("findPerson", () => {
+  it("finds by normalized email, and nothing once Person is hidden", () => {
+    const id = createRecord("person", { name: "Ana", emails: "ana@example.com" }).id;
+    expect(findPerson(" ANA@example.com ")).toBe(id);
+    expect(findPerson("nobody@example.com")).toBeNull();
+    publish({ typeId: getTypeBySlug("person")!.id, actor: "test", ops: [{ op: "set_type_meta", hidden: true }] });
+    expect(findPerson("ana@example.com")).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import type { Premade } from "./index.js";
 
-// People: what mail senders, chats and attendees resolve to (lookupOrCreate).
+// People: what mail senders, chats and calendar guests link to. Only direct contact creates one (lookupOrCreate).
 export const PERSON: Premade = {
   key: "person",
   batches: [
