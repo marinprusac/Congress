@@ -68,7 +68,14 @@ typeRoutes.get("/records", requireSession, (c) => {
   const type = c.req.query("type");
   if (!type) return c.json({ error: "invalid_request", message: "type is required" }, 400);
   try {
-    return c.json(listRecords(type, { limit: Number(c.req.query("limit") ?? 50), offset: Number(c.req.query("offset") ?? 0) }));
+    return c.json(
+      listRecords(type, {
+        limit: Number(c.req.query("limit") ?? 50),
+        offset: Number(c.req.query("offset") ?? 0),
+        from: c.req.query("from") || undefined,
+        to: c.req.query("to") || undefined,
+      })
+    );
   } catch (err) {
     return fail(c, err);
   }

@@ -70,6 +70,14 @@ export function compileFeedRule(def: TypeDefinition, rule: FeedRule, now: Date):
       clauses.push(`"updated_at" >= ?`);
       params.push(t - w.hours * HOUR);
       break;
+    case "ongoing": {
+      const start = field(w.field);
+      const end = field(w.end);
+      const [s, e] = [quoteIdent(start.column), quoteIdent(end.column)];
+      clauses.push(`${s} IS NOT NULL AND ${s} <= ? AND ${e} IS NOT NULL AND ${e} > ?`);
+      params.push(start.kind === "date" ? dayOf(t) : t, end.kind === "date" ? dayOf(t) : t);
+      break;
+    }
   }
   const extra = andClauses(def, rule.and);
   clauses.push(...extra.clauses);
@@ -113,7 +121,24 @@ export function previewFor(def: TypeDefinition, rule: FeedRule, row: Record<stri
     else if (f.id !== def.titleField) fields.push(String(value).slice(0, 80));
   }
   if (fields.length) preview.fields = fields.slice(0, 4);
+  const range = timeRangeOf(def, row);
+  if (range) preview.time = range;
   return preview;
+}
+
+// A type's paired start/end (all-day aware), as a feed time.
+function timeRangeOf(def: TypeDefinition, row: Record<string, Stored>): FeedPreview["time"] | undefined {
+  const r = def.layout.timeRange;
+  if (!r) return undefined;
+  const start = def.fields.find((f) => f.id === r.start && !f.retired);
+  const end = def.fields.find((f) => f.id === r.end && !f.retired);
+  const allDayField = r.allDay ? def.fields.find((f) => f.id === r.allDay && !f.retired) : undefined;
+  if (!start) return undefined;
+  const s = decodeValue(start, row[start.column]);
+  if (s === null || s === "") return undefined;
+  const e = end ? decodeValue(end, row[end.column]) : null;
+  const allDay = start.kind === "date" || (allDayField ? decodeValue(allDayField, row[allDayField.column]) === true : false);
+  return { start: String(s), ...(e ? { end: String(e) } : {}), ...(allDay ? { allDay: true } : {}) };
 }
 
 export type RowQuery = (sql: string, params: Stored[]) => Record<string, Stored>[];

@@ -72,6 +72,8 @@ export const feedRuleSchema = z.object({
     z.object({ op: z.literal("eq"), field: z.string(), value: z.union([z.string(), z.number(), z.boolean()]) }),
     z.object({ op: z.literal("is_set"), field: z.string() }),
     z.object({ op: z.literal("updated_within"), hours: z.number().positive().max(24 * 365) }),
+    // Under way now: field (start) <= now < end.
+    z.object({ op: z.literal("ongoing"), field: z.string(), end: z.string() }),
   ]),
   // Extra conditions that must also hold (e.g. done = false).
   and: z.array(z.object({ field: z.string(), value: z.union([z.string(), z.number(), z.boolean(), z.null()]) })).max(5).optional(),
@@ -137,7 +139,11 @@ export const typeDefinitionSchema = z.object({
   tableName: z.string(),
   titleField: z.string().nullable(),
   fields: z.array(fieldDefinitionSchema),
-  layout: z.object({ body: z.string().nullable() }),
+  // timeRange pairs start/end (and an all-day boolean) into one control and feed time.
+  layout: z.object({
+    body: z.string().nullable(),
+    timeRange: z.object({ start: z.string(), end: z.string(), allDay: z.string().nullable() }).nullable().optional(),
+  }),
   actions: z.array(typeActionSchema),
   feedRules: z.array(feedRuleSchema),
   timeTriggers: z.array(timeTriggerSchema).default([]),
@@ -184,6 +190,7 @@ export const operationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("reorder_fields"), order: z.array(fieldRef) }),
   z.object({ op: z.literal("set_title_field"), field: fieldRef }),
   z.object({ op: z.literal("set_layout"), body: fieldRef.nullable() }),
+  z.object({ op: z.literal("set_time_range"), range: z.object({ start: fieldRef, end: fieldRef, allDay: fieldRef.nullable().optional() }).nullable() }),
   z.object({ op: z.literal("set_actions"), actions: z.array(typeActionSchema).max(5) }),
   z.object({ op: z.literal("set_feed_rules"), rules: z.array(feedRuleSchema).max(10) }),
   z.object({ op: z.literal("set_time_triggers"), triggers: z.array(timeTriggerSchema).max(3) }),

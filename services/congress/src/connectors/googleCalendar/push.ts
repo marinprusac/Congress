@@ -2,8 +2,9 @@ import { ConnectorRefusedError, type ConnectorContext, type SourceRecord, type S
 import { API, listCalendars } from "./calendars.js";
 import { getEventRow, parseEventKey, removeEvent, toSourceRecord, writeEvent } from "./cache.js";
 import { RESPONSES, rawFacts, type RawGoogleEvent } from "./facts.js";
+import { dayOf, ownerZone } from "../../typeEngine/zone.js";
 
-// Writes to Google, then through to the cache. Unused until phase 6 bindings.
+// Writes to Google, then through to the cache; bindings call these.
 
 const str = (v: SourceValue | undefined) => (typeof v === "string" ? v : undefined);
 
@@ -13,16 +14,19 @@ function eventUrl(calendarId: string, eventId?: string): string {
 }
 
 // Maps source values to Google's body; only the keys present are sent.
-export function toGoogleBody(values: Record<string, SourceValue>): Record<string, unknown> {
+// Times are instants; an all-day one names its day in the owner's zone.
+export function toGoogleBody(values: Record<string, SourceValue>, zone = ownerZone()): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   if ("title" in values) body.summary = str(values.title) ?? "";
   if ("description" in values) body.description = str(values.description) ?? "";
   if ("location" in values) body.location = str(values.location) ?? "";
-  const timeZone = str(values.timeZone);
+  const timeZone = str(values.timeZone) ?? zone;
   const time = (v: SourceValue | undefined) => {
-    const s = str(v);
-    if (!s) throw new ConnectorRefusedError("start and end are required");
-    return values.allDay === true ? { date: s.slice(0, 10), dateTime: null } : { dateTime: s, date: null, ...(timeZone ? { timeZone } : {}) };
+    const ms = Date.parse(str(v) ?? "");
+    if (!Number.isFinite(ms)) throw new ConnectorRefusedError("start and end are required");
+    return values.allDay === true
+      ? { date: dayOf(ms, zone), dateTime: null }
+      : { dateTime: new Date(ms).toISOString(), date: null, timeZone };
   };
   if ("start" in values) body.start = time(values.start);
   if ("end" in values) body.end = time(values.end);

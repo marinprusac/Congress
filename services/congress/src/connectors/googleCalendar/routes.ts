@@ -57,7 +57,7 @@ export function calendarPanelRoutes(ctx: ConnectorContext): Hono {
   app.put("/accounts/:id/calendars/:calendarId", async (c) => {
     const body = z.object({ selected: z.boolean() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "selected must be a boolean" }, 400);
-    const ok = setSelected(Number(c.req.param("id")), c.req.param("calendarId"), body.data.selected);
+    const ok = setSelected(ctx, Number(c.req.param("id")), c.req.param("calendarId"), body.data.selected);
     if (!ok) return c.json({ error: "unknown calendar" }, 404);
     if (body.data.selected) ctx.syncNow();
     return c.json({ ok: true });

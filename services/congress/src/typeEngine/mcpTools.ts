@@ -12,6 +12,7 @@ import {
   getRecord,
   listRecords,
   NAMESPACE,
+  rangeFields,
   relatedRecords,
   RecordConflictError,
   RecordLockedError,
@@ -20,7 +21,7 @@ import {
   typeOfRecord,
   updateRecord,
 } from "./records.js";
-import { withBinding } from "./bindings/runtime.js";
+import { bindingTargets, runBindingAction, withBinding } from "./bindings/runtime.js";
 import { typeEngineSource } from "./source.js";
 import { lookupOrCreate } from "./lookups.js";
 import { FileTooLargeError, storeUpload } from "./files.js";
@@ -96,15 +97,51 @@ export function registerTypeTools(server: McpServer): void {
     const fields = describeFields(def);
     const refHint = "Records are exhibits: reference one elsewhere with its `token`; use Congress's own tools for Connections.";
 
+    const range = rangeFields(def);
+    const when = range ? `${range.start.label.toLowerCase()}` : "date";
     server.registerTool(
       `list_${plural(slug)}`,
       {
         title: `List ${def.pluralLabel}`,
-        description: `List ${def.pluralLabel.toLowerCase()}, most recently updated first. Fields: ${fields}.`,
-        inputSchema: { limit: z.number().int().min(1).max(200).optional(), offset: z.number().int().min(0).optional() },
+        description: `List ${def.pluralLabel.toLowerCase()}, most recently updated first${range ? ", or soonest first within from/to" : ""}. Fields: ${fields}.`,
+        inputSchema: {
+          limit: z.number().int().min(1).max(200).optional(),
+          offset: z.number().int().min(0).optional(),
+          from: z.string().optional().describe(`ISO time: only ones whose ${when} range reaches past it`),
+          to: z.string().optional().describe(`ISO time: only ones whose ${when} is before it`),
+        },
       },
-      ({ limit, offset }) => guarded(() => listRecords(slug, { limit: limit ?? 50, offset }).map((r) => withChip(t, r)))
+      (args: { limit?: number; offset?: number; from?: string; to?: string }) =>
+        guarded(() => listRecords(slug, { limit: args.limit ?? 50, offset: args.offset, from: args.from, to: args.to }).map((r) => withChip(t, r)))
     );
+
+    // Bindings: where new records can go, and the source's actions.
+    for (const target of def.bindings.filter((b) => b.create)) {
+      const f = def.fields.find((x) => x.id === target.create!.targetField);
+      server.registerTool(
+        `list_${slug}_destinations`,
+        {
+          title: `${def.label} destinations`,
+          description: `Values for a ${label}'s "${f?.slug}" field that put it in ${target.label} (empty keeps it local only). Changing it later moves the ${label}.`,
+          inputSchema: {},
+        },
+        () => guarded(() => bindingTargets(t))
+      );
+      break;
+    }
+    for (const b of def.bindings) {
+      for (const a of b.actions) {
+        server.registerTool(
+          `${a.id}_${slug}`,
+          {
+            title: `${a.label} ${def.label}`,
+            description: `${a.label} a ${label} in ${b.label} (this reaches ${b.label}, and anyone it notifies). Only offered on some records: get_${slug} lists a record's binding.actions.`,
+            inputSchema: { id: z.string().min(1) },
+          },
+          ({ id }) => guarded(() => runBindingAction(id, a.id).then((r) => withChip(t, r)))
+        );
+      }
+    }
 
     server.registerTool(
       `search_${plural(slug)}`,

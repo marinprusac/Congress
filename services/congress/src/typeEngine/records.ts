@@ -145,13 +145,51 @@ export function getRecord(id: string): RecordDto | null {
   return row ? toDto(t, row) : null;
 }
 
-export function listRecords(typeSlug: string, opts: { limit?: number; offset?: number } = {}): RecordDto[] {
+export interface ListOptions {
+  limit?: number;
+  offset?: number;
+  // A window (ISO): records whose time range overlaps it, soonest first.
+  from?: string;
+  to?: string;
+}
+
+// The fields a window filters on: the time range, else the first indexed date/datetime.
+export function rangeFields(def: TypeDefinition): { start: FieldDefinition; end?: FieldDefinition } | null {
+  const live = (id: string | null | undefined) => (id ? def.fields.find((f) => f.id === id && !f.retired) : undefined);
+  const r = def.layout.timeRange;
+  const start = live(r?.start) ?? activeFields(def).find((f) => f.options.indexed && (f.kind === "datetime" || f.kind === "date"));
+  return start ? { start, end: live(r?.end) } : null;
+}
+
+export function listRecords(typeSlug: string, opts: ListOptions = {}): RecordDto[] {
   const t = getTypeBySlug(typeSlug);
   if (!t) throw new RecordNotFoundError(`no type "${typeSlug}"`);
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 500);
+  const where: string[] = [];
+  const params: Stored[] = [];
+  let order = `"updated_at" DESC`;
+  if (opts.from || opts.to) {
+    for (const v of [opts.from, opts.to]) {
+      if (v && !Number.isFinite(Date.parse(v))) throw new RecordValidationError({ formErrors: [`not a date: ${v}`], fieldErrors: {} });
+    }
+    const range = rangeFields(t.definition);
+    if (!range) throw new RecordValidationError({ formErrors: [`${t.definition.pluralLabel} have no date to filter by`], fieldErrors: {} });
+    const s = quoteIdent(range.start.column);
+    const e = range.end ? quoteIdent(range.end.column) : s;
+    if (opts.to) {
+      where.push(`${s} < ?`);
+      params.push(encodeValue(range.start, opts.to));
+    }
+    if (opts.from) {
+      where.push(`coalesce(${e}, ${s}) >= ?`);
+      params.push(encodeValue(range.end ?? range.start, opts.from));
+    }
+    where.push(`${s} IS NOT NULL`);
+    order = `${s} ASC`;
+  }
   const rows = exhibitsSqlite
-    .prepare(`SELECT * FROM ${quoteIdent(t.definition.tableName)} ORDER BY "updated_at" DESC LIMIT ? OFFSET ?`)
-    .all(limit, Math.max(opts.offset ?? 0, 0)) as Row[];
+    .prepare(`SELECT * FROM ${quoteIdent(t.definition.tableName)} ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY ${order} LIMIT ? OFFSET ?`)
+    .all(...params, limit, Math.max(opts.offset ?? 0, 0)) as Row[];
   return rows.map((r) => toDto(t, r));
 }
 
@@ -553,8 +591,10 @@ export function eventPayload(t: StoredType, id: string, title: string) {
   return { recordId: id, type: t.definition.slug, title, url: `/e/${id}` };
 }
 
+// A hidden type isn't in use yet (e.g. before a cutover): it publishes nothing.
 function emit(t: StoredType, verb: string, dto: RecordDto, actor?: string, changed?: string[]) {
   const def = t.definition;
+  if (def.hidden) return;
   const titleField = def.fields.find((f) => f.id === def.titleField);
   publishEvent({
     chamber: EVENT_SOURCE,

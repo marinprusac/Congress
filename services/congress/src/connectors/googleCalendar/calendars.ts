@@ -73,14 +73,27 @@ export function selectedCalendars(accountId: number): CalendarRow[] {
     .all();
 }
 
-export function setSelected(accountId: number, calendarId: string, selected: boolean): boolean {
+// Deselecting purges the calendar's events, and emits their deletes.
+export function setSelected(ctx: ConnectorContext, accountId: number, calendarId: string, selected: boolean): boolean {
   const res = db
     .update(calendars)
     .set(selected ? { selected } : { selected, syncToken: null })
     .where(and(eq(calendars.accountId, accountId), eq(calendars.calendarId, calendarId)))
     .run();
-  if (res.changes > 0 && !selected) purgeCalendar(accountId, calendarId);
+  if (res.changes > 0 && !selected) for (const key of purgeCalendar(accountId, calendarId)) ctx.emitChange("event", key, true);
   return res.changes > 0;
+}
+
+const WRITABLE = new Set(["owner", "writer"]);
+
+// Selected calendars the owner can add events to.
+export function writableCalendars(): CalendarRow[] {
+  return db
+    .select()
+    .from(calendars)
+    .where(eq(calendars.selected, true))
+    .all()
+    .filter((c) => WRITABLE.has(c.accessRole ?? ""));
 }
 
 export function setSyncToken(accountId: number, calendarId: string, token: string | null): void {

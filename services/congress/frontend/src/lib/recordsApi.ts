@@ -15,7 +15,8 @@ export class RecordConflict extends Error {
 
 async function check<T>(res: Response): Promise<T> {
   if (res.status === 409) {
-    const body = (await res.json().catch(() => ({}))) as { field?: string; message?: string };
+    const body = (await res.json().catch(() => ({}))) as { error?: string; field?: string; message?: string };
+    if (body.error !== "unique_conflict") throw new Error(body.message ?? "Refused.");
     throw new RecordConflict(body.field ?? "value", body.message);
   }
   if (!res.ok) {
@@ -69,6 +70,22 @@ export async function updateRecord(id: string, values: Record<string, RecordValu
       body: JSON.stringify({ values }),
     })
   );
+}
+
+// A binding's action (e.g. Decline an invitation), run at the source.
+export async function runRecordAction(id: string, action: string): Promise<RecordDto> {
+  return check(await fetch(`/congress/records/${encodeURIComponent(id)}/actions/${encodeURIComponent(action)}`, { method: "POST" }));
+}
+
+export interface BindingTargets {
+  binding: string;
+  field: string;
+  label: string;
+  targets: { value: string; label: string; group?: string }[];
+}
+
+export async function fetchTargets(slug: string): Promise<BindingTargets[]> {
+  return check(await fetch(`/congress/types/${encodeURIComponent(slug)}/targets`));
 }
 
 export async function deleteRecord(id: string): Promise<void> {
