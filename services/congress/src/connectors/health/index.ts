@@ -7,7 +7,6 @@ import { closeHealthDb, runHealthMigrations } from "./db/client.js";
 import { countMetrics, getHealthSettings, ingestSamples, latestMetrics, listMetrics, updateHealthSettings } from "./store.js";
 import { normalizeHealthAutoExportPayload } from "./normalize.js";
 import { healthIngestRequestSchema, healthMetricTypeSchema } from "./types.js";
-import { legacyFitnessSettings } from "../fitnessLegacy.js";
 
 const refuse = () => Promise.reject(new ConnectorRefusedError("Health metrics are read-only"));
 
@@ -27,14 +26,7 @@ export const healthConnector = defineConnector({
   events: [
     { type: "fitness.health_metric_received", label: "Health data received", description: "New or changed Apple Health samples arrived.", payloadFields: { count: { type: "number" } } },
   ],
-  start() {
-    runHealthMigrations();
-    // Until the cutover the token lives in the Fitness Chamber: borrow it.
-    if (!getHealthSettings().ingestToken) {
-      const legacy = legacyFitnessSettings();
-      if (legacy?.healthIngestToken) updateHealthSettings({ ingestToken: legacy.healthIngestToken });
-    }
-  },
+  start: () => runHealthMigrations(),
   stop: () => closeHealthDb(),
   sync: async () => ({ changed: 0, error: null }),
   intervalMs: () => 24 * 3_600_000,

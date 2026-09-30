@@ -1,11 +1,10 @@
 import { ConnectorRefusedError, defineConnector } from "../contract.js";
 import { closeHevyDb, runHevyMigrations } from "./db/client.js";
-import { getHevySettings, getRoutineRow, getWorkoutRow, listRoutineRows, listWorkoutRows, routineExercises, routineRecord, updateHevySettings, workoutDetail, workoutRecord } from "./cache.js";
+import { getRoutineRow, getWorkoutRow, listRoutineRows, listWorkoutRows, routineExercises, routineRecord, workoutDetail, workoutRecord } from "./cache.js";
 import { syncHevy } from "./sync.js";
 import { updateRoutine } from "./routines.js";
 import { hevyPanelRoutes } from "./routes.js";
 import { registerHevyTools } from "./tools.js";
-import { legacyFitnessSettings } from "../fitnessLegacy.js";
 
 const refuse = (why: string) => Promise.reject(new ConnectorRefusedError(why));
 
@@ -48,14 +47,7 @@ export const hevyConnector = defineConnector({
       payloadFields: { consecutiveFailures: { type: "number" }, lastError: { type: "string" } },
     },
   ],
-  start() {
-    runHevyMigrations();
-    // Until the cutover the key lives in the Fitness Chamber: borrow it.
-    if (!getHevySettings().apiKey) {
-      const legacy = legacyFitnessSettings();
-      if (legacy?.hevyApiKey) updateHevySettings({ apiKey: legacy.hevyApiKey });
-    }
-  },
+  start: () => runHevyMigrations(),
   stop: () => closeHevyDb(),
   sync: (ctx) => syncHevy(ctx),
   intervalMs: () => 15 * 60_000,
