@@ -16,6 +16,7 @@ import {
   useStackNav,
 } from "@congress/congress-ui";
 import { ViewSlot, viewHref } from "@/components/ViewSlot";
+import { findView as findViewSource, useViewSources } from "@/views/coreViews";
 import { HomeAsks } from "@/components/HomeAsks";
 import { GearIcon } from "@/components/TabBar";
 import { feedQueryKey, fetchFeed } from "@/lib/feedApi";
@@ -29,16 +30,17 @@ function findView(registry: ChamberRegistryEntry[] | undefined, chamber: string,
 
 // The owner's pinned views - fixed shortcuts above the ranked feed, the way
 // stories sit above a feed. Pinning happens in Settings -> Home.
-function PinnedViews({ registry }: { registry: ChamberRegistryEntry[] | undefined }) {
+function PinnedViews() {
   const { data: settings } = useCapitolSettings();
-  const pinned = (settings?.pinnedViews ?? []).map((p) => findView(registry, p.chamber, p.viewId)).filter((v) => v !== null);
+  const sources = useViewSources();
+  const pinned = (settings?.pinnedViews ?? []).map((p) => findViewSource(sources, p.chamber, p.viewId)).filter((v) => v !== null);
 
   return (
     <nav className="home-stories" aria-label="Pinned views">
-      {pinned.map(({ entry, view }) => (
-        <StackLink key={`${entry.name}:${view.id}`} to={viewHref(entry.name, view)} className="home-story">
+      {pinned.map(({ source, view }) => (
+        <StackLink key={`${source.name}:${view.id}`} to={viewHref(source.name, view)} className="home-story">
           <span className="home-story-bubble">
-            <ChamberMark name={entry.name} />
+            <ChamberMark name={source.name} />
           </span>
           <span className="home-story-label">{view.label}</span>
         </StackLink>
@@ -135,7 +137,7 @@ export function HomePage() {
       />
       <main className="chamber-main home-main">
         <HomeAsks />
-        <PinnedViews registry={registry} />
+        <PinnedViews />
         {feed.isLoading && <FeedSkeleton />}
         {feed.isError && <p className="font-mono text-sm text-alert">Couldn't load the feed.</p>}
         {feed.data && feed.data.length === 0 && <p className="font-mono text-sm text-dust">— Nothing here yet —</p>}

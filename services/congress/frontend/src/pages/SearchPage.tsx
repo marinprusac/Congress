@@ -11,6 +11,7 @@ import {
   useStackNav,
 } from "@congress/congress-ui";
 import { viewHref } from "@/components/ViewSlot";
+import { useViewSources } from "@/views/coreViews";
 import { fetchTypes } from "@/lib/recordsApi";
 import { TYPES_KEY } from "@/records/RecordPage";
 
@@ -41,9 +42,8 @@ export function SearchPage() {
   const typeLabels = new Map((types ?? []).map((t) => [t.definition.slug, t.definition.label]));
 
   const needle = query.trim().toLowerCase();
-  const chambers = (registry ?? []).filter((c) => c.status === "active" && (c.views ?? []).length > 0);
-  const views = chambers.flatMap((c) =>
-    (c.views ?? [])
+  const views = useViewSources().flatMap((c) =>
+    c.views
       .filter((v) => !needle || v.label.toLowerCase().includes(needle) || c.displayName.toLowerCase().includes(needle))
       .map((v) => ({ chamber: c, view: v }))
   );
