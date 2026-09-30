@@ -52,12 +52,21 @@ export function forwardToChamber(c: Context): Promise<Response> {
 // the build). Public: an icon carries nothing sensitive. Any miss is a 404
 // and the caller falls back to a generic mark.
 // Runtime exhibit types share one mark for now (typeEngine's "e").
-const RECORD_ICON = fileURLToPath(new URL("../frontend/public/icons/record.svg", import.meta.url));
-const EVENTS_ICON = fileURLToPath(new URL("../frontend/public/icons/events.svg", import.meta.url));
+const icon = (name: string) => fileURLToPath(new URL(`../frontend/public/icons/${name}.svg`, import.meta.url));
+// Congress's own marks: records, and the views that replaced Chambers (same names, so pins keep theirs).
+const CORE_ICONS: Record<string, string> = {
+  e: icon("record"),
+  types: icon("record"),
+  builder: icon("record"),
+  events: icon("events"),
+  fitness: icon("fitness"),
+  map: icon("map"),
+};
 
 export async function serveChamberIcon(c: Context, chamberName: string): Promise<Response> {
-  if (chamberName === "e" || chamberName === "types" || chamberName === "builder" || chamberName === "events") {
-    const svg = await readFile(chamberName === "events" ? EVENTS_ICON : RECORD_ICON);
+  const core = CORE_ICONS[chamberName];
+  if (core) {
+    const svg = await readFile(core);
     return c.body(svg, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=3600" });
   }
   const module = getModule(chamberName);

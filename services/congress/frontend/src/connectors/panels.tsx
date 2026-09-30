@@ -3,6 +3,7 @@ import type { ConnectorStatus } from "@/lib/connectorsListApi";
 import { GoogleCalendarPanel } from "./GoogleCalendarPanel";
 import { GmailPanel } from "./GmailPanel";
 import { HealthPanel, HevyPanel } from "./FitnessPanels";
+import { LocationPanel } from "./LocationPanel";
 
 // Connectors are hand-written, so their setup panels are too.
 export const CONNECTOR_PANELS: Record<string, ComponentType<{ status: ConnectorStatus }>> = {
@@ -10,4 +11,5 @@ export const CONNECTOR_PANELS: Record<string, ComponentType<{ status: ConnectorS
   gmail: GmailPanel,
   hevy: HevyPanel,
   health: HealthPanel,
+  location: LocationPanel,
 };

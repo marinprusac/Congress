@@ -23,6 +23,8 @@ import { CHAMBER_MODULES } from "./chambers/modules.js";
 import { startConnectors, stopConnectors } from "./connectors/registry.js";
 import { startBindings, stopBindings } from "./typeEngine/bindings/runtime.js";
 import { CONNECTORS } from "./connectors/list.js";
+import { importLegacyMap } from "./typeEngine/legacy/mapImport.js";
+import { healTrackingStateOnBoot } from "./connectors/location/reprocess.js";
 
 runMigrations();
 startTypeEngine();
@@ -35,6 +37,14 @@ await loadChambers(CHAMBER_MODULES);
 // Bindings listen first, so the connectors' first sync is pulled in.
 startBindings();
 await startConnectors(CONNECTORS);
+// One-time: the retired Map Chamber's places, GPS log, visits and trips move over.
+try {
+  const stats = importLegacyMap();
+  console.log("Map import:", JSON.stringify(stats));
+  if (!stats.skipped) await healTrackingStateOnBoot();
+} catch (err) {
+  console.error("Map import failed:", err);
+}
 
 const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (info) => {
   console.log(`Congress listening on http://${info.address}:${info.port}`);

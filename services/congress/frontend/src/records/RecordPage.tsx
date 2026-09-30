@@ -22,6 +22,7 @@ import {
 } from "@congress/congress-ui";
 import type { CapitolExhibitResolveResult, CapitolExhibitSearchResult, FieldDefinition, RecordValue, TypeDefinition } from "@congress/shared-types";
 import { LIVE_RENDERERS } from "@/connectors/live";
+import { MapPointControl, type MapPoint } from "./MapPointControl";
 import {
   canCreate,
   createRecord,
@@ -124,7 +125,9 @@ export function RecordPage() {
   const range = def?.layout.timeRange ?? null;
   const live = (id: string | null | undefined) => (id ? def?.fields.find((f) => f.id === id && !f.retired) : undefined);
   const [startField, endField, allDayField] = [live(range?.start), live(range?.end), live(range?.allDay)];
-  const rangeIds = new Set([startField?.id, endField?.id, allDayField?.id].filter(Boolean));
+  const point = def?.layout.mapPoint ?? null;
+  const [latField, lonField, radiusField] = [live(point?.latitude), live(point?.longitude), live(point?.radius)];
+  const rangeIds = new Set([startField?.id, endField?.id, allDayField?.id, latField?.id, lonField?.id, radiusField?.id].filter(Boolean));
   const properties =
     def?.fields.filter((f) => !f.retired && f !== titleField && f !== bodyField && !actionFields.has(f.id) && !rangeIds.has(f.id)) ?? [];
   const binding = recordQuery.data?.binding ?? null;
@@ -283,6 +286,12 @@ export function RecordPage() {
     setValues((v) => ({ ...v, [startField.slug]: next.start, [endField.slug]: next.end, ...(allDayField ? { [allDayField.slug]: next.allDay } : {}) }));
   };
 
+  const setPoint = (next: MapPoint) => {
+    if (!latField || !lonField) return;
+    setValues((v) => ({ ...v, [latField.slug]: next.latitude, [lonField.slug]: next.longitude, ...(radiusField ? { [radiusField.slug]: next.radius } : {}) }));
+    attemptPendingRef.current = true;
+  };
+
   const toggle = (field: string) => {
     const f = def?.fields.find((x) => x.id === field);
     if (!f) return;
@@ -362,6 +371,21 @@ export function RecordPage() {
                   onChange={setRange}
                   hasAllDay={Boolean(allDayField)}
                   readOnly={locked.has(startField.slug)}
+                />
+              </div>
+            )}
+
+            {latField && lonField && (
+              <div className="mb-6">
+                <MapPointControl
+                  value={{
+                    latitude: (current[latField.slug] as number | null) ?? null,
+                    longitude: (current[lonField.slug] as number | null) ?? null,
+                    radius: radiusField ? ((current[radiusField.slug] as number | null) ?? null) : null,
+                  }}
+                  onChange={setPoint}
+                  hasRadius={Boolean(radiusField)}
+                  readOnly={locked.has(latField.slug)}
                 />
               </div>
             )}

@@ -18,5 +18,7 @@ export const PLACE: Premade = {
       // Hidden until the Map Chamber's cutover (phase 7c).
       { op: "set_type_meta", hidden: true },
     ],
+    // Cutover: in use.
+    [{ op: "set_type_meta", hidden: false }],
   ],
 };
