@@ -12,6 +12,12 @@ import type {
 
 type Area = DefinitionChange["area"];
 
+const AUTO_CREATE_TEXT: Record<TypeDefinition["autoCreate"], string> = {
+  never: "never (only you or the AI add them)",
+  corresponded: "only people you've corresponded with",
+  any: "anything a connected source sees",
+};
+
 export function diffDefinitions(before: TypeDefinition | null, after: TypeDefinition): DefinitionChange[] {
   const out: DefinitionChange[] = [];
   const add = (area: Area, text: string) => out.push({ area, text });
@@ -31,6 +37,7 @@ export function diffDefinitions(before: TypeDefinition | null, after: TypeDefini
     if (before.eventPrefix !== after.eventPrefix) add("type", `Event prefix ${before.eventPrefix} → ${after.eventPrefix}`);
     if (before.hidden !== after.hidden) add("type", after.hidden ? "Hide type" : "Show type");
   }
+  if ((before?.autoCreate ?? "never") !== after.autoCreate) add("type", `Auto-create: ${AUTO_CREATE_TEXT[after.autoCreate]}`);
 
   const prev = new Map((before?.fields ?? []).map((f) => [f.id, f]));
   for (const f of after.fields) {
@@ -74,7 +81,8 @@ export function diffDefinitions(before: TypeDefinition | null, after: TypeDefini
 function describeField(f: FieldDefinition): string {
   const bits: string[] = [f.kind];
   const o = f.options;
-  if (o.target) bits[0] = `${o.many ? "many " : ""}${o.target}`;
+  if (o.target) bits[0] = `${o.many ? "links" : "link"} to ${o.target}`;
+  if (o.key) bits.push(`${o.key} key`);
   if (o.options) bits.push(o.options.map((x) => x.label).join("/"));
   for (const key of ["required", "unique", "searchable", "indexed", "integer", "readonly"] as const) if (o[key]) bits.push(key);
   return bits.join(", ");
@@ -86,6 +94,7 @@ function optionChanges(a: FieldOptions, b: FieldOptions): string[] {
     if (Boolean(a[key]) !== Boolean(b[key])) out.push(`${key} ${b[key] ? "on" : "off"}`);
   }
   if (a.target !== b.target) out.push(`target ${b.target ?? "none"}`);
+  if (a.key !== b.key) out.push(b.key ? `${b.key} key` : "no longer a key");
   const before = new Map((a.options ?? []).map((o) => [o.value, o.label]));
   const after = new Map((b.options ?? []).map((o) => [o.value, o.label]));
   for (const [v, label] of after) {

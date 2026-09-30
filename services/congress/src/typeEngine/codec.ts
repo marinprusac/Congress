@@ -3,6 +3,7 @@ import type { FieldDefinition, RecordValue, TypeDefinition } from "@congress/sha
 import { activeFields } from "./operations.js";
 import type { Stored } from "./casts.js";
 import { DATE_PATTERN, dayOf, isValidDate } from "./zone.js";
+import { cleanKeyText, invalidKeyValues } from "./keyValues.js";
 
 // Pure: API values <-> stored SQLite values, and input validation built from
 // a definition. Datetimes are ISO strings in the API, epoch ms at rest; dates
@@ -33,6 +34,8 @@ export function decodeValue(f: FieldDefinition, stored: Stored | undefined): Rec
 export function encodeValue(f: FieldDefinition, value: RecordValue): Stored {
   switch (f.kind) {
     case "text":
+      if (typeof value !== "string") return "";
+      return f.options.key ? cleanKeyText(value) : value;
     case "richtext":
       return typeof value === "string" ? value : "";
     case "boolean":
@@ -58,8 +61,15 @@ export function encodeValue(f: FieldDefinition, value: RecordValue): Stored {
 function fieldSchema(f: FieldDefinition, requireValue: boolean): z.ZodTypeAny {
   const required = requireValue && Boolean(f.options.required);
   switch (f.kind) {
-    case "text":
-      return required ? z.string().trim().min(1, `${f.label} is required`).max(MAX_TEXT) : z.string().max(MAX_TEXT);
+    case "text": {
+      const s = required ? z.string().trim().min(1, `${f.label} is required`).max(MAX_TEXT) : z.string().max(MAX_TEXT);
+      const kind = f.options.key;
+      if (!kind) return s;
+      return s.superRefine((v, ctx) => {
+        const bad = invalidKeyValues(kind, v);
+        if (bad.length) ctx.addIssue({ code: "custom", message: `not ${kind === "email" ? "an email" : "a phone number"}: ${bad.join(", ")}` });
+      });
+    }
     case "richtext":
       return required ? z.string().trim().min(1, `${f.label} is required`).max(MAX_TEXT) : z.string().max(MAX_TEXT);
     case "boolean":

@@ -12,6 +12,7 @@ import { isJoinField } from "./ddl.js";
 import { backupDir, snapshot } from "./backups.js";
 import { ulid } from "./ulid.js";
 import { diffDefinitions } from "./diff.js";
+import { keyClashes, keySignature, rebuildKeys } from "./keys.js";
 
 // Owns every type definition: publishing applies ops, plans the migration
 // and runs it together with the version row in one transaction.
@@ -212,7 +213,9 @@ function preview(prep: () => { current: StoredType | undefined; def: TypeDefinit
   }
   const before = prepared.current?.definition ?? null;
   const plan = planMigration(before, prepared.def);
-  return { definition: prepared.def, changes: diffDefinitions(before, prepared.def), plan, ...runPreflight(plan), errors: [] };
+  const counts = runPreflight(plan);
+  if (prepared.current && keySignature(before ?? undefined) !== keySignature(prepared.def)) counts.blockers.push(...keyClashes(prepared.def));
+  return { definition: prepared.def, changes: diffDefinitions(before, prepared.def), plan, ...counts, errors: [] };
 }
 
 export function listVersions(typeId: string): TypeVersion[] {
@@ -259,6 +262,11 @@ function commit(
     if (counts.blockers.length) throw new PublishError(counts.blockers.map((b) => `${b.label} (${b.count})`));
     warnings.push(...counts.warnings.map((w) => `${w.label} (${w.count})`));
     for (const step of plan.steps) exhibitsSqlite.exec(step);
+    if (current && keySignature(current.definition) !== keySignature(def)) {
+      const clashes = keyClashes(def);
+      if (clashes.length) throw new PublishError(clashes.map((c) => `${c.label} (${c.count})`));
+      rebuildKeys(id, def);
+    }
 
     const definitionJson = JSON.stringify(def);
     if (current) {

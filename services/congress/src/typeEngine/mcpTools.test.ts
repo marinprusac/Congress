@@ -35,7 +35,7 @@ describe("the types MCP server", () => {
   });
 
   const toolsFor = (slug: string) => [`create_${slug}`, `delete_${slug}`, `get_${slug}`, `list_${slug}s`, `search_${slug}s`, `update_${slug}`];
-  const PREMADE_TOOLS = ["note", "task", "document"].flatMap(toolsFor);
+  const PREMADE_TOOLS = [...["note", "task", "document", "person"].flatMap(toolsFor), "find_or_create_person"];
 
   it("offers the premade types' tools, none for hidden types", async () => {
     publish({
@@ -75,6 +75,33 @@ describe("the types MCP server", () => {
     expect(await call("get_novel", { id: created.id })).toMatchObject({ id: created.id });
     expect(await call("delete_novel", { id: created.id })).toEqual({ ok: true, id: created.id });
     expect(await call("get_novel", { id: created.id })).toMatchObject({ error: "not_found" });
+  });
+
+  it("finds or creates people by email or phone, without duplicates", async () => {
+    const ana = await call("find_or_create_person", { email: "Ana@Example.com", values: { name: "Ana" } });
+    expect(ana).toMatchObject({ created: true, values: { name: "Ana", emails: "Ana@Example.com" } });
+    expect(await call("find_or_create_person", { email: " ana@example.com" })).toMatchObject({ created: false, id: ana.id });
+    const bob = await call("find_or_create_person", { phone: "+385 91 123 4567" });
+    expect(bob).toMatchObject({ created: true, values: { name: "+385 91 123 4567", phones: "+385 91 123 4567" } });
+    expect(await call("create_person", { name: "Ana again", emails: "ana@example.com" })).toMatchObject({ error: "conflict", field: "emails" });
+  });
+
+  it("shows which records link to one", async () => {
+    publish({
+      actor: "test",
+      ops: [
+        { op: "create_type", slug: "meeting", label: "Meeting" },
+        { op: "add_field", slug: "title", label: "Title", kind: "text" },
+        { op: "set_title_field", field: "title" },
+        { op: "add_field", slug: "people", label: "People", kind: "relation", options: { target: "person", many: true } },
+      ],
+    });
+    const ana = await call("find_or_create_person", { email: "ana@example.com" });
+    const meeting = await call("create_meeting", { title: "Standup", people: [ana.id] });
+    expect(await call("get_person", { id: ana.id })).toMatchObject({
+      linkedFrom: [{ from: "Meetings · People", total: 1, records: [{ id: meeting.id, token: `[[exhibit:e:${meeting.id}|Standup]]` }] }],
+    });
+    expect(await call("create_meeting", { title: "Bad", people: ["nope"] })).toMatchObject({ error: "invalid" });
   });
 
   it("rejects a missing required field", async () => {

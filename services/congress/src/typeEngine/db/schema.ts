@@ -121,3 +121,16 @@ export const recordTriggerState = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.recordId, t.ladder] }), index("record_trigger_state_type_idx").on(t.typeId, t.ladder)]
 );
+
+// Lookup keys (normalized emails/phones) from fields with a `key` option.
+export const recordKeys = sqliteTable(
+  "record_keys",
+  {
+    typeId: text("type_id").notNull(),
+    kind: text("kind").notNull(),
+    value: text("value").notNull(),
+    recordId: text("record_id").notNull(),
+    fieldId: text("field_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.typeId, t.kind, t.value] }), index("record_keys_record_idx").on(t.recordId)]
+);

@@ -3,6 +3,7 @@ import { getTypeByPremadeKey, markForked, publish, PublishError } from "../store
 import { NOTE } from "./note.js";
 import { TASK } from "./task.js";
 import { DOCUMENT } from "./document.js";
+import { PERSON } from "./person.js";
 
 // Premade types ship as ordered batches of operations, applied once each at
 // boot like migrations. A batch that no longer applies (the owner changed the
@@ -13,7 +14,7 @@ export interface Premade {
   batches: Operation[][];
 }
 
-export const PREMADES: Premade[] = [NOTE, TASK, DOCUMENT];
+export const PREMADES: Premade[] = [NOTE, TASK, DOCUMENT, PERSON];
 
 export function installPremades(list: Premade[] = PREMADES): void {
   for (const premade of list) {

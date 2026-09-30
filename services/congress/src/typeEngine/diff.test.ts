@@ -3,6 +3,7 @@ import type { Operation, TypeDefinition } from "@congress/shared-types";
 import { applyOperations } from "./operations.js";
 import { diffDefinitions } from "./diff.js";
 import { TASK } from "./premade/task.js";
+import { PERSON } from "./premade/person.js";
 
 function build(ops: Operation[], start: TypeDefinition | null = null): TypeDefinition {
   const { def, errors } = applyOperations(start, ops);
@@ -67,5 +68,33 @@ describe("diffDefinitions", () => {
       "Time trigger: due (end of day) and completed = false: due_soon 1d before, overdue at the time; clears with due_cleared",
     ]);
     expect(diffDefinitions(task, task)).toEqual([]);
+  });
+
+  it("describes Person: links, keys and the auto-create policy", () => {
+    const person = PERSON.batches.reduce<TypeDefinition | null>((def, ops) => build(ops, def), null)!;
+    expect(texts(null, person)).toEqual([
+      "Create type “Person” (People)",
+      "Auto-create: only people you've corresponded with",
+      "Add field “Name” (text, required, searchable)",
+      "Add field “Emails” (text, email key, searchable)",
+      "Add field “Phones” (text, phone key, searchable)",
+      "Add field “Birthday” (date)",
+      "Add field “Notes” (richtext, searchable)",
+      "Title field: “Name”",
+      "Body field: “Notes”",
+    ]);
+    const linked = build(
+      [
+        { op: "add_field", slug: "friends", label: "Friends", kind: "relation", options: { target: "person", many: true } },
+        { op: "set_field_options", field: "phones", options: { key: null } },
+        { op: "set_type_meta", autoCreate: "never" },
+      ],
+      person
+    );
+    expect(texts(person, linked)).toEqual([
+      "Auto-create: never (only you or the AI add them)",
+      "“Phones”: no longer a key",
+      "Add field “Friends” (links to person)",
+    ]);
   });
 });

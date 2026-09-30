@@ -11,7 +11,7 @@ import { getTypeBySlug, listTypes, listVersions, recordCount } from "../typeEngi
 // /mcp/builder: drafting exhibit-type changes, only in a thread the owner
 // granted builder mode (re-checked on every call; a grant can end mid-run).
 
-const OPS_GUIDE = `Ops, applied in order: create_type (a new type's first op), set_type_meta, add_field, rename_field, retire_field, restore_field, change_field_kind, set_field_options, reorder_fields, set_title_field (a text field; every type needs one), set_layout (a richtext body field), set_actions, set_feed_rules, set_time_triggers. Fields are referenced by id or current slug. Renames are free; retiring keeps the data (restore_field brings it back); change_field_kind rebuilds the table and clears values that can't convert (preview_draft counts them). Nothing is ever dropped.`;
+const OPS_GUIDE = `Ops, applied in order: create_type (a new type's first op), set_type_meta, add_field, rename_field, retire_field, restore_field, change_field_kind, set_field_options, reorder_fields, set_title_field (a text field; every type needs one), set_layout (a richtext body field), set_actions, set_feed_rules, set_time_triggers. Fields are referenced by id or current slug. Renames are free; retiring keeps the data (restore_field brings it back); change_field_kind rebuilds the table and clears values that can't convert (preview_draft counts them). Nothing is ever dropped. Relations: kind "relation" with options.target (an existing type's slug, e.g. "person") and options.many for several; target and many are fixed once added, and a type other types link to keeps its slug. Keys: a text field with options.key "email" or "phone" holds one value per line, each unique across the type (used to find records, e.g. people). set_type_meta autoCreate ("never" | "corresponded" | "any") says whether connected sources may create records on their own.`;
 
 class NotGranted extends Error {}
 
@@ -80,11 +80,17 @@ export function registerBuilderTools(server: McpServer) {
     () =>
       guarded(() => {
         threadWithGrant();
-        return listTypes({ includeHidden: true }).map((t) => ({
+        const all = listTypes({ includeHidden: true });
+        return all.map((t) => ({
           version: t.version,
           origin: t.origin,
           customized: t.forked,
           recordCount: recordCount(t.id),
+          linkedFrom: all.flatMap((o) =>
+            o.definition.fields
+              .filter((f) => !f.retired && f.kind === "relation" && f.options.target === t.definition.slug)
+              .map((f) => `${o.definition.slug}.${f.slug}`)
+          ),
           definition: t.definition,
         }));
       })

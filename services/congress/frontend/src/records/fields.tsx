@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import type { CapitolExhibitResolveResult, FieldDefinition, FileRef, RecordValue } from "@congress/shared-types";
+import { useEffect, useRef, useState } from "react";
+import type { CapitolExhibitResolveResult, FieldDefinition, FileRef, KeyKind, RecordValue } from "@congress/shared-types";
 import {
   ExhibitChip,
   ExhibitFieldEditor,
@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchTypes, fileUrl, quickCreateRecord, searchRecords, TYPES_KEY, uploadFile } from "@/lib/recordsApi";
 import { fromLocalInput, toLocalInput } from "./datetime";
 import { formatBytes } from "./format";
+import { isValidKey, keyHref, savedText, toLines } from "./keyLines";
 
 // One control per field kind; every record page is built from these.
 
@@ -25,6 +26,7 @@ export interface FieldProps {
 export function FieldControl({ field, value, onChange, onNavigate }: FieldProps) {
   switch (field.kind) {
     case "text":
+      if (field.options.key) return <KeyListControl kind={field.options.key} value={String(value ?? "")} onChange={onChange} />;
       return <input className="field-plain w-full font-mono text-base" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />;
     case "richtext":
       return (
@@ -153,6 +155,57 @@ export function ReadonlyValue({ field, value }: { field: FieldDefinition; value:
             : "No"
           : String(value);
   return <p className="font-mono text-base text-slate">{text}</p>;
+}
+
+// Emails/phones, one row each; only valid rows are saved.
+function KeyListControl({ kind, value, onChange }: { kind: KeyKind; value: string; onChange: (value: RecordValue) => void }) {
+  const [rows, setRows] = useState<string[]>(() => (value ? toLines(value) : []));
+  // A value from outside (a record load) replaces the rows.
+  useEffect(() => {
+    if (savedText(kind, rows) !== value) setRows(value ? toLines(value) : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, kind]);
+
+  const update = (next: string[]) => {
+    setRows(next);
+    onChange(savedText(kind, next));
+  };
+  const noun = kind === "email" ? "email" : "phone";
+
+  return (
+    <div className="space-y-1">
+      {rows.map((row, i) => {
+        const bad = row.trim() !== "" && !isValidKey(kind, row);
+        return (
+          <div key={i} className="flex min-w-0 items-center gap-3">
+            <input
+              type={kind === "email" ? "email" : "tel"}
+              inputMode={kind === "email" ? "email" : "tel"}
+              autoFocus={row === "" && i === rows.length - 1}
+              className="field-plain min-w-0 flex-1 font-mono text-base"
+              value={row}
+              onChange={(e) => update(rows.map((r, j) => (j === i ? e.target.value : r)))}
+            />
+            {bad ? (
+              <span className="shrink-0 font-mono text-xs text-alert">Not {kind === "email" ? "an email" : "a number"}</span>
+            ) : (
+              row.trim() && (
+                <a href={keyHref(kind, row)} className="tap-target shrink-0 font-mono text-xs text-accent hover:underline">
+                  {kind === "email" ? "Mail" : "Call"}
+                </a>
+              )
+            )}
+            <button type="button" aria-label={`Remove ${noun}`} className="tap-target shrink-0 font-mono text-xs text-dust" onClick={() => update(rows.filter((_, j) => j !== i))}>
+              ×
+            </button>
+          </div>
+        );
+      })}
+      <button type="button" className="tap-target font-mono text-sm text-slate hover:underline" onClick={() => setRows([...rows, ""])}>
+        + Add {noun}
+      </button>
+    </div>
+  );
 }
 
 function RelationControl({ field, value, onChange, onNavigate }: FieldProps) {

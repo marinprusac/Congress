@@ -5,15 +5,18 @@ import type { CapitolExhibitSearchResult, ExhibitSearchResult, FileRef, RecordDt
 export const TYPES_KEY = ["congress", "types"] as const;
 
 export class RecordConflict extends Error {
-  constructor(public readonly field: string) {
-    super(`Another record already has this ${field}.`);
+  constructor(
+    public readonly field: string,
+    message?: string
+  ) {
+    super(message ? `${message[0]!.toUpperCase()}${message.slice(1)}.` : `Another record already has this ${field}.`);
   }
 }
 
 async function check<T>(res: Response): Promise<T> {
   if (res.status === 409) {
-    const body = (await res.json().catch(() => ({}))) as { field?: string };
-    throw new RecordConflict(body.field ?? "value");
+    const body = (await res.json().catch(() => ({}))) as { field?: string; message?: string };
+    throw new RecordConflict(body.field ?? "value", body.message);
   }
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { message?: string };
