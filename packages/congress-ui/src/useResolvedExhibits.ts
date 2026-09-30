@@ -39,10 +39,13 @@ function flushPending(): void {
       for (const result of data.results) {
         byToken.set(buildExhibitToken({ chamber: result.chamber, id: result.id }), result);
       }
-      for (const entry of batch) {
-        const result = byToken.get(buildExhibitToken(entry.ref));
+      // Results come back in request order; a legacy id (notes:note-4)
+      // resolves under its new namespace, so position is the fallback match.
+      const aligned = data.results.length === batch.length;
+      batch.forEach((entry, i) => {
+        const result = byToken.get(buildExhibitToken(entry.ref)) ?? (aligned ? data.results[i] : undefined);
         entry.resolve(result ?? { ...entry.ref, unavailable: true });
-      }
+      });
     })
     .catch((err) => {
       for (const entry of batch) entry.reject(err);

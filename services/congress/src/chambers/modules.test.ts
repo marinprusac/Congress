@@ -35,9 +35,9 @@ afterAll(async () => {
 });
 
 describe("every Chamber in one process", () => {
-  it("starts all eight", () => {
+  it("starts all seven", () => {
     const active = listChambers().filter((c) => c.status === "active").map((c) => c.name);
-    expect(active.sort()).toEqual(["calendar", "documents", "fitness", "mail", "map", "notes", "tasks", "whatsapp"]);
+    expect(active.sort()).toEqual(["calendar", "documents", "fitness", "mail", "map", "tasks", "whatsapp"]);
   });
 
   it("keeps WhatsApp out of Search and the feed", async () => {
@@ -45,7 +45,7 @@ describe("every Chamber in one process", () => {
     expect((await chamberFetch("whatsapp", "/feed")).status).toBe(404);
   });
 
-  it.each(["notes", "calendar", "documents", "tasks", "map", "fitness", "mail"])("serves %s's exhibit search in-process", async (name) => {
+  it.each(["calendar", "documents", "tasks", "map", "fitness", "mail"])("serves %s's exhibit search in-process", async (name) => {
     const res = await chamberFetch(name, "/exhibits/search?q=");
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ results: expect.any(Array) });
@@ -58,8 +58,8 @@ describe("every Chamber in one process", () => {
       body: JSON.stringify({ name: "Only in tasks" }),
     });
     expect(created.status).toBe(201);
-    const notes = (await (await chamberFetch("notes", "/exhibits/search?q=Only")).json()) as { results: unknown[] };
-    expect(notes.results).toEqual([]);
+    const documents = (await (await chamberFetch("documents", "/exhibits/search?q=Only")).json()) as { results: unknown[] };
+    expect(documents.results).toEqual([]);
     const tasks = (await (await chamberFetch("tasks", "/exhibits/search?q=Only")).json()) as { results: { name: string }[] };
     expect(tasks.results.map((r) => r.name)).toEqual(["Only in tasks"]);
   });

@@ -7,12 +7,12 @@ import { NOTE } from "./premade/note.js";
 beforeAll(() => runExhibitsMigrations());
 
 describe("installPremades", () => {
-  it("installs Note hidden, once", () => {
+  it("installs Note (visible after the cutover batch), once", () => {
     installPremades([NOTE]);
     installPremades([NOTE]);
     const note = getTypeByPremadeKey("note")!;
-    expect(note).toMatchObject({ version: 1, origin: "premade", premadeBatch: 1, forked: false });
-    expect(note.definition).toMatchObject({ slug: "note", hidden: true, tableName: "x_note" });
+    expect(note).toMatchObject({ version: 2, origin: "premade", premadeBatch: 2, forked: false });
+    expect(note.definition).toMatchObject({ slug: "note", hidden: false, tableName: "x_note" });
     expect(note.definition.fields.map((f) => [f.slug, f.kind])).toEqual([
       ["title", "text"],
       ["body", "richtext"],
@@ -22,19 +22,22 @@ describe("installPremades", () => {
   });
 
   it("applies a new batch exactly once", () => {
-    const v2: Premade = { ...NOTE, batches: [...NOTE.batches, [{ op: "set_type_meta", icon: "notebook" }]] };
-    installPremades([v2]);
-    installPremades([v2]);
-    expect(getTypeByPremadeKey("note")).toMatchObject({ version: 2, premadeBatch: 2 });
+    const next: Premade = { ...NOTE, batches: [...NOTE.batches, [{ op: "set_type_meta", icon: "notebook" }]] };
+    installPremades([next]);
+    installPremades([next]);
+    expect(getTypeByPremadeKey("note")).toMatchObject({ version: 3, premadeBatch: 3 });
   });
 
   it("marks a type forked when the owner's edits break a batch, without throwing", () => {
     const note = getTypeByPremadeKey("note")!;
     publish({ typeId: note.id, ops: [{ op: "retire_field", field: "pinned" }], actor: "me" });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const v3: Premade = { ...NOTE, batches: [...NOTE.batches, [{ op: "set_type_meta", icon: "notebook" }], [{ op: "rename_field", field: "pinned", label: "Starred" }]] };
-    expect(() => installPremades([v3])).not.toThrow();
-    expect(getTypeByPremadeKey("note")).toMatchObject({ forked: true, premadeBatch: 2 });
+    const next: Premade = {
+      ...NOTE,
+      batches: [...NOTE.batches, [{ op: "set_type_meta", icon: "notebook" }], [{ op: "rename_field", field: "pinned", label: "Starred" }]],
+    };
+    expect(() => installPremades([next])).not.toThrow();
+    expect(getTypeByPremadeKey("note")).toMatchObject({ forked: true, premadeBatch: 3 });
     warn.mockRestore();
   });
 });

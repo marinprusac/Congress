@@ -15,7 +15,7 @@ const envSchema = z.object({
   // Runtime exhibit types: definitions plus one real table per type.
   EXHIBITS_DB_PATH: z.string().default("./data/exhibits.sqlite3"),
   // One-time Notes Chamber -> Note type import (typeEngine/legacy/notesImport.ts).
-  NOTES_IMPORT_ENABLED: z.enum(["true", "false"]).default("false"),
+  NOTES_IMPORT_ENABLED: z.enum(["true", "false"]).default("true"),
   LEGACY_NOTES_DB_PATH: z.string().optional(),
   // Web Push is additive (the in-app notification center works without it),
   // so an unset keypair must never crash boot - sendWebPush no-ops with a

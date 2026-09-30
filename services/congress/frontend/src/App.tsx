@@ -16,6 +16,7 @@ import { SearchPage } from "@/pages/SearchPage";
 import { NotificationsPage } from "@/pages/NotificationsPage";
 import { ViewPage } from "@/pages/ViewPage";
 import { RecordPage } from "@/records/RecordPage";
+import { LegacyNoteRedirect } from "@/records/LegacyNoteRedirect";
 
 // Page transitions wait for a Chamber's bundle so they animate the real page.
 setRoutePreloader((path) => {
@@ -63,6 +64,10 @@ export function App() {
         {/* Every runtime exhibit type's records (typeEngine). */}
         <Route path="/e/new/:type" element={<RecordPage />} />
         <Route path="/e/:id" element={<RecordPage />} />
+        {/* The Notes Chamber's old URLs, now the Note type. */}
+        <Route path="/notes/n/:id" element={<LegacyNoteRedirect />} />
+        <Route path="/notes/new" element={<Navigate to="/e/new/note" replace />} />
+        <Route path="/notes/*" element={<Navigate to="/" replace />} />
         {/* Old URLs of Chambers folded into Congress - bookmarks and the
             installed PWA's saved URL land here. */}
         <Route path="/capitol/*" element={<Navigate to="/" replace />} />

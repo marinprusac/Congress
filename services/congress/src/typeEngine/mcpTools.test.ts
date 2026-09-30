@@ -34,8 +34,19 @@ describe("the types MCP server", () => {
     expect(buildMcpServers("congress").types?.url).toMatch(/\/mcp\/types$/);
   });
 
-  it("offers no tools for hidden types", async () => {
-    expect(await names()).toEqual(["describe_type", "list_types"]);
+  const NOTE_TOOLS = ["create_note", "delete_note", "get_note", "list_notes", "search_notes", "update_note"];
+
+  it("offers Note's tools, none for hidden types", async () => {
+    publish({
+      actor: "test",
+      ops: [
+        { op: "create_type", slug: "secret", label: "Secret" },
+        { op: "add_field", slug: "title", label: "Title", kind: "text" },
+        { op: "set_title_field", field: "title" },
+        { op: "set_type_meta", hidden: true },
+      ],
+    });
+    expect(await names()).toEqual(["describe_type", "list_types", ...NOTE_TOOLS].sort());
   });
 
   it("follows the live definitions, per request", async () => {
@@ -48,7 +59,9 @@ describe("the types MCP server", () => {
         { op: "add_field", slug: "read", label: "Read", kind: "boolean" },
       ],
     });
-    expect(await names()).toEqual(["create_book", "delete_book", "describe_type", "get_book", "list_books", "list_types", "search_books", "update_book"]);
+    expect(await names()).toEqual(
+      ["create_book", "delete_book", "describe_type", "get_book", "list_books", "list_types", "search_books", "update_book", ...NOTE_TOOLS].sort()
+    );
     publish({ typeId: getTypeBySlug("book")!.id, ops: [{ op: "set_type_meta", slug: "novel", label: "Novel" }], actor: "test" });
     expect(await names()).toContain("create_novel");
   });

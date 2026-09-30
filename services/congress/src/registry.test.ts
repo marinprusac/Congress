@@ -9,7 +9,7 @@ import { publishEvent } from "./events.js";
 import { db, runMigrations } from "./db/client.js";
 import { chambers } from "./db/schema.js";
 import { addModule } from "./chambers/runtime.js";
-import { attachChamber, detachChamber, getChamber, listChambers, markChamberOffline, registerChamber } from "./registry.js";
+import { attachChamber, detachChamber, forgetChamber, getChamber, listChambers, markChamberOffline, registerChamber } from "./registry.js";
 
 beforeAll(() => runMigrations(migrationsDir("congress")));
 
@@ -114,5 +114,14 @@ describe("listChambers", () => {
     markChamberOffline(makeManifest("romeo"));
     const names = listChambers().map((c) => c.name);
     expect(names).toEqual(expect.arrayContaining(["papa", "quebec", "romeo"]));
+  });
+});
+
+describe("forgetChamber", () => {
+  it("drops a retired Chamber's row and cache entry", () => {
+    registerChamber(makeManifest("retired"));
+    forgetChamber("retired");
+    expect(getChamber("retired")).toBeNull();
+    expect(db.select().from(chambers).all().map((r) => r.name)).not.toContain("retired");
   });
 });
