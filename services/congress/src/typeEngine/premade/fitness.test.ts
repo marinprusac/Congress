@@ -50,8 +50,8 @@ afterAll(async () => {
 });
 
 describe("the Workout and Routine premades bound to Hevy", () => {
-  it("mirror Hevy quietly, hidden until the cutover", () => {
-    expect(getTypeBySlug("workout")!.definition.hidden).toBe(true);
+  it("mirror Hevy quietly", () => {
+    expect(getTypeBySlug("workout")!.definition.hidden).toBe(false);
     const [w] = listRecords("workout");
     expect(w!.values).toMatchObject({ exercises: "Bench Press", exercise_count: 1, volume_kg: 600, start: "2026-09-05T08:00:00.000Z" });
     expect(String(w!.values.title)).toMatch(/^Push Day · Sep 5, 2026$/);

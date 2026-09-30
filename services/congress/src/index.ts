@@ -23,6 +23,7 @@ import { CHAMBER_MODULES } from "./chambers/modules.js";
 import { startConnectors, stopConnectors } from "./connectors/registry.js";
 import { startBindings, stopBindings } from "./typeEngine/bindings/runtime.js";
 import { CONNECTORS } from "./connectors/list.js";
+import { importLegacyFitness } from "./typeEngine/legacy/fitnessImport.js";
 
 runMigrations();
 startTypeEngine();
@@ -35,6 +36,12 @@ await loadChambers(CHAMBER_MODULES);
 // Bindings listen first, so the connectors' first sync is pulled in.
 startBindings();
 await startConnectors(CONNECTORS);
+// One-time: the retired Fitness Chamber's links and health history move over.
+try {
+  console.log("Fitness import:", JSON.stringify(importLegacyFitness()));
+} catch (err) {
+  console.error("Fitness import failed:", err);
+}
 
 const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (info) => {
   console.log(`Congress listening on http://${info.address}:${info.port}`);
