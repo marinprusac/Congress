@@ -45,3 +45,13 @@ export const selectCalendar = (accountId: number, calendarId: string, selected: 
   send<{ ok: true }>(`${GCAL}/accounts/${accountId}/calendars/${encodeURIComponent(calendarId)}`, { method: "PUT", body: JSON.stringify({ selected }) });
 export const saveCalendarSettings = (patch: Partial<CalendarSettings>) =>
   send<CalendarSettings>(`${GCAL}/settings`, { method: "PUT", body: JSON.stringify(patch) });
+
+export interface GmailPanelStatus {
+  accounts: { id: number; label: string; hasAccess: boolean; canMarkRead: boolean; needsReconnect: boolean; threads: number; lastSyncedAt: string | null; lastError: string | null }[];
+  settings: { includeAllCategories: boolean };
+}
+
+const GMAIL = "/gmail";
+export const fetchGmailPanel = () => send<GmailPanelStatus>(`${GMAIL}/status`);
+export const saveGmailSettings = (patch: Partial<GmailPanelStatus["settings"]>) =>
+  send<GmailPanelStatus["settings"]>(`${GMAIL}/settings`, { method: "PUT", body: JSON.stringify(patch) });

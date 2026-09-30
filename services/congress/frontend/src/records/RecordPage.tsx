@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -21,7 +21,9 @@ import {
   useStackNav,
 } from "@congress/congress-ui";
 import type { CapitolExhibitResolveResult, CapitolExhibitSearchResult, FieldDefinition, RecordValue, TypeDefinition } from "@congress/shared-types";
+import { LIVE_RENDERERS } from "@/connectors/live";
 import {
+  canCreate,
   createRecord,
   deleteRecord,
   fetchRecord,
@@ -128,6 +130,9 @@ export function RecordPage() {
   const binding = recordQuery.data?.binding ?? null;
   const locked = new Set(binding?.locked ?? []);
   const createsAtSource = Boolean(def?.bindings.some((b) => b.create));
+  const bound = binding ? def?.bindings.find((b) => b.id === binding.id) : undefined;
+  const Live = binding?.detail && bound ? LIVE_RENDERERS[`${bound.connector}:${bound.kind}`] : undefined;
+  const creatable = def ? canCreate(def) : false;
   const targetsQuery = useQuery({ queryKey: ["types", typeSlug, "targets"], queryFn: () => fetchTargets(typeSlug as string), enabled: createsAtSource && Boolean(typeSlug) });
   const destination = targetsQuery.data?.[0];
   const requiredFields = def?.fields.filter((f) => !f.retired && !f.options.readonly && f.options.required) ?? [];
@@ -262,6 +267,16 @@ export function RecordPage() {
     onSuccess: (updated) => queryClient.setQueryData(["record", updated.id], updated),
     onError: (err) => showToast(err instanceof Error ? err.message : "Couldn't do that.", "error"),
   });
+  // Actions a live view runs on its own (e.g. mark read on open): no toast when they fail.
+  const runSilently = useCallback(
+    (action: string) => {
+      if (!recordId) return;
+      runRecordAction(recordId, action)
+        .then((updated) => queryClient.setQueryData(["record", updated.id], updated))
+        .catch(() => {});
+    },
+    [recordId, queryClient]
+  );
 
   const setRange = (next: RangeValue) => {
     if (!startField || !endField) return;
@@ -348,8 +363,9 @@ export function RecordPage() {
             {properties.length > 0 && (
               <div className="mb-6 grid grid-cols-1 gap-4">
                 {properties
-                  // Engine-written fields show once they hold something.
+                  // Engine-written and source-kept fields show once they hold something.
                   .filter((f) => !(f.options.readonly && (isDraft || isEmptyValue(recordQuery.data?.values[f.slug]))))
+                  .filter((f) => !(locked.has(f.slug) && (isEmptyValue(current[f.slug]) || current[f.slug] === false)))
                   .map((f) => (
                     <PropertyRow key={f.id} field={f}>
                       {f.slug === destination?.field && !locked.has(f.slug) ? (
@@ -388,7 +404,7 @@ export function RecordPage() {
               renderIcon={(chamber) => getChamberIcon(chamber)}
               onNavigate={onNavigate}
               editable
-              onCreateReference={type ? (title) => quickCreateRecord(type, title) : undefined}
+              onCreateReference={type && creatable ? (title) => quickCreateRecord(type, title) : undefined}
               draftConnections={draftConnections}
               onDraftConnectionsChange={setDraftConnections}
               actions={
@@ -417,7 +433,7 @@ export function RecordPage() {
                           </button>
                         );
                       })}
-                      {!binding?.lockReason && (
+                      {!binding?.lockReason && bound?.delete !== "never" && (
                         <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
                           Delete
                         </button>
@@ -427,7 +443,9 @@ export function RecordPage() {
                 </ExhibitActionBar>
               }
             >
-              {bodyField && locked.has(bodyField.slug) ? (
+              {Live && binding && recordId ? (
+                <Live recordId={recordId} binding={binding} runAction={runSilently} />
+              ) : bodyField && locked.has(bodyField.slug) ? (
                 <ReadonlyValue field={bodyField} value={current[bodyField.slug]} onNavigate={onNavigate} />
               ) : bodyField ? (
                 <ExhibitFieldEditor
