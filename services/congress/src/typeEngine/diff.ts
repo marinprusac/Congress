@@ -67,6 +67,10 @@ export function diffDefinitions(before: TypeDefinition | null, after: TypeDefini
     const r = after.layout.timeRange;
     add("layout", r ? `Time range: ${name(after, r.start)} to ${name(after, r.end)}${r.allDay ? `, all day by ${name(after, r.allDay)}` : ""}` : "No time range");
   }
+  if (JSON.stringify(before?.layout.mapPoint ?? null) !== JSON.stringify(after.layout.mapPoint ?? null)) {
+    const p = after.layout.mapPoint;
+    add("layout", p ? `Map point: ${name(after, p.latitude)}, ${name(after, p.longitude)}${p.radius ? `, radius ${name(after, p.radius)}` : ""}` : "No map point");
+  }
 
   const changed = <T>(a: T[] | undefined, b: T[]) => JSON.stringify(a ?? []) !== JSON.stringify(b);
   if (changed(before?.actions, after.actions)) {

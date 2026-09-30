@@ -179,3 +179,22 @@ describe("rollbackDefinition", () => {
     ]);
   });
 });
+
+describe("set_map_point", () => {
+  const point: Operation[] = [
+    { op: "add_field", slug: "lat", label: "Latitude", kind: "number" },
+    { op: "add_field", slug: "lon", label: "Longitude", kind: "number" },
+    { op: "add_field", slug: "r", label: "Radius", kind: "number" },
+    { op: "set_map_point", point: { latitude: "lat", longitude: "lon", radius: "r" } },
+  ];
+
+  it("pairs number fields into one map point, and lets go of retired ones", () => {
+    expect(build(point).def.layout.mapPoint).toEqual({ latitude: "fld_lat", longitude: "fld_lon", radius: "fld_r" });
+    expect(build([...point, { op: "retire_field", field: "r" }]).def.layout.mapPoint).toEqual({ latitude: "fld_lat", longitude: "fld_lon", radius: null });
+    expect(build([...point, { op: "retire_field", field: "lat" }]).def.layout.mapPoint).toBeNull();
+  });
+
+  it("needs numbers", () => {
+    expect(build([...point.slice(0, 2), { op: "set_map_point", point: { latitude: "title", longitude: "lon" } }]).errors).toEqual(['#6 set_map_point: "title" must be a number']);
+  });
+});

@@ -113,8 +113,7 @@ export async function getFeed(opts: { timeoutMs?: number } = {}): Promise<FeedIt
   }
   for (const c of listConnectors()) {
     try {
-      const out = c.feed?.(new Date());
-      if (out) perChamber.push({ chamber: { name: out.source, views: out.views }, candidates: out.candidates });
+      for (const out of (await c.feed?.(new Date())) ?? []) perChamber.push({ chamber: { name: out.source, views: out.views }, candidates: out.candidates });
     } catch (err) {
       console.warn(`[feed] connector ${c.name} failed: ${(err as Error).message}`);
     }

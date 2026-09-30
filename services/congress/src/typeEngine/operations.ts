@@ -103,6 +103,9 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       const range = d.layout.timeRange;
       if (range && (range.start === f.id || range.end === f.id)) d.layout.timeRange = null;
       else if (range?.allDay === f.id) d.layout.timeRange = { ...range, allDay: null };
+      const point = d.layout.mapPoint;
+      if (point && (point.latitude === f.id || point.longitude === f.id)) d.layout.mapPoint = null;
+      else if (point?.radius === f.id) d.layout.mapPoint = { ...point, radius: null };
       d.actions = d.actions
         .filter((a) => a.field !== f.id)
         .map((a) => (a.stampField === f.id ? { ...a, stampField: undefined } : a));
@@ -175,6 +178,17 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       const allDay = op.range.allDay ? findField(d, op.range.allDay) : null;
       if (allDay && allDay.kind !== "boolean") throw new OperationError(`all-day field "${allDay.slug}" must be boolean`);
       d.layout.timeRange = { start: start.id, end: end.id, allDay: allDay?.id ?? null };
+      return d;
+    }
+    case "set_map_point": {
+      if (!op.point) {
+        d.layout.mapPoint = null;
+        return d;
+      }
+      const fields = [op.point.latitude, op.point.longitude, ...(op.point.radius ? [op.point.radius] : [])].map((ref) => findField(d, ref));
+      for (const f of fields) if (f.kind !== "number") throw new OperationError(`"${f.slug}" must be a number`);
+      if (new Set(fields.map((f) => f.id)).size !== fields.length) throw new OperationError("latitude, longitude and radius must be different fields");
+      d.layout.mapPoint = { latitude: fields[0]!.id, longitude: fields[1]!.id, radius: fields[2]?.id ?? null };
       return d;
     }
     case "set_actions": {

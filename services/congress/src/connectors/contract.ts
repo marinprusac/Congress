@@ -51,11 +51,27 @@ export interface ConnectorContext {
   records: {
     // The record a source item became (through any binding of this connector), or null.
     idFor(kind: string, key: string): string | null;
+    // Every record of a type, read-only (e.g. the owner's Places as input). [] when the type is missing.
+    list(type: string): { id: string; values: Record<string, unknown> }[];
   };
   // Publishes a domain event (declared in the connector's `events`).
   publish(type: string, payload: Record<string, unknown>): void;
   syncNow(): void;
   reschedule(): void;
+}
+
+export interface FeedGroup {
+  source: string;
+  views: ManifestView[];
+  candidates: FeedCandidate[];
+}
+
+// A record of some type was written (by anyone); `values` is absent for a delete.
+export interface RecordChange {
+  type: string;
+  id: string;
+  op: "create" | "update" | "delete";
+  values?: Record<string, unknown>;
 }
 
 export interface Connector {
@@ -94,8 +110,11 @@ export interface Connector {
   // Webhooks at /congress/connectors/<name>/hook/*, without a session: the connector checks its own secret.
   hooks?(ctx: ConnectorContext): Hono;
   onEvent?(ctx: ConnectorContext, event: PublishedEvent): void;
-  // Feed candidates for a hand-written view's card (Congress's frontend renders it), under `source`.
-  feed?(now: Date): { source: string; views: ManifestView[]; candidates: FeedCandidate[] } | null;
+  // Records it reads as input changed (e.g. a Place moved).
+  onRecordChange?(ctx: ConnectorContext, change: RecordChange): void;
+  // Feed candidates, grouped by source: a hand-written view's card (Congress's
+  // frontend renders it) under its view source, a record under "e".
+  feed?(now: Date): FeedGroup[] | Promise<FeedGroup[]>;
   // Extra AI tools on /mcp/types (named <prefix>_*), for what isn't per record.
   tools?(ctx: ConnectorContext, server: McpServer): void;
 }

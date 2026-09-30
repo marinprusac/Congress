@@ -73,7 +73,7 @@ export function fakeGoogle() {
     },
     emitChange: (kind, key, deleted = false) => state.changesSeen.push({ kind, key, deleted }),
     publish: () => {},
-    records: { idFor: () => null },
+    records: { idFor: () => null, list: () => [] },
     syncNow: () => {},
     reschedule: () => {},
   };

@@ -26,7 +26,7 @@ const ctx = {
   name: "hevy",
   google: { accounts: () => [], fetch: async () => undefined },
   people: { find: () => null, resolve: () => null },
-  records: { idFor: (kind: string, key: string) => `rec-${kind}-${key}` },
+  records: { idFor: (kind: string, key: string) => `rec-${kind}-${key}`, list: () => [] },
   emitChange: (kind: string, key: string, deleted = false, quiet = false) => changes.push({ kind, key, deleted, quiet }),
   publish: (type: string, payload: Record<string, unknown>) => published.push({ type, payload }),
   syncNow: () => {},
