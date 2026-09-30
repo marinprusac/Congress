@@ -25,8 +25,10 @@ export function columnType(f: FieldDefinition): string {
       return "INTEGER";
     case "number":
       return f.options.integer ? "INTEGER" : "REAL";
+    case "date":
     case "enum":
     case "relation":
+    case "file":
       return "TEXT";
   }
 }
@@ -76,7 +78,7 @@ export function indexSpecs(def: TypeDefinition): IndexSpec[] {
         name,
         sql: `CREATE UNIQUE INDEX ${quoteIdent(name)} ON ${quoteIdent(t)} (${col}${textual ? " COLLATE NOCASE" : ""}) WHERE ${textual ? `${col} <> ''` : `${col} IS NOT NULL`}`,
       });
-    } else if (f.options.indexed || f.kind === "relation") {
+    } else if (f.options.indexed || f.kind === "relation" || f.kind === "file") {
       const name = `ix_${t}__${f.column}`;
       specs.push({ name, sql: `CREATE INDEX ${quoteIdent(name)} ON ${quoteIdent(t)} (${col})` });
     }

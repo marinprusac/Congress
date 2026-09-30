@@ -14,6 +14,21 @@ const envSchema = z.object({
   DB_PATH: z.string().default("./data/capitol.sqlite3"),
   // Runtime exhibit types: definitions plus one real table per type.
   EXHIBITS_DB_PATH: z.string().default("./data/exhibits.sqlite3"),
+  // Files of `file` fields, one per upload, named by file id.
+  EXHIBIT_FILES_DIR: z.string().default("./data/files"),
+  MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(25 * 1024 * 1024),
+  // Day boundaries for `date` fields when AI settings have no time zone.
+  OWNER_TIMEZONE: z
+    .string()
+    .default("Europe/Zagreb")
+    .refine((zone) => {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: zone });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "OWNER_TIMEZONE must be an IANA time zone"),
   // Web Push is additive (the in-app notification center works without it),
   // so an unset keypair must never crash boot - sendWebPush no-ops with a
   // one-time warning and GET /congress/push/config reports publicKey: null.

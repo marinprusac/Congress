@@ -5,6 +5,8 @@ import { runMigrations, closeDb, sqlite } from "./db/client.js";
 import { closeExhibitsDb, exhibitsSqlite } from "./typeEngine/db/client.js";
 import { startTypeEngine } from "./typeEngine/index.js";
 import { startBackups, stopBackups } from "./typeEngine/backups.js";
+import { collectOrphans } from "./typeEngine/files.js";
+import { startTimeTriggers, stopTimeTriggers } from "./typeEngine/triggers.js";
 import { importLegacyChamberData } from "./legacyImport.js";
 import { startEventCatalogSync, stopEventCatalogSync } from "./eventCatalogSync.js";
 import { startHistoryPruneSweep, stopHistoryPruneSweep } from "./eventHistory.js";
@@ -33,10 +35,14 @@ const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (
 });
 
 startEventCatalogSync();
-startBackups([
-  { name: "exhibits", sqlite: exhibitsSqlite, dbPath: env.EXHIBITS_DB_PATH },
-  { name: "congress", sqlite, dbPath: env.DB_PATH },
-]);
+startBackups(
+  [
+    { name: "exhibits", sqlite: exhibitsSqlite, dbPath: env.EXHIBITS_DB_PATH },
+    { name: "congress", sqlite, dbPath: env.DB_PATH },
+  ],
+  () => collectOrphans()
+);
+await startTimeTriggers();
 startHistoryPruneSweep();
 startAiRetentionSweep();
 startAskTimer();
@@ -47,6 +53,7 @@ async function shutdown() {
   console.log("Shutting down Congress...");
   stopEventCatalogSync();
   stopBackups();
+  stopTimeTriggers();
   stopHistoryPruneSweep();
   stopAiRetentionSweep();
   stopAskTimer();

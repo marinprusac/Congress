@@ -51,6 +51,7 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       layout: { body: null },
       actions: [],
       feedRules: [],
+      timeTriggers: [],
       eventPrefix: op.slug,
       hidden: false,
     };
@@ -96,7 +97,10 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       if (d.titleField === f.id) throw new OperationError("can't retire the title field");
       f.retired = true;
       if (d.layout.body === f.id) d.layout.body = null;
-      d.actions = d.actions.filter((a) => a.field !== f.id);
+      d.actions = d.actions
+        .filter((a) => a.field !== f.id)
+        .map((a) => (a.stampField === f.id ? { ...a, stampField: undefined } : a));
+      d.timeTriggers = d.timeTriggers.filter((t) => t.field !== f.id && !t.and?.some((c) => c.field === f.id));
       return d;
     }
     case "restore_field": {
@@ -108,8 +112,8 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
     }
     case "change_field_kind": {
       const f = findField(d, op.field);
-      if (f.kind === "relation" || op.kind === "relation") {
-        throw new OperationError("changing to or from a relation isn't supported");
+      for (const k of ["relation", "file"] as const) {
+        if ((f.kind === k || op.kind === k) && f.kind !== op.kind) throw new OperationError(`changing to or from a ${k} isn't supported`);
       }
       f.kind = op.kind;
       f.options = normalizeOptions(op.kind, { ...keepCompatible(f.options, op.kind), ...op.options });
@@ -151,8 +155,18 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       d.actions = op.actions.map((a) => {
         const f = findField(d, a.field);
         if (f.kind !== "boolean") throw new OperationError(`action field "${f.slug}" must be boolean`);
-        return { ...a, field: f.id };
+        const stamp = a.stampField ? findField(d, a.stampField) : undefined;
+        if (stamp && stamp.kind !== "datetime") throw new OperationError(`stamp field "${stamp.slug}" must be datetime`);
+        return { ...a, field: f.id, ...(stamp ? { stampField: stamp.id } : {}) };
       });
+      return d;
+    }
+    case "set_time_triggers": {
+      d.timeTriggers = op.triggers.map((t) => ({
+        ...t,
+        field: findField(d, t.field).id,
+        and: t.and?.map((c) => ({ ...c, field: findField(d, c.field).id })),
+      }));
       return d;
     }
     case "set_feed_rules": {
@@ -178,11 +192,29 @@ export function validateDefinition(def: TypeDefinition): string[] {
   for (const f of active) {
     if (f.kind === "enum" && !(f.options.options?.length)) errors.push(`enum "${f.slug}" needs options`);
     if (f.kind === "relation" && !f.options.target) errors.push(`relation "${f.slug}" needs a target type`);
+    if (f.options.readonly && f.options.required) errors.push(`"${f.slug}" can't be both readonly and required`);
   }
+  const isTime = (f: FieldDefinition) => f.kind === "datetime" || f.kind === "date";
   for (const { when } of def.feedRules) {
     if (when.op !== "within_next" && when.op !== "overdue") continue;
     const f = def.fields.find((x) => x.id === when.field);
-    if (f && f.kind !== "datetime") errors.push(`feed rule ${when.op} needs a datetime field, "${f.slug}" is ${f.kind}`);
+    if (f && !isTime(f)) errors.push(`feed rule ${when.op} needs a date or datetime field, "${f.slug}" is ${f.kind}`);
+  }
+  const ladderFields = new Set<string>();
+  for (const t of def.timeTriggers) {
+    const f = def.fields.find((x) => x.id === t.field);
+    if (f && !isTime(f)) errors.push(`time trigger needs a date or datetime field, "${f.slug}" is ${f.kind}`);
+    if (ladderFields.has(t.field)) errors.push(`only one time trigger per field ("${f?.slug}")`);
+    ladderFields.add(t.field);
+  }
+  const events = [
+    ...def.actions.flatMap((a) => [a.onEvent, a.offEvent]),
+    ...def.timeTriggers.flatMap((t) => [...t.steps.map((s) => s.event), t.clearEvent?.event]),
+  ].filter((e): e is string => Boolean(e));
+  const seen = new Set<string>(["created", "updated", "deleted"]);
+  for (const e of events) {
+    if (seen.has(e)) errors.push(`event "${e}" is used twice`);
+    seen.add(e);
   }
   return errors;
 }
@@ -218,7 +250,8 @@ function normalizeOptions(kind: FieldKind, options: FieldOptions): FieldOptions 
   const out: FieldOptions = {};
   if (options.required) out.required = true;
   if (options.indexed) out.indexed = true;
-  if (options.unique && kind !== "boolean" && kind !== "richtext" && !(kind === "relation" && options.many)) out.unique = true;
+  if (options.readonly) out.readonly = true;
+  if (options.unique && kind !== "boolean" && kind !== "richtext" && kind !== "file" && !(kind === "relation" && options.many)) out.unique = true;
   if (options.searchable && (kind === "text" || kind === "richtext")) out.searchable = true;
   if (kind === "number" && options.integer) out.integer = true;
   if (kind === "enum") out.options = dedupeOptions(options.options ?? []);

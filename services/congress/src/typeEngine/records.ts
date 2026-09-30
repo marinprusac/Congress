@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import type { FieldDefinition, RecordDto, RecordValue, TypeDefinition } from "@congress/shared-types";
+import type { FieldDefinition, RecordDto, RecordValue, TypeAction, TypeDefinition } from "@congress/shared-types";
 import { extractOutgoingExhibitRefs } from "@congress/chamber-kit";
 import { exhibitsDb, exhibitsSqlite } from "./db/client.js";
 import { records, recordRefs } from "./db/schema.js";
@@ -7,13 +7,14 @@ import { getType, getTypeBySlug, type StoredType } from "./store.js";
 import { activeFields } from "./operations.js";
 import { isJoinField, quoteIdent } from "./ddl.js";
 import { decodeValue, defaultValue, encodeValue, recordInputSchema } from "./codec.js";
+import { attachFiles, fileRefs, releaseFiles } from "./files.js";
 import { ulid } from "./ulid.js";
 import { syncExhibit } from "../exhibits.js";
 import { publishEvent } from "../events.js";
 import type { Stored } from "./casts.js";
 
 // Generic CRUD over type tables. Every write re-syncs the exhibit cache and
-// publishes <eventPrefix>.created|updated|deleted.
+// publishes <eventPrefix>.created|updated|deleted (plus toggle events).
 
 export const NAMESPACE = "e";
 export const EVENT_SOURCE = "types";
@@ -31,6 +32,25 @@ export class RecordConflictError extends Error {
 }
 
 type Row = Record<string, Stored>;
+
+// After every committed write; `deleted` carries the record as it was.
+export type RecordWriteListener = (t: StoredType, id: string, deleted?: RecordDto) => void;
+const writeListeners = new Set<RecordWriteListener>();
+
+export function onRecordWrite(fn: RecordWriteListener): () => void {
+  writeListeners.add(fn);
+  return () => writeListeners.delete(fn);
+}
+
+function notifyWrite(t: StoredType, id: string, deleted?: RecordDto): void {
+  for (const fn of writeListeners) {
+    try {
+      fn(t, id, deleted);
+    } catch (err) {
+      console.error("[types] record write listener failed:", err);
+    }
+  }
+}
 
 export function recordUrl(id: string): string {
   return `/${id}`;
@@ -59,10 +79,19 @@ function joinValues(f: FieldDefinition, id: string): string[] {
   ).map((r) => r.to_id);
 }
 
+function fileIdsIn(def: TypeDefinition, row: Row): string[] {
+  return activeFields(def)
+    .filter((f) => f.kind === "file" && row[f.column])
+    .map((f) => String(row[f.column]));
+}
+
 export function toDto(t: StoredType, row: Row): RecordDto {
+  const refs = fileRefs(fileIdsIn(t.definition, row));
   const values: Record<string, RecordValue> = {};
   for (const f of activeFields(t.definition)) {
-    values[f.slug] = isJoinField(f) ? joinValues(f, String(row.id)) : decodeValue(f, row[f.column]);
+    if (isJoinField(f)) values[f.slug] = joinValues(f, String(row.id));
+    else if (f.kind === "file") values[f.slug] = row[f.column] ? (refs.get(String(row[f.column])) ?? null) : null;
+    else values[f.slug] = decodeValue(f, row[f.column]);
   }
   return {
     id: String(row.id),
@@ -92,10 +121,18 @@ export function listRecords(typeSlug: string, opts: { limit?: number; offset?: n
   return rows.map((r) => toDto(t, r));
 }
 
-function parseInput(def: TypeDefinition, mode: "create" | "patch", values: unknown): Record<string, RecordValue> {
-  const parsed = recordInputSchema(def, mode).safeParse(values ?? {});
+function parseInput(def: TypeDefinition, mode: "create" | "patch", values: unknown, trusted = false): Record<string, RecordValue> {
+  const parsed = recordInputSchema(def, mode, { includeReadonly: trusted }).safeParse(values ?? {});
   if (!parsed.success) throw new RecordValidationError(parsed.error.flatten());
-  return parsed.data as Record<string, RecordValue>;
+  const input = parsed.data as Record<string, RecordValue>;
+  // File fields take ids of uploaded files.
+  const fileFields = activeFields(def).filter((f) => f.kind === "file" && typeof input[f.slug] === "string");
+  const known = fileRefs(fileFields.map((f) => String(input[f.slug])));
+  const missing = fileFields.filter((f) => !known.has(String(input[f.slug])));
+  if (missing.length) {
+    throw new RecordValidationError({ formErrors: [], fieldErrors: Object.fromEntries(missing.map((f) => [f.slug, ["no such file"]])) });
+  }
+  return input;
 }
 
 function rethrowConflict(def: TypeDefinition, err: unknown): never {
@@ -114,22 +151,48 @@ function writeJoin(f: FieldDefinition, id: string, ids: string[]): void {
   ids.forEach((to, i) => insert.run(id, to, i));
 }
 
+// Toggle actions whose boolean this write flips, with the new state.
+function flippedToggles(def: TypeDefinition, before: Row | null, input: Record<string, RecordValue>): { action: TypeAction; on: boolean }[] {
+  const out: { action: TypeAction; on: boolean }[] = [];
+  for (const action of def.actions) {
+    const f = def.fields.find((x) => x.id === action.field && !x.retired);
+    if (!f || !(f.slug in input)) continue;
+    const was = before ? Number(before[f.column]) === 1 : false;
+    const now = input[f.slug] === true;
+    if (was !== now) out.push({ action, on: now });
+  }
+  return out;
+}
+
+// Stamp columns the flipped toggles set, unless the input sets them itself.
+function stampsFor(def: TypeDefinition, flipped: { action: TypeAction; on: boolean }[], input: Record<string, RecordValue>, at: number) {
+  const stamps = new Map<string, Stored>();
+  for (const { action, on } of flipped) {
+    const f = action.stampField ? def.fields.find((x) => x.id === action.stampField && !x.retired) : undefined;
+    if (f && !(f.slug in input)) stamps.set(f.column, on ? at : null);
+  }
+  return stamps;
+}
+
 export interface CreateOptions {
   actor?: string;
   id?: string;
   at?: Date;
   updatedAt?: Date;
+  // Imports: announce nothing (the caller syncs in bulk) and may set readonly fields.
   silent?: boolean;
+  trusted?: boolean;
 }
 
 export function createRecord(typeSlug: string, values: unknown, opts: CreateOptions = {}): RecordDto {
   const t = getTypeBySlug(typeSlug);
   if (!t) throw new RecordNotFoundError(`no type "${typeSlug}"`);
   const def = t.definition;
-  const input = parseInput(def, "create", values);
+  const input = parseInput(def, "create", values, opts.trusted);
   const at = opts.at ?? new Date();
   const id = opts.id ?? ulid(at.getTime());
   const updatedAt = opts.updatedAt ?? at;
+  const stamps = stampsFor(def, flippedToggles(def, null, input), input, at.getTime());
 
   const cols = ["id", "created_at", "updated_at"];
   const params: Stored[] = [id, at.getTime(), updatedAt.getTime()];
@@ -137,7 +200,7 @@ export function createRecord(typeSlug: string, values: unknown, opts: CreateOpti
   for (const f of fields) {
     if (isJoinField(f)) continue;
     cols.push(f.column);
-    params.push(encodeValue(f, input[f.slug] ?? defaultValue(f)));
+    params.push(stamps.has(f.column) ? stamps.get(f.column)! : encodeValue(f, input[f.slug] ?? defaultValue(f)));
   }
 
   try {
@@ -151,29 +214,39 @@ export function createRecord(typeSlug: string, values: unknown, opts: CreateOpti
   } catch (err) {
     rethrowConflict(def, err);
   }
+  attachFiles(fileIdsIn(def, readRow(def, id)!));
 
   const dto = getRecord(id)!;
-  // Silent (imports): the caller syncs and announces in bulk afterwards.
   if (!opts.silent) {
     syncRecordExhibit(t, id);
     emit(t, "created", dto, opts.actor);
+    notifyWrite(t, id);
   }
   return dto;
 }
 
-export function updateRecord(id: string, patch: unknown, opts: { actor?: string } = {}): RecordDto {
+export function updateRecord(id: string, patch: unknown, opts: { actor?: string; trusted?: boolean } = {}): RecordDto {
   const t = typeOfRecord(id);
   if (!t) throw new RecordNotFoundError(`no record ${id}`);
   const def = t.definition;
-  const input = parseInput(def, "patch", patch);
+  const input = parseInput(def, "patch", patch, opts.trusted);
   const fields = activeFields(def).filter((f) => f.slug in input);
+  const before = readRow(def, id);
+  if (!before) throw new RecordNotFoundError(`no record ${id}`);
+  const now = Date.now();
+  const flipped = flippedToggles(def, before, input);
+  const stamps = stampsFor(def, flipped, input, now);
 
   const sets: string[] = [`"updated_at" = ?`];
-  const params: Stored[] = [Date.now()];
+  const params: Stored[] = [now];
   for (const f of fields) {
     if (isJoinField(f)) continue;
     sets.push(`${quoteIdent(f.column)} = ?`);
     params.push(encodeValue(f, input[f.slug]!));
+  }
+  for (const [column, value] of stamps) {
+    sets.push(`${quoteIdent(column)} = ?`);
+    params.push(value);
   }
 
   try {
@@ -185,10 +258,19 @@ export function updateRecord(id: string, patch: unknown, opts: { actor?: string 
   } catch (err) {
     rethrowConflict(def, err);
   }
+  const after = readRow(def, id)!;
+  const kept = new Set(fileIdsIn(def, after));
+  attachFiles([...kept]);
+  releaseFiles(fileIdsIn(def, before).filter((f) => !kept.has(f)));
 
-  const dto = getRecord(id)!;
+  const dto = toDto(t, after);
   syncRecordExhibit(t, id);
   emit(t, "updated", dto, opts.actor, fields.map((f) => f.slug));
+  for (const { action, on } of flipped) {
+    const verb = on ? action.onEvent : action.offEvent;
+    if (verb) emit(t, verb, dto, opts.actor);
+  }
+  notifyWrite(t, id);
   return dto;
 }
 
@@ -204,8 +286,12 @@ export function deleteRecord(id: string, opts: { actor?: string } = {}): void {
     exhibitsDb.delete(recordRefs).where(eq(recordRefs.recordId, id)).run();
     exhibitsDb.delete(records).where(eq(records.id, id)).run();
   })();
+  if (row) releaseFiles(fileIdsIn(def, row));
   syncExhibit({ chamber: NAMESPACE, id, type: def.slug, name: "", url: "", deleted: true, outgoingRefs: [] });
-  if (dto) emit(t, "deleted", dto, opts.actor);
+  if (dto) {
+    emit(t, "deleted", dto, opts.actor);
+    notifyWrite(t, id, dto);
+  }
 }
 
 export function manualRefs(id: string): string[] {
@@ -260,17 +346,18 @@ export function syncRecordExhibit(t: StoredType, id: string): void {
   });
 }
 
-function emit(t: StoredType, verb: "created" | "updated" | "deleted", dto: RecordDto, actor?: string, changed?: string[]) {
+export function eventPayload(t: StoredType, id: string, title: string) {
+  return { recordId: id, type: t.definition.slug, title, url: `/e/${id}` };
+}
+
+function emit(t: StoredType, verb: string, dto: RecordDto, actor?: string, changed?: string[]) {
   const def = t.definition;
   const titleField = def.fields.find((f) => f.id === def.titleField);
   publishEvent({
     chamber: EVENT_SOURCE,
     type: `${def.eventPrefix}.${verb}`,
     payload: {
-      recordId: dto.id,
-      type: def.slug,
-      title: (titleField && String(dto.values[titleField.slug] ?? "")) || "",
-      url: `/e/${dto.id}`,
+      ...eventPayload(t, dto.id, (titleField && String(dto.values[titleField.slug] ?? "")) || ""),
       ...(changed ? { changed } : {}),
     },
     ...(actor ? { actor } : {}),

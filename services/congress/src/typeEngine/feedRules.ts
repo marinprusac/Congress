@@ -3,6 +3,7 @@ import { closeness, plainTextPreview } from "@congress/chamber-kit";
 import { quoteIdent } from "./ddl.js";
 import { decodeValue, encodeValue } from "./codec.js";
 import type { Stored } from "./casts.js";
+import { dayOf, endOfDay } from "./zone.js";
 
 // Pure: declarative feed rules compiled to SQL + scoring. A type's rules are
 // its Chamber-free replacement for a hand-written feedRules.ts.
@@ -30,18 +31,27 @@ export function compileFeedRule(def: TypeDefinition, rule: FeedRule, now: Date):
   const w = rule.when;
   switch (w.op) {
     case "within_next": {
-      const col = quoteIdent(field(w.field).column);
+      const f = field(w.field);
+      const col = quoteIdent(f.column);
       const windowMs = w.hours * HOUR;
-      clauses.push(`${col} IS NOT NULL AND ${col} >= ? AND ${col} <= ?`);
-      params.push(t, t + windowMs);
+      // A date is due until its day ends: in the window when that end is.
+      if (f.kind === "date") {
+        clauses.push(`${col} IS NOT NULL AND ${col} >= ? AND ${col} < ?`);
+        params.push(dayOf(t), dayOf(t + windowMs));
+      } else {
+        clauses.push(`${col} IS NOT NULL AND ${col} >= ? AND ${col} <= ?`);
+        params.push(t, t + windowMs);
+      }
+      const instant = (row: Record<string, Stored>) => (f.kind === "date" ? endOfDay(String(row[f.column])) : Number(row[f.column]));
       // Sooner scores higher, down to 70% of the rule's score at the edge.
-      score = (row) => Math.round(rule.score * (0.7 + 0.3 * closeness(Number(row[field(w.field).column]) - t, windowMs)));
+      score = (row) => Math.round(rule.score * (0.7 + 0.3 * closeness(instant(row) - t, windowMs)));
       break;
     }
     case "overdue": {
-      const col = quoteIdent(field(w.field).column);
+      const f = field(w.field);
+      const col = quoteIdent(f.column);
       clauses.push(`${col} IS NOT NULL AND ${col} < ?`);
-      params.push(t);
+      params.push(f.kind === "date" ? dayOf(t) : t);
       break;
     }
     case "eq": {
@@ -61,8 +71,21 @@ export function compileFeedRule(def: TypeDefinition, rule: FeedRule, now: Date):
       params.push(t - w.hours * HOUR);
       break;
   }
-  for (const c of rule.and ?? []) {
-    const f = field(c.field);
+  const extra = andClauses(def, rule.and);
+  clauses.push(...extra.clauses);
+  params.push(...extra.params);
+  return { where: clauses.join(" AND "), params, score };
+}
+
+export type Condition = NonNullable<FeedRule["and"]>[number];
+
+// `and` conditions (field = value, null = unset) as SQL; shared with time triggers.
+export function andClauses(def: TypeDefinition, conditions: Condition[] | undefined): { clauses: string[]; params: Stored[] } {
+  const clauses: string[] = [];
+  const params: Stored[] = [];
+  for (const c of conditions ?? []) {
+    const f = def.fields.find((x) => x.id === c.field && !x.retired);
+    if (!f) throw new Error(`condition field ${c.field} is gone`);
     const encoded = c.value === null ? null : encodeValue(f, c.value);
     if (encoded === null) clauses.push(`${quoteIdent(f.column)} IS NULL`);
     else {
@@ -70,7 +93,7 @@ export function compileFeedRule(def: TypeDefinition, rule: FeedRule, now: Date):
       params.push(encoded);
     }
   }
-  return { where: clauses.join(" AND "), params, score };
+  return { clauses, params };
 }
 
 export function previewFor(def: TypeDefinition, rule: FeedRule, row: Record<string, Stored>, title: string): FeedPreview {
@@ -81,7 +104,9 @@ export function previewFor(def: TypeDefinition, rule: FeedRule, row: Record<stri
     if (!f) continue;
     const value = decodeValue(f, row[f.column]);
     if (value === null || value === "") continue;
-    if (f.kind === "datetime" && !preview.time) preview.time = { start: String(value) };
+    if (f.kind === "datetime" && !preview.time) preview.time = { label: f.label.slice(0, 20), start: String(value) };
+    else if (f.kind === "date" && !preview.time) preview.time = { label: f.label.slice(0, 20), start: String(value), allDay: true };
+    else if (f.kind === "file") continue;
     else if (f.kind === "richtext" && !preview.body) preview.body = (plainTextPreview(String(value)) ?? "").slice(0, 400) || undefined;
     else if (f.kind === "boolean") fields.push(`${f.label}: ${value ? "yes" : "no"}`);
     else if (f.kind === "enum") fields.push(f.options.options?.find((o) => o.value === value)?.label ?? String(value));

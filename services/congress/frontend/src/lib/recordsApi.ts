@@ -1,4 +1,4 @@
-import type { CapitolExhibitSearchResult, RecordDto, RecordValue, TypeSummary } from "@congress/shared-types";
+import type { CapitolExhibitSearchResult, FileRef, RecordDto, RecordValue, TypeSummary } from "@congress/shared-types";
 
 // Runtime exhibit types and their records (server: src/typeEngine/routes.ts).
 
@@ -51,6 +51,24 @@ export async function updateRecord(id: string, values: Record<string, RecordValu
 
 export async function deleteRecord(id: string): Promise<void> {
   await check(await fetch(`/congress/records/${encodeURIComponent(id)}`, { method: "DELETE" }));
+}
+
+export function fileUrl(id: string, download = false): string {
+  return `/congress/files/${encodeURIComponent(id)}${download ? "?download=1" : ""}`;
+}
+
+// Streams the file as the raw request body; the id goes into a file field.
+export async function uploadFile(file: File): Promise<FileRef> {
+  const res = await fetch(`/congress/files?name=${encodeURIComponent(file.name)}`, {
+    method: "PUT",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  });
+  if (res.status === 413) {
+    const body = (await res.json().catch(() => ({}))) as { maxBytes?: number };
+    throw new Error(`That file is too large${body.maxBytes ? ` (max ${Math.round(body.maxBytes / 1024 / 1024)} MB)` : ""}.`);
+  }
+  return check(res);
 }
 
 // The "@" picker's "create new": a record of the given type, titled.

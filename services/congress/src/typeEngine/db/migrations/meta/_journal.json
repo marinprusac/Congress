@@ -8,6 +8,13 @@
       "when": 1790724161774,
       "tag": "0000_type_engine",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790728891463,
+      "tag": "0001_files_and_triggers",
+      "breakpoints": true
     }
   ]
 }

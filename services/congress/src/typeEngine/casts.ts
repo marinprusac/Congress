@@ -1,4 +1,5 @@
 import type { EnumOption, FieldKind } from "@congress/shared-types";
+import { dayOf, isValidDate, startOfDay } from "./zone.js";
 
 // Pure value conversion between field kinds, on stored (SQLite) values.
 // Registered as the `te_cast` SQL function, so table rebuilds use it too.
@@ -22,7 +23,7 @@ export function castStored(value: Stored, from: FieldKind, to: CastTarget): Stor
     case "boolean":
       if (value === null) return 0;
       if (from === "boolean" || from === "number") return Number(value) !== 0 ? 1 : 0;
-      if (from === "datetime") return 1;
+      if (from === "datetime" || from === "date" || from === "file") return 1;
       return TRUE_WORDS.has(text.trim().toLowerCase()) ? 1 : 0;
     case "number": {
       if (value === null) return null;
@@ -34,9 +35,20 @@ export function castStored(value: Stored, from: FieldKind, to: CastTarget): Stor
       if (value === null) return null;
       if (from === "number" || from === "datetime") return Math.round(Number(value));
       if (from === "boolean") return null;
+      if (from === "date") return isValidDate(text) ? startOfDay(text) : null;
       const ms = Date.parse(text.trim());
       return Number.isFinite(ms) ? ms : null;
     }
+    case "date": {
+      if (value === null || from === "boolean") return null;
+      if (from === "number" || from === "datetime") return dayOf(Number(value));
+      const t = text.trim();
+      if (isValidDate(t)) return t;
+      const ms = Date.parse(t);
+      return Number.isFinite(ms) ? dayOf(ms) : null;
+    }
+    case "file":
+      return from === "file" && typeof value === "string" && value ? value : null;
     case "enum": {
       const t = text.trim().toLowerCase();
       if (!t) return null;

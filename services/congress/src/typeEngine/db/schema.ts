@@ -71,3 +71,32 @@ export const imports = sqliteTable("imports", {
   ranAt: integer("ran_at", { mode: "timestamp_ms" }).notNull(),
   statsJson: text("stats_json").notNull(),
 });
+
+// Uploaded bytes for `file` fields, stored at EXHIBIT_FILES_DIR/<id>. Files are
+// immutable; one no record uses is orphaned and deleted after a grace period.
+export const files = sqliteTable(
+  "files",
+  {
+    id: text("id").primaryKey(),
+    sha256: text("sha256").notNull(),
+    name: text("name").notNull(),
+    mime: text("mime").notNull(),
+    size: integer("size").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    orphanedAt: integer("orphaned_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("files_orphaned_idx").on(t.orphanedAt)]
+);
+
+// The step each record last reached on each time-trigger ladder (keyed by field id).
+export const recordTriggerState = sqliteTable(
+  "record_trigger_state",
+  {
+    recordId: text("record_id").notNull(),
+    typeId: text("type_id").notNull(),
+    ladder: text("ladder").notNull(),
+    state: text("state").notNull(),
+    firedAt: integer("fired_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.recordId, t.ladder] }), index("record_trigger_state_type_idx").on(t.typeId, t.ladder)]
+);

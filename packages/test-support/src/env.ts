@@ -28,6 +28,8 @@ const tempDir = mkdtempSync(join(tmpdir(), "congress-test-"));
 // itself, and better-sqlite3 creates the file.
 process.env.DB_PATH = join(tempDir, "test.sqlite3");
 process.env.EXHIBITS_DB_PATH = join(tempDir, "exhibits.sqlite3");
+process.env.EXHIBIT_FILES_DIR = join(tempDir, "exhibit-files");
+process.env.OWNER_TIMEZONE = "Europe/Zagreb";
 
 process.env.NODE_ENV = "test";
 process.env.HOST = "127.0.0.1";

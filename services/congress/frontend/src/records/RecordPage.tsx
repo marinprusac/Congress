@@ -22,7 +22,8 @@ import {
 } from "@congress/congress-ui";
 import type { CapitolExhibitResolveResult, CapitolExhibitSearchResult, FieldDefinition, RecordValue, TypeDefinition } from "@congress/shared-types";
 import { createRecord, deleteRecord, fetchRecord, fetchTypes, quickCreateRecord, RecordConflict, updateRecord } from "@/lib/recordsApi";
-import { FieldControl, PropertyRow } from "./fields";
+import { FieldControl, isFileRef, PropertyRow, ReadonlyValue } from "./fields";
+import { titleFromFilename } from "./format";
 
 // One page for every runtime exhibit type: /e/:id and /e/new/:type. A new
 // record is created on the title's blur, then autosaves a diff of changed
@@ -38,10 +39,22 @@ function defaultFor(f: FieldDefinition): RecordValue {
   return null;
 }
 
-// Field order, so autosave's content comparison is stable.
+// Editable fields in order, so autosave's content comparison is stable.
+// Readonly fields are engine-written and shown from the server's copy.
 function canonical(def: TypeDefinition | undefined, values: Values): Values {
   if (!def) return {};
-  return Object.fromEntries(def.fields.filter((f) => !f.retired).map((f) => [f.slug, values[f.slug] ?? defaultFor(f)]));
+  return Object.fromEntries(def.fields.filter((f) => !f.retired && !f.options.readonly).map((f) => [f.slug, values[f.slug] ?? defaultFor(f)]));
+}
+
+// What the API takes: a file field's id rather than its expanded value.
+function toInput(values: Values): Values {
+  return Object.fromEntries(Object.entries(values).map(([k, v]) => [k, isFileRef(v) ? v.id : v]));
+}
+
+function isFilled(f: FieldDefinition, v: RecordValue | undefined): boolean {
+  if (typeof v === "string") return v.trim() !== "";
+  if (Array.isArray(v)) return v.length > 0;
+  return v !== null && v !== undefined;
 }
 
 function diff(prev: Values, next: Values): Values {
@@ -78,6 +91,9 @@ export function RecordPage() {
   const bodyField = def?.layout.body ? def.fields.find((f) => f.id === def.layout.body && !f.retired) : undefined;
   const actionFields = new Set(def?.actions.map((a) => a.field) ?? []);
   const properties = def?.fields.filter((f) => !f.retired && f !== titleField && f !== bodyField && !actionFields.has(f.id)) ?? [];
+  const requiredFields = def?.fields.filter((f) => !f.retired && !f.options.readonly && f.options.required) ?? [];
+  // Set when a draft gains a value off-blur (an upload), to try creating after render.
+  const attemptPendingRef = useRef(false);
   const current = useMemo(() => canonical(def, values), [def, values]);
   const isDraft = recordId === null;
 
@@ -92,7 +108,7 @@ export function RecordPage() {
 
   const createMutation = useMutation({
     mutationFn: async (draft: Values) => {
-      const created = await createRecord(typeSlug as string, draft);
+      const created = await createRecord(typeSlug as string, toInput(draft));
       await flushDraftConnections(created.id, draftConnections);
       return created;
     },
@@ -116,7 +132,8 @@ export function RecordPage() {
 
   const draftCreate = useDraftCreate({
     value: current,
-    canCreate: (v) => recordId === null && Boolean(titleField && String(v[titleField.slug] ?? "").trim()),
+    canCreate: (v) =>
+      recordId === null && Boolean(titleField && String(v[titleField.slug] ?? "").trim()) && requiredFields.every((f) => isFilled(f, v[f.slug])),
     onCreate: (draft) => createMutation.mutate(draft),
   });
 
@@ -137,7 +154,7 @@ export function RecordPage() {
   }, [idParam, recordId]);
 
   const updateMutation = useMutation({
-    mutationFn: (patch: Values) => updateRecord(recordId as string, patch),
+    mutationFn: (patch: Values) => updateRecord(recordId as string, toInput(patch)),
     onSuccess: (updated) => queryClient.setQueryData(["record", updated.id], updated),
     onError: (err) => showToast(err instanceof RecordConflict ? err.message : "Couldn't save.", "error"),
   });
@@ -181,7 +198,24 @@ export function RecordPage() {
     setValues((v) => ({ ...v, [f.slug]: !(current[f.slug] === true) }));
   };
 
-  const set = (slug: string, value: RecordValue) => setValues((v) => ({ ...v, [slug]: value }));
+  const set = (slug: string, value: RecordValue) =>
+    setValues((v) => {
+      const next = { ...v, [slug]: value };
+      // A first upload names an untitled record after its file.
+      if (isFileRef(value) && titleField && !String(v[titleField.slug] ?? "").trim()) next[titleField.slug] = titleFromFilename(value.name);
+      return next;
+    });
+
+  const setFile = (slug: string, value: RecordValue) => {
+    set(slug, value);
+    attemptPendingRef.current = true;
+  };
+
+  useEffect(() => {
+    if (!attemptPendingRef.current) return;
+    attemptPendingRef.current = false;
+    draftCreate.attempt();
+  }, [current, draftCreate]);
 
   const header = (
     <ChamberHeader
@@ -219,11 +253,22 @@ export function RecordPage() {
 
             {properties.length > 0 && (
               <div className="mb-6 grid grid-cols-1 gap-4">
-                {properties.map((f) => (
-                  <PropertyRow key={f.id} field={f}>
-                    <FieldControl field={f} value={current[f.slug] ?? null} onChange={(v) => set(f.slug, v)} onNavigate={onNavigate} />
-                  </PropertyRow>
-                ))}
+                {properties
+                  .filter((f) => !(f.options.readonly && isDraft))
+                  .map((f) => (
+                    <PropertyRow key={f.id} field={f}>
+                      {f.options.readonly ? (
+                        <ReadonlyValue field={f} value={recordQuery.data?.values[f.slug]} />
+                      ) : (
+                        <FieldControl
+                          field={f}
+                          value={current[f.slug] ?? null}
+                          onChange={(v) => (f.kind === "file" ? setFile(f.slug, v) : set(f.slug, v))}
+                          onNavigate={onNavigate}
+                        />
+                      )}
+                    </PropertyRow>
+                  ))}
               </div>
             )}
 

@@ -19,6 +19,8 @@ import {
   updateRecord,
 } from "./records.js";
 import { typeEngineSource } from "./source.js";
+import { FileTooLargeError, storeUpload } from "./files.js";
+import { env } from "../env.js";
 
 // The "types" MCP server: generic tools plus list/search/get/create/update/
 // delete per visible type, rebuilt from live definitions on every request.
@@ -37,10 +39,15 @@ function describeFields(def: TypeDefinition): string {
             ? ` (${f.options.many ? "ids of" : "id of a"} ${f.options.target} record${f.options.many ? "s" : ""})`
             : f.kind === "datetime"
               ? " (ISO 8601)"
-              : f.kind === "richtext"
-                ? " (markdown; may contain [[exhibit:chamber:id|Name]] tokens)"
-                : "";
-      return `${f.slug}: ${f.kind}${f.options.required ? ", required" : ""}${extra}`;
+              : f.kind === "date"
+                ? " (YYYY-MM-DD, a calendar day)"
+                : f.kind === "file"
+                  ? " (write the id upload_file returns)"
+                  : f.kind === "richtext"
+                    ? " (markdown; may contain [[exhibit:chamber:id|Name]] tokens)"
+                    : "";
+      const flags = `${f.options.required ? ", required" : ""}${f.options.readonly ? ", read-only" : ""}`;
+      return `${f.slug}: ${f.kind}${flags}${extra}`;
     })
     .join("; ");
 }
@@ -159,5 +166,34 @@ export function registerTypeTools(server: McpServer): void {
     "describe_type",
     { title: "Describe Type", description: "One type's full definition.", inputSchema: { slug: z.string().min(1) } },
     ({ slug }) => guarded(() => getTypeBySlug(slug)?.definition ?? { error: "not_found" })
+  );
+
+  server.registerTool(
+    "upload_file",
+    {
+      title: "Upload File",
+      description: `Store a file (base64, at most ${Math.floor(env.MAX_UPLOAD_BYTES / 1024 / 1024)} MB) and get its id, then set that id as a file field's value (e.g. create_document's "file").`,
+      inputSchema: {
+        filename: z.string().min(1).max(200),
+        mimeType: z.string().default("application/octet-stream"),
+        contentBase64: z.string().min(1),
+      },
+    },
+    ({ filename, mimeType, contentBase64 }) =>
+      guarded(async () => {
+        const bytes = Buffer.from(contentBase64, "base64");
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new Uint8Array(bytes));
+            controller.close();
+          },
+        });
+        try {
+          return await storeUpload(body, { name: filename, mime: mimeType });
+        } catch (err) {
+          if (err instanceof FileTooLargeError) return { error: "file_too_large", maxBytes: err.maxBytes };
+          throw err;
+        }
+      })
   );
 }

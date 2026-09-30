@@ -46,7 +46,7 @@ describe("the types MCP server", () => {
         { op: "set_type_meta", hidden: true },
       ],
     });
-    expect(await names()).toEqual(["describe_type", "list_types", ...NOTE_TOOLS].sort());
+    expect(await names()).toEqual(["describe_type", "list_types", "upload_file", ...NOTE_TOOLS].sort());
   });
 
   it("follows the live definitions, per request", async () => {
@@ -60,7 +60,7 @@ describe("the types MCP server", () => {
       ],
     });
     expect(await names()).toEqual(
-      ["create_book", "delete_book", "describe_type", "get_book", "list_books", "list_types", "search_books", "update_book", ...NOTE_TOOLS].sort()
+      ["create_book", "delete_book", "describe_type", "get_book", "list_books", "list_types", "search_books", "update_book", "upload_file", ...NOTE_TOOLS].sort()
     );
     publish({ typeId: getTypeBySlug("book")!.id, ops: [{ op: "set_type_meta", slug: "novel", label: "Novel" }], actor: "test" });
     expect(await names()).toContain("create_novel");
