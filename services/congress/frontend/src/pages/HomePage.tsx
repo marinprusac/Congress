@@ -16,7 +16,7 @@ import {
   useStackNav,
 } from "@congress/congress-ui";
 import { ViewSlot, viewHref } from "@/components/ViewSlot";
-import { findView as findViewSource, useViewSources } from "@/views/coreViews";
+import { findCoreView, findView as findViewSource, useViewSources } from "@/views/coreViews";
 import { HomeAsks } from "@/components/HomeAsks";
 import { GearIcon } from "@/components/TabBar";
 import { feedQueryKey, fetchFeed } from "@/lib/feedApi";
@@ -56,6 +56,11 @@ function PinnedViews() {
 function FeedEntry({ item, registry }: { item: FeedItem; registry: ChamberRegistryEntry[] | undefined }) {
   const nav = useStackNav();
   if (item.kind === "view") {
+    const core = findCoreView(item.chamber, item.viewId);
+    if (core) {
+      const source = { name: core.source.name, displayName: core.source.displayName, status: "active" as const };
+      return <ViewSlot chamber={source} view={core.view} Card={core.view.Card} reason={item.reason} />;
+    }
     const found = findView(registry, item.chamber, item.viewId);
     if (!found) return null;
     return <ViewSlot chamber={found.entry} view={found.view} reason={item.reason} />;

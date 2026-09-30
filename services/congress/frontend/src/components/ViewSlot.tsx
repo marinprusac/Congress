@@ -93,12 +93,15 @@ export function ViewSlot({
   view,
   reason,
   full = false,
+  Card,
 }: {
-  chamber: ChamberRegistryEntry;
+  chamber: Pick<ChamberRegistryEntry, "name" | "displayName" | "status">;
   view: ManifestView;
   reason?: string;
   // The card is the whole page (/view/:chamber/:viewId), not a feed item.
   full?: boolean;
+  // Congress's own card (a core view); otherwise the Chamber's remote one.
+  Card?: ComponentType;
 }) {
   const active = chamber.status === "active";
 
@@ -106,7 +109,7 @@ export function ViewSlot({
   // reached through Search and the pinned row) - see rankFeed.
   if (!view.card) return null;
 
-  const View = active ? getViewComponent(chamber.name, view.id) : null;
+  const View = Card ?? (active ? getViewComponent(chamber.name, view.id) : null);
 
   return (
     <section className="feed-card">

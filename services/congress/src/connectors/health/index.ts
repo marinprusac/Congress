@@ -48,6 +48,11 @@ export const healthConnector = defineConnector({
     },
   },
   push: { create: refuse, update: refuse, delete: refuse, act: refuse },
+  // The Health view's card, once the Fitness Chamber (which shows its own) is gone.
+  feed: () =>
+    getHealthSettings().publishEvents
+      ? { source: "fitness", views: [{ id: "health", label: "Health", card: true, fullPath: "/health" }], candidates: [{ kind: "view", viewId: "health", score: 15 }] }
+      : null,
   hooks(ctx) {
     const app = new Hono();
     app.post("/ingest", async (c) => {

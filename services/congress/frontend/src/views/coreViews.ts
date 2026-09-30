@@ -1,5 +1,7 @@
+import type { ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ManifestView } from "@congress/shared-types";
+import { HealthCard } from "@/views/health/HealthViews";
 import { fetchRegistry } from "@congress/congress-ui";
 import { fetchTypes, TYPES_KEY } from "@/lib/recordsApi";
 
@@ -9,9 +11,10 @@ import { fetchTypes, TYPES_KEY } from "@/lib/recordsApi";
 export interface ViewSource {
   name: string;
   displayName: string;
-  views: ManifestView[];
+  views: (ManifestView & { Card?: ComponentType })[];
 }
 
+// `type`: shown once that type is in use.
 const CORE_VIEWS: (ViewSource & { type: string })[] = [
   {
     name: "events",
@@ -22,7 +25,20 @@ const CORE_VIEWS: (ViewSource & { type: string })[] = [
       { id: "week", label: "Week", fullPath: "/week" },
     ],
   },
+  {
+    name: "fitness",
+    displayName: "Fitness",
+    type: "workout",
+    views: [{ id: "health", label: "Health", fullPath: "/health", card: true, Card: HealthCard }],
+  },
 ];
+
+// A core view with its own card, for the feed and /view/... (null for a Chamber's).
+export function findCoreView(name: string, viewId: string) {
+  const source = CORE_VIEWS.find((s) => s.name === name);
+  const view = source?.views.find((v) => v.id === viewId);
+  return source && view ? { source, view } : null;
+}
 
 export function useViewSources(): ViewSource[] {
   const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });

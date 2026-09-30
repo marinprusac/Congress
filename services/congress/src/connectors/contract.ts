@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { FieldKind, KeyKind, ManifestEvent } from "@congress/shared-types";
+import type { FeedCandidate, FieldKind, KeyKind, ManifestEvent, ManifestView } from "@congress/shared-types";
 import type { PublishedEvent } from "../events.js";
 import type { Evidence } from "../typeEngine/lookups.js";
 
@@ -94,6 +94,8 @@ export interface Connector {
   // Webhooks at /congress/connectors/<name>/hook/*, without a session: the connector checks its own secret.
   hooks?(ctx: ConnectorContext): Hono;
   onEvent?(ctx: ConnectorContext, event: PublishedEvent): void;
+  // Feed candidates for a hand-written view's card (Congress's frontend renders it), under `source`.
+  feed?(now: Date): { source: string; views: ManifestView[]; candidates: FeedCandidate[] } | null;
   // Extra AI tools on /mcp/types (named <prefix>_*), for what isn't per record.
   tools?(ctx: ConnectorContext, server: McpServer): void;
 }
