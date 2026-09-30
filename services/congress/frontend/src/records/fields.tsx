@@ -1,14 +1,17 @@
-import { useState } from "react";
-import type { CapitolExhibitResolveResult, FieldDefinition, RecordValue } from "@congress/shared-types";
+import { useRef, useState } from "react";
+import type { CapitolExhibitResolveResult, FieldDefinition, FileRef, RecordValue } from "@congress/shared-types";
 import {
   ExhibitChip,
   ExhibitFieldEditor,
   FormLabel,
   getChamberIcon,
+  showToast,
   useExhibitSearch,
   useResolvedExhibits,
 } from "@congress/congress-ui";
+import { fileUrl, uploadFile } from "@/lib/recordsApi";
 import { fromLocalInput, toLocalInput } from "./datetime";
+import { formatBytes } from "./format";
 
 // One control per field kind; every record page is built from these.
 
@@ -66,9 +69,90 @@ export function FieldControl({ field, value, onChange, onNavigate }: FieldProps)
           ))}
         </select>
       );
+    case "date":
+      return (
+        <input
+          type="date"
+          className="field-plain w-full font-mono text-base"
+          value={typeof value === "string" ? value : ""}
+          onChange={(e) => onChange(e.target.value || null)}
+        />
+      );
     case "relation":
       return <RelationControl field={field} value={value} onChange={onChange} onNavigate={onNavigate} />;
+    case "file":
+      return <FileControl field={field} value={value} onChange={onChange} onNavigate={onNavigate} />;
   }
+}
+
+export function isFileRef(value: RecordValue | undefined): value is FileRef {
+  return typeof value === "object" && value !== null && !Array.isArray(value) && "mime" in value;
+}
+
+function FileControl({ value, onChange }: FieldProps) {
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const file = isFileRef(value) ? value : null;
+
+  const pick = async (picked: File | undefined) => {
+    if (!picked) return;
+    setBusy(true);
+    try {
+      onChange(await uploadFile(picked));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Upload failed.", "error");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const input = <input ref={inputRef} type="file" className="hidden" onChange={(e) => void pick(e.target.files?.[0])} />;
+  if (!file) {
+    return (
+      <div>
+        {input}
+        <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} className="tap-target font-mono text-sm text-accent hover:underline disabled:text-dust">
+          {busy ? "Uploading —" : "Choose file"}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {input}
+      {file.mime.startsWith("image/") && <img src={fileUrl(file.id)} alt={file.name} className="max-h-72 max-w-full rounded border border-dust object-contain" />}
+      <p className="break-all font-mono text-sm text-ink">
+        {file.name} <span className="text-dust">· {formatBytes(file.size)}</span>
+      </p>
+      <div className="flex flex-wrap gap-x-4">
+        <a href={fileUrl(file.id)} target="_blank" rel="noopener" className="tap-target font-mono text-sm text-accent hover:underline">
+          Open
+        </a>
+        <a href={fileUrl(file.id, true)} download={file.name} className="tap-target font-mono text-sm text-accent hover:underline">
+          Download
+        </a>
+        <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} className="tap-target font-mono text-sm text-slate hover:underline disabled:text-dust">
+          {busy ? "Uploading —" : "Replace"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Engine-written values: shown, never edited.
+export function ReadonlyValue({ field, value }: { field: FieldDefinition; value: RecordValue | undefined }) {
+  const text =
+    value === null || value === undefined || value === ""
+      ? "—"
+      : field.kind === "datetime" && typeof value === "string"
+        ? new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+        : field.kind === "boolean"
+          ? value
+            ? "Yes"
+            : "No"
+          : String(value);
+  return <p className="font-mono text-base text-slate">{text}</p>;
 }
 
 function RelationControl({ field, value, onChange, onNavigate }: FieldProps) {

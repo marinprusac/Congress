@@ -43,7 +43,35 @@ describe("type routes", () => {
     });
     const slugs = async (path: string) => ((await (await call(path)).json()) as { definition: { slug: string } }[]).map((t) => t.definition.slug);
     expect(await slugs("/congress/types")).toEqual(["note"]);
-    expect(await slugs("/congress/types?all=1")).toEqual(["note", "secret"]);
+    expect(await slugs("/congress/types?all=1")).toEqual(["note", "task", "document", "secret"]);
+  });
+
+  it("upload a file raw and serve it back inline, ranged and as a download", async () => {
+    const put = await call("/congress/files?name=scan%20%C3%A9.pdf", { method: "PUT", body: "%PDF-hello", headers: { "Content-Type": "application/pdf" } });
+    expect(put.status).toBe(201);
+    const ref = (await put.json()) as { id: string; name: string; mime: string; size: number };
+    expect(ref).toMatchObject({ name: "scan é.pdf", mime: "application/pdf", size: 10 });
+
+    const got = await call(`/congress/files/${ref.id}`);
+    expect(got.status).toBe(200);
+    expect(got.headers.get("content-disposition")).toMatch(/^inline;.*filename\*=UTF-8''scan%20%C3%A9\.pdf/);
+    expect(got.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(await got.text()).toBe("%PDF-hello");
+
+    const ranged = await call(`/congress/files/${ref.id}`, { headers: { range: "bytes=1-3" } });
+    expect(ranged.status).toBe(206);
+    expect(await ranged.text()).toBe("PDF");
+    expect((await call(`/congress/files/${ref.id}`, { headers: { range: "bytes=50-" } })).status).toBe(416);
+    expect((await call(`/congress/files/${ref.id}?download=1`)).headers.get("content-disposition")).toMatch(/^attachment;/);
+  });
+
+  it("serve unknown types as attachments and keep files behind the session", async () => {
+    const put = await call("/congress/files?name=x.html", { method: "PUT", body: "<script>1</script>", headers: { "Content-Type": "text/html" } });
+    const { id } = (await put.json()) as { id: string };
+    expect((await call(`/congress/files/${id}`)).headers.get("content-disposition")).toMatch(/^attachment;/);
+    expect((await call(`/congress/files/${id}`, {}, false)).status).toBe(401);
+    expect((await call("/congress/files?name=x", { method: "PUT", body: "x" }, false)).status).toBe(401);
+    expect((await call("/congress/files/nope")).status).toBe(404);
   });
 
   it("create, read, patch and delete a record", async () => {

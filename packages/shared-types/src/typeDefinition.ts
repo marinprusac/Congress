@@ -6,7 +6,7 @@ import { z } from "zod";
 export const SLUG_PATTERN = /^[a-z][a-z0-9_]{0,40}$/;
 export const slugSchema = z.string().regex(SLUG_PATTERN, "lowercase letters, digits and _; starts with a letter");
 
-export const FIELD_KINDS = ["text", "richtext", "boolean", "datetime", "number", "enum", "relation"] as const;
+export const FIELD_KINDS = ["text", "richtext", "boolean", "datetime", "date", "number", "enum", "relation", "file"] as const;
 export const fieldKindSchema = z.enum(FIELD_KINDS);
 export type FieldKind = z.infer<typeof fieldKindSchema>;
 
@@ -24,6 +24,8 @@ export const fieldOptionsSchema = z
     options: z.array(enumOptionSchema).max(100).optional(),
     target: slugSchema.optional(),
     many: z.boolean().optional(),
+    // Written only by the engine (e.g. a toggle's stamp), never by input.
+    readonly: z.boolean().optional(),
   })
   .strict();
 export type FieldOptions = z.infer<typeof fieldOptionsSchema>;
@@ -45,6 +47,11 @@ export const typeActionSchema = z.object({
   field: z.string(),
   on: z.string().min(1).max(40),
   off: z.string().min(1).max(40),
+  // Events (<prefix>.<name>) when the boolean turns on/off, by any write.
+  onEvent: slugSchema.optional(),
+  offEvent: slugSchema.optional(),
+  // A datetime field set to now when the boolean turns on, cleared when off.
+  stampField: z.string().optional(),
 });
 export type TypeAction = z.infer<typeof typeActionSchema>;
 
@@ -64,6 +71,19 @@ export const feedRuleSchema = z.object({
 });
 export type FeedRule = z.infer<typeof feedRuleSchema>;
 
+// A ladder of events relative to a date/datetime field: a record's state is
+// the latest step it has reached; falling back out of every step fires clearEvent.
+export const triggerEventSchema = z.object({ event: slugSchema, label: z.string().min(1).max(80) });
+export const timeTriggerSchema = z.object({
+  field: z.string(),
+  // Date fields only: offsets count from the day's start, or its end (default).
+  anchor: z.enum(["start_of_day", "end_of_day"]).optional(),
+  and: z.array(z.object({ field: z.string(), value: z.union([z.string(), z.number(), z.boolean(), z.null()]) })).max(5).optional(),
+  steps: z.array(triggerEventSchema.extend({ offsetMinutes: z.number().int().min(-525_600).max(525_600) })).min(1).max(5),
+  clearEvent: triggerEventSchema.optional(),
+});
+export type TimeTrigger = z.infer<typeof timeTriggerSchema>;
+
 export const typeDefinitionSchema = z.object({
   slug: slugSchema,
   label: z.string().min(1).max(60),
@@ -75,6 +95,7 @@ export const typeDefinitionSchema = z.object({
   layout: z.object({ body: z.string().nullable() }),
   actions: z.array(typeActionSchema),
   feedRules: z.array(feedRuleSchema),
+  timeTriggers: z.array(timeTriggerSchema).default([]),
   eventPrefix: slugSchema,
   hidden: z.boolean(),
 });
@@ -117,6 +138,7 @@ export const operationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("set_layout"), body: fieldRef.nullable() }),
   z.object({ op: z.literal("set_actions"), actions: z.array(typeActionSchema).max(5) }),
   z.object({ op: z.literal("set_feed_rules"), rules: z.array(feedRuleSchema).max(10) }),
+  z.object({ op: z.literal("set_time_triggers"), triggers: z.array(timeTriggerSchema).max(3) }),
 ]);
 export type Operation = z.infer<typeof operationSchema>;
 
@@ -128,13 +150,17 @@ export const typeSummarySchema = z.object({
 });
 export type TypeSummary = z.infer<typeof typeSummarySchema>;
 
-export type RecordValue = string | number | boolean | null | string[];
+// A `file` field's value as read; writes take the file's id instead.
+export const fileRefSchema = z.object({ id: z.string(), name: z.string(), mime: z.string(), size: z.number().int() });
+export type FileRef = z.infer<typeof fileRefSchema>;
+
+export type RecordValue = string | number | boolean | null | string[] | FileRef;
 
 export const recordDtoSchema = z.object({
   id: z.string(),
   type: slugSchema,
   typeVersion: z.number().int(),
-  values: z.record(z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())])),
+  values: z.record(z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string()), fileRefSchema])),
   createdAt: z.string(),
   updatedAt: z.string(),
   provenance: z.object({ binding: z.string(), key: z.string() }).nullable(),

@@ -110,6 +110,61 @@ describe("applyOperations", () => {
   });
 });
 
+describe("time triggers, toggle events and new kinds", () => {
+  const withDue: Operation[] = [
+    { op: "add_field", slug: "due", label: "Due", kind: "date" },
+    { op: "add_field", slug: "done", label: "Done", kind: "boolean" },
+    { op: "add_field", slug: "done_at", label: "Done at", kind: "datetime", options: { readonly: true } },
+  ];
+  const ladder = (field = "due", event = "due_soon") => ({
+    op: "set_time_triggers" as const,
+    triggers: [{ field, and: [{ field: "done", value: false }], steps: [{ event, label: "Soon", offsetMinutes: -60 }] }],
+  });
+
+  it("resolves ladder and stamp fields to ids", () => {
+    const { def, errors } = build([
+      ...withDue,
+      ladder(),
+      { op: "set_actions", actions: [{ kind: "toggle", field: "done", on: "Reopen", off: "Done", onEvent: "done", stampField: "done_at" }] },
+    ]);
+    expect(errors).toEqual([]);
+    expect(def.timeTriggers[0]).toMatchObject({ field: "fld_due", and: [{ field: "fld_done", value: false }] });
+    expect(def.actions[0]).toMatchObject({ field: "fld_done", stampField: "fld_done_at" });
+  });
+
+  it("rejects ladders on non-time fields, clashing events and bad stamps", () => {
+    expect(build([...withDue, ladder("done")]).errors.join()).toMatch(/date or datetime/);
+    expect(build([...withDue, ladder("due", "updated")]).errors.join()).toMatch(/"updated" is used twice/);
+    expect(
+      build([...withDue, { op: "set_actions", actions: [{ kind: "toggle", field: "done", on: "a", off: "b", stampField: "due" }] }]).errors.join()
+    ).toMatch(/must be datetime/);
+    expect(build([{ op: "add_field", slug: "x", label: "X", kind: "text", options: { readonly: true, required: true } }]).errors.join()).toMatch(
+      /readonly and required/
+    );
+  });
+
+  it("drops a retired field's ladder and stamp", () => {
+    const { def } = build([
+      ...withDue,
+      ladder(),
+      { op: "set_actions", actions: [{ kind: "toggle", field: "done", on: "a", off: "b", stampField: "done_at" }] },
+      { op: "retire_field", field: "due" },
+      { op: "retire_field", field: "done_at" },
+    ]);
+    expect(def.timeTriggers).toEqual([]);
+    expect(def.actions[0]?.stampField).toBeUndefined();
+  });
+
+  it("never changes a file field's kind", () => {
+    const { errors } = build([
+      { op: "add_field", slug: "scan", label: "Scan", kind: "file", options: { unique: true } },
+      { op: "change_field_kind", field: "scan", kind: "text" },
+    ]);
+    expect(errors.join()).toMatch(/to or from a file/);
+    expect(build([{ op: "add_field", slug: "scan", label: "Scan", kind: "file", options: { unique: true } }]).def.fields[1]?.options).toEqual({});
+  });
+});
+
 describe("rollbackDefinition", () => {
   it("restores the target and keeps newer fields retired", () => {
     const v1 = build().def;

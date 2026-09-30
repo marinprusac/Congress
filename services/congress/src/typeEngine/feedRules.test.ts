@@ -62,3 +62,53 @@ describe("feedCandidatesFor", () => {
     expect(ranked.map((r) => (r.kind === "exhibit" ? `${r.chamber}:${r.exhibitId}` : ""))).toEqual(["mail:thread-1", "e:late", "e:soon", "e:edge"]);
   });
 });
+
+describe("feed rules on date fields", () => {
+  const dateDef = applyOperations(null, [
+    { op: "create_type", slug: "chore", label: "Chore" },
+    { op: "add_field", slug: "title", label: "Title", kind: "text" },
+    { op: "set_title_field", field: "title" },
+    { op: "add_field", slug: "due", label: "Due", kind: "date" },
+    {
+      op: "set_feed_rules",
+      rules: [
+        { when: { op: "overdue", field: "due" }, score: 90, reason: "Overdue", preview: ["due"] },
+        { when: { op: "within_next", field: "due", hours: 48 }, score: 85 },
+      ],
+    },
+  ] satisfies Operation[]).def;
+
+  function candidatesAt(at: Date) {
+    const sqlite = new Database(":memory:");
+    for (const step of planMigration(null, dateDef).steps) sqlite.exec(step);
+    const insert = sqlite.prepare(`INSERT INTO x_chore (id, created_at, updated_at, title, due) VALUES (?, 0, 0, ?, ?)`);
+    const rows: [string, string | null][] = [
+      ["yesterday", "2026-09-29"],
+      ["today", "2026-09-30"],
+      ["tomorrow", "2026-10-01"],
+      ["in2", "2026-10-02"],
+      ["none", null],
+    ];
+    for (const [id, due] of rows) insert.run(id, id, due);
+    return feedCandidatesFor(dateDef, at, (sql, params) => sqlite.prepare(sql).all(...params) as never, (r) => String(r.title));
+  }
+  const ids = (cs: ReturnType<typeof candidatesAt>, reason?: string) =>
+    cs
+      .filter((c) => (reason ? c.reason === reason : !c.reason))
+      .map((c) => (c.kind === "exhibit" ? c.exhibitId : ""))
+      .sort();
+
+  it("counts a day as due until it ends in the owner's zone", () => {
+    // 23:30 on 30 Sep in Zagreb (CEST).
+    const cs = candidatesAt(new Date("2026-09-30T21:30:00Z"));
+    expect(ids(cs, "Overdue")).toEqual(["yesterday"]);
+    expect(ids(cs)).toEqual(["today", "tomorrow"]);
+    expect(cs.find((c) => c.reason === "Overdue")).toMatchObject({ preview: { time: { label: "Due", start: "2026-09-29", allDay: true } } });
+  });
+
+  it("rolls over at local midnight, not UTC", () => {
+    const cs = candidatesAt(new Date("2026-09-30T22:00:00Z"));
+    expect(ids(cs, "Overdue")).toEqual(["today", "yesterday"]);
+    expect(ids(cs)).toEqual(["in2", "tomorrow"]);
+  });
+});

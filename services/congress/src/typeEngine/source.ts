@@ -97,7 +97,8 @@ export const typeEngineSource: LocalExhibitSource = {
   },
 };
 
-// Event catalog entries for every visible type (see eventCatalogSync.ts).
+// Event catalog entries for every type (see eventCatalogSync.ts): record
+// events, toggle events and time-trigger steps.
 export function typeEventCatalog(): { name: string; events: ManifestEvent[] }[] {
   const events = listTypes().flatMap((t) => {
     const d = t.definition;
@@ -106,11 +107,20 @@ export function typeEventCatalog(): { name: string; events: ManifestEvent[] }[] 
       title: { type: "string" as const, description: "Its title" },
       url: { type: "string" as const, description: "Link to open it" },
     };
-    return (["created", "updated", "deleted"] as const).map((verb) => ({
-      type: `${d.eventPrefix}.${verb}`,
-      label: `${d.label} ${verb}`,
-      payloadFields,
-    }));
+    const lower = d.label.toLowerCase();
+    const named: { event: string; label: string; description?: string }[] = [
+      ...(["created", "updated", "deleted"] as const).map((verb) => ({ event: verb, label: `${d.label} ${verb}` })),
+      ...d.actions.flatMap((a) => {
+        const f = d.fields.find((x) => x.id === a.field);
+        const what = f?.label.toLowerCase() ?? "toggle";
+        return [
+          ...(a.onEvent ? [{ event: a.onEvent, label: `${d.label} ${a.onEvent.replace(/_/g, " ")}`, description: `A ${lower}'s ${what} turned on.` }] : []),
+          ...(a.offEvent ? [{ event: a.offEvent, label: `${d.label} ${a.offEvent.replace(/_/g, " ")}`, description: `A ${lower}'s ${what} turned off.` }] : []),
+        ];
+      }),
+      ...d.timeTriggers.flatMap((t) => [...t.steps, ...(t.clearEvent ? [t.clearEvent] : [])]),
+    ];
+    return named.map((e) => ({ type: `${d.eventPrefix}.${e.event}`, label: e.label, ...(e.description ? { description: e.description } : {}), payloadFields }));
   });
   return [{ name: "types", events }];
 }

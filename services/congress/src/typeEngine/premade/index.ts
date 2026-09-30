@@ -1,6 +1,8 @@
 import type { Operation } from "@congress/shared-types";
 import { getTypeByPremadeKey, markForked, publish, PublishError } from "../store.js";
 import { NOTE } from "./note.js";
+import { TASK } from "./task.js";
+import { DOCUMENT } from "./document.js";
 
 // Premade types ship as ordered batches of operations, applied once each at
 // boot like migrations. A batch that no longer applies (the owner changed the
@@ -11,7 +13,7 @@ export interface Premade {
   batches: Operation[][];
 }
 
-export const PREMADES: Premade[] = [NOTE];
+export const PREMADES: Premade[] = [NOTE, TASK, DOCUMENT];
 
 export function installPremades(list: Premade[] = PREMADES): void {
   for (const premade of list) {

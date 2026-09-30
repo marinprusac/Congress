@@ -47,3 +47,26 @@ describe("recordInputSchema", () => {
     expect(patch.safeParse({ due: null, status: null, points: null }).success).toBe(true);
   });
 });
+
+describe("date and readonly fields", () => {
+  const withDate = applyOperations(def, [
+    { op: "add_field", slug: "day", label: "Day", kind: "date" },
+    { op: "add_field", slug: "closed_at", label: "Closed at", kind: "datetime", options: { readonly: true } },
+  ]).def;
+  const day = withDate.fields.find((f) => f.slug === "day")!;
+
+  it("keeps dates as YYYY-MM-DD and reads a timestamp as its day in the owner's zone", () => {
+    expect(encodeValue(day, "2026-10-01")).toBe("2026-10-01");
+    expect(encodeValue(day, "2026-09-30T23:30:00Z")).toBe("2026-10-01");
+    expect(decodeValue(day, "2026-10-01")).toBe("2026-10-01");
+    const patch = recordInputSchema(withDate, "patch");
+    expect(patch.safeParse({ day: "2026-02-30" }).success).toBe(false);
+    expect(patch.safeParse({ day: "tomorrow" }).success).toBe(false);
+    expect(patch.safeParse({ day: null }).success).toBe(true);
+  });
+
+  it("leaves readonly fields out of input unless trusted", () => {
+    expect(recordInputSchema(withDate, "patch").safeParse({ closed_at: "2026-09-30T10:00:00Z" }).success).toBe(false);
+    expect(recordInputSchema(withDate, "patch", { includeReadonly: true }).safeParse({ closed_at: "2026-09-30T10:00:00Z" }).success).toBe(true);
+  });
+});

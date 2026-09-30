@@ -60,9 +60,18 @@ export function runDailyBackups(targets: BackupTarget[], now = new Date()): stri
 
 let timer: ReturnType<typeof setInterval> | null = null;
 
-export function startBackups(targets: BackupTarget[]): void {
-  runDailyBackups(targets);
-  timer = setInterval(() => runDailyBackups(targets), CHECK_INTERVAL_MS);
+// `housekeeping` rides the same hourly tick (e.g. deleting orphaned files).
+export function startBackups(targets: BackupTarget[], housekeeping?: () => void): void {
+  const run = () => {
+    runDailyBackups(targets);
+    try {
+      housekeeping?.();
+    } catch (err) {
+      console.error("[backups] housekeeping failed:", err);
+    }
+  };
+  run();
+  timer = setInterval(run, CHECK_INTERVAL_MS);
   timer.unref();
 }
 

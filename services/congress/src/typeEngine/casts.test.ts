@@ -36,4 +36,13 @@ describe("castStored", () => {
     expect(castStored("done", "text", { kind: "enum", options })).toBe("done");
     expect(castStored("later", "text", { kind: "enum", options })).toBeNull();
   });
+
+  it("converts dates and datetimes through the owner's zone", () => {
+    // 23:30 UTC on 30 Sep is already 1 Oct in Zagreb.
+    expect(castStored(Date.parse("2026-09-30T23:30:00Z"), "datetime", { kind: "date" })).toBe("2026-10-01");
+    expect(castStored("2026-10-01", "date", { kind: "datetime" })).toBe(Date.parse("2026-09-30T22:00:00Z"));
+    expect(castStored(" 2026-10-01 ", "text", { kind: "date" })).toBe("2026-10-01");
+    expect(castStored("someday", "text", { kind: "date" })).toBeNull();
+    expect(castStored("2026-10-01", "date", { kind: "text" })).toBe("2026-10-01");
+  });
 });
