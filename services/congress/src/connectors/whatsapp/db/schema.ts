@@ -15,8 +15,8 @@ export const chats = sqliteTable("chats", {
   lastRevoked: integer("last_revoked", { mode: "boolean" }).notNull().default(false),
   unreadCount: integer("unread_count").notNull().default(0),
   markedUnread: integer("marked_unread", { mode: "boolean" }).notNull().default(false),
-  // 1:1 only: whether the owner has written in it (null until checked) - direct contact.
-  wroteIn: integer("wrote_in", { mode: "boolean" }),
+  // 1:1 only: the owner's messages among the last 100 (null until counted) - how direct the contact is.
+  ownerMessages: integer("owner_messages"),
   personId: text("person_id"),
   syncedAt: integer("synced_at", { mode: "timestamp_ms" }).notNull(),
 });
