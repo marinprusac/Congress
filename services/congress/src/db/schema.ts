@@ -267,7 +267,7 @@ export const aiMessages = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     threadId: integer("thread_id").notNull(),
     role: text("role", { enum: ["user", "assistant", "system"] }).notNull(),
-    kind: text("kind", { enum: ["text", "message", "question", "proposal", "answer", "decision", "notice"] })
+    kind: text("kind", { enum: ["text", "message", "question", "proposal", "builder_request", "type_publish", "answer", "decision", "notice"] })
       .notNull()
       .default("text"),
     status: text("status", { enum: ["ok", "error", "refused", "cancelled"] }).notNull().default("ok"),
@@ -290,6 +290,20 @@ export const aiMessages = sqliteTable(
     index("ai_messages_created_at_idx").on(table.createdAt),
     index("ai_messages_ask_state_idx").on(table.askState),
   ]
+);
+
+// Builder mode: the owner let the AI draft type changes in one thread until expiresAt.
+export const aiBuilderGrants = sqliteTable(
+  "ai_builder_grants",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    threadId: integer("thread_id").notNull(),
+    requestMessageId: integer("request_message_id").notNull(),
+    grantedAt: integer("granted_at", { mode: "timestamp_ms" }).notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+  },
+  (table) => [index("ai_builder_grants_thread_idx").on(table.threadId, table.expiresAt)]
 );
 
 // One row per AI run of any kind - the audit trail behind "Why?" and

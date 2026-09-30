@@ -157,13 +157,24 @@ export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
       costUsd: { type: "number" },
     },
   },
+  {
+    type: "congress.type_published",
+    label: "Exhibit type changed",
+    description: "The owner approved a change to an exhibit type the AI drafted in builder mode.",
+    payloadFields: {
+      slug: { type: "string" },
+      label: { type: "string" },
+      version: { type: "number" },
+      summary: { type: "string" },
+    },
+  },
 ];
 
 // Top-level paths Congress's own shell owns (services/congress/frontend's
 // App.tsx routes, and the service worker's shell-route allowlist). A Chamber
 // is served at "/<name>/*", so one named any of these would be unreachable -
 // Congress refuses to register it.
-export const RESERVED_CHAMBER_NAMES = ["congress", "search", "notifications", "settings", "chat", "view", "vendor", "auth", "api", "mcp", "privacy", "terms", "e", "types"] as const;
+export const RESERVED_CHAMBER_NAMES = ["congress", "search", "notifications", "settings", "chat", "view", "vendor", "auth", "api", "mcp", "privacy", "terms", "e", "types", "builder"] as const;
 
 export const manifestSchema = z.object({
   name: z.string().min(1),

@@ -3,6 +3,7 @@ import type { AiAskState, AiMessage, AiMessageKind, AiMessageRole, AiMessageStat
 import { db } from "../db/client.js";
 import { aiMessages, aiThreads } from "../db/schema.js";
 import { runSummaries } from "./runs.js";
+import { activeGrant } from "./builder.js";
 
 type ThreadRow = typeof aiThreads.$inferSelect;
 type MessageRow = typeof aiMessages.$inferSelect;
@@ -50,6 +51,7 @@ function toThread(row: ThreadRow, extras: { snippet: string | null; openAskCount
     archived: row.archivedAt !== null,
     unread: row.lastMessageAt.getTime() > lastReadAt,
     openAskCount: extras.openAskCount,
+    builderUntil: activeGrant(row.id)?.expiresAt.toISOString() ?? null,
     pendingRunId: row.pendingRunId,
     snippet: extras.snippet,
     lastMessageAt: row.lastMessageAt.toISOString(),

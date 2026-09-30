@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { definitionChangeSchema } from "./typeDefinition.js";
 
 // AI-authored asks: a message (optionally delayed = a reminder), a question
 // with a form the AI builds itself, and a proposal of changes the owner
@@ -143,7 +144,18 @@ export type AskProposalPayload = z.infer<typeof askProposalPayloadSchema>;
 export const answerAskRequestSchema = z.object({ values: z.record(z.string(), z.unknown()) });
 export type AnswerAskRequest = z.infer<typeof answerAskRequestSchema>;
 
-export const decideAskRequestSchema = z.object({ approve: z.boolean(), note: z.string().trim().max(1000).optional() });
+export const BUILDER_GRANT_MINUTES = [15, 60, 240] as const;
+
+export const decideAskRequestSchema = z.object({
+  approve: z.boolean(),
+  note: z.string().trim().max(1000).optional(),
+  // builder_request only: how long the grant lasts.
+  grantMinutes: z
+    .number()
+    .int()
+    .refine((m) => (BUILDER_GRANT_MINUTES as readonly number[]).includes(m))
+    .optional(),
+});
 export type DecideAskRequest = z.infer<typeof decideAskRequestSchema>;
 
 // Owner-facing list of what the AI is waiting on or has to say.
@@ -151,10 +163,37 @@ export const openAskSchema = z.object({
   messageId: z.number().int(),
   threadId: z.number().int(),
   threadTitle: z.string(),
-  kind: z.enum(["message", "question", "proposal"]),
+  kind: z.enum(["message", "question", "proposal", "builder_request", "type_publish"]),
   title: z.string(),
   text: z.string(),
   payload: z.unknown(),
   createdAt: z.string(),
 });
 export type OpenAsk = z.infer<typeof openAskSchema>;
+
+// The AI asks to enter builder mode in its thread.
+export const builderRequestPayloadSchema = z.object({
+  title: z.string().min(1).max(120),
+  // Types it expects to create or change (shown only, not enforced).
+  scope: z.string().max(300).nullable().default(null),
+  grantedUntil: z.string().nullable().default(null),
+  note: z.string().max(1000).nullable().default(null),
+});
+export type BuilderRequestPayload = z.infer<typeof builderRequestPayloadSchema>;
+
+// One draft, frozen as reviewed: approval publishes exactly this.
+export const typePublishPayloadSchema = z.object({
+  title: z.string().min(1).max(120),
+  draftId: z.string(),
+  hash: z.string(),
+  typeLabel: z.string(),
+  isNew: z.boolean(),
+  rollbackTo: z.number().int().nullable(),
+  changes: z.array(definitionChangeSchema),
+  warnings: z.array(z.object({ label: z.string(), count: z.number().int() })),
+  rebuild: z.boolean(),
+  publishedVersion: z.number().int().nullable().default(null),
+  error: z.string().nullable().default(null),
+  note: z.string().max(1000).nullable().default(null),
+});
+export type TypePublishPayload = z.infer<typeof typePublishPayloadSchema>;

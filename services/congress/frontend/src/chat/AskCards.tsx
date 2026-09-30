@@ -5,6 +5,9 @@ import {
   askMessagePayloadSchema,
   askProposalPayloadSchema,
   askQuestionPayloadSchema,
+  builderRequestPayloadSchema,
+  typePublishPayloadSchema,
+  BUILDER_GRANT_MINUTES,
   type AiMessage,
   type AskField,
   type AskProposalPayload,
@@ -16,7 +19,7 @@ import { QuestionForm } from "./QuestionForm";
 import { useChatNavigation } from "./chatNav";
 import { durationLabel, stringifyToolValue, timeLabel } from "./chatFormat";
 
-const KIND_LABEL = { message: "Message", question: "Question", proposal: "Proposal" } as const;
+const KIND_LABEL = { message: "Message", question: "Question", proposal: "Proposal", builder_request: "Builder mode", type_publish: "Type change" } as const;
 
 function WhySheet({ runId, onClose }: { runId: string; onClose: () => void }) {
   const run = useQuery({ queryKey: aiRunQueryKey(runId), queryFn: () => fetchAiRun(runId) });
@@ -220,8 +223,167 @@ function ProposalAsk({ message }: { message: AiMessage }) {
   );
 }
 
+// Approve/reject with an optional note, shared by builder mode's cards.
+function useDecision(message: AiMessage) {
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const decide = async (approve: boolean, opts: { note?: string; grantMinutes?: number } = {}) => {
+    setBusy(true);
+    try {
+      await decideAsk(message.id, approve, opts.note, opts.grantMinutes);
+      void queryClient.invalidateQueries({ queryKey: aiThreadQueryKey(message.threadId) });
+      void queryClient.invalidateQueries({ queryKey: aiAsksQueryKey });
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Couldn't send your decision", "error");
+      setBusy(false);
+    }
+  };
+  return { busy, decide };
+}
+
+function RejectWithNote({ busy, label, onBack, onReject }: { busy: boolean; label: string; onBack: () => void; onReject: (note: string) => void }) {
+  const [note, setNote] = useState("");
+  return (
+    <div className="ask-reject">
+      <textarea className="ask-input ask-textarea" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why? (optional)" maxLength={1000} autoFocus />
+      <div className="ask-buttons">
+        <button type="button" className="ask-secondary" onClick={onBack} disabled={busy}>
+          Back
+        </button>
+        <button type="button" className="ask-danger" onClick={() => onReject(note.trim())} disabled={busy}>
+          {label}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const minutesLabel = (m: number) => (m < 60 ? `${m} min` : `${m / 60} h`);
+
+function BuilderRequestAsk({ message }: { message: AiMessage }) {
+  const nav = useChatNavigation();
+  const { busy, decide } = useDecision(message);
+  const [declining, setDeclining] = useState(false);
+  const [minutes, setMinutes] = useState<number>(60);
+  const parsed = builderRequestPayloadSchema.safeParse(message.payload);
+  if (!parsed.success) return <p className="chat-notice">This request couldn't be shown.</p>;
+  const payload = parsed.data;
+  const state = message.askState;
+  const until = payload.grantedUntil ? new Date(payload.grantedUntil) : null;
+  const status =
+    state === "approved" && until
+      ? until > new Date()
+        ? `Granted until ${until.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`
+        : "Grant ended"
+      : state === "rejected"
+        ? "Declined"
+        : state === "expired"
+          ? "Expired"
+          : state === "withdrawn"
+            ? "Withdrawn"
+            : null;
+
+  return (
+    <CardShell message={message} title={payload.title} status={status}>
+      <ChatMarkdown text={message.text} className="ask-body" {...nav} />
+      {payload.scope ? <p className="ask-meta-line">Scope: {payload.scope}</p> : null}
+      {state === "rejected" && payload.note ? <p className="ask-note">“{payload.note}”</p> : null}
+      {state === "open" ? (
+        declining ? (
+          <RejectWithNote busy={busy} label="Decline" onBack={() => setDeclining(false)} onReject={(note) => void decide(false, { note: note || undefined })} />
+        ) : (
+          <>
+            <p className="ask-actions-label">Let the AI draft type changes in this chat for</p>
+            <div className="ask-chips" role="radiogroup" aria-label="Grant length">
+              {BUILDER_GRANT_MINUTES.map((m) => (
+                <button key={m} type="button" role="radio" aria-checked={minutes === m} className={`ask-chip${minutes === m ? " selected" : ""}`} onClick={() => setMinutes(m)} disabled={busy}>
+                  {minutesLabel(m)}
+                </button>
+              ))}
+            </div>
+            <p className="ask-meta-line">Nothing is published without your approval of each change.</p>
+            <div className="ask-buttons">
+              <button type="button" className="ask-secondary" onClick={() => setDeclining(true)} disabled={busy}>
+                Decline
+              </button>
+              <button type="button" className="ask-submit" onClick={() => void decide(true, { grantMinutes: minutes })} disabled={busy}>
+                {busy ? "Granting —" : "Grant"}
+              </button>
+            </div>
+          </>
+        )
+      ) : null}
+    </CardShell>
+  );
+}
+
+function TypePublishAsk({ message }: { message: AiMessage }) {
+  const nav = useChatNavigation();
+  const { busy, decide } = useDecision(message);
+  const [rejecting, setRejecting] = useState(false);
+  const parsed = typePublishPayloadSchema.safeParse(message.payload);
+  if (!parsed.success) return <p className="chat-notice">This change couldn't be shown.</p>;
+  const payload = parsed.data;
+  const state = message.askState;
+  const status =
+    state === "executed"
+      ? `Published · v${payload.publishedVersion}`
+      : state === "failed"
+        ? "Failed"
+        : state === "approved"
+          ? "Publishing —"
+          : state === "rejected"
+            ? "Rejected"
+            : state === "expired"
+              ? "Expired"
+              : state === "withdrawn"
+                ? "Withdrawn"
+                : null;
+  const what = payload.isNew ? `New type · ${payload.typeLabel}` : payload.rollbackTo ? `${payload.typeLabel} · back to v${payload.rollbackTo}` : payload.typeLabel;
+
+  return (
+    <CardShell message={message} title={payload.title} status={status}>
+      <ChatMarkdown text={message.text} className="ask-body" {...nav} />
+      <p className="ask-actions-label">{what}</p>
+      <ul className="type-changes">
+        {payload.changes.map((c, i) => (
+          <li key={i}>{c.text}</li>
+        ))}
+      </ul>
+      {payload.warnings.length ? (
+        <ul className="type-warnings">
+          {payload.warnings.map((w, i) => (
+            <li key={i}>
+              {w.label} · {w.count} {w.count === 1 ? "record" : "records"}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {payload.rebuild ? <p className="ask-meta-line">Rebuilds the table; a backup is taken first.</p> : null}
+      {state === "failed" && payload.error ? <p className="ask-note ask-note--error">{payload.error}</p> : null}
+      {state === "rejected" && payload.note ? <p className="ask-note">“{payload.note}”</p> : null}
+      {state === "open" ? (
+        rejecting ? (
+          <RejectWithNote busy={busy} label="Reject" onBack={() => setRejecting(false)} onReject={(note) => void decide(false, { note: note || undefined })} />
+        ) : (
+          <div className="ask-buttons">
+            <button type="button" className="ask-secondary" onClick={() => setRejecting(true)} disabled={busy}>
+              Reject
+            </button>
+            <button type="button" className="ask-submit" onClick={() => void decide(true)} disabled={busy}>
+              {busy ? "Publishing —" : "Publish"}
+            </button>
+          </div>
+        )
+      ) : null}
+    </CardShell>
+  );
+}
+
 export function AskCard({ message }: { message: AiMessage }) {
   if (message.kind === "question") return <QuestionAsk message={message} />;
   if (message.kind === "proposal") return <ProposalAsk message={message} />;
+  if (message.kind === "builder_request") return <BuilderRequestAsk message={message} />;
+  if (message.kind === "type_publish") return <TypePublishAsk message={message} />;
   return <MessageAsk message={message} />;
 }

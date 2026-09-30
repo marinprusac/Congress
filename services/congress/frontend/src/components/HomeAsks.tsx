@@ -7,7 +7,7 @@ import { useChatNavigation } from "@/chat/chatNav";
 import { listStamp } from "@/chat/chatFormat";
 import "@/chat/asks.css";
 
-const KIND_LABEL = { message: "Message", question: "Question", proposal: "Proposal" } as const;
+const KIND_LABEL = { message: "Message", question: "Question", proposal: "Proposal", builder_request: "Builder mode", type_publish: "Type change" } as const;
 
 function HomeAsk({ ask }: { ask: OpenAsk }) {
   const nav = useChatNavigation();
@@ -28,7 +28,7 @@ function HomeAsk({ ask }: { ask: OpenAsk }) {
           <OneTapAnswer messageId={ask.messageId} threadId={ask.threadId} field={oneTap} />
         ) : (
           <StackLink to={href} className="ask-submit home-ask-open">
-            {ask.kind === "question" ? "Answer" : ask.kind === "proposal" ? "Review" : "Open"}
+            {ask.kind === "question" ? "Answer" : ask.kind === "builder_request" ? "Decide" : ask.kind === "message" ? "Open" : "Review"}
           </StackLink>
         )}
         {ask.kind === "message" ? (

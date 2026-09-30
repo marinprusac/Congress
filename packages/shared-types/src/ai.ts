@@ -11,8 +11,19 @@ export const aiMessageRoleSchema = z.enum(["user", "assistant", "system"]);
 export type AiMessageRole = z.infer<typeof aiMessageRoleSchema>;
 
 // text: plain chat turn. message/question/proposal: AI-authored asks.
+// builder_request/type_publish: builder mode's asks (grant, then each publish).
 // answer/decision: the owner's reply to a question/proposal. notice: system.
-export const aiMessageKindSchema = z.enum(["text", "message", "question", "proposal", "answer", "decision", "notice"]);
+export const aiMessageKindSchema = z.enum([
+  "text",
+  "message",
+  "question",
+  "proposal",
+  "builder_request",
+  "type_publish",
+  "answer",
+  "decision",
+  "notice",
+]);
 export type AiMessageKind = z.infer<typeof aiMessageKindSchema>;
 
 export const aiMessageStatusSchema = z.enum(["ok", "error", "refused", "cancelled"]);
@@ -77,6 +88,8 @@ export const aiThreadSchema = z.object({
   archived: z.boolean(),
   unread: z.boolean(),
   openAskCount: z.number().int(),
+  // Active builder-mode grant: the AI may draft type changes until then.
+  builderUntil: z.string().nullable(),
   pendingRunId: z.string().nullable(),
   snippet: z.string().nullable(),
   lastMessageAt: z.string(),

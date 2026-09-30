@@ -9,6 +9,7 @@ import {
   aiThreadsQueryKey,
   cancelAiRun,
   createAiThread,
+  endBuilderMode,
   markAiThreadRead,
   postAiThreadMessage,
   retryAiThread,
@@ -27,6 +28,31 @@ const SUGGESTIONS = ["What's on my plate today?", "Summarise my week so far", "W
 
 function BackButton() {
   return <ChatBackButton />;
+}
+
+// While the owner's builder-mode grant lasts, with a way to end it early.
+function BuilderBanner({ thread }: { thread: AiThread }) {
+  const queryClient = useQueryClient();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  const end = useMutation({
+    mutationFn: () => endBuilderMode(thread.id),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: aiThreadQueryKey(thread.id) }),
+  });
+  const until = thread.builderUntil ? new Date(thread.builderUntil).getTime() : 0;
+  if (until <= now) return null;
+  const minutes = Math.max(1, Math.round((until - now) / 60_000));
+  return (
+    <div className="builder-banner" role="status">
+      <span>Builder mode · {minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`} left</span>
+      <button type="button" onClick={() => end.mutate()} disabled={end.isPending}>
+        End
+      </button>
+    </div>
+  );
 }
 
 function PausedBanner() {
@@ -219,6 +245,7 @@ function Conversation({ threadId }: { threadId: number }) {
         {thread.data ? <ThreadActions thread={thread.data} onDeleted={chat.back} /> : null}
       </header>
       <PausedBanner />
+      {thread.data ? <BuilderBanner thread={thread.data} /> : null}
       <div className="chat-scroll" ref={scrollRef}>
         <div className="chat-log" ref={contentRef}>
           <div ref={topRef} className="chat-top-sentinel" />

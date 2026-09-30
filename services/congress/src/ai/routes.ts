@@ -20,7 +20,7 @@ import { createThread, postMessage, retryLast, ThreadBusyError, ThreadNotFoundEr
 import { cancelJob, enqueue, onQueueChange, PRIORITY, queueSnapshot } from "./jobQueue.js";
 import { runAi } from "./engine.js";
 import { broadcast, onStreamEvent, replayEvents } from "./runStream.js";
-import { deleteThreadRow, getThread, getThreadRow, listThreadMessages, listThreads, markThreadRead, updateThreadRow } from "./threads.js";
+import { deleteThreadRow, getMessage, getThread, getThreadRow, listThreadMessages, listThreads, markThreadRead, updateThreadRow } from "./threads.js";
 import { AUTONOMOUS_KINDS, getRunDetail, listRecentRuns, spendSince } from "./runs.js";
 import { startOfLocalDay } from "./pushPolicy.js";
 import { addFact, deleteFact, deleteTracking, getTracking, listFacts, listTracking, updateFact, updateTracking } from "./memory.js";
@@ -34,6 +34,7 @@ import {
   decideProposal,
   listOpenAsks,
 } from "./asks.js";
+import { decideBuilderRequest, decidePublish, endGrant } from "./builder.js";
 
 // Mounted at /congress/ai (server.ts), ahead of the /api/:chamber/*
 // wildcard. Session-gated throughout.
@@ -147,6 +148,12 @@ aiRoutes.post("/threads/:id/retry", requireSession, (c) => {
   }
 });
 
+aiRoutes.post("/threads/:id/builder/end", requireSession, (c) => {
+  const id = threadId(c.req.param("id"));
+  if (!id) return c.json({ error: "not_found" }, 404);
+  return c.json({ ended: endGrant(id) });
+});
+
 // ---- Asks (the owner's side) ----
 
 function askErrorResponse(err: unknown) {
@@ -173,7 +180,12 @@ aiRoutes.post("/messages/:id/decide", requireSession, async (c) => {
   const parsed = decideAskRequestSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   try {
-    return c.json(decideProposal(Number(c.req.param("id")), parsed.data.approve, parsed.data.note || undefined));
+    const id = Number(c.req.param("id"));
+    const { approve, note, grantMinutes } = parsed.data;
+    const kind = getMessage(id)?.kind;
+    if (kind === "builder_request") return c.json(decideBuilderRequest(id, approve, { note: note || undefined, grantMinutes }));
+    if (kind === "type_publish") return c.json(decidePublish(id, approve, note || undefined));
+    return c.json(decideProposal(id, approve, note || undefined));
   } catch (err) {
     const { body, status } = askErrorResponse(err);
     return c.json(body, status);

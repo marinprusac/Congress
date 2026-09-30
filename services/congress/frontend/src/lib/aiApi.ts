@@ -105,8 +105,13 @@ export async function answerAsk(messageId: number, values: Record<string, unknow
   throw new AskAnswerError(body?.message ?? `Couldn't send the answer (${res.status})`, body?.fieldErrors ?? {});
 }
 
-export async function decideAsk(messageId: number, approve: boolean, note?: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/messages/${messageId}/decide`, sendJson("POST", { approve, note }));
+export async function decideAsk(messageId: number, approve: boolean, note?: string, grantMinutes?: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/messages/${messageId}/decide`, sendJson("POST", { approve, note, grantMinutes }));
+  if (!res.ok) await jsonOrError(res);
+}
+
+export async function endBuilderMode(threadId: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/threads/${threadId}/builder/end`, sendJson("POST", {}));
   if (!res.ok) await jsonOrError(res);
 }
 
