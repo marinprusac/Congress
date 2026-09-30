@@ -103,6 +103,12 @@ export function App() {
         />
         <Route path="/mail/settings" element={<Navigate to="/settings?from=accounts" replace />} />
         <Route path="/mail/*" element={<Navigate to="/" replace />} />
+        <Route path="/fitness/workouts/:id" element={<LegacyRedirect chamber="fitness" idPrefix="workout-" noun="workout" />} />
+        <Route path="/fitness/routines/new" element={<Navigate to="/e/new/routine" replace />} />
+        <Route path="/fitness/routines/:id" element={<LegacyRedirect chamber="fitness" idPrefix="routine-" noun="routine" />} />
+        <Route path="/fitness/metrics" element={<Navigate to="/fitness/health" replace />} />
+        <Route path="/fitness/settings" element={<Navigate to="/settings?from=accounts" replace />} />
+        <Route path="/fitness/*" element={<Navigate to="/" replace />} />
         {/* Old URLs of Chambers folded into Congress - bookmarks and the
             installed PWA's saved URL land here. */}
         <Route path="/capitol/*" element={<Navigate to="/" replace />} />

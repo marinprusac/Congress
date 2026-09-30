@@ -41,6 +41,8 @@ export const WORKOUT: Premade = {
       // Hidden, bound and silent until the Fitness Chamber's cutover (phase 7b).
       { op: "set_type_meta", hidden: true },
     ],
+    // Cutover: in use.
+    [{ op: "set_type_meta", hidden: false }],
   ],
 };
 
@@ -73,5 +75,6 @@ export const ROUTINE: Premade = {
       },
       { op: "set_type_meta", hidden: true },
     ],
+    [{ op: "set_type_meta", hidden: false }],
   ],
 };

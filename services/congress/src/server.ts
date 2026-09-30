@@ -35,7 +35,7 @@ import { parseRunContext, withRunContext } from "./ai/runContext.js";
 import { aiRoutes } from "./ai/routes.js";
 import { getFeed } from "./feed.js";
 import { googleConnectorRoutes } from "./connectors/google/routes.js";
-import { connectorRoutes } from "./connectors/routes.js";
+import { callHook, connectorRoutes } from "./connectors/routes.js";
 import { typeRoutes } from "./typeEngine/routes.js";
 import { registerTypeTools } from "./typeEngine/mcpTools.js";
 import { registerBuilderTools } from "./mcp/builderTools.js";
@@ -209,10 +209,9 @@ app.delete("/congress/exhibits/:id/connections/:otherExhibitId", requireSession,
   return c.json(result);
 });
 
-// Called by an iOS Shortcuts automation, which can't present a session
-// cookie - chamber-fitness checks its own ingest secret instead. Registered
-// ahead of the "/api/:chamber/*" wildcard below.
-app.post("/api/fitness/health/ingest", (c) => dispatchToChamber(c, "fitness", "/health/ingest", "system"));
+// The owner's Health Auto Export Shortcut still posts here (the retired
+// Fitness Chamber's URL): the health connector's webhook checks its token.
+app.post("/api/fitness/health/ingest", (c) => callHook("health", "/ingest", c.req.raw));
 
 app.all("/api/:chamber/*", requireSession, forwardToChamber);
 

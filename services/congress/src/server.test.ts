@@ -9,6 +9,9 @@ import { runMigrations } from "./db/client.js";
 import { loadChamber } from "./chambers/loader.js";
 import { detachChamber } from "./registry.js";
 import { app } from "./server.js";
+import { startConnectors, stopConnectors } from "./connectors/registry.js";
+import { healthConnector } from "./connectors/health/index.js";
+import { updateHealthSettings } from "./connectors/health/store.js";
 
 const internal = { "X-Congress-Internal-Token": TEST_INTERNAL_TOKEN };
 const json = { "Content-Type": "application/json" };
@@ -200,33 +203,24 @@ describe("chamber paths", () => {
 });
 
 describe("POST /api/fitness/health/ingest", () => {
-  // The one deliberate exception to "every /api/:chamber/* request needs a
-  // session" - an iOS Shortcuts automation can't present a session cookie.
-  // The secret check happens entirely inside chamber-fitness's own handler.
-  it("404s if chamber-fitness isn't loaded", async () => {
+  // The one deliberate exception to "every /api/* request needs a session":
+  // the owner's Shortcut can't present one. The health connector's webhook
+  // checks its own token.
+  it("404s if the health connector isn't running", async () => {
     const res = await app.request("/api/fitness/health/ingest", { method: "POST", headers: json, body: "{}" }, bindings());
     expect(res.status).toBe(404);
   });
 
-  it("dispatches with no session required, passing the caller's token header through unmodified", async () => {
-    await loadChamber(
-      makeFakeChamberModule("fitness", {
-        configure: (c) =>
-          c.post("/api/health/ingest", async (ctx) =>
-            ctx.json({ receivedToken: ctx.req.header("x-health-ingest-token") ?? null, actor: ctx.req.header("x-congress-actor") ?? null, body: await ctx.req.json() })
-          ),
-      }),
-      { envFor: () => ({}) }
-    );
-
-    const res = await app.request(
-      "/api/fitness/health/ingest",
-      { method: "POST", headers: { ...json, "X-Health-Ingest-Token": "owner-secret" }, body: JSON.stringify({ samples: [] }) },
-      bindings()
-    );
-
+  it("reaches the health connector's webhook with no session, which checks the token", async () => {
+    await startConnectors([healthConnector]);
+    updateHealthSettings({ ingestToken: "owner-secret" });
+    const post = (token: string) =>
+      app.request("/api/fitness/health/ingest", { method: "POST", headers: { ...json, "X-Health-Ingest-Token": token }, body: JSON.stringify({ metrics: [] }) }, bindings());
+    expect((await post("wrong")).status).toBe(401);
+    const res = await post("owner-secret");
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ receivedToken: "owner-secret", actor: "system", body: { samples: [] } });
+    await expect(res.json()).resolves.toEqual({ accepted: 0, duplicated: 0, skipped: 0 });
+    await stopConnectors();
   });
 });
 

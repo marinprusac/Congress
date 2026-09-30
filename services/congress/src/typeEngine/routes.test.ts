@@ -42,7 +42,7 @@ describe("type routes", () => {
       ],
     });
     const slugs = async (path: string) => ((await (await call(path)).json()) as { definition: { slug: string } }[]).map((t) => t.definition.slug);
-    expect(await slugs("/congress/types")).toEqual(["note", "task", "document", "person", "event", "email"]);
+    expect(await slugs("/congress/types")).toEqual(["note", "task", "document", "person", "event", "email", "workout", "routine"]);
     expect(await slugs("/congress/types?all=1")).toEqual(["note", "task", "document", "person", "event", "email", "workout", "routine", "secret"]);
   });
 

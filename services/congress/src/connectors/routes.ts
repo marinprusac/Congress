@@ -17,17 +17,29 @@ function forward(c: { req: { url: string; raw: Request } }, name: string, marker
   return app.fetch(new Request(new URL(rest + url.search, "http://connector"), c.req.raw));
 }
 
-// No session: a device (e.g. an iOS Shortcut) calls these; the connector checks its own secret.
-connectorRoutes.all("/:name/hook/*", async (c) => {
-  const name = c.req.param("name");
+function hooksOf(name: string): Hono | null {
   const running = runningConnector(name);
-  if (!running?.connector.hooks) return c.json({ error: "unknown connector" }, 404);
+  if (!running?.connector.hooks) return null;
   let hooks = hookApps.get(name);
   if (!hooks) {
     hooks = running.connector.hooks(running.ctx);
     hookApps.set(name, hooks);
   }
-  return forward(c, name, "/hook", hooks);
+  return hooks;
+}
+
+// A connector webhook reached by another URL (a device configured before the connector existed).
+export async function callHook(name: string, path: string, req: Request): Promise<Response> {
+  const hooks = hooksOf(name);
+  if (!hooks) return Response.json({ error: "unknown connector" }, { status: 404 });
+  return hooks.fetch(new Request(new URL(path, "http://connector"), req));
+}
+
+// No session: a device (e.g. an iOS Shortcut) calls these; the connector checks its own secret.
+connectorRoutes.all("/:name/hook/*", async (c) => {
+  const name = c.req.param("name");
+  const hooks = hooksOf(name);
+  return hooks ? forward(c, name, "/hook", hooks) : c.json({ error: "unknown connector" }, 404);
 });
 
 connectorRoutes.get("/:name/series/:kind", requireSession, (c) => {
