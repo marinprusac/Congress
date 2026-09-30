@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ManifestView } from "@congress/shared-types";
 import { HealthCard } from "@/views/health/HealthViews";
+import { TodayMapWidget } from "@/views/map/TodayMapWidget";
 import { fetchRegistry } from "@congress/congress-ui";
 import { fetchTypes, TYPES_KEY } from "@/lib/recordsApi";
 
@@ -30,6 +31,15 @@ const CORE_VIEWS: (ViewSource & { type: string })[] = [
     displayName: "Fitness",
     type: "workout",
     views: [{ id: "health", label: "Health", fullPath: "/health", card: true, Card: HealthCard }],
+  },
+  {
+    name: "map",
+    displayName: "Map",
+    type: "place",
+    views: [
+      { id: "today-map", label: "Today", fullPath: "/", card: true, Card: TodayMapWidget },
+      { id: "pending", label: "Visits to classify", fullPath: "/pending" },
+    ],
   },
 ];
 

@@ -34,9 +34,9 @@ afterAll(async () => {
 });
 
 describe("every Chamber in one process", () => {
-  it("starts all five", () => {
+  it("starts the one left", () => {
     const active = listChambers().filter((c) => c.status === "active").map((c) => c.name);
-    expect(active.sort()).toEqual(["map", "whatsapp"]);
+    expect(active).toEqual(["whatsapp"]);
   });
 
   it("keeps WhatsApp out of Search and the feed", async () => {
@@ -44,9 +44,4 @@ describe("every Chamber in one process", () => {
     expect((await chamberFetch("whatsapp", "/feed")).status).toBe(404);
   });
 
-  it.each(["map"])("serves %s's exhibit search in-process", async (name) => {
-    const res = await chamberFetch(name, "/exhibits/search?q=");
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toMatchObject({ results: expect.any(Array) });
-  });
 });

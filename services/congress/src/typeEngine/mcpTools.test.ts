@@ -36,7 +36,7 @@ describe("the types MCP server", () => {
 
   const toolsFor = (slug: string) => [`create_${slug}`, `delete_${slug}`, `get_${slug}`, `list_${slug}s`, `search_${slug}s`, `update_${slug}`];
   const PREMADE_TOOLS = [
-    ...["note", "task", "document", "person", "event"].flatMap(toolsFor),
+    ...["note", "task", "document", "person", "event", "place"].flatMap(toolsFor),
     "find_or_create_person",
     // Event's Google Calendar binding: destinations and invitation answers.
     "list_event_destinations",

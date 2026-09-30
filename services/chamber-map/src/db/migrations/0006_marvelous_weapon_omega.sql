@@ -1,1 +1,0 @@
-ALTER TABLE `places` DROP COLUMN `category`;

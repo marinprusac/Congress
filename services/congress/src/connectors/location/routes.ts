@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { classifyVisit, getVisitActiveAt, listTrips, listVisits } from "./visits.js";
+import { classifyVisit, getVisit, getVisitActiveAt, listTrips, listVisits } from "./visits.js";
 import { listPlaces } from "./places.js";
 import { getPollState, toPollHealth } from "./pollState.js";
 import { reprocessRange } from "./reprocess.js";
@@ -31,6 +31,11 @@ export function locationRoutes(): Hono {
     const at = date(c.req.query("at"));
     if (!at) return c.json({ error: "invalid_request" }, 400);
     return c.json(await getVisitActiveAt(at));
+  });
+
+  app.get("/visits/:id", async (c) => {
+    const visit = await getVisit(Number(c.req.param("id")));
+    return visit ? c.json(visit) : c.json({ error: "not_found" }, 404);
   });
 
   // A visit a rebuild already replaced (e.g. after its new Place was made) is simply done.

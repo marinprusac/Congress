@@ -20,6 +20,8 @@ import { LegacyRedirect } from "@/records/LegacyRedirect";
 import { TimelinePage, WeekPage } from "@/views/calendar/CalendarViews";
 import { HealthPage } from "@/views/health/HealthViews";
 import { NewRoutinePage } from "@/views/fitness/NewRoutinePage";
+import { MapPage } from "@/views/map/MapPage";
+import { PendingVisitsPage } from "@/views/map/PendingVisitsPage";
 
 // Page transitions wait for a Chamber's bundle so they animate the real page.
 setRoutePreloader((path) => {
@@ -70,6 +72,13 @@ export function App() {
         {/* Fitness: Apple Health, and a new Hevy routine (it needs exercises before it exists). */}
         <Route path="/fitness/health" element={<HealthPage />} />
         <Route path="/e/new/routine" element={<NewRoutinePage />} />
+        {/* The Map: the day's places and trips, and stops to classify (location connector). */}
+        <Route path="/map" element={<MapPage />} />
+        <Route path="/map/pending" element={<PendingVisitsPage />} />
+        <Route path="/map/p/:id" element={<LegacyRedirect chamber="map" idPrefix="place-" noun="place" />} />
+        <Route path="/map/places/new" element={<Navigate to="/e/new/place" replace />} />
+        <Route path="/map/settings" element={<Navigate to="/settings?from=accounts" replace />} />
+        <Route path="/map/*" element={<Navigate to="/map" replace />} />
         {/* Every runtime exhibit type's records (typeEngine). */}
         <Route path="/e/new/:type" element={<RecordPage />} />
         <Route path="/e/:id" element={<RecordPage />} />
