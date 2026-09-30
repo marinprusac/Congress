@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import type { FieldDefinition, RecordDto, TimeTrigger, TypeDefinition } from "@congress/shared-types";
 import { exhibitsDb, exhibitsSqlite } from "./db/client.js";
-import { recordTriggerState } from "./db/schema.js";
+import { imports, recordTriggerState } from "./db/schema.js";
 import { listTypes, onTypesChanged, type StoredType } from "./store.js";
 import { quoteIdent } from "./ddl.js";
 import { andClauses } from "./feedRules.js";
@@ -61,6 +61,19 @@ function ladderRows(def: TypeDefinition, trigger: TimeTrigger, extra: string, ex
     .all(...conds.params, ...extraParams) as Row[];
 }
 
+// Pure: a "before" step (e.g. starting soon) whose moment has already come
+// isn't news any more - reached late, it's recorded without announcing.
+export function isStale(step: Step, instant: number, now: number): boolean {
+  return step.offsetMinutes < 0 && instant <= now;
+}
+
+function staleStep(def: TypeDefinition, trigger: TimeTrigger, row: Row | undefined, step: Step | null, now: number, zone: string): boolean {
+  const f = ladderField(def, trigger);
+  if (!f || !row || !step) return false;
+  const instant = instantOf(f, row[f.column] ?? null, trigger.anchor, zone);
+  return instant !== null && isStale(step, instant, now);
+}
+
 function currentStep(def: TypeDefinition, trigger: TimeTrigger, row: Row | undefined, now: number, zone: string): Step | null {
   const f = ladderField(def, trigger);
   if (!f || !row) return null;
@@ -95,18 +108,39 @@ function transition(t: StoredType, trigger: TimeTrigger, id: string, title: stri
   }
 }
 
+// A ladder new to the engine (just published) first records where every
+// record stands without announcing it: steps reached in the past aren't news.
+const ladderKey = (t: StoredType, trigger: TimeTrigger) => `ladder:${t.id}:${trigger.field}`;
+
+function markLadderKnown(t: StoredType, trigger: TimeTrigger): void {
+  exhibitsDb.insert(imports).values({ key: ladderKey(t, trigger), ranAt: new Date(), statsJson: "{}" }).onConflictDoNothing().run();
+}
+
+function ladderKnown(t: StoredType, trigger: TimeTrigger): boolean {
+  if (exhibitsDb.select().from(imports).where(eq(imports.key, ladderKey(t, trigger))).get()) return true;
+  // A ladder that fired before this marker existed counts as known.
+  const fired = exhibitsDb
+    .select()
+    .from(recordTriggerState)
+    .where(and(eq(recordTriggerState.typeId, t.id), eq(recordTriggerState.ladder, trigger.field)))
+    .get();
+  if (fired) markLadderKnown(t, trigger);
+  return Boolean(fired);
+}
+
 // One record, right after a write (or its delete).
 export function evaluateRecord(t: StoredType, id: string, deleted?: RecordDto, now = Date.now(), silent = false): void {
   const def = t.definition;
   const zone = ownerZone();
   for (const trigger of def.timeTriggers) {
+    const quiet = silent || !ladderKnown(t, trigger);
     const prev = storedStates(t.id, trigger.field, id).get(id);
     const row = deleted ? undefined : ladderRows(def, trigger, `"id" = ?`, [id])[0];
     const cur = currentStep(def, trigger, row, now, zone);
     if (!cur && prev === undefined) continue;
     const titleRow = row ?? (deleted ? undefined : (exhibitsSqlite.prepare(`SELECT * FROM ${quoteIdent(def.tableName)} WHERE "id" = ?`).get(id) as Row | undefined));
     const title = deleted ? titleFromDto(def, deleted) : titleRow ? titleOf(def, titleRow) : "";
-    transition(t, trigger, id, title, cur, prev, now, silent);
+    transition(t, trigger, id, title, cur, prev, now, quiet || staleStep(def, trigger, row, cur, now, zone));
   }
 }
 
@@ -130,6 +164,7 @@ export function evaluateAll(now = Date.now()): void {
     for (const trigger of def.timeTriggers) {
       const f = ladderField(def, trigger);
       if (!f) continue;
+      const known = ladderKnown(t, trigger);
       const rows = ladderRows(def, trigger, `${quoteIdent(f.column)} <= ?`, [reachedBound(f, trigger, now, zone)]);
       const stored = storedStates(t.id, trigger.field);
       const seen = new Set<string>();
@@ -137,8 +172,9 @@ export function evaluateAll(now = Date.now()): void {
         const id = String(row.id);
         seen.add(id);
         const cur = currentStep(def, trigger, row, now, zone);
-        transition(t, trigger, id, titleOf(def, row), cur, stored.get(id), now);
+        transition(t, trigger, id, titleOf(def, row), cur, stored.get(id), now, !known || staleStep(def, trigger, row, cur, now, zone));
       }
+      if (!known) markLadderKnown(t, trigger);
       // Stored states whose record no longer qualifies fall out of the ladder.
       for (const [id, prev] of stored) {
         if (seen.has(id)) continue;

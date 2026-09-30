@@ -276,7 +276,7 @@ export function relatedRecords(id: string): RelatedGroup[] | null {
       : [`${quoteIdent(f.column)} = ?`, id];
     const total = Number((exhibitsSqlite.prepare(`SELECT count(*) AS n FROM ${table} WHERE ${where}`).get(from) as { n: number }).n);
     if (total === 0) continue;
-    const rows = exhibitsSqlite.prepare(`SELECT * FROM ${table} WHERE ${where} ORDER BY "updated_at" DESC LIMIT ?`).all(from, RELATED_LIMIT) as Row[];
+    const rows = exhibitsSqlite.prepare(`SELECT * FROM ${table} WHERE ${where} ORDER BY "updated_at" DESC, "id" DESC LIMIT ?`).all(from, RELATED_LIMIT) as Row[];
     groups.push({
       type: def.slug,
       typeLabel: def.pluralLabel,

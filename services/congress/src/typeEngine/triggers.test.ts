@@ -133,6 +133,38 @@ describe("time-trigger ladders", () => {
     expect(getRecord(imported)?.values.title).toBe("Imported");
   });
 
+  it("doesn't announce past steps when a ladder is added to records that exist", async () => {
+    const t = getTypeBySlug("chore")!;
+    const late = createRecord("chore", { title: "Long overdue", due: "2026-08-01" }).id;
+    const soon = createRecord("chore", { title: "Tomorrow", due: "2026-10-02" }).id;
+    // Done two hours before the ladder exists: its step is already in the past.
+    const finished = createRecord("chore", { title: "Finished", done: true }).id;
+    await vi.advanceTimersByTimeAsync(2 * 3_600_000);
+    events.length = 0;
+    publish({
+      typeId: t.id,
+      actor: "test",
+      ops: [
+        {
+          op: "set_time_triggers",
+          triggers: [
+            ...t.definition.timeTriggers,
+            { field: "done_at", steps: [{ event: "done_long_ago", label: "Done a while ago", offsetMinutes: 60 }] },
+          ],
+        },
+      ],
+    });
+    expect(seen()).toEqual([]);
+    updateRecord(late, { done: true });
+    expect(seen()).toEqual(["chore.updated:Long overdue", "chore.done:Long overdue", "chore.cleared:Long overdue"]);
+    events.length = 0;
+    // Its done_at is now: the new ladder is known, so an hour later it fires.
+    await vi.advanceTimersByTimeAsync(61 * 60_000);
+    expect(seen()).toEqual(["chore.done_long_ago:Long overdue"]);
+    deleteRecord(soon);
+    deleteRecord(finished);
+  });
+
   it("wakes at most every MAX_TIMEOUT_MS for far-off dates", async () => {
     updateRecord(rent, { due: "2027-06-01" });
     events.length = 0;

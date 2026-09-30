@@ -35,7 +35,15 @@ describe("the types MCP server", () => {
   });
 
   const toolsFor = (slug: string) => [`create_${slug}`, `delete_${slug}`, `get_${slug}`, `list_${slug}s`, `search_${slug}s`, `update_${slug}`];
-  const PREMADE_TOOLS = [...["note", "task", "document", "person"].flatMap(toolsFor), "find_or_create_person"];
+  const PREMADE_TOOLS = [
+    ...["note", "task", "document", "person", "event"].flatMap(toolsFor),
+    "find_or_create_person",
+    // Event's Google Calendar binding: destinations and invitation answers.
+    "list_event_destinations",
+    "accept_event",
+    "maybe_event",
+    "decline_event",
+  ];
 
   it("offers the premade types' tools, none for hidden types", async () => {
     publish({

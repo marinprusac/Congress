@@ -55,6 +55,7 @@ const envSchema = z.object({
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
   GOOGLE_OAUTH_REDIRECT_URI: z.string().optional(),
+  // Where the credentials lived first; the retired Calendar Chamber's .env stays on the server.
   GOOGLE_OAUTH_FALLBACK_ENV_PATH: z.string().default("../chamber-calendar/.env"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });

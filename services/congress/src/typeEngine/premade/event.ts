@@ -92,5 +92,19 @@ export const EVENT: Premade = {
       // Hidden, bound and silent until the Calendar Chamber's cutover (phase 6 step 4).
       { op: "set_type_meta", hidden: true },
     ],
+    // Cutover: in use, and "starting soon" moves here from the Chamber's timer.
+    [
+      {
+        op: "set_time_triggers",
+        triggers: [
+          {
+            field: "start",
+            and: [{ field: "all_day", value: false }, { field: "hidden", value: false }],
+            steps: [{ event: "starting_soon", label: "Event starting soon", offsetMinutes: -30 }],
+          },
+        ],
+      },
+      { op: "set_type_meta", hidden: false },
+    ],
   ],
 };
