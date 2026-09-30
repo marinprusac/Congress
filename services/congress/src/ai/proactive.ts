@@ -92,7 +92,7 @@ export async function buildDigest(since: number, zone: string): Promise<{ text: 
   const events = eventsSince(since);
   const items = listTracking(["active"]);
   const asks = (await listAsksForAi()).asks.filter((a) => a.state === "open" || a.state === "scheduled");
-  const feed = await getFeed({ timeoutMs: 1500 }).catch(() => []);
+  const feed = await getFeed().catch(() => []);
   const upcoming = feed
     .filter((f) => f.kind === "exhibit")
     .slice(0, 10)

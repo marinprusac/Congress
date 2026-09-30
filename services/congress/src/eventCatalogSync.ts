@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import { CONGRESS_SYNTHETIC_EVENTS } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { eventSettings } from "./db/schema.js";
-import { listChambers } from "./registry.js";
 import { typeEventCatalog } from "./typeEngine/source.js";
 import { getLocalSource } from "./exhibitSources.js";
 import { listConnectors } from "./connectors/runtime.js";
@@ -17,8 +16,6 @@ import { listConnectors } from "./connectors/runtime.js";
 // owner's own configured toggles/thresholds, and never deletes a row for an
 // event type that's temporarily missing (e.g. that Chamber is offline).
 export function syncEventCatalog(): void {
-  const registry = listChambers();
-
   const knownTypes = new Set(db.select({ eventType: eventSettings.eventType }).from(eventSettings).all().map((row) => row.eventType));
   const now = new Date();
 
@@ -30,7 +27,7 @@ export function syncEventCatalog(): void {
 
   const typeCatalog = getLocalSource("e") ? typeEventCatalog() : [];
   const connectorCatalog = listConnectors().flatMap((c) => (c.events?.length ? [{ name: c.name, events: c.events }] : []));
-  for (const chamber of [...registry, ...syntheticChambers, ...typeCatalog, ...connectorCatalog]) {
+  for (const chamber of [...syntheticChambers, ...typeCatalog, ...connectorCatalog]) {
     for (const event of chamber.events) {
       const payloadFieldsJson = event.payloadFields ? JSON.stringify(event.payloadFields) : null;
       if (knownTypes.has(event.type)) {

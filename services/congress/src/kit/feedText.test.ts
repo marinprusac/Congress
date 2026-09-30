@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closeness, formatDuration, plainTextPreview } from "./feed.js";
+import { closeness, formatDuration, plainTextPreview } from "./feedText.js";
 
 describe("plainTextPreview", () => {
   it("turns exhibit chips into their labels and drops markdown markers", () => {

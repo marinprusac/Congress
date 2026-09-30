@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { mcpTextResult } from "@congress/chamber-kit";
+import { mcpTextResult } from "../kit/mcp.js";
 import { askFieldSchema, proposedActionSchema } from "@congress/shared-types";
 import { currentRunContext } from "../ai/runContext.js";
 import { AskClosedError, AskInvalidError, AskNotFoundError, askQuestion, listAsksForAi, proposeActions, sendMessage, withdrawAsk } from "../ai/asks.js";

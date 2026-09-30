@@ -1,5 +1,5 @@
 import type { FeedCandidate, FeedPreview, FeedRule, TypeDefinition } from "@congress/shared-types";
-import { closeness, plainTextPreview } from "@congress/chamber-kit";
+import { closeness, plainTextPreview } from "../kit/feedText.js";
 import { quoteIdent } from "./ddl.js";
 import { decodeValue, encodeValue } from "./codec.js";
 import type { Stored } from "./casts.js";

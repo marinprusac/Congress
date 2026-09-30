@@ -6,11 +6,10 @@ import {
   GoogleConnectorUnavailableError,
   GoogleScopeMissingError,
   type LegacyGoogleAccount,
-} from "@congress/chamber-kit";
+} from "../../kit/googleErrors.js";
 import { db } from "../../db/client.js";
 import { googleAccounts } from "../../db/schema.js";
 import { publishEvent } from "../../events.js";
-import { listModules } from "../../chambers/runtime.js";
 import { listConnectors } from "../runtime.js";
 import { googleClientConfig } from "./config.js";
 import { refreshAccessToken, revokeToken, RevokedTokenError } from "./oauth.js";
@@ -40,15 +39,11 @@ function getRow(id: number): AccountRow | undefined {
   return db.select().from(googleAccounts).where(eq(googleAccounts.id, id)).get();
 }
 
-// Every loaded Chamber and started connector that declared googleScopes.
+// Every started connector that declared googleScopes.
 export function googleRequesters(): Array<{ chamber: string; displayName: string; scopes: string[] }> {
-  const chambers = listModules()
-    .filter((m) => (m.manifest.googleScopes ?? []).length > 0)
-    .map((m) => ({ chamber: m.manifest.name, displayName: m.manifest.displayName, scopes: m.manifest.googleScopes ?? [] }));
-  const connectors = listConnectors()
+  return listConnectors()
     .filter((c) => (c.googleScopes ?? []).length > 0)
     .map((c) => ({ chamber: c.name, displayName: c.label, scopes: c.googleScopes ?? [] }));
-  return [...chambers, ...connectors];
 }
 
 export function requestedScopes(): string[] {

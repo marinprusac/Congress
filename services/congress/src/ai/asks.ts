@@ -14,11 +14,10 @@ import {
   type ProposalResult,
   type ProposedAction,
 } from "@congress/shared-types";
-import { callChamberTool } from "@congress/chamber-kit";
+import { callChamberTool } from "../kit/mcp.js";
 import { db } from "../db/client.js";
 import { aiMessages, aiThreads } from "../db/schema.js";
 import { env } from "../env.js";
-import { getChamber } from "../registry.js";
 import { dismissNotificationByKey, pushNotification } from "../notifications.js";
 import { getAiSettings } from "./settings.js";
 import { decidePush, startOfLocalDay, type PushDecision } from "./pushPolicy.js";
@@ -168,8 +167,8 @@ export function askQuestion(
 // The server a proposed call targets must exist and speak MCP.
 function mcpUrlFor(server: string): string | null {
   if (server === "congress") return `${selfBaseUrl()}/mcp`;
-  const chamber = getChamber(server);
-  return chamber?.status === "active" && chamber.mcpUrl ? chamber.mcpUrl : null;
+  if (server === "types") return `${selfBaseUrl()}/mcp/types`;
+  return null;
 }
 
 export function normalizeToolName(server: string, tool: string): string {

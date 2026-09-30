@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Emits .br/.gz siblings for every compressible file under each service's
-// frontend/dist, so chamber-kit's mountStaticFrontend (serveStatic with
+// frontend/dist, so Congress's mountStaticFrontend (src/kit/static.ts) (serveStatic with
 // precompressed: true) can stream pre-compressed bytes instead of Caddy
 // re-running zstd/gzip over the same file on every single request. Run once
 // after all of a deploy's build:web/build:remote/build:vendor steps finish

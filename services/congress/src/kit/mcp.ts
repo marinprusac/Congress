@@ -7,7 +7,6 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { ACTOR_HEADER } from "@congress/shared-types";
-import { runWithActor } from "./actorContext.js";
 
 export function mcpTextResult(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
@@ -44,9 +43,7 @@ export function createMcpApp(name: string, registerTools: (server: McpServer) =>
       const body =
         c.req.method === "GET" || c.req.method === "HEAD" ? undefined : await c.req.json().catch(() => undefined);
 
-      // Tool callbacks run inside this call, so anything they publish is
-      // stamped with the caller's actor (Deputy sets it on its MCP config).
-      await runWithActor(c.req.header(ACTOR_HEADER), () => transport.handleRequest(c.env.incoming, c.env.outgoing, body));
+      await transport.handleRequest(c.env.incoming, c.env.outgoing, body);
 
       return RESPONSE_ALREADY_SENT;
     } catch (err) {

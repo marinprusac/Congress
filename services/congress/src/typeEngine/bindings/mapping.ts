@@ -1,4 +1,4 @@
-import { WIKILINK_PATTERN } from "@congress/chamber-kit";
+import { WIKILINK_PATTERN } from "../../kit/wikilinks.js";
 import type { Binding, FactCondition, FieldDefinition, FieldKind, RecordValue, TypeDefinition } from "@congress/shared-types";
 import { parseExhibitToken } from "@congress/shared-types";
 import type { SourceKind, SourceValue } from "../../connectors/contract.js";

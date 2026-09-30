@@ -58,6 +58,6 @@ export interface EventLike {
 export function eventWeight(event: EventLike, watchedTypes: Set<string>): number {
   if (event.actor === "congress" || event.type.startsWith("congress.ai_")) return 0;
   if (watchedTypes.has(event.type)) return 3;
-  if (event.type.startsWith("congress.chamber_") || event.type === "congress.app_updated" || event.type === "logs.rule_updated") return 0.25;
+  if (event.type === "congress.app_updated" || event.type === "logs.rule_updated") return 0.25;
   return 1;
 }

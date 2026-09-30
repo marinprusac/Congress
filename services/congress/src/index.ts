@@ -18,8 +18,6 @@ import { startTrackingScheduler, stopTrackingScheduler } from "./ai/tracking.js"
 import { listTracking } from "./ai/memory.js";
 import { startProactive, stopProactive } from "./ai/proactive.js";
 import { importLegacyDirectives } from "./ai/legacyDirectivesImport.js";
-import { loadChambers, stopChambers } from "./chambers/loader.js";
-import { CHAMBER_MODULES } from "./chambers/modules.js";
 import { startConnectors, stopConnectors } from "./connectors/registry.js";
 import { startBindings, stopBindings } from "./typeEngine/bindings/runtime.js";
 import { CONNECTORS } from "./connectors/list.js";
@@ -30,8 +28,6 @@ importLegacyChamberData();
 importLegacyDeputySettings();
 recoverInterruptedThreads();
 await importLegacyDirectives();
-// Every Chamber runs inside this process; a failing one is marked offline.
-await loadChambers(CHAMBER_MODULES);
 // Bindings listen first, so the connectors' first sync is pulled in.
 startBindings();
 await startConnectors(CONNECTORS);
@@ -65,7 +61,6 @@ async function shutdown() {
   stopAskTimer();
   stopTrackingScheduler();
   stopProactive();
-  await stopChambers();
   stopBindings();
   await stopConnectors();
   server.close(() => {

@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import type { FieldDefinition, RecordDto, RecordValue, RelatedGroup, TypeAction, TypeDefinition } from "@congress/shared-types";
-import { extractOutgoingExhibitRefs } from "@congress/chamber-kit";
+import { extractOutgoingExhibitRefs } from "../kit/wikilinks.js";
 import { exhibitsDb, exhibitsSqlite } from "./db/client.js";
 import { records, recordRefs } from "./db/schema.js";
 import { getType, getTypeBySlug, listTypes, type StoredType } from "./store.js";

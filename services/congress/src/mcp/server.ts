@@ -1,4 +1,4 @@
-import { createMcpApp } from "@congress/chamber-kit";
+import { createMcpApp } from "../kit/mcp.js";
 import { registerTools } from "./tools.js";
 import { env } from "../env.js";
 

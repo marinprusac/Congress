@@ -1,4 +1,4 @@
-import { loadEnv } from "@congress/chamber-kit";
+import { loadEnv } from "./kit/env.js";
 import { z } from "zod";
 
 // Congress's own env. Each Chamber's config comes from its own .env instead

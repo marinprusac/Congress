@@ -3,15 +3,17 @@ import { sql } from "drizzle-orm";
 import { serve, type ServerType } from "@hono/node-server";
 import { z } from "zod";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createMcpApp, mcpTextResult } from "@congress/chamber-kit";
-import { makeManifest, migrationsDir, TEST_INTERNAL_TOKEN } from "@congress/test-support";
+import { createMcpApp, mcpTextResult } from "../kit/mcp.js";
+import { migrationsDir, TEST_INTERNAL_TOKEN } from "@congress/test-support";
 import type { RunContext, RunOutcome } from "./engine.js";
 
 const runAi = vi.fn<(ctx: RunContext) => Promise<RunOutcome>>();
 vi.mock("./engine.js", () => ({ runAi: (ctx: RunContext) => runAi(ctx) }));
+// Proposals call Congress's own /mcp; point it at the fake server below.
+const self = vi.hoisted(() => ({ origin: "" }));
+vi.mock("./mcpConfig.js", async (orig) => ({ ...(await orig<typeof import("./mcpConfig.js")>()), selfBaseUrl: () => self.origin }));
 
 import { db, runMigrations } from "../db/client.js";
-import { registerChamber } from "../registry.js";
 import { updateAiSettings } from "./settings.js";
 import {
   AskClosedError,
@@ -89,7 +91,7 @@ beforeAll(async () => {
     const s = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: 0 }, () => resolve(s));
   });
   const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  registerChamber(makeManifest("tasks", { mcpUrl: `${origin}/mcp` }));
+  self.origin = origin;
 });
 
 afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
@@ -221,7 +223,7 @@ describe("proposals", () => {
   it("executes exactly the approved calls against the Chamber and reports back", async () => {
     const thread = insertThread({});
     const { message } = await proposeActions(
-      { title: "Add task", rationale: "You mentioned it", urgency: "quiet", actions: [{ server: "tasks", tool: "mcp__tasks__create_task", args: { title: "Renew car" }, summary: "Create 'Renew car'" }] },
+      { title: "Add task", rationale: "You mentioned it", urgency: "quiet", actions: [{ server: "congress", tool: "mcp__congress__create_task", args: { title: "Renew car" }, summary: "Create 'Renew car'" }] },
       { runId: null, threadId: thread.id }
     );
     decideProposal(message.id, true);
@@ -239,8 +241,8 @@ describe("proposals", () => {
         rationale: "r",
         urgency: "quiet",
         actions: [
-          { server: "tasks", tool: "explode", args: {}, summary: "fails" },
-          { server: "tasks", tool: "create_task", args: { title: "never" }, summary: "skipped" },
+          { server: "congress", tool: "explode", args: {}, summary: "fails" },
+          { server: "congress", tool: "create_task", args: { title: "never" }, summary: "skipped" },
         ],
       },
       { runId: null, threadId: null }
@@ -255,7 +257,7 @@ describe("proposals", () => {
 
   it("records a rejection with the owner's note and runs nothing", async () => {
     const { message } = await proposeActions(
-      { title: "Delete", rationale: "r", urgency: "quiet", actions: [{ server: "tasks", tool: "create_task", args: { title: "x" }, summary: "s" }] },
+      { title: "Delete", rationale: "r", urgency: "quiet", actions: [{ server: "congress", tool: "create_task", args: { title: "x" }, summary: "s" }] },
       { runId: null, threadId: null }
     );
     decideProposal(message.id, false, "Not now");

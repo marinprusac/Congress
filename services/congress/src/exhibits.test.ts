@@ -1,10 +1,10 @@
 import { sql } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { makeFakeChamberModule, makeManifest, migrationsDir, type FakeChamberModule } from "@congress/test-support";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { ExhibitResolveResult, ExhibitSearchResult } from "@congress/shared-types";
+import { migrationsDir } from "@congress/test-support";
 import { db, runMigrations } from "./db/client.js";
 import { exhibitCache, exhibitRefs } from "./db/schema.js";
-import { detachChamber, markChamberOffline, registerChamber } from "./registry.js";
-import { loadChamber } from "./chambers/loader.js";
+import { registerLocalSource, type LocalExhibitSource } from "./exhibitSources.js";
 import {
   getCachedChamber,
   getConnections,
@@ -15,45 +15,42 @@ import {
   syncExhibit,
 } from "./exhibits.js";
 
-// In-process Chambers, loaded the way Congress loads real ones.
-async function load(name: string, configure: (app: FakeChamberModule["app"]) => void): Promise<FakeChamberModule> {
-  const fake = makeFakeChamberModule(name, { configure });
-  await loadChamber(fake, { envFor: () => ({}) });
-  return fake;
+// An in-process exhibit source, registered the way the type engine registers its own.
+function makeSource(namespace: string, parts: Partial<LocalExhibitSource>): LocalExhibitSource {
+  const source: LocalExhibitSource = {
+    namespace,
+    search: () => [],
+    resolve: (ids) => ids.map((id): ExhibitResolveResult => ({ id, name: `Live ${id}`, url: `/x/${id}` })),
+    typeOf: () => null,
+    chip: () => null,
+    addManualRef: () => null,
+    removeManualRef: () => null,
+    feedCandidates: () => [],
+    ...parts,
+  };
+  registerLocalSource(source);
+  return source;
 }
 
-beforeAll(async () => {
+const result = (id: string, name: string, score?: number): ExhibitSearchResult => ({ id, type: "note", name, url: `/x/${id}`, score });
+
+beforeAll(() => {
   runMigrations(migrationsDir("congress"));
 
-  await load("notes", (app) => {
-    app.get("/api/exhibits/search", (c) =>
-      c.json({ results: [{ id: "note-1", type: "note", name: `Note for ${c.req.query("q")}`, url: "/n/1" }] })
-    );
-    app.post("/api/exhibits/resolve", async (c) => {
-      const { ids } = (await c.req.json()) as { ids: string[] };
-      return c.json({
-        results: ids.map((id) => (id === "note-gone" ? { id, deleted: true } : { id, name: `Live ${id}`, url: `/n/${id}` })),
-      });
-    });
-    app.get("/api/exhibits/chip/:rawId", (c) => {
-      const rawId = c.req.param("rawId");
-      if (rawId === "404") return c.json({ error: "not_found" }, 404);
-      return c.json({ id: `note-${rawId}`, name: `Note ${rawId}`, url: `/n/${rawId}` });
-    });
+  makeSource("notes", {
+    search: (q) => [result("note-1", `Note for ${q}`)],
+    resolve: (ids) => ids.map((id) => (id === "note-gone" ? { id, deleted: true as const } : { id, name: `Live ${id}`, url: `/n/${id}` })),
+    chip: (raw) => (raw === "404" ? null : { id: `note-${raw}`, name: `Note ${raw}`, url: `/n/${raw}` }),
   });
-
-  await load("tasks", (app) => {
-    app.get("/api/exhibits/search", (c) => c.json({ results: [{ id: "task-1", type: "task", name: "A task", url: "/t/1" }] }));
-    app.post("/api/exhibits/resolve", async (c) => {
-      const { ids } = (await c.req.json()) as { ids: string[] };
-      return c.json({ results: ids.map((id) => ({ id, name: `Task ${id}`, url: `/t/${id}` })) });
-    });
+  makeSource("tasks", { search: () => [result("task-1", "A task")], resolve: (ids) => ids.map((id) => ({ id, name: `Task ${id}`, url: `/t/${id}` })) });
+  makeSource("broken", {
+    search: () => {
+      throw new Error("boom");
+    },
   });
-
-  await load("broken", (app) => {
-    app.get("/api/exhibits/search", (c) => c.json({ error: "boom" }, 500));
-    app.post("/api/exhibits/resolve", (c) => c.json({ error: "boom" }, 500));
-  });
+  // Mirrors the type engine: a score only for a non-empty query.
+  makeSource("low", { search: (q) => [result("low-1", "Low score match", q ? 1 : undefined)] });
+  makeSource("high", { search: (q) => [result("high-1", "High score match", q ? 6 : undefined)] });
 });
 
 beforeEach(() => {
@@ -136,7 +133,7 @@ describe("getCachedChamber", () => {
 });
 
 describe("resolveExhibits", () => {
-  it("returns an empty array for no refs, without touching any chamber", async () => {
+  it("returns an empty array for no refs, without touching any source", async () => {
     await expect(resolveExhibits([])).resolves.toEqual([]);
   });
 
@@ -157,7 +154,7 @@ describe("resolveExhibits", () => {
     ]);
   });
 
-  it("resolves a cache miss live against the owning chamber and caches the answer", async () => {
+  it("resolves a cache miss live against the owning source and caches the answer", async () => {
     const [result] = await resolveExhibits([{ id: "note-7", chamber: "notes" }]);
     expect(result).toEqual({ id: "note-7", chamber: "notes", name: "Live note-7", url: "/n/note-7" });
     expect(getCachedChamber("note-7")).toBe("notes");
@@ -178,9 +175,8 @@ describe("resolveExhibits", () => {
     expect(results[1]).toMatchObject({ name: "Cached one" });
   });
 
-  it("marks an exhibit unavailable when its chamber is offline, without failing the whole batch", async () => {
+  it("marks an exhibit unavailable when its namespace has no source, without failing the whole batch", async () => {
     cached("note-1", "notes", "One");
-    markChamberOffline(makeManifest("temp"));
 
     const results = await resolveExhibits([
       { id: "note-1", chamber: "notes" },
@@ -191,13 +187,7 @@ describe("resolveExhibits", () => {
     expect(results[1]).toEqual({ id: "temp-1", chamber: "temp", unavailable: true });
   });
 
-  it("marks an exhibit unavailable when its chamber rejects the resolve", async () => {
-    await expect(resolveExhibits([{ id: "broken-1", chamber: "broken" }])).resolves.toEqual([
-      { id: "broken-1", chamber: "broken", unavailable: true },
-    ]);
-  });
-
-  it("tombstones an exhibit the owning chamber reports as deleted", async () => {
+  it("tombstones an exhibit the owning source reports as deleted", async () => {
     await expect(resolveExhibits([{ id: "note-gone", chamber: "notes" }])).resolves.toEqual([
       { id: "note-gone", chamber: "notes", deleted: true },
     ]);
@@ -320,70 +310,38 @@ describe("getManualConnectionOwner", () => {
 });
 
 describe("searchExhibits", () => {
-  it("fans out to every active chamber and tags each result with its owner", async () => {
+  it("merges every source and tags each result with its owner", async () => {
     const results = await searchExhibits("week");
     expect(results).toContainEqual(expect.objectContaining({ id: "note-1", chamber: "notes" }));
     expect(results).toContainEqual(expect.objectContaining({ id: "task-1", chamber: "tasks" }));
   });
 
-  it("passes the query through to each chamber", async () => {
+  it("passes the query through to each source", async () => {
     const results = await searchExhibits("week");
     expect(results.find((r) => r.chamber === "notes")?.name).toBe("Note for week");
   });
 
-  it("drops a failing chamber's results instead of failing the whole search", async () => {
+  it("drops a failing source's results instead of failing the whole search", async () => {
     const results = await searchExhibits("week");
     expect(results.some((r) => r.chamber === "broken")).toBe(false);
     expect(results.length).toBeGreaterThan(0);
   });
 
-  describe("cross-chamber score merge", () => {
-    beforeAll(async () => {
-      // "low" registers before "high" - a merge that just concatenated
-      // per-chamber results in registration order (the pre-fix behaviour)
-      // would put low's result first regardless of score.
-      // Mirrors a real Chamber's own contract: score is present only for a
-      // non-empty query (see createTableBackedExhibits.search), so the
-      // empty-query test below can assert every result is unscored.
-      await load("low", (app) => {
-        app.get("/api/exhibits/search", (c) => {
-          const score = c.req.query("q") ? 1 : undefined;
-          return c.json({ results: [{ id: "low-1", type: "note", name: "Low score match", url: "/l/1", score }] });
-        });
-      });
-      await load("high", (app) => {
-        app.get("/api/exhibits/search", (c) => {
-          const score = c.req.query("q") ? 6 : undefined;
-          return c.json({ results: [{ id: "high-1", type: "note", name: "High score match", url: "/h/1", score }] });
-        });
-      });
-    });
+  it("ranks a higher-scoring result first regardless of registration order", async () => {
+    const ids = (await searchExhibits("query")).map((r) => r.id);
+    expect(ids.indexOf("high-1")).toBeLessThan(ids.indexOf("low-1"));
+  });
 
-    afterAll(async () => {
-      detachChamber("low");
-      detachChamber("high");
-    });
+  it("ranks a source that omits score entirely beneath any source with a positive score", async () => {
+    // A missing score is 0, not "unranked and therefore first".
+    const ids = (await searchExhibits("query")).map((r) => r.id);
+    expect(ids.indexOf("high-1")).toBeLessThan(ids.indexOf("note-1"));
+    expect(ids.indexOf("high-1")).toBeLessThan(ids.indexOf("task-1"));
+  });
 
-    it("ranks a higher-scoring result first regardless of chamber registration order", async () => {
-      const results = await searchExhibits("query");
-      const ids = results.map((r) => r.id);
-      expect(ids.indexOf("high-1")).toBeLessThan(ids.indexOf("low-1"));
-    });
-
-    it("ranks a chamber that omits score entirely beneath any chamber with a positive score", async () => {
-      // "notes"/"tasks" (registered in the outer beforeAll) never send
-      // `score` at all - a missing score must be treated as 0, not as
-      // "unranked and therefore first".
-      const results = await searchExhibits("query");
-      const ids = results.map((r) => r.id);
-      expect(ids.indexOf("high-1")).toBeLessThan(ids.indexOf("note-1"));
-      expect(ids.indexOf("high-1")).toBeLessThan(ids.indexOf("task-1"));
-    });
-
-    it("leaves an empty query's results without a score and merge-stable", async () => {
-      const results = await searchExhibits("");
-      expect(results.every((r) => r.score === undefined)).toBe(true);
-    });
+  it("leaves an empty query's results without a score", async () => {
+    const results = await searchExhibits("");
+    expect(results.every((r) => r.score === undefined)).toBe(true);
   });
 });
 
@@ -398,17 +356,12 @@ describe("getExhibitChip", () => {
     });
   });
 
-  it("reports a chamber that is not registered", async () => {
+  it("reports a namespace that has no source", async () => {
     await expect(getExhibitChip("nosuch", "1")).resolves.toEqual({ error: "chamber_not_found" });
   });
 
-  it("reports a row the chamber does not have", async () => {
+  it("reports a row the source does not have", async () => {
     await expect(getExhibitChip("notes", "404")).resolves.toEqual({ error: "not_found" });
-  });
-
-  it("reports a chamber whose module is not loaded", async () => {
-    registerChamber(makeManifest("dead"));
-    await expect(getExhibitChip("dead", "1")).resolves.toEqual({ error: "chamber_unavailable" });
   });
 });
 

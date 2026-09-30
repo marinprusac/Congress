@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { mcpTextResult as textResult } from "@congress/chamber-kit";
+import { mcpTextResult as textResult } from "../../kit/mcp.js";
 import { listVisits, listVisitsCovering, listTrips } from "./visits.js";
 import type { Visit } from "./types.js";
 import { startOfDay, endOfDay } from "../../typeEngine/zone.js";

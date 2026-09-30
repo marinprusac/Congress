@@ -1,14 +1,5 @@
-import type { EventPublishRequest, ChamberSubscription } from "@congress/shared-types";
-import { getChamber } from "./registry.js";
-import { listModules } from "./chambers/runtime.js";
+import type { EventPublishRequest } from "@congress/shared-types";
 import { handleReceivedEvent } from "./eventReceive.js";
-
-// Coarse per-chamber gate: does this Chamber's declared interest list (its
-// module's subscriptions()) cover this publish at all. "*" subscribes to
-// every type. The Chamber's own onEvent still does the precise matching.
-export function subscriptionMatches(subscriptions: ChamberSubscription[], type: string): boolean {
-  return subscriptions.some((s) => s.type === "*" || s.type === type);
-}
 
 export interface PublishedEvent {
   chamber: string;
@@ -25,9 +16,8 @@ export function onEventPublished(listener: (event: PublishedEvent) => void): () 
   return () => publishListeners.delete(listener);
 }
 
-// Relays a published domain event to every active, subscribed Chamber
-// instead of storing it - Congress never inspects `type`/`payload`.
-// Fire-and-forget: a Chamber's handler failing never reaches the publisher.
+// Hands a published domain event to the AI's observers and Congress's own log rules.
+// Fire-and-forget: a handler failing never reaches the publisher.
 export function publishEvent(req: EventPublishRequest): void {
   const occurredAt = req.occurredAt ?? new Date().toISOString();
   const body = { chamber: req.chamber, type: req.type, payload: req.payload, occurredAt, actor: req.actor };
@@ -40,20 +30,8 @@ export function publishEvent(req: EventPublishRequest): void {
     }
   }
 
-  // Congress's own log rules (record to history / push a notification) are
-  // core now, not a subscribing Chamber - handled in-process for every
-  // publish, no registry lookup or HTTP hop. handleReceivedEvent does its
-  // own precise per-event-type check, so no coarse subscription gate either.
+  // Log rules (record to history / push a notification); it checks the event type itself.
   handleReceivedEvent(body).catch((err: unknown) => {
     console.warn(`Log rule handling failed for ${req.type}: ${(err as Error).message}`);
   });
-
-  for (const module of listModules()) {
-    const name = module.manifest.name;
-    if (!module.onEvent || getChamber(name)?.status !== "active") continue;
-    if (!subscriptionMatches(module.subscriptions?.() ?? [], req.type)) continue;
-    void Promise.resolve()
-      .then(() => module.onEvent!(body))
-      .catch((err: unknown) => console.warn(`[${name}] event handler failed for ${req.type}: ${(err as Error).message}`));
-  }
 }

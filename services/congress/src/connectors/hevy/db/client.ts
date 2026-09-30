@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createLazyDb } from "@congress/chamber-kit";
+import { createLazyDb } from "../../../kit/db.js";
 import { env } from "../../../env.js";
 import * as schema from "./schema.js";
 

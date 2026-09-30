@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { mcpTextResult } from "@congress/chamber-kit";
+import { mcpTextResult } from "../kit/mcp.js";
 import { aiUrgencySchema, operationSchema } from "@congress/shared-types";
 import { currentRunContext } from "../ai/runContext.js";
 import { activeGrant, requestPublish } from "../ai/builder.js";

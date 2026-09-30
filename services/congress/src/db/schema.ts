@@ -1,25 +1,5 @@
 import { sqliteTable, text, integer, real, index, uniqueIndex, primaryKey } from "drizzle-orm/sqlite-core";
 
-export const chambers = sqliteTable("chambers", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull().unique(),
-  displayName: text("display_name").notNull(),
-  version: text("version").notNull(),
-  routesJson: text("routes_json").notNull(),
-  viewsJson: text("views_json").notNull().default("[]"),
-  exhibitTypesJson: text("exhibit_types_json").notNull().default("[]"),
-  eventsJson: text("events_json").notNull().default("[]"),
-  // The Chamber's event interest list when it was loaded (informational;
-  // events.ts reads the module's subscriptions() live).
-  subscriptionsJson: text("subscriptions_json").notNull().default("[]"),
-  apiBase: text("api_base").notNull(),
-  mcpUrl: text("mcp_url"),
-  healthUrl: text("health_url").notNull(),
-  status: text("status", { enum: ["active", "offline", "detached"] }).notNull().default("active"),
-  lastHeartbeatAt: integer("last_heartbeat_at", { mode: "timestamp_ms" }),
-  registeredAt: integer("registered_at", { mode: "timestamp_ms" }).notNull(),
-});
-
 // Disposable, rebuildable resolution cache - a Chamber pushes here on Exhibit
 // create/update/delete (POST /congress/exhibits/sync). Missing/stale rows
 // always fall back to a live call to the owning Chamber, never treated as

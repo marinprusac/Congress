@@ -7,4 +7,3 @@ export * from "./paths.js";
 export * from "./manifest.js";
 export * from "./fakeChamber.js";
 export * from "./waitFor.js";
-export * from "./fakeModule.js";

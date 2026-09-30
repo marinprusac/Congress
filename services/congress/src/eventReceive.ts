@@ -1,7 +1,7 @@
 import type { EventDelivery } from "@congress/shared-types";
 // interpolate is shared with chamber-automation (and Congress's own relay
 // filter) rather than re-declared here - see chamber-kit's eventMatching.ts.
-import { interpolate } from "@congress/chamber-kit";
+import { interpolate } from "./kit/interpolate.js";
 import { getEventSettingsRowByType, markEventSettingsFired } from "./eventSettings.js";
 import { pushNotification } from "./notifications.js";
 import { recordHistory } from "./eventHistory.js";

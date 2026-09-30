@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { mcpTextResult as textResult } from "@congress/chamber-kit";
+import { mcpTextResult as textResult } from "../../kit/mcp.js";
 import { findChats, listChats, listUnread, markReadLocally, readChat, readerStatus, searchMessages } from "./aiRead.js";
 
 // Read-only WhatsApp tools for Congress's AI. Nothing here can send, react,

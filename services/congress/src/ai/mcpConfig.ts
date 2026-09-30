@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ACTOR_HEADER } from "@congress/shared-types";
 import { env } from "../env.js";
-import { listChambers } from "../registry.js";
 import { getLocalSource } from "../exhibitSources.js";
 import { RUN_ID_HEADER, THREAD_ID_HEADER, type RunContextInfo } from "./runContext.js";
 
@@ -45,10 +44,6 @@ export function buildMcpServers(
   if (getLocalSource("e")) mcpServers.types = { type: "http", url: `${selfBaseUrl()}/mcp/types`, headers: congressHeaders };
   // Only for a thread with a builder-mode grant (the server re-checks it).
   if (opts.builder) mcpServers.builder = { type: "http", url: `${selfBaseUrl()}/mcp/builder`, headers: congressHeaders };
-  for (const chamber of listChambers()) {
-    if (chamber.status !== "active" || !chamber.mcpUrl) continue;
-    mcpServers[chamber.name] = { type: "http", url: chamber.mcpUrl, headers };
-  }
   return mcpServers;
 }
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { mcpTextResult } from "@congress/chamber-kit";
+import { mcpTextResult } from "../../kit/mcp.js";
 import type { ConnectorContext } from "../contract.js";
 import { getRecord } from "../../typeEngine/records.js";
 import { listFolders } from "./cache.js";

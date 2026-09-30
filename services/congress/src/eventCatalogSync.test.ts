@@ -2,9 +2,9 @@ import { sql } from "drizzle-orm";
 import { migrationsDir } from "@congress/test-support";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-// The catalog is derived from Congress's own registry, read in-process.
-vi.mock("./registry.js", () => ({ listChambers: vi.fn(() => []), getChamber: vi.fn() }));
-import { listChambers } from "./registry.js";
+// The catalog is derived from the running connectors' declared events.
+vi.mock("./connectors/runtime.js", () => ({ listConnectors: vi.fn(() => []) }));
+import { listConnectors } from "./connectors/runtime.js";
 
 import { db, runMigrations } from "./db/client.js";
 import { eventSettings } from "./db/schema.js";
@@ -18,7 +18,7 @@ beforeEach(() => {
 });
 
 function stubRegistry(chambers: Array<{ name: string; events: unknown[] }>) {
-  vi.mocked(listChambers).mockReturnValue(chambers as never);
+  vi.mocked(listConnectors).mockReturnValue(chambers as never);
 }
 
 describe("syncEventCatalog", () => {
@@ -96,12 +96,12 @@ describe("syncEventCatalog", () => {
 });
 
 describe("syncEventCatalog (Congress's own events)", () => {
-  it("derives rows for Congress's synthetic events even with an empty registry", () => {
+  it("derives rows for Congress's synthetic events even with no connectors running", () => {
     stubRegistry([]);
 
     syncEventCatalog();
 
-    expect(getEventSettingsRowByType("congress.chamber_offline")?.chamber).toBe("congress");
+    expect(getEventSettingsRowByType("google.account_connected")?.chamber).toBe("congress");
     expect(getEventSettingsRowByType("logs.rule_updated")?.chamber).toBe("congress");
   });
 });

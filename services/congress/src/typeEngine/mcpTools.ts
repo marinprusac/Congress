@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RecordValue, TypeDefinition } from "@congress/shared-types";
 import { buildChipToken } from "@congress/shared-types";
-import { mcpTextResult } from "@congress/chamber-kit";
+import { mcpTextResult } from "../kit/mcp.js";
 import { listTypes, getTypeBySlug, type StoredType } from "./store.js";
 import { activeFields } from "./operations.js";
 import { recordInputSchema } from "./codec.js";

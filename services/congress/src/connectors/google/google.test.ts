@@ -1,10 +1,11 @@
 import { sql } from "drizzle-orm";
 import { migrationsDir } from "@congress/test-support";
-import { GoogleAccountNeedsReconnectError, GoogleScopeMissingError, defineChamber } from "@congress/chamber-kit";
+import { GoogleAccountNeedsReconnectError, GoogleScopeMissingError } from "../../kit/googleErrors.js";
 import { Hono } from "hono";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../events.js", () => ({ publishEvent: vi.fn() }));
+vi.mock("../runtime.js", async (importOriginal) => ({ ...(await importOriginal<typeof import("../runtime.js")>()), listConnectors: vi.fn(() => []) }));
 vi.mock("./oauth.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./oauth.js")>()),
   refreshAccessToken: vi.fn(),
@@ -14,7 +15,8 @@ vi.mock("./oauth.js", async (importOriginal) => ({
 import { db, runMigrations } from "../../db/client.js";
 import { googleAccounts } from "../../db/schema.js";
 import { publishEvent } from "../../events.js";
-import { addModule, removeModule } from "../../chambers/runtime.js";
+import { listConnectors } from "../runtime.js";
+import type { Connector } from "../contract.js";
 import { resolveGoogleClientConfig, setGoogleClientConfigForTests } from "./config.js";
 import { refreshAccessToken, RevokedTokenError, safeReturnTo, consumeOAuthState, createOAuthState, buildAuthUrl } from "./oauth.js";
 import {
@@ -59,17 +61,8 @@ function insert(id: number, opts: { scope?: string; expiry?: Date; needsReconnec
     .run();
 }
 
-function fakeChamber(name: string, googleScopes: string[]) {
-  return defineChamber({
-    manifest: { name, displayName: name.toUpperCase(), version: "1", routes: { home: `/${name}`, settings: `/${name}/settings` }, views: [], exhibitTypes: [], events: [], googleScopes },
-    app: new Hono(),
-    registerTools: () => {},
-    dir: "/tmp",
-    initEnv: () => {},
-    start: () => {},
-    stop: () => {},
-  });
-}
+// A started connector that only declares what it needs from Google.
+const stubConnector = (name: string, googleScopes: string[]) => ({ name, label: name.toUpperCase(), googleScopes }) as Connector;
 
 describe("resolveGoogleClientConfig", () => {
   it("prefers Congress's own vars", () => {
@@ -197,14 +190,10 @@ describe("accounts", () => {
 });
 
 describe("googleConnectorStatus", () => {
-  afterEach(() => {
-    removeModule("cal");
-    removeModule("mail");
-  });
+  afterEach(() => vi.mocked(listConnectors).mockReturnValue([]));
 
-  it("unions every Chamber's scopes and lists what each account is missing", () => {
-    addModule(fakeChamber("cal", [CAL]));
-    addModule(fakeChamber("mail", [GMAIL]));
+  it("unions every connector's scopes and lists what each account is missing", () => {
+    vi.mocked(listConnectors).mockReturnValue([stubConnector("cal", [CAL]), stubConnector("mail", [GMAIL])]);
     insert(1);
     expect(requestedScopes().sort()).toEqual([CAL, GMAIL].sort());
     const status = googleConnectorStatus();
