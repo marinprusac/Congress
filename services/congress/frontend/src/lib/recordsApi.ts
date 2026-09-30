@@ -111,6 +111,14 @@ export async function uploadFile(file: File): Promise<FileRef> {
 }
 
 // The "@" picker's "create new": a record of the given type, titled.
+// A type whose bindings can't create only gets records from its source.
+export const canCreate = (def: TypeSummary["definition"]) => def.bindings.length === 0 || def.bindings.some((b) => b.create);
+
+// The source's live content for a record (its shape is the connector's; null when none).
+export async function fetchLive<T>(id: string): Promise<T | null> {
+  return (await check<{ content: T | null }>(await fetch(`/congress/records/${encodeURIComponent(id)}/live`))).content;
+}
+
 export async function quickCreateRecord(type: TypeSummary, title: string): Promise<CapitolExhibitSearchResult> {
   const titleField = type.definition.fields.find((f) => f.id === type.definition.titleField);
   const created = await createRecord(type.definition.slug, titleField ? { [titleField.slug]: title } : {});

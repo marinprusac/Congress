@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChamberMark, fetchRegistry, resolveChamberPath, usePresence, useStackNav } from "@congress/congress-ui";
-import { fetchTypes } from "@/lib/recordsApi";
+import { canCreate, fetchTypes } from "@/lib/recordsApi";
 import { TYPES_KEY } from "@/records/RecordPage";
 
 // The "+" sheet: every kind of Exhibit the active Chambers let the owner
@@ -27,7 +27,7 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
   // Runtime types first (core), then what each active Chamber offers.
   const options = [
     ...(types ?? [])
-      .filter((t) => !t.definition.hidden)
+      .filter((t) => !t.definition.hidden && canCreate(t.definition))
       .map((t) => ({ chamber: "e", type: t.definition.slug, label: t.definition.label, path: `/e/new/${t.definition.slug}` })),
     ...(registry ?? [])
       .filter((c) => c.status === "active")
