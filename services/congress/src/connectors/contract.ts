@@ -78,6 +78,8 @@ export interface Connector {
     detail?(ctx: ConnectorContext, kind: string, key: string, opts: Record<string, string>): Promise<unknown>;
     // Searches the whole source, not only what's cached; nothing is stored.
     search?(ctx: ConnectorContext, kind: string, query: string, limit: number): Promise<SourceRecord[]>;
+    // A time series kept by the connector, never records (e.g. health samples); newest first.
+    series?(kind: string, opts: { from?: string; to?: string; limit?: number }): unknown[];
     // Fetches one record into the cache (so a binding can pull it), or null. quiet: no events.
     fetch?(ctx: ConnectorContext, kind: string, key: string, opts?: { quiet?: boolean }): Promise<SourceRecord | null>;
   };
@@ -89,6 +91,8 @@ export interface Connector {
   };
   // Setup-panel API, mounted at /congress/connectors/<name>/*.
   routes?(ctx: ConnectorContext): Hono;
+  // Webhooks at /congress/connectors/<name>/hook/*, without a session: the connector checks its own secret.
+  hooks?(ctx: ConnectorContext): Hono;
   onEvent?(ctx: ConnectorContext, event: PublishedEvent): void;
   // Extra AI tools on /mcp/types (named <prefix>_*), for what isn't per record.
   tools?(ctx: ConnectorContext, server: McpServer): void;
