@@ -16,6 +16,8 @@ const envSchema = z.object({
   EXHIBITS_DB_PATH: z.string().default("./data/exhibits.sqlite3"),
   // Files of `file` fields, one per upload, named by file id.
   EXHIBIT_FILES_DIR: z.string().default("./data/files"),
+  // Each connector's own cache DB (connectors/<name>).
+  CONNECTORS_DATA_DIR: z.string().default("./data/connectors"),
   MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(25 * 1024 * 1024),
   // Day boundaries for `date` fields when AI settings have no time zone.
   OWNER_TIMEZONE: z

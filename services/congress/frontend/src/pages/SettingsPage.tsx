@@ -25,7 +25,7 @@ import { SignOutControl } from "@/components/LoginGate";
 import { LogsTab } from "@/pages/LogsTab";
 import { AiSettingsTab } from "@/pages/AiSettingsTab";
 import { HomeSettingsTab } from "@/pages/HomeSettingsTab";
-import { AccountsTab } from "@/pages/AccountsTab";
+import { ConnectorsTab } from "@/pages/ConnectorsTab";
 import { TypesSettingsTab } from "@/pages/TypesSettingsTab";
 
 function SettingsGearIcon() {
@@ -258,7 +258,7 @@ export function SettingsPage() {
             className={tab === "accounts" ? "settings-tab active" : "settings-tab"}
             onClick={() => setTab("accounts")}
           >
-            Accounts
+            Connectors
           </button>
           <button
             type="button"
@@ -293,7 +293,7 @@ export function SettingsPage() {
           ) : tab === "ai" ? (
             <AiSettingsTab />
           ) : tab === "accounts" ? (
-            <AccountsTab />
+            <ConnectorsTab />
           ) : tab === "types" ? (
             <TypesSettingsTab />
           ) : ActivePanelComponent && activePanel ? (
