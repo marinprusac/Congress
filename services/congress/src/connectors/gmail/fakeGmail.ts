@@ -88,12 +88,13 @@ export function fakeGmail() {
     name: "gmail",
     google: { accounts: () => state.accounts, fetch },
     people: {
-      find: (email) => {
+      find: (key) => {
+        const email = typeof key === "string" ? key : (key.email ?? key.phone ?? "");
         state.found.push(email);
         return state.people[email] ?? null;
       },
       resolve: (input, evidence) => {
-        state.resolved.push({ email: input.email, evidence });
+        state.resolved.push({ email: input.email ?? input.phone ?? "", evidence });
         return evidence === "corresponded" ? `person-${input.email}` : null;
       },
     },

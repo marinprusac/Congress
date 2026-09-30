@@ -1,4 +1,4 @@
-import type { Connector, ConnectorContext } from "./contract.js";
+import type { Connector, ConnectorContext, PersonKey } from "./contract.js";
 import { createSyncScheduler, type SyncStatus } from "./scheduler.js";
 import { addConnector, emitConnectorSynced, emitSourceChange, removeConnector } from "./runtime.js";
 import { googleApiFetch } from "./googleApi.js";
@@ -31,30 +31,39 @@ const running = new Map<string, Running>();
 let unsubscribe: (() => void) | null = null;
 let unsubscribeRecords: (() => void) | null = null;
 
-export function resolvePerson(input: { email: string; name?: string | null }, evidence: Evidence, actor: string): string | null {
+const keysOf = (k: PersonKey) => [
+  ...(k.email ? [{ kind: "email" as const, value: k.email }] : []),
+  ...(k.phone ? [{ kind: "phone" as const, value: k.phone }] : []),
+];
+
+export function resolvePerson(input: PersonKey & { name?: string | null }, evidence: Evidence, actor: string): string | null {
   const t = getTypeBySlug("person");
-  if (!t || t.definition.hidden) return null;
+  if (!t || t.definition.hidden || keysOf(input).length === 0) return null;
   const title = activeFields(t.definition).find((f) => f.id === t.definition.titleField);
   const name = input.name?.trim();
   try {
     const result = lookupOrCreate("person", {
-      keys: [{ kind: "email", value: input.email }],
+      keys: keysOf(input),
       values: title && name ? { [title.slug]: name } : undefined,
       evidence,
       actor,
     });
     return result.id;
   } catch (err) {
-    console.warn(`Person lookup for ${input.email} failed: ${(err as Error).message}`);
+    console.warn(`Person lookup for ${input.email ?? input.phone} failed: ${(err as Error).message}`);
     return null;
   }
 }
 
-export function findPerson(email: string): string | null {
+export function findPerson(key: string | PersonKey): string | null {
   const t = getTypeBySlug("person");
-  const value = normalizeKey("email", email);
-  if (!t || t.definition.hidden || !value) return null;
-  return findByKey(t.id, "email", value) ?? null;
+  if (!t || t.definition.hidden) return null;
+  for (const k of keysOf(typeof key === "string" ? { email: key } : key)) {
+    const value = normalizeKey(k.kind, k.value);
+    const id = value ? findByKey(t.id, k.kind, value) : undefined;
+    if (id) return id;
+  }
+  return null;
 }
 
 export function recordFor(connector: string, kind: string, key: string): string | null {
