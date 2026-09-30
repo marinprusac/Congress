@@ -4,6 +4,7 @@ import { migrationsDir, TEST_MASTER_PASSWORD } from "@congress/test-support";
 import { runMigrations } from "../db/client.js";
 import { app } from "../server.js";
 import { startTypeEngine } from "./index.js";
+import { publish } from "./store.js";
 
 const json = { "Content-Type": "application/json" };
 const bindings = () => ({ incoming: { socket: { remoteAddress: "10.0.0.1" } } }) as unknown as HttpBindings;
@@ -31,9 +32,18 @@ describe("type routes", () => {
   });
 
   it("list hidden types only with ?all=1", async () => {
-    expect(await (await call("/congress/types")).json()).toEqual([]);
-    const all = (await (await call("/congress/types?all=1")).json()) as { definition: { slug: string } }[];
-    expect(all.map((t) => t.definition.slug)).toEqual(["note"]);
+    publish({
+      actor: "test",
+      ops: [
+        { op: "create_type", slug: "secret", label: "Secret" },
+        { op: "add_field", slug: "title", label: "Title", kind: "text" },
+        { op: "set_title_field", field: "title" },
+        { op: "set_type_meta", hidden: true },
+      ],
+    });
+    const slugs = async (path: string) => ((await (await call(path)).json()) as { definition: { slug: string } }[]).map((t) => t.definition.slug);
+    expect(await slugs("/congress/types")).toEqual(["note"]);
+    expect(await slugs("/congress/types?all=1")).toEqual(["note", "secret"]);
   });
 
   it("create, read, patch and delete a record", async () => {

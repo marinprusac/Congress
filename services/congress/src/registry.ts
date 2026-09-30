@@ -97,6 +97,12 @@ export function attachChamber(name: string): ChamberRegistryEntry | null {
   return setStatus(name, getModule(name) ? "active" : "offline");
 }
 
+// Drops a retired Chamber's row for good (it became part of core).
+export function forgetChamber(name: string): void {
+  db.delete(chambers).where(eq(chambers.name, name)).run();
+  ensureCache().delete(name);
+}
+
 export function listChambers(): ChamberRegistryEntry[] {
   return Array.from(ensureCache().values());
 }

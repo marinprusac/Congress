@@ -1,6 +1,6 @@
 import type { Premade } from "./index.js";
 
-// Replaces the Notes Chamber. Hidden until the cutover batch.
+// Replaces the Notes Chamber.
 export const NOTE: Premade = {
   key: "note",
   batches: [
@@ -14,5 +14,7 @@ export const NOTE: Premade = {
       { op: "set_actions", actions: [{ kind: "toggle", field: "pinned", on: "Unpin", off: "Pin" }] },
       { op: "set_type_meta", hidden: true },
     ],
+    // Cutover: visible once the Notes Chamber's data is imported.
+    [{ op: "set_type_meta", hidden: false }],
   ],
 };
