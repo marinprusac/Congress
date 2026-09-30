@@ -1,7 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { makeFakeChamberModule, migrationsDir } from "@congress/test-support";
+import { migrationsDir } from "@congress/test-support";
 import { runMigrations } from "../db/client.js";
-import { loadChamber } from "../chambers/loader.js";
 import { registerLocalSource } from "../exhibitSources.js";
 import {
   addManualConnection,
@@ -49,26 +48,12 @@ beforeAll(async () => {
   dune = createRecord("book", { title: "Dune", blurb: "desert planet", read: true }).id;
   draft = createRecord("book", { title: "Desert Solitaire", read: false }).id;
   createRecord("secret", { title: "Desert secret" });
-
-  await loadChamber(
-    makeFakeChamberModule("tasks", {
-      configure: (app) => {
-        app.get("/api/exhibits/search", (c) => c.json({ results: [{ id: "task-1", type: "task", name: "Desert trip", url: "/t/1", score: 5 }] }));
-        app.post("/api/exhibits/resolve", async (c) => {
-          const { ids } = (await c.req.json()) as { ids: string[] };
-          return c.json({ results: ids.map((id) => ({ id, name: `Task ${id}`, url: `/t/${id}` })) });
-        });
-        app.get("/api/feed", (c) => c.json({ items: [{ kind: "exhibit", exhibitId: "task-1", score: 50 }] }));
-      },
-    }),
-    { envFor: () => ({}) }
-  );
 });
 
 describe("the e namespace", () => {
-  it("merges search results with Chambers by score and skips hidden types", async () => {
+  it("ranks search results by score and skips hidden types", async () => {
     const results = await searchExhibits("desert");
-    expect(results.map((r) => `${r.chamber}:${r.name}`)).toEqual(["e:Desert Solitaire", "tasks:Desert trip", "e:Dune"]);
+    expect(results.map((r) => `${r.chamber}:${r.name}`)).toEqual(["e:Desert Solitaire", "e:Dune"]);
     expect(results[0]).toMatchObject({ type: "book", url: `/${draft}` });
   });
 
@@ -78,12 +63,12 @@ describe("the e namespace", () => {
     const results = await resolveExhibits([
       { id: dune, chamber: "e" },
       { id: gone, chamber: "e" },
-      { id: "task-1", chamber: "tasks" },
+      { id: "nope", chamber: "gone-chamber" },
     ]);
     expect(results).toEqual([
       { id: dune, chamber: "e", name: "Dune", url: `/${dune}` },
       { id: gone, chamber: "e", deleted: true },
-      { id: "task-1", chamber: "tasks", name: "Task task-1", url: "/t/task-1" },
+      { id: "nope", chamber: "gone-chamber", unavailable: true },
     ]);
   });
 
@@ -93,16 +78,16 @@ describe("the e namespace", () => {
   });
 
   it("adds and removes manual connections owned by a record", async () => {
-    expect(await addManualConnection(dune, "task-1", "tasks")).toEqual({ refs: ["task-1"] });
-    expect((await getConnections(dune)).map((c) => c.id)).toEqual(["task-1"]);
-    expect((await getConnections("task-1")).map((c) => c.id)).toEqual([dune]);
-    expect(await removeManualConnection("task-1", dune)).toEqual({ refs: [] });
+    expect(await addManualConnection(dune, draft, "e")).toEqual({ refs: [draft] });
+    expect((await getConnections(dune)).map((c) => c.id)).toEqual([draft]);
+    expect((await getConnections(draft)).map((c) => c.id)).toEqual([dune]);
+    expect(await removeManualConnection(draft, dune)).toEqual({ refs: [] });
     expect(await getConnections(dune)).toEqual([]);
   });
 
-  it("puts rule candidates in the feed next to Chamber ones", async () => {
+  it("puts rule candidates in the feed", async () => {
     const feed = await getFeed();
-    expect(feed.map((i) => (i.kind === "exhibit" ? `${i.chamber}:${i.name}` : i.viewId))).toEqual(["tasks:Task task-1", "e:Desert Solitaire"]);
+    expect(feed.map((i) => (i.kind === "exhibit" ? `${i.chamber}:${i.name}` : i.viewId))).toEqual(["e:Desert Solitaire"]);
   });
 
   it("adds catalog entries for visible types only", async () => {

@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import type { HttpBindings } from "@hono/node-server";
 import { z } from "zod";
-import { createMcpApp, mountManifestAndHealth, mountStaticFrontend } from "@congress/chamber-kit";
+import { createMcpApp } from "./kit/mcp.js";
+import { mountManifestAndHealth, mountStaticFrontend } from "./kit/static.js";
 import {
   updateEventSettingsRequestSchema,
   pushSubscriptionRequestSchema,
@@ -13,9 +14,7 @@ import {
 import { env } from "./env.js";
 import { authRoutes, requireSession } from "./sessionAuth.js";
 import { capitolManifest } from "./manifest.js";
-import { listChambers, getChamber } from "./registry.js";
-import { dispatchToChamber, forwardToChamber, serveChamberAssets, serveChamberIcon } from "./gateway.js";
-import { getModule } from "./chambers/runtime.js";
+import { serveChamberIcon } from "./gateway.js";
 import {
   searchExhibits,
   resolveExhibits,
@@ -52,7 +51,8 @@ mountManifestAndHealth(app, capitolManifest);
 
 app.route("/auth", authRoutes);
 
-app.get("/congress/registry", requireSession, (c) => c.json(listChambers()));
+// No Chambers remain; the shell still asks (removed with its last caller).
+app.get("/congress/registry", requireSession, (c) => c.json([]));
 
 // Public/unauthenticated - see serveChamberIcon's own comment for why.
 app.get("/congress/chambers/:name/icon", (c) => serveChamberIcon(c, c.req.param("name")));
@@ -68,15 +68,14 @@ app.put("/congress/settings", requireSession, async (c) => {
   return c.json(await updateSettings(parsed.data));
 });
 
-// The home "For You" feed - every active Chamber's scored views and
-// exhibits, merged and ranked. See feed.ts.
+// The home "For You" feed: every source's scored views and records, merged and ranked. See feed.ts.
 app.get("/congress/feed", requireSession, async (c) => c.json({ items: await getFeed() }));
 
 // Congress's own AI: the chat, the shared budget/pause settings and the
 // live run stream - see ai/routes.ts.
 app.route("/congress/ai", aiRoutes);
 
-// Google sign-in shared by every Chamber that talks to Google.
+// Google sign-in shared by every connector that talks to Google.
 app.route("/congress/connectors/google", googleConnectorRoutes);
 app.route("/congress/connectors", connectorRoutes);
 
@@ -183,9 +182,7 @@ app.get("/congress/exhibits/:id/connections", requireSession, async (c) => {
 
 // Adds a manual connection from the Exhibit currently being viewed (`:id`,
 // always already-cached - it's the record on screen) to a picked Exhibit
-// (`targetExhibitId`) - proxies to `:id`'s own Chamber's
-// "/api/exhibits/:id/refs" (see mountManualRefsRoutes in @congress/chamber-kit).
-// Shares its logic with the create_exhibit_connection MCP tool via
+// (`targetExhibitId`). Shares its logic with the create_exhibit_connection MCP tool via
 // addManualConnection.
 app.post("/congress/exhibits/:id/connections", requireSession, async (c) => {
   const body = await c.req.json().catch(() => null);
@@ -213,9 +210,9 @@ app.delete("/congress/exhibits/:id/connections/:otherExhibitId", requireSession,
 // Fitness Chamber's URL): the health connector's webhook checks its token.
 app.post("/api/fitness/health/ingest", (c) => callHook("health", "/ingest", c.req.raw));
 
-app.all("/api/:chamber/*", requireSession, forwardToChamber);
+app.all("/api/*", (c) => c.json({ error: "not_found" }, 404));
 
-// /mcp and /mcp/<chamber> are called by MCP clients (the `claude` CLI), not
+// /mcp, /mcp/types and /mcp/builder are called by MCP clients (the `claude` CLI), not
 // the browser - gated by the internal-token header inside createMcpApp.
 app.use("/mcp", (c, next) => withRunContext(parseRunContext((h) => c.req.header(h)), next));
 app.use("/mcp/*", (c, next) => withRunContext(parseRunContext((h) => c.req.header(h)), next));
@@ -228,29 +225,11 @@ app.all("/mcp/types", (c) => typesMcpApp.fetch(c.req.raw, c.env));
 const builderMcpApp = createMcpApp("builder", registerBuilderTools, env.CONGRESS_INTERNAL_TOKEN);
 app.all("/mcp/builder", (c) => builderMcpApp.fetch(c.req.raw, c.env));
 
-// Each Chamber's MCP server - still real HTTP, since the CLI is a subprocess.
-const chamberMcpApps = new Map<string, ReturnType<typeof createMcpApp>>();
-app.all("/mcp/:chamber", (c) => {
-  const name = c.req.param("chamber");
-  const module = getModule(name);
-  if (!module || getChamber(name)?.status !== "active") return c.json({ error: "chamber_not_found" }, 404);
-  let mcp = chamberMcpApps.get(name);
-  if (!mcp) {
-    mcp = createMcpApp(name, module.registerTools, env.CONGRESS_INTERNAL_TOKEN);
-    chamberMcpApps.set(name, mcp);
-  }
-  return mcp.fetch(c.req.raw, c.env);
-});
-
 app.route("/mcp", mcpApp);
 
 // Public privacy policy + terms (linked from Google's OAuth consent screen).
 const privacyHtml = readFileSync(new URL("./legal/privacy.html", import.meta.url), "utf8");
 app.get("/privacy", (c) => c.html(privacyHtml));
 app.get("/terms", (c) => c.redirect("/privacy#terms"));
-
-// A Chamber's built assets at "/<name>/*"; every other "/<name>/..." path is
-// a shell route, served by Congress's own SPA below.
-app.get("/:chamberName/*", serveChamberAssets);
 
 mountStaticFrontend(app);

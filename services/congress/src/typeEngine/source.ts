@@ -1,6 +1,6 @@
 import { eq, inArray } from "drizzle-orm";
 import type { ExhibitResolveResult, ExhibitSearchResult, FeedCandidate, ManifestEvent } from "@congress/shared-types";
-import { scoreExhibitMatch } from "@congress/chamber-kit";
+import { scoreExhibitMatch } from "../kit/exhibitScore.js";
 import type { LocalExhibitSource } from "../exhibitSources.js";
 import { exhibitsDb, exhibitsSqlite } from "./db/client.js";
 import { records } from "./db/schema.js";

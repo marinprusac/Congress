@@ -1,4 +1,4 @@
-import { GoogleAccountNeedsReconnectError, GoogleScopeMissingError } from "@congress/chamber-kit";
+import { GoogleAccountNeedsReconnectError, GoogleScopeMissingError } from "../../kit/googleErrors.js";
 import type { ConnectorContext, SyncResult } from "../contract.js";
 import { GoogleApiError } from "../googleApi.js";
 import { accountRows, API, ensureSeeded, recordAccountSync, selectedCalendars, setSyncToken, type CalendarRow } from "./calendars.js";

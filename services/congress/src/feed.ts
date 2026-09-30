@@ -1,19 +1,12 @@
-import { chamberFeedResponseSchema, type ChamberRegistryEntry, type FeedCandidate, type FeedItem, type FeedPreview } from "@congress/shared-types";
-import { listChambers } from "./registry.js";
+import type { FeedCandidate, FeedItem, FeedPreview, ManifestView } from "@congress/shared-types";
 import { resolveExhibits } from "./exhibits.js";
-import { chamberFetch } from "./chambers/runtime.js";
 import { listLocalSources } from "./exhibitSources.js";
 import { listConnectors } from "./connectors/runtime.js";
 
-// The home "For You" feed. Every active Chamber is asked for its own scored
-// candidates (GET /api/feed, chamber-kit's mountFeedRoute) - the domain
-// knowledge of what's urgent stays in the Chamber - and this merges and
-// ranks them. rankFeed is deliberately the one place a smarter ranker (e.g.
-// Haiku re-ranking the same candidates) can slot in later.
-
-// Short: the feed is fetched on every Home open, and a slow Chamber should
-// cost its own candidates, not the whole feed.
-const FEED_FAN_OUT_TIMEOUT_MS = 2_000;
+// The home "For You" feed. Every source (record types, connectors) supplies
+// its own scored candidates and this merges and ranks them. rankFeed is
+// deliberately the one place a smarter ranker (e.g. Haiku re-ranking the same
+// candidates) can slot in later.
 
 // A declared view the Chamber didn't score (or a Chamber with no /api/feed
 // at all) still shows up, just below anything actually time-relevant - the
@@ -22,19 +15,8 @@ export const DEFAULT_VIEW_SCORE = 10;
 
 const MAX_ITEMS = 50;
 
-async function fetchChamberCandidates(chamber: ChamberRegistryEntry, timeoutMs: number): Promise<FeedCandidate[]> {
-  try {
-    const res = await chamberFetch(chamber.name, "/feed", { signal: AbortSignal.timeout(timeoutMs) });
-    if (!res.ok) return [];
-    const parsed = chamberFeedResponseSchema.safeParse(await res.json());
-    return parsed.success ? parsed.data.items : [];
-  } catch {
-    return [];
-  }
-}
-
 export interface ChamberCandidates {
-  chamber: Pick<ChamberRegistryEntry, "name" | "views">;
+  chamber: { name: string; views: ManifestView[] };
   candidates: FeedCandidate[];
 }
 
@@ -98,12 +80,8 @@ export function rankFeed(perChamber: ChamberCandidates[]): Unresolved[] {
   return items.sort((a, b) => b.score - a.score).slice(0, MAX_ITEMS);
 }
 
-export async function getFeed(opts: { timeoutMs?: number } = {}): Promise<FeedItem[]> {
-  const timeoutMs = opts.timeoutMs ?? FEED_FAN_OUT_TIMEOUT_MS;
-  const active = listChambers().filter((c) => c.status === "active");
-  const perChamber: ChamberCandidates[] = await Promise.all(
-    active.map(async (chamber) => ({ chamber, candidates: await fetchChamberCandidates(chamber, timeoutMs) }))
-  );
+export async function getFeed(): Promise<FeedItem[]> {
+  const perChamber: ChamberCandidates[] = [];
   for (const source of listLocalSources()) {
     try {
       perChamber.unshift({ chamber: { name: source.namespace, views: [] }, candidates: source.feedCandidates(new Date()) });

@@ -54,6 +54,6 @@ describe("eventWeight", () => {
     expect(eventWeight({ type: "congress.ai_chat_run" }, watched)).toBe(0);
     expect(eventWeight({ type: "tasks.overdue" }, watched)).toBe(3);
     expect(eventWeight({ type: "notes.created", actor: "system" }, watched)).toBe(1);
-    expect(eventWeight({ type: "congress.chamber_offline" }, watched)).toBe(0.25);
+    expect(eventWeight({ type: "logs.rule_updated" }, watched)).toBe(0.25);
   });
 });

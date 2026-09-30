@@ -112,18 +112,6 @@ export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
     payloadFields: { accountId: { type: "number" }, label: { type: "string" } },
   },
   {
-    type: "congress.chamber_offline",
-    label: "Chamber went offline",
-    description: "A Chamber failed to start and was marked offline.",
-    payloadFields: { chamberName: { type: "string" } },
-  },
-  {
-    type: "congress.chamber_online",
-    label: "Chamber came back online",
-    description: "A previously-offline Chamber started successfully again.",
-    payloadFields: { chamberName: { type: "string" } },
-  },
-  {
     type: "congress.app_updated",
     label: "App updated",
     description: "The PWA's service worker activated a newly deployed version and the shell reloaded onto it.",

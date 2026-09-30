@@ -225,6 +225,13 @@
       "when": 1790732135816,
       "tag": "0031_builder_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1790810848948,
+      "tag": "0032_drop_chambers",
+      "breakpoints": true
     }
   ]
 }

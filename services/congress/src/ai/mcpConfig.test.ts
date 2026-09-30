@@ -1,18 +1,12 @@
-import { makeManifest, migrationsDir, TEST_INTERNAL_TOKEN } from "@congress/test-support";
+import { migrationsDir, TEST_INTERNAL_TOKEN } from "@congress/test-support";
 import { beforeAll, describe, expect, it } from "vitest";
 import { runMigrations } from "../db/client.js";
-import { registerChamber, markChamberOffline } from "../registry.js";
 import { buildMcpServers } from "./mcpConfig.js";
 
-beforeAll(() => {
-  runMigrations(migrationsDir("congress"));
-  registerChamber(makeManifest("notes", { mcpUrl: "http://127.0.0.1:3000/mcp/notes" }));
-  markChamberOffline(makeManifest("tasks", { mcpUrl: "http://127.0.0.1:3000/mcp/tasks" }));
-  registerChamber(makeManifest("silent"));
-});
+beforeAll(() => runMigrations(migrationsDir("congress")));
 
 describe("buildMcpServers", () => {
-  it("always includes Congress's own /mcp, which never appears in its own registry", () => {
+  it("always includes Congress's own /mcp", () => {
     const servers = buildMcpServers("congress");
     expect(servers.congress).toEqual({
       type: "http",
@@ -21,15 +15,14 @@ describe("buildMcpServers", () => {
     });
   });
 
-  it("includes every active MCP-capable Chamber and skips offline or MCP-less ones", () => {
-    const servers = buildMcpServers("congress");
-    expect(Object.keys(servers).sort()).toEqual(["congress", "notes"]);
-    expect(servers.notes?.url).toBe("http://127.0.0.1:3000/mcp/notes");
+  it("adds builder mode's server only when asked", () => {
+    expect(Object.keys(buildMcpServers("congress"))).toEqual(["congress"]);
+    expect(Object.keys(buildMcpServers("congress", undefined, { builder: true })).sort()).toEqual(["builder", "congress"]);
   });
 
   it("attributes every tool call to the caller that asked for the run", () => {
     const servers = buildMcpServers("deputy");
     expect(servers.congress?.headers["X-Congress-Actor"]).toBe("deputy");
-    expect(servers.notes?.headers["X-Congress-Actor"]).toBe("deputy");
+    expect(buildMcpServers("deputy", undefined, { builder: true }).builder?.headers["X-Congress-Actor"]).toBe("deputy");
   });
 });

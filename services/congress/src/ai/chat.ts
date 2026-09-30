@@ -18,7 +18,7 @@ import {
 } from "./threads.js";
 import { publishEvent } from "../events.js";
 import { getCachedChamber, resolveExhibits } from "../exhibits.js";
-import { extractExhibitTokensWithLabels, WIKILINK_PATTERN } from "@congress/chamber-kit";
+import { extractExhibitTokensWithLabels, WIKILINK_PATTERN } from "../kit/wikilinks.js";
 import { buildExhibitToken, parseExhibitToken } from "@congress/shared-types";
 
 export class ThreadNotFoundError extends Error {}

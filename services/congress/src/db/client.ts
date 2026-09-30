@@ -1,4 +1,4 @@
-import { createDb } from "@congress/chamber-kit";
+import { createDb } from "../kit/db.js";
 import { env } from "../env.js";
 import * as schema from "./schema.js";
 

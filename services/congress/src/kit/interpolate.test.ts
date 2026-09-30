@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getPath, interpolate } from "./eventMatching.js";
+import { getPath, interpolate } from "./interpolate.js";
 
 describe("getPath", () => {
   it("reads a top-level key", () => {

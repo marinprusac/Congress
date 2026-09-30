@@ -7,8 +7,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.tests.json && pnpm -r typecheck",
     "dev:congress": "pnpm --filter congress dev:server",
-    "dev:congress:web": "pnpm --filter congress dev:web",
-    "create-chamber": "node scripts/create-chamber.mjs"
+    "dev:congress:web": "pnpm --filter congress dev:web"
   },
   "devDependencies": {
     "@congress/shared-types": "workspace:*",

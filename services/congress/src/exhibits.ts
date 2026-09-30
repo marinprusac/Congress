@@ -1,5 +1,4 @@
 import { and, eq, inArray, or } from "drizzle-orm";
-import { z } from "zod";
 import type {
   ExhibitResolveResult,
   ExhibitSyncRequest,
@@ -7,19 +6,10 @@ import type {
   CapitolExhibitResolveResult,
   ExhibitRefEntry,
 } from "@congress/shared-types";
-import { exhibitSearchResultSchema, exhibitResolveResultSchema, buildChipToken } from "@congress/shared-types";
+import { buildChipToken } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { exhibitCache, exhibitRefs } from "./db/schema.js";
-import { listChambers, getChamber } from "./registry.js";
-import { chamberFetch } from "./chambers/runtime.js";
-import { canonicalId, canonicalIds, getLocalSource, legacyIdsOf, listLocalSources } from "./exhibitSources.js";
-
-const FAN_OUT_TIMEOUT_MS = 5_000;
-
-// Only Capitol parses these - the response envelope for its own fan-out
-// calls to each Chamber's /exhibits/search and /exhibits/resolve.
-const exhibitSearchResponseSchema = z.object({ results: z.array(exhibitSearchResultSchema) });
-const exhibitResolveResponseSchema = z.object({ results: z.array(exhibitResolveResultSchema) });
+import { canonicalId, canonicalIds, getLocalSource, listLocalSources } from "./exhibitSources.js";
 
 // Runs the upsert + delete-and-reinsert as one transaction with a single
 // multi-row insert, rather than a `.run()` per row - better-sqlite3 wraps
@@ -86,32 +76,7 @@ export function syncExhibit(push: ExhibitSyncRequest): void {
 }
 
 export async function searchExhibits(query: string): Promise<CapitolExhibitSearchResult[]> {
-  const chambers = listChambers().filter((c) => c.status === "active");
-
-  const perChamberResults = await Promise.all(
-    chambers.map(async (chamber): Promise<CapitolExhibitSearchResult[]> => {
-      try {
-        const res = await chamberFetch(chamber.name, `/exhibits/search?q=${encodeURIComponent(query)}`, {
-          signal: AbortSignal.timeout(FAN_OUT_TIMEOUT_MS),
-        });
-        if (!res.ok) return [];
-        const parsed = exhibitSearchResponseSchema.safeParse(await res.json());
-        if (!parsed.success) return [];
-        return parsed.data.results.map((r) => ({ ...r, chamber: chamber.name }));
-      } catch {
-        return [];
-      }
-    })
-  );
-
-  // Stable sort by score (missing -> 0) merges every active Chamber's
-  // results into one relevance-ranked list, rather than the raw
-  // concatenation order above (which is just chamber-registration order).
-  // For an empty query no Chamber attaches a score at all (see
-  // createTableBackedExhibits.search / searchEventExhibits), so every
-  // comparison is 0-vs-0 and this sort is a no-op - the existing
-  // per-chamber-recency, registration-order "browse recent" behavior is
-  // unchanged.
+  // Stable sort by score (missing -> 0): one relevance-ranked list across every source.
   const local = listLocalSources().flatMap((source) => {
     try {
       return source.search(query).map((r) => ({ ...r, chamber: source.namespace }));
@@ -120,38 +85,14 @@ export async function searchExhibits(query: string): Promise<CapitolExhibitSearc
       return [];
     }
   });
-  return [...local, ...perChamberResults.flat()].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  return local.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 }
 
-// Resolves every id in one owning Chamber through a single POST
-// /exhibits/resolve call, rather than one call per id - the resolve
-// contract already takes an array and was clearly designed for this.
-// resolveOneLive (below) is the single-id case of this same call.
+// Resolves every id in one in-process source; an unknown namespace is unavailable.
 async function resolveManyLive(ids: string[], chamber: string): Promise<CapitolExhibitResolveResult[]> {
   const local = getLocalSource(chamber);
-  if (local) return cacheResolved(chamber, ids, new Map(local.resolve(ids).map((r) => [r.id, r])), local.typeOf);
-
-  const entry = getChamber(chamber);
-  if (!entry || entry.status !== "active") {
-    return ids.map((id) => ({ id, chamber, unavailable: true }));
-  }
-
-  try {
-    const res = await chamberFetch(entry.name, `/exhibits/resolve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids }),
-      signal: AbortSignal.timeout(FAN_OUT_TIMEOUT_MS),
-    });
-    if (!res.ok) return ids.map((id) => ({ id, chamber, unavailable: true }));
-
-    const parsed = exhibitResolveResponseSchema.safeParse(await res.json());
-    if (!parsed.success) return ids.map((id) => ({ id, chamber, unavailable: true }));
-
-    return cacheResolved(chamber, ids, new Map(parsed.data.results.map((r) => [r.id, r])));
-  } catch {
-    return ids.map((id) => ({ id, chamber, unavailable: true }));
-  }
+  if (!local) return ids.map((id) => ({ id, chamber, unavailable: true }));
+  return cacheResolved(chamber, ids, new Map(local.resolve(ids).map((r) => [r.id, r])), local.typeOf);
 }
 
 // Writes a live resolve back into the cache and maps it to results.
@@ -374,16 +315,7 @@ export function getManualConnectionOwner(aId: string, bId: string): { ownerId: s
   return { ownerId: row.sourceId, chamber: row.sourceChamber };
 }
 
-const exhibitChipResponseSchema = z.union([
-  z.object({ id: z.string(), name: z.string(), url: z.string() }),
-  z.object({ error: z.string() }),
-]);
-
-// Builds a ready-to-paste `[[exhibit:chamber:id|Name]]` chip for a Chamber's
-// own raw row id (e.g. what its create_x/get_x MCP tools already return) -
-// Congress has no local access to another Chamber's DB, so this always asks
-// that Chamber's own GET /exhibits/chip/:rawId (in-process),
-// mirroring resolveOneLive's chamber-lookup + fetch + typed-failure shape.
+// Builds a ready-to-paste `[[exhibit:e:id|Name]]` chip for a record's raw id.
 export async function getExhibitChip(
   chamber: string,
   rawId: string
@@ -392,34 +324,13 @@ export async function getExhibitChip(
   | { error: "chamber_not_found" | "chamber_unavailable" | "not_found" }
 > {
   const local = getLocalSource(chamber);
-  if (local) {
-    const hit = local.chip(rawId);
-    if (!hit) return { error: "not_found" };
-    return { ...hit, chamber, token: buildChipToken({ chamber, id: hit.id, name: hit.name }) };
-  }
-  const entry = getChamber(chamber);
-  if (!entry || entry.status !== "active") return { error: "chamber_not_found" };
-
-  try {
-    const res = await chamberFetch(entry.name, `/exhibits/chip/${encodeURIComponent(rawId)}`, {
-      signal: AbortSignal.timeout(FAN_OUT_TIMEOUT_MS),
-    });
-    if (res.status === 404) return { error: "not_found" };
-    if (!res.ok) return { error: "chamber_unavailable" };
-
-    const parsed = exhibitChipResponseSchema.safeParse(await res.json());
-    if (!parsed.success || "error" in parsed.data) return { error: "not_found" };
-
-    const { id, name, url } = parsed.data;
-    return { id, chamber, name, url, token: buildChipToken({ chamber, id, name }) };
-  } catch {
-    return { error: "chamber_unavailable" };
-  }
+  if (!local) return { error: "chamber_not_found" };
+  const hit = local.chip(rawId);
+  if (!hit) return { error: "not_found" };
+  return { ...hit, chamber, token: buildChipToken({ chamber, id: hit.id, name: hit.name }) };
 }
 
-// Adds a manual Connection from `id` to `targetExhibitId`, proxying to `id`'s
-// owning Chamber's own "/api/exhibits/:id/refs" (see mountManualRefsRoutes in
-// @congress/chamber-kit), callable from both an HTTP route and an MCP tool.
+// Adds a manual Connection from `id` to `targetExhibitId`, callable from both an HTTP route and an MCP tool.
 export async function addManualConnection(
   rawId: string,
   rawTargetId: string,
@@ -442,25 +353,9 @@ export async function addManualConnection(
   }
 
   const local = getLocalSource(chamber);
-  if (local) {
-    const refs = local.addManualRef(id, targetExhibitId);
-    return refs ? { refs } : { error: "not_found" };
-  }
-
-  const entry = getChamber(chamber);
-  if (!entry || entry.status !== "active") return { error: "not_found" };
-  try {
-    const res = await chamberFetch(entry.name, `/exhibits/${encodeURIComponent(id)}/refs`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ targetExhibitId, targetChamber }),
-      signal: AbortSignal.timeout(FAN_OUT_TIMEOUT_MS),
-    });
-    if (!res.ok) return { error: "not_found" };
-    return (await res.json()) as { refs: string[] };
-  } catch {
-    return { error: "not_found" };
-  }
+  if (!local) return { error: "not_found" };
+  const refs = local.addManualRef(id, targetExhibitId);
+  return refs ? { refs } : { error: "not_found" };
 }
 
 // Removes a manual Connection between `id` and `otherExhibitId`, regardless
@@ -475,24 +370,7 @@ export async function removeManualConnection(
   if (!owner) return { error: "not_found" };
   const otherId = owner.ownerId === id ? otherExhibitId : id;
   const local = getLocalSource(owner.chamber);
-  if (local) {
-    const refs = local.removeManualRef(owner.ownerId, otherId);
-    return refs ? { refs } : { error: "not_found" };
-  }
-  const entry = getChamber(owner.chamber);
-  if (!entry || entry.status !== "active") return { error: "not_found" };
-  // A Chamber may still store the connection under the other side's legacy id.
-  for (const candidate of [otherId, ...legacyIdsOf(otherId)]) {
-    try {
-      const res = await chamberFetch(
-        entry.name,
-        `/exhibits/${encodeURIComponent(owner.ownerId)}/refs/${encodeURIComponent(candidate)}`,
-        { method: "DELETE", signal: AbortSignal.timeout(FAN_OUT_TIMEOUT_MS) }
-      );
-      if (res.ok) return (await res.json()) as { refs: string[] };
-    } catch {
-      // try the next candidate
-    }
-  }
-  return { error: "not_found" };
+  if (!local) return { error: "not_found" };
+  const refs = local.removeManualRef(owner.ownerId, otherId);
+  return refs ? { refs } : { error: "not_found" };
 }

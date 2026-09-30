@@ -1,7 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import { z } from "zod";
-import { mcpTextResult } from "@congress/chamber-kit";
+import { mcpTextResult } from "../../kit/mcp.js";
 import { ConnectorRefusedError, defineConnector } from "../contract.js";
 import { closeHealthDb, runHealthMigrations } from "./db/client.js";
 import { countMetrics, getHealthSettings, ingestSamples, latestMetrics, listMetrics, updateHealthSettings } from "./store.js";

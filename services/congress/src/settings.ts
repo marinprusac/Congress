@@ -1,4 +1,4 @@
-import { createSingleRowSettings } from "@congress/chamber-kit";
+import { createSingleRowSettings } from "./kit/settings.js";
 import type { CapitolSettings } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { settings } from "./db/schema.js";

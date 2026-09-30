@@ -1,10 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { mcpTextResult } from "@congress/chamber-kit";
+import { mcpTextResult } from "../kit/mcp.js";
 import { buildChipToken } from "@congress/shared-types";
 import { registerAskTools } from "./askTools.js";
 import { registerMemoryTools } from "./memoryTools.js";
-import { listChambers, getChamber, detachChamber, attachChamber } from "../registry.js";
 import {
   searchExhibits,
   resolveExhibits,
@@ -18,64 +17,6 @@ import { listHistory } from "../eventHistory.js";
 import { listNotifications, dismissNotification } from "../notifications.js";
 
 export function registerTools(server: McpServer) {
-  server.registerTool(
-    "list_chambers",
-    {
-      title: "List Chambers",
-      description: "List all Chambers registered with Capitol, including their status.",
-      inputSchema: {},
-    },
-    async () => {
-      const chambers = listChambers();
-      return mcpTextResult(chambers);
-    }
-  );
-
-  server.registerTool(
-    "get_chamber_status",
-    {
-      title: "Get Chamber Status",
-      description: "Get the registry entry and status for a single Chamber by name.",
-      inputSchema: { name: z.string().min(1) },
-    },
-    async ({ name }) => {
-      const chamber = getChamber(name);
-      if (!chamber) {
-        return mcpTextResult({ error: "not_found", name });
-      }
-      return mcpTextResult(chamber);
-    }
-  );
-
-  server.registerTool(
-    "detach_chamber",
-    {
-      title: "Detach Chamber",
-      description:
-        "Manually take a Chamber out of rotation - its API, frontend, feed, search and MCP tools stop being served while its module stays loaded. Survives restarts; only attach_chamber clears it.",
-      inputSchema: { name: z.string().min(1) },
-    },
-    async ({ name }) => {
-      const chamber = detachChamber(name);
-      if (!chamber) return mcpTextResult({ error: "not_found", name });
-      return mcpTextResult(chamber);
-    }
-  );
-
-  server.registerTool(
-    "attach_chamber",
-    {
-      title: "Attach Chamber",
-      description: "Clear a manual detach and mark a Chamber active again.",
-      inputSchema: { name: z.string().min(1) },
-    },
-    async ({ name }) => {
-      const chamber = attachChamber(name);
-      if (!chamber) return mcpTextResult({ error: "not_found", name });
-      return mcpTextResult(chamber);
-    }
-  );
-
   server.registerTool(
     "search_exhibits",
     {

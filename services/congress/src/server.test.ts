@@ -1,13 +1,9 @@
 import type { AddressInfo } from "node:net";
 import { serve, type ServerType } from "@hono/node-server";
 import type { HttpBindings } from "@hono/node-server";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { listChamberTools, mcpTextResult } from "@congress/chamber-kit";
-import { makeFakeChamberModule, migrationsDir, TEST_INTERNAL_TOKEN, TEST_MASTER_PASSWORD } from "@congress/test-support";
+import { migrationsDir, TEST_INTERNAL_TOKEN, TEST_MASTER_PASSWORD } from "@congress/test-support";
 import { runMigrations } from "./db/client.js";
-import { loadChamber } from "./chambers/loader.js";
-import { detachChamber } from "./registry.js";
 import { app } from "./server.js";
 import { startConnectors, stopConnectors } from "./connectors/registry.js";
 import { healthConnector } from "./connectors/health/index.js";
@@ -31,21 +27,6 @@ beforeAll(async () => {
     bindings()
   );
   sessionCookie = res.headers.get("set-cookie")!.split(";")[0]!;
-
-  const configure = (c: ReturnType<typeof makeFakeChamberModule>["app"]) => {
-    c.get("/api/notes", (ctx) => ctx.json([{ id: 1, title: "One" }]));
-    c.post("/api/health/ingest", async (ctx) =>
-      ctx.json({ receivedToken: ctx.req.header("x-health-ingest-token") ?? null, body: await ctx.req.json() })
-    );
-  };
-  await loadChamber(makeFakeChamberModule("e2e", { configure }), { envFor: () => ({}) });
-  await loadChamber(
-    makeFakeChamberModule("tooled", {
-      registerTools: (server) =>
-        (server as McpServer).registerTool("ping", { title: "Ping", description: "Answers pong." }, async () => mcpTextResult("pong")),
-    }),
-    { envFor: () => ({}) }
-  );
 });
 
 function session() {
@@ -110,7 +91,6 @@ describe("session-only routes", () => {
     { method: "PUT", path: "/congress/ai/settings", body: { contextPrompt: "" } },
     { method: "GET", path: "/congress/ai/settings/spend" },
     { method: "GET", path: "/congress/feed" },
-    { method: "GET", path: "/api/e2e/notes" },
   ];
 
   it.each(cases)("401s $method $path without a session", async ({ method, path, body }) => {
@@ -169,35 +149,21 @@ describe("request validation", () => {
   });
 });
 
-describe("load -> registry -> API -> detach", () => {
-  it("carries a loaded chamber from the registry to an API call and back out", async () => {
-    const registry = (await (await app.request("/congress/registry", { headers: session() }, bindings())).json()) as { name: string; status: string; mcpUrl?: string }[];
-    expect(registry.find((c) => c.name === "e2e")).toMatchObject({ status: "active", mcpUrl: "http://127.0.0.1:3000/mcp/e2e" });
-
-    const res = await app.request("/api/e2e/notes", { headers: session() }, bindings());
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual([{ id: 1, title: "One" }]);
+describe("no Chambers", () => {
+  it("has an empty registry", async () => {
+    const res = await app.request("/congress/registry", { headers: session() }, bindings());
+    await expect(res.json()).resolves.toEqual([]);
   });
 
-  it("503s once the owner detaches the chamber", async () => {
-    await loadChamber(makeFakeChamberModule("parked"), { envFor: () => ({}) });
-    detachChamber("parked");
-    const res = await app.request("/api/parked/notes", { headers: session() }, bindings());
-    expect(res.status).toBe(503);
-    await expect(res.json()).resolves.toEqual({ error: "chamber_offline", chamber: "parked" });
+  it("404s any /api path that isn't a route, rather than serving the shell", async () => {
+    const res = await app.request("/api/notes/anything", { headers: session() }, bindings());
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ error: "not_found" });
   });
-});
 
-describe("chamber paths", () => {
-  it("falls through to Congress's own frontend for a chamber navigation path", async () => {
-    // Hard-loading "/e2e/n/1" must reach the shell, which mounts the Chamber.
-    const res = await app.request("/e2e/n/1", {}, bindings());
+  it("falls through to Congress's own frontend for a page path, including a retired Chamber's", async () => {
+    const res = await app.request("/whatsapp/c/x", {}, bindings());
     expect(res.status).not.toBe(401);
-    expect(res.status).not.toBe(503);
-  });
-
-  it("does not shadow Congress's own routes for an unknown first path segment", async () => {
-    const res = await app.request("/some-unregistered-path", {}, bindings());
     expect(res.status).not.toBe(503);
   });
 });
@@ -240,17 +206,8 @@ describe("mcp mounts", () => {
     expect((await app.request("/mcp", { method: "POST", headers: json, body: "{}" })).status).toBe(401);
   });
 
-  it("gates a chamber's /mcp/<name> with the shared secret", async () => {
-    expect((await fetch(`${origin}/mcp/tooled`, { method: "POST", headers: json, body: "{}" })).status).toBe(401);
-  });
-
-  it("serves exactly that chamber's tools at /mcp/<name>", async () => {
-    const tools = await listChamberTools(`${origin}/mcp/tooled`, TEST_INTERNAL_TOKEN);
-    expect(tools.map((t) => t.name)).toEqual(["ping"]);
-  });
-
-  it("404s an unknown chamber's mcp path instead of falling through to Congress's own", async () => {
-    const res = await fetch(`${origin}/mcp/nosuch`, { method: "POST", headers: { ...internal, ...json }, body: "{}" });
-    expect(res.status).toBe(404);
+  it("gates the types and builder servers with the shared secret", async () => {
+    expect((await fetch(`${origin}/mcp/types`, { method: "POST", headers: json, body: "{}" })).status).toBe(401);
+    expect((await fetch(`${origin}/mcp/builder`, { method: "POST", headers: json, body: "{}" })).status).toBe(401);
   });
 });

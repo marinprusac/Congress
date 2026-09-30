@@ -1,7 +1,7 @@
 import type { AddressInfo } from "node:net";
 import { serve, type ServerType } from "@hono/node-server";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { callChamberTool, listChamberTools } from "@congress/chamber-kit";
+import { callChamberTool, listChamberTools } from "../../kit/mcp.js";
 import { migrationsDir, TEST_INTERNAL_TOKEN } from "@congress/test-support";
 import { app } from "../../server.js";
 import { runMigrations } from "../../db/client.js";
