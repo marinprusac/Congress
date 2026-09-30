@@ -476,51 +476,6 @@ export function deleteRecord(id: string, opts: { actor?: string; fromSource?: bo
   }
 }
 
-// Moves a record to another type under the same id, so links, manual refs and
-// aliases keep working. An import, not an edit: no events.
-export function retypeRecord(id: string, targetSlug: string, values: unknown): RecordDto {
-  const from = typeOfRecord(id);
-  if (!from) throw new RecordNotFoundError(`no record ${id}`);
-  const to = getTypeBySlug(targetSlug);
-  if (!to) throw new RecordNotFoundError(`no type "${targetSlug}"`);
-  if (from.id === to.id) throw new RecordValidationError({ formErrors: [`already a ${to.definition.label}`], fieldErrors: {} });
-  const old = readRow(from.definition, id)!;
-  const def = to.definition;
-  const input = parseInput(def, "create", values, false);
-
-  const cols = ["id", "created_at", "updated_at"];
-  const params: Stored[] = [id, old.created_at as number, old.updated_at as number];
-  const fields = activeFields(def);
-  for (const f of fields) {
-    if (isJoinField(f)) continue;
-    cols.push(f.column);
-    params.push(encodeValue(f, input[f.slug] ?? defaultValue(f)));
-  }
-  let unlinked: { t: StoredType; id: string }[] = [];
-  try {
-    exhibitsSqlite.transaction(() => {
-      unlinked = unlinkEverywhere(id, from.definition.slug);
-      exhibitsSqlite.prepare(`DELETE FROM ${quoteIdent(from.definition.tableName)} WHERE "id" = ?`).run(id);
-      for (const f of from.definition.fields) if (isJoinField(f)) exhibitsSqlite.prepare(`DELETE FROM ${quoteIdent(f.column)} WHERE "from_id" = ?`).run(id);
-      deleteKeys(id);
-      exhibitsDb.update(records).set({ typeId: to.id }).where(eq(records.id, id)).run();
-      exhibitsSqlite
-        .prepare(`INSERT INTO ${quoteIdent(def.tableName)} (${cols.map(quoteIdent).join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`)
-        .run(...params);
-      for (const f of fields) if (isJoinField(f)) writeJoin(f, id, (input[f.slug] as string[] | undefined) ?? []);
-      if (hasKeys(def)) writeKeys(to.id, def, id, readRow(def, id)!);
-    })();
-  } catch (err) {
-    rethrowConflict(def, err);
-  }
-  releaseFiles(fileIdsIn(from.definition, old));
-  attachFiles(fileIdsIn(def, readRow(def, id)!));
-  syncRecordExhibit(to, id);
-  for (const u of unlinked) syncRecordExhibit(u.t, u.id);
-  notifyWrite(to, id, undefined, { op: "cleanup", changed: [] });
-  return getRecord(id)!;
-}
-
 // Bindings: the record mirroring a source record, and (re)linking one.
 export function findBySource(t: StoredType, binding: string, key: string): string | undefined {
   const row = exhibitsSqlite
