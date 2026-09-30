@@ -3,6 +3,7 @@ import type { RecordDto } from "@congress/shared-types";
 import { GmailThread } from "./GmailThread";
 import { HevyRoutine } from "./HevyRoutine";
 import { HevyWorkout } from "./HevyWorkout";
+import { WhatsappChat } from "./WhatsappChat";
 
 // Hand-written renderers for a connector's live content (read.detail), keyed
 // by "<connector>:<kind>". A record page shows one where its body would go.
@@ -19,4 +20,5 @@ export const LIVE_RENDERERS: Record<string, ComponentType<LiveProps>> = {
   "gmail:thread": GmailThread,
   "hevy:workout": HevyWorkout,
   "hevy:routine": HevyRoutine,
+  "whatsapp:chat": WhatsappChat,
 };

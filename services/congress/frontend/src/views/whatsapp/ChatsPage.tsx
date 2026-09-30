@@ -1,23 +1,15 @@
 import { useEffect, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import {
-  ListEmptyState,
-  ListErrorState,
-  ListLoadingState,
-  ListSearchInput,
-  StackLink,
-  resolveChamberPath,
-  useShellHosted,
-} from "@congress/congress-ui";
-import { cursorAt, fetchChats, fetchStatus, ReaderUnavailableError, searchAll, type ChatSummary, type Message } from "@/lib/api";
-import { chatTitle, listTime, needsPairing, previewText, senderLabel, statusNotice } from "@/lib/format";
-import { Avatar } from "@/components/Avatar";
-import { PairingPanel } from "@/components/PairingPanel";
+import { ListEmptyState, ListErrorState, ListLoadingState, ListSearchInput, StackLink } from "@congress/congress-ui";
+import { cursorAt, fetchChats, fetchStatus, ReaderUnavailableError, searchAll, type ChatSummary, type Message } from "@/views/whatsapp/api";
+import { chatTitle, listTime, needsPairing, previewText, senderLabel, statusNotice } from "@/views/whatsapp/format";
+import { Avatar } from "@/views/whatsapp/Avatar";
+import { PairingPanel } from "@/connectors/WhatsappPanel";
+import "./whatsapp.css";
 
 export function useChatPath() {
-  const shellHosted = useShellHosted();
   return (jid: string, at?: Message) => {
-    const base = resolveChamberPath(`/c/${encodeURIComponent(jid)}`, "whatsapp", shellHosted);
+    const base = `/whatsapp/c/${encodeURIComponent(jid)}`;
     return at ? `${base}?at=${encodeURIComponent(cursorAt(at.ts))}&msg=${encodeURIComponent(at.id)}` : base;
   };
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { mediaUrl, type Message } from "@/lib/api";
-import { clockTime, formatBytes, formatDuration, senderLabel, typeLabel } from "@/lib/format";
+import { mediaUrl, type Message } from "@/views/whatsapp/api";
+import { clockTime, formatBytes, formatDuration, senderLabel, typeLabel } from "@/views/whatsapp/format";
 
 // Attachments load only when tapped: each view is a download through wa-reader.
 function Media({ message }: { message: Message }) {

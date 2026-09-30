@@ -41,6 +41,8 @@ const CORE_VIEWS: (ViewSource & { type: string })[] = [
       { id: "pending", label: "Visits to classify", fullPath: "/pending" },
     ],
   },
+  // Same name and view id as the Chamber, so a pinned chat list keeps working.
+  { name: "whatsapp", displayName: "WhatsApp", type: "chat", views: [{ id: "chats", label: "WhatsApp", fullPath: "/" }] },
 ];
 
 // A core view with its own card, for the feed and /view/... (null for a Chamber's).

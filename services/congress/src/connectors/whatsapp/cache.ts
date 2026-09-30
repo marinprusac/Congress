@@ -32,7 +32,7 @@ export const getChatRow = (jid: string): ChatRow | undefined => db.select().from
 export const listChatRows = (): ChatRow[] => db.select().from(chats).orderBy(desc(chats.lastAt)).all();
 
 export function getWhatsappSettings() {
-  return db.select().from(settings).where(eq(settings.id, 1)).get() ?? { id: 1, createPeople: false };
+  return db.select().from(settings).where(eq(settings.id, 1)).get() ?? { id: 1, createPeople: true };
 }
 
 export function setCreatePeople(on: boolean): void {

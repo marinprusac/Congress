@@ -60,6 +60,8 @@ const ctx = {
 } as unknown as ConnectorContext;
 
 beforeEach(() => {
+  setCreatePeople(false);
+  whatsappDb.run(sql`delete from chats`);
   resolved.length = 0;
   found.length = 0;
   emitted.length = 0;
@@ -88,7 +90,16 @@ describe("the WhatsApp connector's chats", () => {
     expect(resolved).toEqual(["+385911111111"]);
     expect(getChatRow(ANA)?.personId).toBe("person-+385911111111");
     expect(getChatRow(BOB)?.personId).toBeNull();
-    expect(emitted.map((e) => e.key)).toEqual([ANA]);
+    expect(emitted.map((e) => e.key).sort()).toEqual([ANA, BOB, GROUP].sort());
+  });
+
+  it("lets the owner switch People creation, and counts who is waiting", async () => {
+    await syncWhatsapp(ctx);
+    const app = whatsappConnector.routes!(ctx);
+    expect(await (await app.request("/settings")).json()).toEqual({ createPeople: false, minOwnerMessages: 5, pending: 1 });
+    const put = await app.request("/settings", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ createPeople: true }) });
+    expect(await put.json()).toMatchObject({ createPeople: true });
+    expect((await app.request("/settings", { method: "PUT", body: "{}" })).status).toBe(400);
   });
 
   it("marks read only in the reader, never telling WhatsApp", async () => {

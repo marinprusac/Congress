@@ -1,8 +1,8 @@
-import { resolveApiBase, parseJsonResponse as json } from "@congress/congress-ui";
+import { parseJsonResponse as json } from "@congress/congress-ui";
 
 // Mirrors wa-reader's JSON (reader/internal/store/queries.go). Read-only: nothing
 // here reaches WhatsApp (marking read changes only wa-reader's own DB).
-export const API_BASE = resolveApiBase("whatsapp");
+export const API_BASE = "/congress/connectors/whatsapp";
 
 export interface ReaderStatus {
   state: string;
@@ -67,6 +67,21 @@ async function get<T>(path: string): Promise<T> {
   if (res.status === 503) throw new ReaderUnavailableError("reader_unavailable");
   return json<T>(res);
 }
+
+export interface WhatsappSettings {
+  createPeople: boolean;
+  minOwnerMessages: number;
+  pending: number;
+}
+
+export const fetchSettings = () => get<WhatsappSettings>("/settings");
+
+export async function saveSettings(createPeople: boolean): Promise<WhatsappSettings> {
+  const res = await fetch(`${API_BASE}/settings`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ createPeople }) });
+  return json<WhatsappSettings>(res);
+}
+
+export const fetchChatRecord = (jid: string) => get<{ id: string | null }>(`/chats/${enc(jid)}/record`);
 
 export const fetchStatus = () => get<ReaderStatus>("/status");
 

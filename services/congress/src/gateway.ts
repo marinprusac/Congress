@@ -61,6 +61,7 @@ const CORE_ICONS: Record<string, string> = {
   events: icon("events"),
   fitness: icon("fitness"),
   map: icon("map"),
+  whatsapp: icon("whatsapp"),
 };
 
 export async function serveChamberIcon(c: Context, chamberName: string): Promise<Response> {
