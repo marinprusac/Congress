@@ -28,8 +28,6 @@ const tempDir = mkdtempSync(join(tmpdir(), "congress-test-"));
 // itself, and better-sqlite3 creates the file.
 process.env.DB_PATH = join(tempDir, "test.sqlite3");
 process.env.EXHIBITS_DB_PATH = join(tempDir, "exhibits.sqlite3");
-// Tests call the Notes importer directly when they want it.
-process.env.NOTES_IMPORT_ENABLED = "false";
 
 process.env.NODE_ENV = "test";
 process.env.HOST = "127.0.0.1";
