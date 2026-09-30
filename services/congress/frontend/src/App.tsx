@@ -18,6 +18,8 @@ import { ViewPage } from "@/pages/ViewPage";
 import { RecordPage } from "@/records/RecordPage";
 import { LegacyRedirect } from "@/records/LegacyRedirect";
 import { TimelinePage, WeekPage } from "@/views/calendar/CalendarViews";
+import { HealthPage } from "@/views/health/HealthViews";
+import { NewRoutinePage } from "@/views/fitness/NewRoutinePage";
 
 // Page transitions wait for a Chamber's bundle so they animate the real page.
 setRoutePreloader((path) => {
@@ -65,6 +67,9 @@ export function App() {
         {/* The calendar's views over Event records. */}
         <Route path="/events" element={<TimelinePage />} />
         <Route path="/events/week" element={<WeekPage />} />
+        {/* Fitness: Apple Health, and a new Hevy routine (it needs exercises before it exists). */}
+        <Route path="/fitness/health" element={<HealthPage />} />
+        <Route path="/e/new/routine" element={<NewRoutinePage />} />
         {/* Every runtime exhibit type's records (typeEngine). */}
         <Route path="/e/new/:type" element={<RecordPage />} />
         <Route path="/e/:id" element={<RecordPage />} />

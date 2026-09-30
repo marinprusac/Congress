@@ -3,6 +3,7 @@ import { listChambers } from "./registry.js";
 import { resolveExhibits } from "./exhibits.js";
 import { chamberFetch } from "./chambers/runtime.js";
 import { listLocalSources } from "./exhibitSources.js";
+import { listConnectors } from "./connectors/runtime.js";
 
 // The home "For You" feed. Every active Chamber is asked for its own scored
 // candidates (GET /api/feed, chamber-kit's mountFeedRoute) - the domain
@@ -108,6 +109,14 @@ export async function getFeed(opts: { timeoutMs?: number } = {}): Promise<FeedIt
       perChamber.unshift({ chamber: { name: source.namespace, views: [] }, candidates: source.feedCandidates(new Date()) });
     } catch (err) {
       console.warn(`[feed] ${source.namespace} failed: ${(err as Error).message}`);
+    }
+  }
+  for (const c of listConnectors()) {
+    try {
+      const out = c.feed?.(new Date());
+      if (out) perChamber.push({ chamber: { name: out.source, views: out.views }, candidates: out.candidates });
+    } catch (err) {
+      console.warn(`[feed] connector ${c.name} failed: ${(err as Error).message}`);
     }
   }
   const ranked = rankFeed(perChamber);

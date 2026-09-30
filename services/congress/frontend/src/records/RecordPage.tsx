@@ -328,7 +328,13 @@ export function RecordPage() {
         {missing && <p className="font-mono text-sm text-alert">Not found.</p>}
         {!loading && !missing && def && (
           <article>
-            {titleField && (
+            {titleField && locked.has(titleField.slug) && (
+              // Kept by the source: shown whole, wrapping, rather than as a one-line input.
+              <div className="mb-6 border-b border-dust pb-4">
+                <h1 className="break-words font-display text-3xl text-ink">{String(current[titleField.slug] ?? "") || "Untitled"}</h1>
+              </div>
+            )}
+            {titleField && !locked.has(titleField.slug) && (
               <div className="mb-6 border-b border-dust pb-4">
                 <input
                   ref={titleRef}
@@ -444,7 +450,7 @@ export function RecordPage() {
               }
             >
               {Live && binding && recordId ? (
-                <Live recordId={recordId} binding={binding} runAction={runSilently} />
+                <Live recordId={recordId} sourceKey={recordQuery.data?.provenance?.key ?? ""} binding={binding} runAction={runSilently} />
               ) : bodyField && locked.has(bodyField.slug) ? (
                 <ReadonlyValue field={bodyField} value={current[bodyField.slug]} onNavigate={onNavigate} />
               ) : bodyField ? (

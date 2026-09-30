@@ -114,6 +114,9 @@ export async function uploadFile(file: File): Promise<FileRef> {
 // A type whose bindings can't create only gets records from its source.
 export const canCreate = (def: TypeSummary["definition"]) => def.bindings.length === 0 || def.bindings.some((b) => b.create);
 
+// Types a hand-written page creates at /e/new/<slug> instead (a new Hevy routine needs its exercises first).
+export const CUSTOM_NEW = new Set(["routine"]);
+
 // The source's live content for a record (its shape is the connector's; null when none).
 export async function fetchLive<T>(id: string): Promise<T | null> {
   return (await check<{ content: T | null }>(await fetch(`/congress/records/${encodeURIComponent(id)}/live`))).content;
