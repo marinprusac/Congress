@@ -3,7 +3,7 @@ import { createSyncScheduler, type SyncStatus } from "./scheduler.js";
 import { addConnector, emitConnectorSynced, emitSourceChange, removeConnector } from "./runtime.js";
 import { googleApiFetch } from "./googleApi.js";
 import { listGoogleAccounts } from "./google/accounts.js";
-import { onEventPublished } from "../events.js";
+import { onEventPublished, publishEvent } from "../events.js";
 import { getTypeBySlug } from "../typeEngine/store.js";
 import { activeFields } from "../typeEngine/operations.js";
 import { lookupOrCreate, type Evidence } from "../typeEngine/lookups.js";
@@ -59,11 +59,12 @@ export function makeContext(connector: Connector, hooks: { syncNow(): void; resc
   return {
     name: connector.name,
     google: {
-      accounts: () => listGoogleAccounts().map((a) => ({ id: a.id, label: a.label, email: a.email, needsReconnect: a.needsReconnect })),
-      fetch: (accountId, url, init) => googleApiFetch(accountId, connector.googleScopes ?? [], url, init),
+      accounts: () => listGoogleAccounts().map((a) => ({ id: a.id, label: a.label, email: a.email, needsReconnect: a.needsReconnect, scopes: a.scopes })),
+      fetch: (accountId, url, init, scopes) => googleApiFetch(accountId, scopes ?? connector.googleScopes ?? [], url, init),
     },
     people: { find: findPerson, resolve: (input, evidence) => resolvePerson(input, evidence, connector.name) },
-    emitChange: (kind, key, deleted = false) => emitSourceChange({ connector: connector.name, kind, key, deleted }),
+    emitChange: (kind, key, deleted = false, quiet = false) => emitSourceChange({ connector: connector.name, kind, key, deleted, quiet }),
+    publish: (type, payload) => publishEvent({ chamber: connector.name, type, payload }),
     ...hooks,
   };
 }

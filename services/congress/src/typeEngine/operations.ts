@@ -279,7 +279,7 @@ export function validateDefinition(def: TypeDefinition): string[] {
   }
   const isTime = (f: FieldDefinition) => f.kind === "datetime" || f.kind === "date";
   for (const { when } of def.feedRules) {
-    if (when.op !== "within_next" && when.op !== "overdue" && when.op !== "ongoing") continue;
+    if (when.op !== "within_next" && when.op !== "within_last" && when.op !== "overdue" && when.op !== "ongoing") continue;
     for (const id of when.op === "ongoing" ? [when.field, when.end] : [when.field]) {
       const f = def.fields.find((x) => x.id === id);
       if (f && !isTime(f)) errors.push(`feed rule ${when.op} needs a date or datetime field, "${f.slug}" is ${f.kind}`);

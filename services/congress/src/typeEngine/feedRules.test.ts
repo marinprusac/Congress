@@ -112,3 +112,27 @@ describe("feed rules on date fields", () => {
     expect(ids(cs)).toEqual(["in2", "tomorrow"]);
   });
 });
+
+describe("within_last", () => {
+  it("picks the recent past, newest first", () => {
+    const mail = applyOperations(null, [
+      { op: "create_type", slug: "mail", label: "Mail" },
+      { op: "add_field", slug: "subject", label: "Subject", kind: "text" },
+      { op: "set_title_field", field: "subject" },
+      { op: "add_field", slug: "at", label: "At", kind: "datetime", options: { indexed: true } },
+      { op: "set_feed_rules", rules: [{ when: { op: "within_last", field: "at", hours: 24 }, score: 60 }] },
+    ] satisfies Operation[]).def;
+    const sqlite = new Database(":memory:");
+    for (const step of planMigration(null, mail).steps) sqlite.exec(step);
+    const insert = sqlite.prepare(`INSERT INTO x_mail (id, created_at, updated_at, subject, at) VALUES (?, 0, 0, ?, ?)`);
+    insert.run("fresh", "Fresh", now.getTime() - HOUR);
+    insert.run("stale", "Stale", now.getTime() - 23 * HOUR);
+    insert.run("old", "Old", now.getTime() - 30 * HOUR);
+    insert.run("future", "Future", now.getTime() + HOUR);
+    const candidates = feedCandidatesFor(mail, now, (sql, params) => sqlite.prepare(sql).all(...params) as never, (r) => String(r.subject));
+    const scores = Object.fromEntries(candidates.map((c) => [c.kind === "exhibit" ? c.exhibitId : "", c.score]));
+    expect(Object.keys(scores).sort()).toEqual(["fresh", "stale"]);
+    expect(scores.fresh!).toBeGreaterThan(scores.stale!);
+    expect(scores.fresh!).toBeLessThanOrEqual(60);
+  });
+});

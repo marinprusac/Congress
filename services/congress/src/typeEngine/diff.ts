@@ -161,6 +161,8 @@ function describeRule(def: TypeDefinition, r: FeedRule): string {
       ? `${fieldLabel(def, w.field)} within ${w.hours}h`
       : w.op === "overdue"
         ? `${fieldLabel(def, w.field)} overdue`
+        : w.op === "within_last"
+          ? `${fieldLabel(def, w.field)} within the last ${w.hours}h`
         : w.op === "ongoing"
           ? `under way (${fieldLabel(def, w.field)} to ${fieldLabel(def, w.end)})`
           : w.op === "eq"

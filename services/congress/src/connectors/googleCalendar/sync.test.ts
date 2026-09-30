@@ -90,7 +90,7 @@ describe("google calendar sync", () => {
 
   it("keeps syncing other accounts when one fails", async () => {
     const { state, ctx } = fakeGoogle();
-    state.accounts.push({ id: 2, label: "Work", email: "me@work.io", needsReconnect: false }, { id: 3, label: "Old", email: "old@x.io", needsReconnect: true });
+    state.accounts.push({ id: 2, label: "Work", email: "me@work.io", needsReconnect: false, scopes: [] }, { id: 3, label: "Old", email: "old@x.io", needsReconnect: true, scopes: [] });
     state.calendarList[2] = [{ id: "primary", summary: "Work", primary: true }];
     state.full["1/primary"] = [ev("a")];
     state.failing.add(2);

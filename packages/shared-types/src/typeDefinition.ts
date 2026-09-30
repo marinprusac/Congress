@@ -74,6 +74,8 @@ export const feedRuleSchema = z.object({
     z.object({ op: z.literal("updated_within"), hours: z.number().positive().max(24 * 365) }),
     // Under way now: field (start) <= now < end.
     z.object({ op: z.literal("ongoing"), field: z.string(), end: z.string() }),
+    // Happened within the last hours (field in the past, newer scores higher).
+    z.object({ op: z.literal("within_last"), field: z.string(), hours: z.number().positive().max(24 * 365) }),
   ]),
   // Extra conditions that must also hold (e.g. done = false).
   and: z.array(z.object({ field: z.string(), value: z.union([z.string(), z.number(), z.boolean(), z.null()]) })).max(5).optional(),
@@ -234,6 +236,8 @@ export const recordDtoSchema = z.object({
       actions: z.array(z.object({ id: z.string(), label: z.string() })),
       // Source values no field holds (hybrid storage), read live.
       live: z.record(z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())])),
+      // The connector serves live content (GET /congress/records/:id/live).
+      detail: z.boolean().optional(),
       pending: z.object({ error: z.string().nullable(), failed: z.boolean(), since: z.string() }).nullable(),
     })
     .nullable()

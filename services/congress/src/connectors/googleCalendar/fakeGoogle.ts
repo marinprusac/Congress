@@ -11,11 +11,12 @@ export interface FakeAccount {
   label: string;
   email: string;
   needsReconnect: boolean;
+  scopes: string[];
 }
 
 export function fakeGoogle() {
   const state = {
-    accounts: [{ id: 1, label: "Me", email: "me@example.com", needsReconnect: false }] as FakeAccount[],
+    accounts: [{ id: 1, label: "Me", email: "me@example.com", needsReconnect: false, scopes: [] }] as FakeAccount[],
     calendarList: { 1: [{ id: "primary", summary: "Me", primary: true }, { id: "work", summary: "Work" }] } as Record<number, { id: string; summary: string; primary?: boolean }[]>,
     // Returned by full syncs, and by incremental ones (then cleared).
     full: {} as Record<string, RawGoogleEvent[]>,
@@ -71,6 +72,7 @@ export function fakeGoogle() {
       },
     },
     emitChange: (kind, key, deleted = false) => state.changesSeen.push({ kind, key, deleted }),
+    publish: () => {},
     syncNow: () => {},
     reschedule: () => {},
   };

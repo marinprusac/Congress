@@ -47,6 +47,11 @@ export class RecordLockedError extends Error {
   }
 }
 
+// A bound type whose bindings can't create only gets records from its source.
+export function canCreate(def: TypeDefinition): boolean {
+  return def.bindings.length === 0 || def.bindings.some((b) => b.create);
+}
+
 export interface WriteInfo {
   op: "create" | "update" | "delete" | "cleanup";
   // Field slugs the write set (create: every given field).
@@ -355,6 +360,9 @@ export function createRecord(typeSlug: string, values: unknown, opts: CreateOpti
   const t = getTypeBySlug(typeSlug);
   if (!t) throw new RecordNotFoundError(`no type "${typeSlug}"`);
   const def = t.definition;
+  if (!opts.fromSource && !opts.trusted && !canCreate(def)) {
+    throw new RecordLockedError([], `${def.pluralLabel} only come from ${def.bindings.map((x) => x.label).join(" or ")}`);
+  }
   // Trusted imports may leave a required field empty (e.g. a file lost on disk).
   const input = parseInput(def, opts.trusted || opts.fromSource ? "patch" : "create", values, opts.trusted || opts.fromSource);
   const at = opts.at ?? new Date();
