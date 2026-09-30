@@ -1,10 +1,22 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-// A bookmarked retired-Chamber URL (/notes/n/5, /tasks/t/5, /documents/d/5)
+// A bookmarked retired-Chamber URL (/notes/n/5, /calendar/e/1/cal/evt)
 // opens the record its import made instead.
-export function LegacyRedirect({ chamber, idPrefix, noun }: { chamber: string; idPrefix: string; noun: string }) {
-  const { id = "" } = useParams();
+export function LegacyRedirect({
+  chamber,
+  idPrefix,
+  noun,
+  idFrom,
+}: {
+  chamber: string;
+  idPrefix: string;
+  noun: string;
+  // Builds the old id from several URL parts (default: the :id param).
+  idFrom?: (params: Record<string, string | undefined>) => string;
+}) {
+  const params = useParams();
+  const id = idFrom ? idFrom(params) : (params.id ?? "");
   const navigate = useNavigate();
   const [missing, setMissing] = useState(false);
 

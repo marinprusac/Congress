@@ -8,7 +8,8 @@ import { runMigrations } from "../../db/client.js";
 import { onEventPublished, type PublishedEvent } from "../../events.js";
 import { startTypeEngine } from "../index.js";
 import { exhibitsSqlite } from "../db/client.js";
-import { getTypeBySlug, publish } from "../store.js";
+import { getTypeBySlug } from "../store.js";
+import { startTimeTriggers, stopTimeTriggers } from "../triggers.js";
 import { createRecord, getRecord, listRecords, RecordLockedError, titleOf, updateRecord } from "../records.js";
 import { feedCandidatesFor } from "../feedRules.js";
 import { setOwnerZoneForTests, startOfDay } from "../zone.js";
@@ -45,6 +46,7 @@ beforeAll(async () => {
     }),
   ];
   startBindings();
+  await startTimeTriggers();
   await startConnectors([googleCalendar], {
     context: () => ({ ...g.ctx, emitChange: (kind, key, deleted = false) => emitSourceChange({ connector: "google-calendar", kind, key, deleted }) }),
   });
@@ -53,13 +55,14 @@ beforeAll(async () => {
 
 afterAll(async () => {
   stopBindings();
+  stopTimeTriggers();
   await stopConnectors();
   setOwnerZoneForTests(null);
 });
 
 describe("the Event premade bound to Google Calendar", () => {
-  it("mirrors Google events, all-day ones at midnight in the owner's zone, silently while hidden", () => {
-    expect(getTypeBySlug("event")!.definition.hidden).toBe(true);
+  it("mirrors Google events, all-day ones at midnight in the owner's zone", () => {
+    expect(getTypeBySlug("event")!.definition.hidden).toBe(false);
     const mine = byGoogleId("mine");
     expect(mine.values).toMatchObject({ title: "Planning", calendar: "1:primary", all_day: false, response: null, hidden: false });
     const raw = g.state.full["1/primary"]![0]!;
@@ -67,7 +70,16 @@ describe("the Event premade bound to Google Calendar", () => {
     const holiday = byGoogleId("holiday");
     const day = g.state.full["1/primary"]![1]!.start.date!;
     expect(holiday.values).toMatchObject({ all_day: true, start: new Date(startOfDay(day, "Europe/Zagreb")).toISOString() });
-    expect(events.filter((e) => e.type.startsWith("event."))).toEqual([]);
+    expect(events.filter((e) => e.type === "event.starting_soon")).toEqual([]);
+  });
+
+  it("announces an event 30 minutes before it starts, but not one already under way", () => {
+    const at = (min: number) => new Date(Date.now() + min * 60_000).toISOString();
+    const soon = createRecord("event", { title: "Coffee", start: at(10), end: at(40) }, { actor: "me" }).id;
+    createRecord("event", { title: "Started already", start: at(-120), end: at(60) }, { actor: "me" });
+    createRecord("event", { title: "Hidden soon", start: at(10), end: at(40), hidden: true }, { actor: "me" });
+    const soonEvents = events.filter((e) => e.type === "event.starting_soon").map((e) => (e.payload as { title: string; url: string }));
+    expect(soonEvents).toEqual([expect.objectContaining({ title: "Coffee", url: `/e/${soon}` })]);
   });
 
   it("links guests to People and locks someone else's invitation", () => {
@@ -140,8 +152,6 @@ describe("the AI's event tools", () => {
     JSON.parse(((await callChamberTool(url, TEST_INTERNAL_TOKEN, tool, args)) as { content: { text: string }[] }).content[0]!.text);
 
   beforeAll(async () => {
-    // Visible types get tools; Event stays hidden until the cutover.
-    publish({ typeId: getTypeBySlug("event")!.id, actor: "test", ops: [{ op: "set_type_meta", hidden: false }] });
     server = await new Promise<ServerType>((resolve) => {
       const s = serve({ fetch: app.fetch, hostname: "127.0.0.1", port: 0 }, () => resolve(s));
     });

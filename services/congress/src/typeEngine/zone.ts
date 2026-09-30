@@ -57,8 +57,13 @@ export function addDays(date: string, days: number): string {
 // Local midnight starting `date` in `zone`. Guesses as if the zone were UTC,
 // then corrects by the zone's offset twice so a DST switch that night settles.
 export function startOfDay(date: string, zone = ownerZone()): number {
+  return wallTime(date, 0, 0, zone);
+}
+
+// The instant a local wall-clock time on `date` names in `zone`.
+export function wallTime(date: string, hour: number, minute: number, zone = ownerZone()): number {
   const [y, m, d] = date.split("-").map(Number) as [number, number, number];
-  const target = Date.UTC(y, m - 1, d);
+  const target = Date.UTC(y, m - 1, d, hour, minute);
   let guess = target;
   for (let i = 0; i < 2; i++) {
     const p = partsIn(guess, zone);

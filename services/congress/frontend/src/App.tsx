@@ -75,6 +75,20 @@ export function App() {
         <Route path="/tasks/t/:id" element={<LegacyRedirect chamber="tasks" idPrefix="task-" noun="task" />} />
         <Route path="/tasks/new" element={<Navigate to="/e/new/task" replace />} />
         <Route path="/tasks/*" element={<Navigate to="/" replace />} />
+        <Route
+          path="/calendar/e/:acct/:cal/:evt"
+          element={
+            <LegacyRedirect
+              chamber="calendar"
+              idPrefix="event-"
+              noun="event"
+              idFrom={(p) => `${p.acct}:${encodeURIComponent(p.cal ?? "")}:${encodeURIComponent(p.evt ?? "")}`}
+            />
+          }
+        />
+        <Route path="/calendar/new" element={<Navigate to="/e/new/event" replace />} />
+        <Route path="/calendar/week" element={<Navigate to="/events/week" replace />} />
+        <Route path="/calendar/*" element={<Navigate to="/events" replace />} />
         <Route path="/documents/d/:id" element={<LegacyRedirect chamber="documents" idPrefix="document-" noun="document" />} />
         <Route path="/documents/new" element={<Navigate to="/e/new/document" replace />} />
         <Route path="/documents/*" element={<Navigate to="/" replace />} />
