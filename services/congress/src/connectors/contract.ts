@@ -33,6 +33,9 @@ export interface SyncResult {
   error: string | null;
 }
 
+// How a connector names a person: an email, a phone number, or both.
+export type PersonKey = { email?: string; phone?: string };
+
 export interface ConnectorContext {
   name: string;
   google: {
@@ -41,10 +44,10 @@ export interface ConnectorContext {
     fetch(accountId: number, url: string, init?: RequestInit, scopes?: string[]): Promise<unknown>;
   };
   people: {
-    // An existing Person with this email, or null. Never creates.
-    find(email: string): string | null;
-    // Finds or creates by email; only direct contact (evidence "corresponded") should create.
-    resolve(input: { email: string; name?: string | null }, evidence: Evidence): string | null;
+    // An existing Person with this email (or phone), or null. Never creates.
+    find(key: string | PersonKey): string | null;
+    // Finds or creates by email/phone; only direct contact (evidence "corresponded") should create.
+    resolve(input: PersonKey & { name?: string | null }, evidence: Evidence): string | null;
   };
   // quiet: pulled without events (a backfill).
   emitChange(kind: string, key: string, deleted?: boolean, quiet?: boolean): void;
