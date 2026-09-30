@@ -35,6 +35,7 @@ import { parseRunContext, withRunContext } from "./ai/runContext.js";
 import { aiRoutes } from "./ai/routes.js";
 import { getFeed } from "./feed.js";
 import { googleConnectorRoutes } from "./connectors/google/routes.js";
+import { connectorRoutes } from "./connectors/routes.js";
 import { typeRoutes } from "./typeEngine/routes.js";
 import { registerTypeTools } from "./typeEngine/mcpTools.js";
 import { registerBuilderTools } from "./mcp/builderTools.js";
@@ -77,6 +78,7 @@ app.route("/congress/ai", aiRoutes);
 
 // Google sign-in shared by every Chamber that talks to Google.
 app.route("/congress/connectors/google", googleConnectorRoutes);
+app.route("/congress/connectors", connectorRoutes);
 
 // Runtime exhibit types and their records (typeEngine/).
 app.route("/congress", typeRoutes);

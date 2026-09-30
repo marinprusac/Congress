@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ConfirmSheet, googleConnectHref } from "@congress/congress-ui";
 import type { GoogleConnectorStatus } from "@congress/shared-types";
 import { disconnectGoogleAccount, fetchGoogleConnector, renameGoogleAccount } from "@/lib/connectorsApi";
+import { fetchConnectors } from "@/lib/connectorsListApi";
+import { CONNECTOR_PANELS } from "@/connectors/panels";
 
 type Account = GoogleConnectorStatus["accounts"][number];
 
@@ -89,8 +91,35 @@ function AccountRow({ account }: { account: Account }) {
   );
 }
 
-// Google accounts shared by every Chamber that talks to Google.
-export function AccountsTab() {
+// Google sign-in on top, then one setup panel per connector.
+export function ConnectorsTab() {
+  return (
+    <div className="space-y-8">
+      <GoogleAccounts />
+      <ConnectorPanels />
+    </div>
+  );
+}
+
+function ConnectorPanels() {
+  const { data } = useQuery({ queryKey: ["connectors", "list"], queryFn: fetchConnectors, refetchInterval: 30_000 });
+  return (
+    <>
+      {data?.map((status) => {
+        const Panel = CONNECTOR_PANELS[status.name];
+        return (
+          <section key={status.name}>
+            <h3 className="mb-3 font-display text-xl text-ink">{status.label}</h3>
+            {Panel ? <Panel status={status} /> : <p className="font-mono text-sm text-dust">No settings.</p>}
+          </section>
+        );
+      })}
+    </>
+  );
+}
+
+// Google accounts shared by every Chamber and connector that talks to Google.
+function GoogleAccounts() {
   const { data, isLoading, isError } = useQuery({ queryKey: ["connectors", "google"], queryFn: fetchGoogleConnector });
 
   return (

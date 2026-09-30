@@ -20,6 +20,8 @@ import { startProactive, stopProactive } from "./ai/proactive.js";
 import { importLegacyDirectives } from "./ai/legacyDirectivesImport.js";
 import { loadChambers, stopChambers } from "./chambers/loader.js";
 import { CHAMBER_MODULES } from "./chambers/modules.js";
+import { startConnectors, stopConnectors } from "./connectors/registry.js";
+import { CONNECTORS } from "./connectors/list.js";
 
 runMigrations();
 startTypeEngine();
@@ -29,6 +31,7 @@ recoverInterruptedThreads();
 await importLegacyDirectives();
 // Every Chamber runs inside this process; a failing one is marked offline.
 await loadChambers(CHAMBER_MODULES);
+await startConnectors(CONNECTORS);
 
 const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (info) => {
   console.log(`Congress listening on http://${info.address}:${info.port}`);
@@ -60,6 +63,7 @@ async function shutdown() {
   stopTrackingScheduler();
   stopProactive();
   await stopChambers();
+  await stopConnectors();
   server.close(() => {
     closeDb();
     closeExhibitsDb();

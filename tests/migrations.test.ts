@@ -62,3 +62,18 @@ describe("type engine migrations", () => {
     }
   });
 });
+
+describe("connector migrations", () => {
+  it("google calendar's cache applies cleanly, twice", async () => {
+    process.env.CONNECTORS_DATA_DIR = join(dir, "connectors");
+    vi.resetModules();
+    const { runGcalMigrations, closeGcalDb } = await import("../services/congress/src/connectors/googleCalendar/db/client.js");
+    try {
+      runGcalMigrations();
+      runGcalMigrations();
+      expect(statSync(join(dir, "connectors", "google-calendar.sqlite3")).size).toBeGreaterThan(0);
+    } finally {
+      closeGcalDb();
+    }
+  });
+});
