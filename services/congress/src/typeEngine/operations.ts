@@ -125,6 +125,9 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       if (f.kind === "relation" && Boolean(merged.many) !== Boolean(f.options.many)) {
         throw new OperationError("a relation can't switch between one and many");
       }
+      if (f.kind === "relation" && f.options.target && merged.target !== f.options.target) {
+        throw new OperationError("a relation's target type can't change; add a new field instead");
+      }
       f.options = normalizeOptions(f.kind, merged);
       return d;
     }

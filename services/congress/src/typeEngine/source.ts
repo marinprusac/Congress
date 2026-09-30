@@ -19,7 +19,7 @@ const RECENT_LIMIT = 10;
 
 type Row = Record<string, Stored>;
 
-function searchType(t: ReturnType<typeof listTypes>[number], query: string): ExhibitSearchResult[] {
+export function searchType(t: ReturnType<typeof listTypes>[number], query: string): ExhibitSearchResult[] {
   const def = t.definition;
   const table = quoteIdent(def.tableName);
   const title = def.fields.find((f) => f.id === def.titleField);

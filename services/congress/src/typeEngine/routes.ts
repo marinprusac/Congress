@@ -6,6 +6,7 @@ import {
   createRecord,
   deleteRecord,
   getRecord,
+  relatedRecords,
   listRecords,
   RecordConflictError,
   RecordNotFoundError,
@@ -13,6 +14,7 @@ import {
   updateRecord,
 } from "./records.js";
 import { resolveLegacyAlias } from "./aliases.js";
+import { searchType } from "./source.js";
 import { contentDisposition, filePath, FileTooLargeError, getFile, isInlineMime, resolveByteRange, storeUpload } from "./files.js";
 import { ULID_PATTERN } from "./ulid.js";
 import { env } from "../env.js";
@@ -61,9 +63,23 @@ typeRoutes.get("/records", requireSession, (c) => {
   }
 });
 
+// One type's records matching q (recent ones when q is empty): the relation picker.
+typeRoutes.get("/records/search", requireSession, (c) => {
+  const t = getTypeBySlug(c.req.query("type") ?? "");
+  if (!t) return c.json({ error: "not_found" }, 404);
+  const q = c.req.query("q") ?? "";
+  const results = searchType(t, q);
+  return c.json(q.trim() ? results.sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 20) : results);
+});
+
 typeRoutes.get("/records/:id", requireSession, (c) => {
   const record = getRecord(c.req.param("id"));
   return record ? c.json(record) : c.json({ error: "not_found" }, 404);
+});
+
+typeRoutes.get("/records/:id/related", requireSession, (c) => {
+  const groups = relatedRecords(c.req.param("id"));
+  return groups ? c.json(groups) : c.json({ error: "not_found" }, 404);
 });
 
 typeRoutes.post("/records", requireSession, async (c) => {

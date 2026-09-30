@@ -146,3 +146,37 @@ describe("preview", () => {
     expect(versions.at(-1)!.changes[0]).toEqual({ area: "type", text: "Create type “Book” (Books)" });
   });
 });
+
+describe("relations", () => {
+  const typeOps = (slug: string, extra: Operation[] = []): Operation[] => [
+    { op: "create_type", slug, label: slug },
+    { op: "add_field", slug: "name", label: "Name", kind: "text" },
+    { op: "set_title_field", field: "name" },
+    ...extra,
+  ];
+
+  it("needs an existing target, or the type itself", () => {
+    const toFilm: Operation = { op: "add_field", slug: "of", label: "Of", kind: "relation", options: { target: "film" } };
+    expect(() => publish({ actor: "test", ops: typeOps("review", [toFilm]) })).toThrow(/no type "film"/);
+    const { type } = publish({
+      actor: "test",
+      ops: typeOps("review", [
+        { op: "add_field", slug: "of", label: "Of", kind: "relation", options: { target: "book" } },
+        { op: "add_field", slug: "replies", label: "Replies", kind: "relation", options: { target: "review", many: true } },
+      ]),
+    });
+    expect(type.version).toBe(1);
+  });
+
+  it("keeps a relation's target fixed", () => {
+    const review = getTypeBySlug("review")!;
+    const retarget: Operation = { op: "set_field_options", field: "of", options: { target: "review" } };
+    expect(() => publish({ typeId: review.id, actor: "test", ops: [retarget] })).toThrow(/target type can't change/);
+  });
+
+  it("refuses renaming a linked-to type's slug, but not its label", () => {
+    const book = getTypeBySlug("book")!;
+    expect(() => publish({ typeId: book.id, actor: "test", ops: [{ op: "set_type_meta", slug: "novel" }] })).toThrow(/review\.of/);
+    expect(publish({ typeId: book.id, actor: "test", ops: [{ op: "set_type_meta", label: "Novel" }] }).type.definition.slug).toBe("book");
+  });
+});

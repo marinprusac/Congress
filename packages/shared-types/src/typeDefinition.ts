@@ -188,3 +188,14 @@ export const typeOverviewSchema = typeSummarySchema.extend({
   recordCount: z.number().int(),
 });
 export type TypeOverview = z.infer<typeof typeOverviewSchema>;
+
+// Reverse relations: the records whose relation field links to one record.
+export const relatedGroupSchema = z.object({
+  type: z.string(),
+  typeLabel: z.string(),
+  field: z.string(),
+  fieldLabel: z.string(),
+  total: z.number().int(),
+  records: z.array(z.object({ id: z.string(), name: z.string(), url: z.string() })),
+});
+export type RelatedGroup = z.infer<typeof relatedGroupSchema>;

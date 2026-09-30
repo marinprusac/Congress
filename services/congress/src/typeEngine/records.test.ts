@@ -12,6 +12,7 @@ import {
   deleteRecord,
   getRecord,
   listRecords,
+  relatedRecords,
   RecordConflictError,
   RecordValidationError,
   removeManualRef,
@@ -24,6 +25,16 @@ const stop = onEventPublished((e) => events.push(e));
 beforeAll(() => {
   runMigrations(migrationsDir("congress"));
   runExhibitsMigrations();
+  for (const slug of ["person", "shelf"]) {
+    publish({
+      actor: "test",
+      ops: [
+        { op: "create_type", slug, label: slug },
+        { op: "add_field", slug: "name", label: "Name", kind: "text" },
+        { op: "set_title_field", field: "name" },
+      ],
+    });
+  }
   publish({
     actor: "test",
     ops: [
@@ -87,21 +98,25 @@ describe("records", () => {
   });
 
   it("syncs outgoing refs from richtext tokens, relations and manual refs", () => {
+    const person = createRecord("person", { name: "George Eliot" }).id;
+    const [a, b] = [createRecord("shelf", { name: "A" }).id, createRecord("shelf", { name: "B" }).id].sort();
     const rec = createRecord("book", {
       title: "Middlemarch",
       notes: "see [[exhibit:tasks:task-3|Read it]]",
-      author: "person-id",
-      shelves: ["shelf-a", "shelf-b"],
+      author: person,
+      shelves: [b, a],
     });
-    expect(getRecord(rec.id)!.values.shelves).toEqual(["shelf-a", "shelf-b"]);
+    expect(getRecord(rec.id)!.values.shelves).toEqual([b, a]);
     addManualRef(rec.id, "note-9");
-    expect(refsFrom(rec.id)).toEqual([
-      ["note-9", true],
-      ["person-id", false],
-      ["shelf-a", false],
-      ["shelf-b", false],
-      ["task-3", false],
-    ]);
+    expect(refsFrom(rec.id)).toEqual(
+      [
+        ["note-9", true],
+        [person, false],
+        [a, false],
+        [b, false],
+        ["task-3", false],
+      ].sort()
+    );
     removeManualRef(rec.id, "note-9");
     expect(refsFrom(rec.id).map(([t]) => t)).not.toContain("note-9");
   });
@@ -118,6 +133,51 @@ describe("records", () => {
   it("lists newest first", () => {
     const titles = listRecords("book").map((r) => r.values.title);
     expect(titles[0]).toBe("Middlemarch");
+  });
+});
+
+describe("relations", () => {
+  it("refuses ids that aren't records of the target type", () => {
+    const shelf = createRecord("shelf", { name: "Top" }).id;
+    const issues = (fn: () => unknown) => {
+      try {
+        fn();
+      } catch (err) {
+        return ((err as RecordValidationError).issues as { fieldErrors: Record<string, string[]> }).fieldErrors;
+      }
+      throw new Error("expected a validation error");
+    };
+    expect(issues(() => createRecord("book", { title: "Wrong", author: shelf }))).toEqual({ author: [expect.stringContaining(shelf)] });
+    expect(issues(() => createRecord("book", { title: "Missing", shelves: [shelf, "nope"] }))).toEqual({ shelves: [expect.stringContaining("nope")] });
+    const book = createRecord("book", { title: "Right", shelves: [shelf] });
+    expect(() => updateRecord(book.id, { author: "nope" })).toThrow(RecordValidationError);
+  });
+
+  it("clears links to a deleted record, in both storage forms, and re-syncs without events", () => {
+    const person = createRecord("person", { name: "Jane Austen" }).id;
+    const shelf = createRecord("shelf", { name: "Classics" }).id;
+    const other = createRecord("shelf", { name: "Favourites" }).id;
+    const emma = createRecord("book", { title: "Persuasion", author: person, shelves: [shelf, other] });
+    expect(relatedRecords(person)).toEqual([
+      { type: "book", typeLabel: "Books", field: "author", fieldLabel: "Author", total: 1, records: [{ id: emma.id, name: "Persuasion", url: `/${emma.id}` }] },
+    ]);
+
+    events.length = 0;
+    deleteRecord(person);
+    deleteRecord(shelf);
+    expect(getRecord(emma.id)!.values).toMatchObject({ author: null, shelves: [other] });
+    expect(refsFrom(emma.id).map(([t]) => t)).toEqual([other]);
+    expect(events.map((e) => e.type)).toEqual(["person.deleted", "shelf.deleted"]);
+  });
+
+  it("groups reverse relations newest first and caps each group", () => {
+    const shelf = createRecord("shelf", { name: "Big" }).id;
+    for (let i = 0; i < 22; i++) createRecord("book", { title: `Vol ${i}`, shelves: [shelf] });
+    const [group] = relatedRecords(shelf)!;
+    expect(group).toMatchObject({ field: "shelves", total: 22 });
+    expect(group!.records).toHaveLength(20);
+    expect(group!.records[0]!.name).toBe("Vol 21");
+    expect(relatedRecords("missing")).toBeNull();
   });
 });
 

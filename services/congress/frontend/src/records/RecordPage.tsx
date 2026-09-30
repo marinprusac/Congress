@@ -21,16 +21,21 @@ import {
   useStackNav,
 } from "@congress/congress-ui";
 import type { CapitolExhibitResolveResult, CapitolExhibitSearchResult, FieldDefinition, RecordValue, TypeDefinition } from "@congress/shared-types";
-import { createRecord, deleteRecord, fetchRecord, fetchTypes, quickCreateRecord, RecordConflict, updateRecord } from "@/lib/recordsApi";
+import { createRecord, deleteRecord, fetchRecord, fetchRelated, fetchTypes, quickCreateRecord, RecordConflict, TYPES_KEY, updateRecord } from "@/lib/recordsApi";
+export { TYPES_KEY };
 import { FieldControl, isFileRef, PropertyRow, ReadonlyValue } from "./fields";
+import { RelatedSection } from "./RelatedSection";
 import { titleFromFilename } from "./format";
 
 // One page for every runtime exhibit type: /e/:id and /e/new/:type. A new
 // record is created on the title's blur, then autosaves a diff of changed
 // fields, the same flow Notes' editor used.
 
-export const TYPES_KEY = ["congress", "types"] as const;
+
 type Values = Record<string, RecordValue>;
+
+// Any record's reverse relations; a save or delete can change them.
+const isRelatedQuery = (q: { queryKey: readonly unknown[] }) => q.queryKey[0] === "record" && q.queryKey[2] === "related";
 
 function defaultFor(f: FieldDefinition): RecordValue {
   if (f.kind === "text" || f.kind === "richtext") return "";
@@ -83,6 +88,7 @@ export function RecordPage() {
 
   const typesQuery = useQuery({ queryKey: TYPES_KEY, queryFn: fetchTypes });
   const recordQuery = useQuery({ queryKey: ["record", recordId], queryFn: () => fetchRecord(recordId as string), enabled: recordId !== null && !deleted });
+  const relatedQuery = useQuery({ queryKey: ["record", recordId, "related"], queryFn: () => fetchRelated(recordId as string), enabled: recordId !== null && !deleted });
 
   const typeSlug = recordQuery.data?.type ?? typeParam;
   const type = typesQuery.data?.find((t) => t.definition.slug === typeSlug);
@@ -96,6 +102,18 @@ export function RecordPage() {
   const attemptPendingRef = useRef(false);
   const current = useMemo(() => canonical(def, values), [def, values]);
   const isDraft = recordId === null;
+  const related = useMemo(() => relatedQuery.data ?? [], [relatedQuery.data]);
+  const linkingCount = related.reduce((n, g) => n + g.total, 0);
+  // Links shown as relation chips or under Related, left out of Connections.
+  const shownLinks = useMemo(() => {
+    const ids = new Set(related.flatMap((g) => g.records.map((r) => r.id)));
+    for (const f of def?.fields ?? []) {
+      if (f.kind !== "relation" || f.retired) continue;
+      const v = current[f.slug];
+      for (const id of Array.isArray(v) ? v : typeof v === "string" && v ? [v] : []) ids.add(String(id));
+    }
+    return ids;
+  }, [related, def, current]);
 
   // Seeds a new record's title from ?title= (the "@" picker's create flow).
   useEffect(() => {
@@ -155,7 +173,10 @@ export function RecordPage() {
 
   const updateMutation = useMutation({
     mutationFn: (patch: Values) => updateRecord(recordId as string, toInput(patch)),
-    onSuccess: (updated) => queryClient.setQueryData(["record", updated.id], updated),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["record", updated.id], updated);
+      void queryClient.invalidateQueries({ predicate: isRelatedQuery });
+    },
     onError: (err) => showToast(err instanceof RecordConflict ? err.message : "Couldn't save.", "error"),
   });
 
@@ -186,6 +207,7 @@ export function RecordPage() {
     onSuccess: () => {
       setDeleted(true);
       queryClient.removeQueries({ queryKey: ["record", recordId] });
+      void queryClient.invalidateQueries({ predicate: isRelatedQuery });
       nav.pop();
       showToast(`${def?.label ?? "Record"} deleted`);
     },
@@ -272,8 +294,11 @@ export function RecordPage() {
               </div>
             )}
 
+            {related.length > 0 && <RelatedSection groups={related} onNavigate={onNavigate} />}
+
             <ExhibitLinksLayout
               exhibitId={recordId}
+              hideIds={shownLinks}
               renderIcon={(chamber) => getChamberIcon(chamber)}
               onNavigate={onNavigate}
               editable
@@ -324,7 +349,9 @@ export function RecordPage() {
               <ConfirmSheet
                 open={confirmingDelete}
                 title={`Delete ${def.label.toLowerCase()}`}
-                message={`Delete "${titleField ? String(current[titleField.slug] ?? "") : def.label}"? This cannot be undone.`}
+                message={`Delete "${titleField ? String(current[titleField.slug] ?? "") : def.label}"? This cannot be undone.${
+                  linkingCount > 0 ? ` ${linkingCount === 1 ? "1 record links" : `${linkingCount} records link`} to it; those links will be cleared.` : ""
+                }`}
                 confirmLabel="Delete"
                 onConfirm={() => {
                   setConfirmingDelete(false);
