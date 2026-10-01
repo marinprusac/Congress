@@ -30,19 +30,21 @@ export interface BuilderGrant {
   expiresAt: Date;
 }
 
-export function activeGrant(threadId: number | null, now = new Date()): BuilderGrant | null {
+export type GrantKind = "builder" | "internet";
+
+export function activeGrant(threadId: number | null, kind: GrantKind = "builder", now = new Date()): BuilderGrant | null {
   if (!threadId) return null;
   const row = db
     .select()
     .from(aiBuilderGrants)
-    .where(and(eq(aiBuilderGrants.threadId, threadId), isNull(aiBuilderGrants.revokedAt), gt(aiBuilderGrants.expiresAt, now)))
+    .where(and(eq(aiBuilderGrants.threadId, threadId), eq(aiBuilderGrants.kind, kind), isNull(aiBuilderGrants.revokedAt), gt(aiBuilderGrants.expiresAt, now)))
     .orderBy(desc(aiBuilderGrants.expiresAt))
     .limit(1)
     .get();
   return row ? { id: row.id, threadId: row.threadId, expiresAt: row.expiresAt } : null;
 }
 
-function openAskInThread(threadId: number, kind: "builder_request" | "type_publish") {
+export function openAskInThread(threadId: number, kind: "builder_request" | "internet_request" | "type_publish") {
   return db
     .select()
     .from(aiMessages)
@@ -70,7 +72,7 @@ export async function requestBuilderMode(input: { title: string; reason: string;
   );
 }
 
-function closeAsk(message: AiMessage, decisionText: string, approve: boolean) {
+export function closeAsk(message: AiMessage, decisionText: string, approve: boolean) {
   dismissNotificationByKey("congress", dedupeKey(message.id));
   insertMessage({ threadId: message.threadId, role: "user", kind: "decision", text: decisionText, payload: { askId: message.id, approve } });
 }
@@ -112,11 +114,15 @@ export function decideBuilderRequest(messageId: number, approve: boolean, opts: 
 }
 
 // The owner ends builder mode early; open drafts stay until discarded.
-export function endGrant(threadId: number, now = new Date()): boolean {
-  const grant = activeGrant(threadId, now);
+export function endGrant(threadId: number, kind: GrantKind = "builder", now = new Date()): boolean {
+  const grant = activeGrant(threadId, kind, now);
   if (!grant) return false;
-  db.update(aiBuilderGrants).set({ revokedAt: now }).where(and(eq(aiBuilderGrants.threadId, threadId), isNull(aiBuilderGrants.revokedAt))).run();
-  insertMessage({ threadId, role: "system", kind: "notice", text: "Builder mode ended." });
+  db
+    .update(aiBuilderGrants)
+    .set({ revokedAt: now })
+    .where(and(eq(aiBuilderGrants.threadId, threadId), eq(aiBuilderGrants.kind, kind), isNull(aiBuilderGrants.revokedAt)))
+    .run();
+  insertMessage({ threadId, role: "system", kind: "notice", text: kind === "internet" ? "Internet access ended." : "Builder mode ended." });
   notifyThreadUpdated(threadId);
   return true;
 }

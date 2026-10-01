@@ -38,6 +38,7 @@ import { callHook, connectorRoutes } from "./connectors/routes.js";
 import { typeRoutes } from "./typeEngine/routes.js";
 import { registerTypeTools } from "./typeEngine/mcpTools.js";
 import { registerBuilderTools } from "./mcp/builderTools.js";
+import { registerWebTools } from "./mcp/webTools.js";
 
 // Chamber included per-ref since an id that never synced has no cache row to
 // infer the owning chamber from.
@@ -221,6 +222,10 @@ app.all("/mcp/types", (c) => typesMcpApp.fetch(c.req.raw, c.env));
 // Builder mode's tools (mcp/builderTools.ts), only for granted threads.
 const builderMcpApp = createMcpApp("builder", registerBuilderTools, env.CONGRESS_INTERNAL_TOKEN);
 app.all("/mcp/builder", (c) => builderMcpApp.fetch(c.req.raw, c.env));
+
+// Internet mode's tools (mcp/webTools.ts), only for granted threads.
+const webMcpApp = createMcpApp("web", registerWebTools, env.CONGRESS_INTERNAL_TOKEN);
+app.all("/mcp/web", (c) => webMcpApp.fetch(c.req.raw, c.env));
 
 app.route("/mcp", mcpApp);
 

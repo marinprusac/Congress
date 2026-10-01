@@ -52,6 +52,7 @@ function toThread(row: ThreadRow, extras: { snippet: string | null; openAskCount
     unread: row.lastMessageAt.getTime() > lastReadAt,
     openAskCount: extras.openAskCount,
     builderUntil: activeGrant(row.id)?.expiresAt.toISOString() ?? null,
+    internetUntil: activeGrant(row.id, "internet")?.expiresAt.toISOString() ?? null,
     pendingRunId: row.pendingRunId,
     snippet: extras.snippet,
     lastMessageAt: row.lastMessageAt.toISOString(),

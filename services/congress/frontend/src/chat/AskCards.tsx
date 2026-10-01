@@ -6,6 +6,7 @@ import {
   askProposalPayloadSchema,
   askQuestionPayloadSchema,
   builderRequestPayloadSchema,
+  internetRequestPayloadSchema,
   typePublishPayloadSchema,
   BUILDER_GRANT_MINUTES,
   type AiMessage,
@@ -19,7 +20,7 @@ import { QuestionForm } from "./QuestionForm";
 import { useChatNavigation } from "./chatNav";
 import { durationLabel, stringifyToolValue, timeLabel } from "./chatFormat";
 
-const KIND_LABEL = { message: "Message", question: "Question", proposal: "Proposal", builder_request: "Builder mode", type_publish: "Type change" } as const;
+const KIND_LABEL = { message: "Message", question: "Question", proposal: "Proposal", builder_request: "Builder mode", internet_request: "Internet", type_publish: "Type change" } as const;
 
 function WhySheet({ runId, onClose }: { runId: string; onClose: () => void }) {
   const run = useQuery({ queryKey: aiRunQueryKey(runId), queryFn: () => fetchAiRun(runId) });
@@ -260,14 +261,16 @@ function RejectWithNote({ busy, label, onBack, onReject }: { busy: boolean; labe
 
 const minutesLabel = (m: number) => (m < 60 ? `${m} min` : `${m / 60} h`);
 
-function BuilderRequestAsk({ message }: { message: AiMessage }) {
+// Builder mode's and internet access's grant requests share one card.
+function GrantRequestAsk({ message, internet }: { message: AiMessage; internet?: boolean }) {
   const nav = useChatNavigation();
   const { busy, decide } = useDecision(message);
   const [declining, setDeclining] = useState(false);
   const [minutes, setMinutes] = useState<number>(60);
-  const parsed = builderRequestPayloadSchema.safeParse(message.payload);
+  const parsed = (internet ? internetRequestPayloadSchema : builderRequestPayloadSchema).safeParse(message.payload);
   if (!parsed.success) return <p className="chat-notice">This request couldn't be shown.</p>;
   const payload = parsed.data;
+  const scope = "scope" in payload && typeof payload.scope === "string" ? payload.scope : null;
   const state = message.askState;
   const until = payload.grantedUntil ? new Date(payload.grantedUntil) : null;
   const status =
@@ -286,14 +289,14 @@ function BuilderRequestAsk({ message }: { message: AiMessage }) {
   return (
     <CardShell message={message} title={payload.title} status={status}>
       <ChatMarkdown text={message.text} className="ask-body" {...nav} />
-      {payload.scope ? <p className="ask-meta-line">Scope: {payload.scope}</p> : null}
+      {scope ? <p className="ask-meta-line">Scope: {scope}</p> : null}
       {state === "rejected" && payload.note ? <p className="ask-note">“{payload.note}”</p> : null}
       {state === "open" ? (
         declining ? (
           <RejectWithNote busy={busy} label="Decline" onBack={() => setDeclining(false)} onReject={(note) => void decide(false, { note: note || undefined })} />
         ) : (
           <>
-            <p className="ask-actions-label">Let the AI draft type changes in this chat for</p>
+            <p className="ask-actions-label">{internet ? "Let the AI read the web in this chat for" : "Let the AI draft type changes in this chat for"}</p>
             <div className="ask-chips" role="radiogroup" aria-label="Grant length">
               {BUILDER_GRANT_MINUTES.map((m) => (
                 <button key={m} type="button" role="radio" aria-checked={minutes === m} className={`ask-chip${minutes === m ? " selected" : ""}`} onClick={() => setMinutes(m)} disabled={busy}>
@@ -301,7 +304,9 @@ function BuilderRequestAsk({ message }: { message: AiMessage }) {
                 </button>
               ))}
             </div>
-            <p className="ask-meta-line">Nothing is published without your approval of each change.</p>
+            <p className="ask-meta-line">
+              {internet ? "It can only read pages; every fetch shows in the run's activity." : "Nothing is published without your approval of each change."}
+            </p>
             <div className="ask-buttons">
               <button type="button" className="ask-secondary" onClick={() => setDeclining(true)} disabled={busy}>
                 Decline
@@ -383,7 +388,8 @@ function TypePublishAsk({ message }: { message: AiMessage }) {
 export function AskCard({ message }: { message: AiMessage }) {
   if (message.kind === "question") return <QuestionAsk message={message} />;
   if (message.kind === "proposal") return <ProposalAsk message={message} />;
-  if (message.kind === "builder_request") return <BuilderRequestAsk message={message} />;
+  if (message.kind === "builder_request") return <GrantRequestAsk message={message} />;
+  if (message.kind === "internet_request") return <GrantRequestAsk message={message} internet />;
   if (message.kind === "type_publish") return <TypePublishAsk message={message} />;
   return <MessageAsk message={message} />;
 }
