@@ -320,6 +320,14 @@ func (s *Store) SetMarkedUnread(ctx context.Context, chat string, marked bool) e
 	return err
 }
 
+// SetMuted records the phone's mute on a chat: 0 = not muted, -1 = forever,
+// otherwise the epoch ms it ends. It may arrive before the chat has a message.
+func (s *Store) SetMuted(ctx context.Context, chat string, isGroup bool, until int64) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO chats (jid, is_group, muted_until) VALUES (?, ?, ?)
+		ON CONFLICT (jid) DO UPDATE SET muted_until = excluded.muted_until`, chat, isGroup, until)
+	return err
+}
+
 // ApplyHistoryUnread applies a history-sync conversation's read state: only its
 // newest `unread` incoming messages stay unread.
 func (s *Store) ApplyHistoryUnread(ctx context.Context, chat string, unread int, marked bool, at int64) error {
@@ -394,8 +402,8 @@ func (s *Store) MergeChat(ctx context.Context, from, to string) error {
 	return s.tx(ctx, func(tx *sql.Tx) error {
 		var name string
 		var isGroup bool
-		var last int64
-		err := tx.QueryRow(`SELECT name, is_group, last_message_at FROM chats WHERE jid = ?`, from).Scan(&name, &isGroup, &last)
+		var last, muted int64
+		err := tx.QueryRow(`SELECT name, is_group, last_message_at, muted_until FROM chats WHERE jid = ?`, from).Scan(&name, &isGroup, &last, &muted)
 		if err == sql.ErrNoRows {
 			return nil
 		}
@@ -418,6 +426,11 @@ func (s *Store) MergeChat(ctx context.Context, from, to string) error {
 		}
 		if err := bumpChat(tx, to, isGroup, last); err != nil {
 			return err
+		}
+		if muted != 0 {
+			if _, err := tx.Exec(`UPDATE chats SET muted_until = ? WHERE jid = ? AND muted_until = 0`, muted, to); err != nil {
+				return err
+			}
 		}
 		if name != "" {
 			_, err = tx.Exec(`UPDATE chats SET name = ? WHERE jid = ? AND name = ''`, name, to)

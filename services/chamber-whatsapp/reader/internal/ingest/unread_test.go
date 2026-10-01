@@ -120,3 +120,32 @@ func TestHistorySyncKeepsThePhonesUnreadCount(t *testing.T) {
 		t.Fatalf("other unread = %d marked = %v", n, marked)
 	}
 }
+
+func TestMuteFromPhoneAndHistory(t *testing.T) {
+	h, _, _ := setup(t)
+	h.Handle(event(ana, ana, "a1", 1000, text("hi")))
+	muted := func() int64 {
+		c, err := h.st.Chat(ctx, ana.String())
+		if err != nil || c == nil {
+			t.Fatalf("chat: %v", err)
+		}
+		return c.MutedUntil
+	}
+	h.Handle(&events.Mute{JID: ana, Action: &waSyncAction.MuteAction{Muted: proto.Bool(true), MuteEndTimestamp: proto.Int64(-1)}})
+	if got := muted(); got != -1 {
+		t.Fatalf("forever = %d", got)
+	}
+	h.Handle(&events.Mute{JID: ana, Action: &waSyncAction.MuteAction{Muted: proto.Bool(true), MuteEndTimestamp: proto.Int64(4000000000)}})
+	if got := muted(); got != 4000000000*1000 {
+		t.Fatalf("timed = %d", got)
+	}
+	h.Handle(&events.Mute{JID: ana, Action: &waSyncAction.MuteAction{Muted: proto.Bool(false)}})
+	if got := muted(); got != 0 {
+		t.Fatalf("unmuted = %d", got)
+	}
+	// An already-expired mute is no mute.
+	h.Handle(&events.Mute{JID: ana, Action: &waSyncAction.MuteAction{Muted: proto.Bool(true), MuteEndTimestamp: proto.Int64(5)}})
+	if got := muted(); got != 0 {
+		t.Fatalf("expired = %d", got)
+	}
+}

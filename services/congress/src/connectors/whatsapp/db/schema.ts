@@ -15,6 +15,9 @@ export const chats = sqliteTable("chats", {
   lastRevoked: integer("last_revoked", { mode: "boolean" }).notNull().default(false),
   unreadCount: integer("unread_count").notNull().default(0),
   markedUnread: integer("marked_unread", { mode: "boolean" }).notNull().default(false),
+  // The phone's mute: 0 none, -1 forever, else the epoch ms it ends; `muted` is that as of the last sync (so an expiry shows as a change).
+  mutedUntil: integer("muted_until").notNull().default(0),
+  muted: integer("muted", { mode: "boolean" }).notNull().default(false),
   // 1:1 only: the owner's messages among the last 100 (null until counted) - how direct the contact is.
   ownerMessages: integer("owner_messages"),
   personId: text("person_id"),

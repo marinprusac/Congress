@@ -1,4 +1,27 @@
+import type { Operation } from "@congress/shared-types";
 import type { Premade } from "./index.js";
+
+type Binding = Extract<Operation, { op: "set_binding" }>["binding"];
+
+const BINDING: Binding = {
+  connector: "whatsapp",
+  kind: "chat",
+  label: "WhatsApp",
+  fields: [
+    { source: "name", target: "name", mode: "pull" },
+    { source: "lastAt", target: "last_at", mode: "pull" },
+    { source: "preview", target: "preview", mode: "pull" },
+    { source: "people", target: "people", mode: "pull" },
+    { source: "unread", target: "unread", mode: "pull" },
+    { source: "hasUnread", target: "has_unread", mode: "pull" },
+    { source: "lastFromMe", target: "last_from_me", mode: "pull" },
+    { source: "isGroup", target: "group", mode: "pull" },
+    { source: "phone", target: "phone", mode: "pull" },
+  ],
+  delete: "never",
+  // Local only: the reader's own DB; WhatsApp and the sender are never told.
+  actions: [{ id: "mark_read", label: "Mark read", act: "markReadLocally", args: {}, when: [{ fact: "hasUnread" }], unless: [] }],
+};
 
 // Replaces the WhatsApp Chamber: one record per chat the wa-reader knows.
 // Messages stay in the reader (read live); nothing is ever sent to WhatsApp.
@@ -32,28 +55,7 @@ export const CHAT: Premade = {
           },
         ],
       },
-      {
-        op: "set_binding",
-        binding: {
-          connector: "whatsapp",
-          kind: "chat",
-          label: "WhatsApp",
-          fields: [
-            { source: "name", target: "name", mode: "pull" },
-            { source: "lastAt", target: "last_at", mode: "pull" },
-            { source: "preview", target: "preview", mode: "pull" },
-            { source: "people", target: "people", mode: "pull" },
-            { source: "unread", target: "unread", mode: "pull" },
-            { source: "hasUnread", target: "has_unread", mode: "pull" },
-            { source: "lastFromMe", target: "last_from_me", mode: "pull" },
-            { source: "isGroup", target: "group", mode: "pull" },
-            { source: "phone", target: "phone", mode: "pull" },
-          ],
-          delete: "never",
-          // Local only: the reader's own DB; WhatsApp and the sender are never told.
-          actions: [{ id: "mark_read", label: "Mark read", act: "markReadLocally", args: {}, when: [{ fact: "hasUnread" }], unless: [] }],
-        },
-      },
+      { op: "set_binding", binding: BINDING },
       // Hidden, bound and silent until the WhatsApp Chamber's cutover (phase 7d).
       { op: "set_type_meta", hidden: true },
     ],
@@ -68,7 +70,7 @@ export const CHAT: Premade = {
       { op: "set_field_options", field: "last_at", options: { hidden: true } },
       { op: "set_field_options", field: "preview", options: { hidden: true } },
     ],
-    // Muted chats stay out of the feed. Local only; the sync never touches it.
+    // Muted chats stay out of the feed.
     [
       { op: "add_field", slug: "muted", label: "Muted", kind: "boolean" },
       {
@@ -88,5 +90,7 @@ export const CHAT: Premade = {
         ],
       },
     ],
+    // Muted comes from WhatsApp (the phone's mute), never edited here.
+    [{ op: "set_binding", binding: { ...BINDING, fields: [...BINDING.fields, { source: "muted", target: "muted", mode: "pull" }] } }],
   ],
 };
