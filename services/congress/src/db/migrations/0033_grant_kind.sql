@@ -1,0 +1,1 @@
+ALTER TABLE `ai_builder_grants` ADD `kind` text DEFAULT 'builder' NOT NULL;

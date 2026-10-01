@@ -20,6 +20,11 @@ describe("buildMcpServers", () => {
     expect(Object.keys(buildMcpServers("congress", undefined, { builder: true })).sort()).toEqual(["builder", "congress"]);
   });
 
+  it("adds internet mode's server only when asked", () => {
+    expect(buildMcpServers("congress")).not.toHaveProperty("web");
+    expect(Object.keys(buildMcpServers("congress", undefined, { internet: true })).sort()).toEqual(["congress", "web"]);
+  });
+
   it("attributes every tool call to the caller that asked for the run", () => {
     const servers = buildMcpServers("deputy");
     expect(servers.congress?.headers["X-Congress-Actor"]).toBe("deputy");

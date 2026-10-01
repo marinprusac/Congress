@@ -12,6 +12,7 @@ export type AiMessageRole = z.infer<typeof aiMessageRoleSchema>;
 
 // text: plain chat turn. message/question/proposal: AI-authored asks.
 // builder_request/type_publish: builder mode's asks (grant, then each publish).
+// internet_request: the ask for internet access in a thread.
 // answer/decision: the owner's reply to a question/proposal. notice: system.
 export const aiMessageKindSchema = z.enum([
   "text",
@@ -19,6 +20,7 @@ export const aiMessageKindSchema = z.enum([
   "question",
   "proposal",
   "builder_request",
+  "internet_request",
   "type_publish",
   "answer",
   "decision",
@@ -90,6 +92,8 @@ export const aiThreadSchema = z.object({
   openAskCount: z.number().int(),
   // Active builder-mode grant: the AI may draft type changes until then.
   builderUntil: z.string().nullable(),
+  // Active internet grant: the AI may fetch web pages until then.
+  internetUntil: z.string().nullable(),
   pendingRunId: z.string().nullable(),
   snippet: z.string().nullable(),
   lastMessageAt: z.string(),

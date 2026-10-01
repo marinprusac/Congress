@@ -247,7 +247,7 @@ export const aiMessages = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     threadId: integer("thread_id").notNull(),
     role: text("role", { enum: ["user", "assistant", "system"] }).notNull(),
-    kind: text("kind", { enum: ["text", "message", "question", "proposal", "builder_request", "type_publish", "answer", "decision", "notice"] })
+    kind: text("kind", { enum: ["text", "message", "question", "proposal", "builder_request", "internet_request", "type_publish", "answer", "decision", "notice"] })
       .notNull()
       .default("text"),
     status: text("status", { enum: ["ok", "error", "refused", "cancelled"] }).notNull().default("ok"),
@@ -272,12 +272,14 @@ export const aiMessages = sqliteTable(
   ]
 );
 
-// Builder mode: the owner let the AI draft type changes in one thread until expiresAt.
+// A capability grant: the owner let the AI use builder mode (type changes) or
+// the internet in one thread until expiresAt.
 export const aiBuilderGrants = sqliteTable(
   "ai_builder_grants",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     threadId: integer("thread_id").notNull(),
+    kind: text("kind", { enum: ["builder", "internet"] }).notNull().default("builder"),
     requestMessageId: integer("request_message_id").notNull(),
     grantedAt: integer("granted_at", { mode: "timestamp_ms" }).notNull(),
     expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),

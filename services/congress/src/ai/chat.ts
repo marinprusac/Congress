@@ -58,7 +58,7 @@ export async function repairInventedTokens(text: string): Promise<string> {
   });
 }
 
-const ASK_KINDS = new Set(["message", "question", "proposal", "builder_request", "type_publish"]);
+const ASK_KINDS = new Set(["message", "question", "proposal", "builder_request", "internet_request", "type_publish"]);
 const HISTORY_LIMIT = 20;
 
 function describeForContext(m: AiMessage): string {

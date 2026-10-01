@@ -44,6 +44,8 @@ const envSchema = z.object({
   // ANTHROPIC_API_KEY bills metered Console usage instead.
   ANTHROPIC_API_KEY: z.string().optional(),
   CLAUDE_CODE_OAUTH_TOKEN: z.string().optional(),
+  // Search API key for the AI's internet mode (mcp/webTools.ts, Brave Search). Unset: fetch_url only.
+  WEB_SEARCH_API_KEY: z.string().optional(),
   // Google connector (connectors/google). Unset falls back to the Calendar
   // Chamber's .env, where these lived before the connector existed.
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),

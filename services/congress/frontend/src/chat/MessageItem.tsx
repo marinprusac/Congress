@@ -37,7 +37,7 @@ function Stamp({ message, show }: { message: AiMessage; show: boolean }) {
 export const MessageItem = memo(function MessageItem({ message, stamp, onRetry, retrying }: MessageItemProps) {
   const nav = useChatNavigation();
 
-  if (["message", "question", "proposal", "builder_request", "type_publish"].includes(message.kind)) {
+  if (["message", "question", "proposal", "builder_request", "internet_request", "type_publish"].includes(message.kind)) {
     return <AskCard message={message} />;
   }
 

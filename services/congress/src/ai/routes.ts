@@ -35,6 +35,7 @@ import {
   listOpenAsks,
 } from "./asks.js";
 import { decideBuilderRequest, decidePublish, endGrant } from "./builder.js";
+import { decideInternetRequest } from "./internet.js";
 
 // Mounted at /congress/ai (server.ts), ahead of the /api/:chamber/*
 // wildcard. Session-gated throughout.
@@ -154,6 +155,12 @@ aiRoutes.post("/threads/:id/builder/end", requireSession, (c) => {
   return c.json({ ended: endGrant(id) });
 });
 
+aiRoutes.post("/threads/:id/internet/end", requireSession, (c) => {
+  const id = threadId(c.req.param("id"));
+  if (!id) return c.json({ error: "not_found" }, 404);
+  return c.json({ ended: endGrant(id, "internet") });
+});
+
 // ---- Asks (the owner's side) ----
 
 function askErrorResponse(err: unknown) {
@@ -184,6 +191,7 @@ aiRoutes.post("/messages/:id/decide", requireSession, async (c) => {
     const { approve, note, grantMinutes } = parsed.data;
     const kind = getMessage(id)?.kind;
     if (kind === "builder_request") return c.json(decideBuilderRequest(id, approve, { note: note || undefined, grantMinutes }));
+    if (kind === "internet_request") return c.json(decideInternetRequest(id, approve, { note: note || undefined, grantMinutes }));
     if (kind === "type_publish") return c.json(decidePublish(id, approve, note || undefined));
     return c.json(decideProposal(id, approve, note || undefined));
   } catch (err) {

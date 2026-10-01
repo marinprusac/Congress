@@ -115,6 +115,11 @@ export async function endBuilderMode(threadId: number): Promise<void> {
   if (!res.ok) await jsonOrError(res);
 }
 
+export async function endInternetMode(threadId: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/threads/${threadId}/internet/end`, sendJson("POST", {}));
+  if (!res.ok) await jsonOrError(res);
+}
+
 export const aiTrackingQueryKey = ["congress", "ai", "tracking"] as const;
 export const aiFactsQueryKey = ["congress", "ai", "facts"] as const;
 

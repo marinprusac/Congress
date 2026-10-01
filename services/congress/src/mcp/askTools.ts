@@ -5,6 +5,7 @@ import { askFieldSchema, proposedActionSchema } from "@congress/shared-types";
 import { currentRunContext } from "../ai/runContext.js";
 import { AskClosedError, AskInvalidError, AskNotFoundError, askQuestion, listAsksForAi, proposeActions, sendMessage, withdrawAsk } from "../ai/asks.js";
 import { requestBuilderMode } from "../ai/builder.js";
+import { requestInternetMode } from "../ai/internet.js";
 
 const urgency = z
   .enum(["quiet", "push"])
@@ -120,6 +121,25 @@ export function registerAskTools(server: McpServer) {
     ({ title, reason, scope, urgency }) =>
       guarded(async () => {
         const { message, delivery } = await requestBuilderMode({ title, reason, scope, urgency }, currentRunContext());
+        return { ok: true, messageId: message.id, threadId: message.threadId, delivery };
+      })
+  );
+
+  server.registerTool(
+    "request_internet_mode",
+    {
+      title: "Request Internet Access",
+      description:
+        "Ask the owner for internet access, needed to read web pages or search the web. You have none without it. The owner grants it for a while in this thread; the web tools then appear in the follow-up run.",
+      inputSchema: {
+        title: z.string().min(1).max(120).describe('Short headline, e.g. "Look up the train timetable".'),
+        reason: z.string().min(1).max(2000).describe("To the owner, in Markdown: what you need to look up and why."),
+        urgency,
+      },
+    },
+    ({ title, reason, urgency }) =>
+      guarded(async () => {
+        const { message, delivery } = await requestInternetMode({ title, reason, urgency }, currentRunContext());
         return { ok: true, messageId: message.id, threadId: message.threadId, delivery };
       })
   );

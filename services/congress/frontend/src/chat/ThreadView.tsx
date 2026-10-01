@@ -10,6 +10,7 @@ import {
   cancelAiRun,
   createAiThread,
   endBuilderMode,
+  endInternetMode,
   markAiThreadRead,
   postAiThreadMessage,
   retryAiThread,
@@ -30,8 +31,8 @@ function BackButton() {
   return <ChatBackButton />;
 }
 
-// While the owner's builder-mode grant lasts, with a way to end it early.
-function BuilderBanner({ thread }: { thread: AiThread }) {
+// While one of the owner's grants (builder mode, internet) lasts, with a way to end it early.
+function GrantBanner({ thread, kind }: { thread: AiThread; kind: "builder" | "internet" }) {
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -39,15 +40,16 @@ function BuilderBanner({ thread }: { thread: AiThread }) {
     return () => clearInterval(id);
   }, []);
   const end = useMutation({
-    mutationFn: () => endBuilderMode(thread.id),
+    mutationFn: () => (kind === "internet" ? endInternetMode(thread.id) : endBuilderMode(thread.id)),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: aiThreadQueryKey(thread.id) }),
   });
-  const until = thread.builderUntil ? new Date(thread.builderUntil).getTime() : 0;
+  const untilIso = kind === "internet" ? thread.internetUntil : thread.builderUntil;
+  const until = untilIso ? new Date(untilIso).getTime() : 0;
   if (until <= now) return null;
   const minutes = Math.max(1, Math.round((until - now) / 60_000));
   return (
     <div className="builder-banner" role="status">
-      <span>Builder mode · {minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`} left</span>
+      <span>{kind === "internet" ? "Internet access" : "Builder mode"} · {minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`} left</span>
       <button type="button" onClick={() => end.mutate()} disabled={end.isPending}>
         End
       </button>
@@ -245,7 +247,8 @@ function Conversation({ threadId }: { threadId: number }) {
         {thread.data ? <ThreadActions thread={thread.data} onDeleted={chat.back} /> : null}
       </header>
       <PausedBanner />
-      {thread.data ? <BuilderBanner thread={thread.data} /> : null}
+      {thread.data ? <GrantBanner thread={thread.data} kind="builder" /> : null}
+      {thread.data ? <GrantBanner thread={thread.data} kind="internet" /> : null}
       <div className="chat-scroll" ref={scrollRef}>
         <div className="chat-log" ref={contentRef}>
           <div ref={topRef} className="chat-top-sentinel" />

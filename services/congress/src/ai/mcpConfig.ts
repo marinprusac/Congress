@@ -32,7 +32,7 @@ export function selfBaseUrl(): string {
 export function buildMcpServers(
   actor: string,
   run: RunContextInfo = { runId: null, threadId: null },
-  opts: { builder?: boolean } = {}
+  opts: { builder?: boolean; internet?: boolean } = {}
 ): Record<string, { type: "http"; url: string; headers: Record<string, string> }> {
   const headers = { "X-Congress-Internal-Token": env.CONGRESS_INTERNAL_TOKEN, [ACTOR_HEADER]: actor };
   const congressHeaders: Record<string, string> = { ...headers };
@@ -44,12 +44,14 @@ export function buildMcpServers(
   if (getLocalSource("e")) mcpServers.types = { type: "http", url: `${selfBaseUrl()}/mcp/types`, headers: congressHeaders };
   // Only for a thread with a builder-mode grant (the server re-checks it).
   if (opts.builder) mcpServers.builder = { type: "http", url: `${selfBaseUrl()}/mcp/builder`, headers: congressHeaders };
+  // Likewise for internet mode.
+  if (opts.internet) mcpServers.web = { type: "http", url: `${selfBaseUrl()}/mcp/web`, headers: congressHeaders };
   return mcpServers;
 }
 
 // `empty`: a config with no servers at all (the gate), so the CLI can't fall
 // back to whatever MCP servers this machine's user has configured.
-export async function writeMcpConfigFile(actor: string, run?: RunContextInfo, opts: { empty?: boolean; builder?: boolean } = {}): Promise<McpConfigFile> {
+export async function writeMcpConfigFile(actor: string, run?: RunContextInfo, opts: { empty?: boolean; builder?: boolean; internet?: boolean } = {}): Promise<McpConfigFile> {
   const dir = await mkdtemp(join(tmpdir(), "congress-ai-mcp-"));
   const path = join(dir, "mcp.json");
   await writeFile(path, JSON.stringify({ mcpServers: opts.empty ? {} : buildMcpServers(actor, run, opts) }, null, 2));

@@ -9,7 +9,7 @@ import { env } from "../env.js";
 import { getAiSettings, updateAiSettings } from "./settings.js";
 import { recordSpend, todaySpendUsd } from "./spend.js";
 import { writeMcpConfigFile } from "./mcpConfig.js";
-import { buildPrompt, builderPromptSection } from "./prompt.js";
+import { buildPrompt, builderPromptSection, internetPromptSection } from "./prompt.js";
 import { activeGrant } from "./builder.js";
 import { memoryPromptSection } from "./memory.js";
 import { startRun, emitProgress, finishRun } from "./runStream.js";
@@ -327,9 +327,10 @@ export async function runAi(ctx: RunContext): Promise<RunOutcome> {
   }
 
   const grant = ctx.jsonSchema ? null : activeGrant(threadId);
-  const memory = ctx.jsonSchema ? undefined : [memoryPromptSection(settings.timeZone), grant && builderPromptSection(grant.expiresAt)].filter(Boolean).join("\n\n");
+  const internet = ctx.jsonSchema ? null : activeGrant(threadId, "internet");
+  const memory = ctx.jsonSchema ? undefined : [memoryPromptSection(settings.timeZone), grant && builderPromptSection(grant.expiresAt), internet && internetPromptSection(internet.expiresAt)].filter(Boolean).join("\n\n");
   const prompt = buildPrompt(settings, ctx.body, new Date(), memory);
-  const mcpConfig = await writeMcpConfigFile(ctx.actor, { runId, threadId }, { empty: Boolean(ctx.jsonSchema), builder: Boolean(grant) });
+  const mcpConfig = await writeMcpConfigFile(ctx.actor, { runId, threadId }, { empty: Boolean(ctx.jsonSchema), builder: Boolean(grant), internet: Boolean(internet) });
   insertRunRow({ id: runId, ...base, status: "running" });
   startRun(runId, ctx.kind, ctx.meta ?? {}, threadId);
 

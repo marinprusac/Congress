@@ -149,7 +149,7 @@ export const BUILDER_GRANT_MINUTES = [15, 60, 240] as const;
 export const decideAskRequestSchema = z.object({
   approve: z.boolean(),
   note: z.string().trim().max(1000).optional(),
-  // builder_request only: how long the grant lasts.
+  // builder_request/internet_request only: how long the grant lasts.
   grantMinutes: z
     .number()
     .int()
@@ -163,7 +163,7 @@ export const openAskSchema = z.object({
   messageId: z.number().int(),
   threadId: z.number().int(),
   threadTitle: z.string(),
-  kind: z.enum(["message", "question", "proposal", "builder_request", "type_publish"]),
+  kind: z.enum(["message", "question", "proposal", "builder_request", "internet_request", "type_publish"]),
   title: z.string(),
   text: z.string(),
   payload: z.unknown(),
@@ -180,6 +180,14 @@ export const builderRequestPayloadSchema = z.object({
   note: z.string().max(1000).nullable().default(null),
 });
 export type BuilderRequestPayload = z.infer<typeof builderRequestPayloadSchema>;
+
+// The AI asks for internet access in its thread.
+export const internetRequestPayloadSchema = z.object({
+  title: z.string().min(1).max(120),
+  grantedUntil: z.string().nullable().default(null),
+  note: z.string().max(1000).nullable().default(null),
+});
+export type InternetRequestPayload = z.infer<typeof internetRequestPayloadSchema>;
 
 // One draft, frozen as reviewed: approval publishes exactly this.
 export const typePublishPayloadSchema = z.object({

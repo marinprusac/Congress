@@ -64,7 +64,7 @@ export function threadForRun(runId: string): number | null {
 export const dedupeKey = (messageId: number) => `ask-${messageId}`;
 
 // Asks that wait on the owner (a message only informs).
-export const DECISION_KINDS = ["question", "proposal", "builder_request", "type_publish"] as const;
+export const DECISION_KINDS = ["question", "proposal", "builder_request", "internet_request", "type_publish"] as const;
 type DecisionKind = (typeof DECISION_KINDS)[number];
 
 async function pushesToday(now: Date, timeZone: string | null): Promise<number> {
