@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { StackLink } from "./navHooks.js";
-import { useShellHosted, resolveChamberPath } from "./ShellHostContext.js";
+import { resolveChamberPath } from "./ShellHostContext.js";
 
 interface ChamberHeaderProps {
   icon: ReactNode;
@@ -24,8 +24,7 @@ interface ChamberHeaderProps {
 // optional back button, icon + title. Navigation and search live in
 // Congress's tab bar, not here.
 export function ChamberHeader({ icon, title, ownChamber = "", titleHref = "/", onBack, extraActions }: ChamberHeaderProps) {
-  const shellHosted = useShellHosted();
-  const resolvedTitleHref = titleHref ? resolveChamberPath(titleHref, ownChamber, shellHosted) : titleHref;
+  const resolvedTitleHref = titleHref ? resolveChamberPath(titleHref, ownChamber) : titleHref;
   const titleContent = (
     <>
       {icon}

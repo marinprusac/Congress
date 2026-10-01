@@ -1,13 +1,9 @@
 import { z } from "zod";
-import { chamberSubscriptionSchema } from "./events.js";
 
 // "offline" means the Chamber failed to start inside Congress. "detached" is
 // a manual owner override (see congress/src/registry.ts's detachChamber/
 // attachChamber) that survives restarts. The frontend treats both as "not
 // active".
-export const chamberStatusSchema = z.enum(["active", "offline", "detached"]);
-export type ChamberStatus = z.infer<typeof chamberStatusSchema>;
-
 export const manifestRoutesSchema = z.object({
   home: z.string(),
   settings: z.string(),
@@ -158,12 +154,6 @@ export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
   },
 ];
 
-// Top-level paths Congress's own shell owns (services/congress/frontend's
-// App.tsx routes, and the service worker's shell-route allowlist). A Chamber
-// is served at "/<name>/*", so one named any of these would be unreachable -
-// Congress refuses to register it.
-export const RESERVED_CHAMBER_NAMES = ["congress", "search", "notifications", "settings", "chat", "view", "vendor", "auth", "api", "mcp", "privacy", "terms", "e", "types", "builder", "events"] as const;
-
 export const manifestSchema = z.object({
   name: z.string().min(1),
   displayName: z.string().min(1),
@@ -183,12 +173,3 @@ export const manifestSchema = z.object({
   googleScopes: z.array(z.string()).optional(),
 });
 export type Manifest = z.infer<typeof manifestSchema>;
-
-export const chamberRegistryEntrySchema = manifestSchema.extend({
-  status: chamberStatusSchema,
-  registeredAt: z.string(),
-  // This Chamber's current event interest list (see events.ts's
-  // chamberSubscriptionSchema), read live from the loaded module.
-  subscriptions: z.array(chamberSubscriptionSchema).default([]),
-});
-export type ChamberRegistryEntry = z.infer<typeof chamberRegistryEntrySchema>;

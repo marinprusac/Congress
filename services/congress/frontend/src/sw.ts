@@ -8,32 +8,21 @@
 // --noEmit`.
 import { precacheAndRoute, createHandlerBoundToURL, matchPrecache } from "workbox-precaching";
 import { registerRoute, setCatchHandler, NavigationRoute } from "workbox-routing";
-import { NetworkOnly, StaleWhileRevalidate } from "workbox-strategies";
-import { ExpirationPlugin } from "workbox-expiration";
-import { CacheableResponsePlugin } from "workbox-cacheable-response";
+import { NetworkOnly } from "workbox-strategies";
 
-// Baked in at build time (see vite.config.ts's `define`) from the deploy's
-// git sha - suffixing the runtime caches below with it means a new deploy
-// gets fresh cache names, and the cleanup in `activate` deletes whatever
-// the previous deploy's build id left behind. Without this, remote-entry.js
-// and the vendor bundle (both deliberately unhashed filenames - see
-// vite.remote.config.ts/vite.vendor.config.ts) would stay cached under the
-// same cache+key forever, since nothing else about their URL ever changes.
+// Baked in at build time (see vite.config.ts's `define`) from the deploy's git sha.
 declare const __BUILD_ID__: string;
-const CHAMBER_REMOTES_CACHE = `chamber-remotes-${__BUILD_ID__}`;
-const VENDOR_CACHE = `vendor-${__BUILD_ID__}`;
+void __BUILD_ID__;
 
 declare let self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Array<{ url: string; revision: string | null }> };
 
 precacheAndRoute(self.__WB_MANIFEST);
 
-// Only Congress's own shell routes ("/", /search, /notifications,
-// /settings, /chat, /view/...) are served from the cached app shell; every
-// other top-level path ("/notes", "/tasks", ...) is a Chamber proxied
-// through server.ts's chamberFrontendProxy, which this worker must never
-// shadow with the cached shell (curl bypasses the service worker, which is
-// why a regression here only ever shows up in a real browser). Keep this in
-// step with App.tsx's SHELL_ROUTES.
+// Only Congress's own shell routes are served from the cached app shell;
+// every other top-level path is a server route (or a retired Chamber's old
+// URL the server answers with the shell), which this worker must never
+// shadow (curl bypasses the service worker, which is why a regression here
+// only ever shows up in a real browser). Keep this in step with App.tsx.
 registerRoute(
   new NavigationRoute(createHandlerBoundToURL("index.html"), {
     denylist: [/^\/(?!$|search$|notifications$|settings$|chat$|chat\/|view\/|e\/|events$|events\/|fitness\/|map$|map\/|whatsapp$|whatsapp\/)/],
@@ -51,47 +40,8 @@ registerRoute(
 // setCatchHandler gets a chance to serve the cached shell instead.
 registerRoute(({ request }) => request.mode === "navigate", new NetworkOnly());
 
-// The shared React/router/query-client bundle every Chamber's remote entry
-// resolves via the importmap (see vite.vendor.config.ts) - StaleWhileRevalidate
-// so a warm cache serves it instantly while a fresh copy is fetched in the
-// background, rather than blocking on network every time.
-registerRoute(
-  ({ url }) => url.pathname.startsWith("/vendor/") && url.pathname.endsWith(".js"),
-  new StaleWhileRevalidate({
-    cacheName: VENDOR_CACHE,
-    // Without this, an error response (a 502 mid-restart, a stale proxy hit)
-    // gets cached as if it were good data - StaleWhileRevalidate has no
-    // built-in notion of "this response was bad, don't keep it" otherwise.
-    plugins: [new CacheableResponsePlugin({ statuses: [0, 200] }), new ExpirationPlugin({ maxEntries: 20 })],
-  })
-);
-
-// Every Chamber's own remote-entry.js/.css (its actual UI code and styles,
-// not just data) - populated the first time a Chamber is actually opened
-// (ChamberHost's own lazy import, or Settings/a widget resolving that same
-// remote-entry.js), never eagerly for Chambers nobody has visited. Once an
-// entry lands here it stays - a cold tab (new tab, reload, returning after
-// a while, even a future session) serves that Chamber's real interface from
-// Cache Storage instead of a fresh network fetch, for as long as this
-// BUILD_ID's cache is current.
-registerRoute(
-  ({ url }) => /^\/[^/]+\/remote-entry\.(js|css)$/.test(url.pathname),
-  new StaleWhileRevalidate({
-    cacheName: CHAMBER_REMOTES_CACHE,
-    // See the vendor route's own comment above - same reasoning.
-    plugins: [new CacheableResponsePlugin({ statuses: [0, 200] }), new ExpirationPlugin({ maxEntries: 64 })],
-  })
-);
-
-// Handles the failure the NetworkOnly route above re-throws (see its own
-// comment for why a route is needed at all) - a full-page load of a
-// Chamber-prefixed URL like /notes/abc normally reaches server.ts's
-// chamberFrontendProxy, but offline that fetch can't succeed at all.
-// Falling back to the precached shell here means it boots anyway and hands
-// off to ChamberHost, which resolves that Chamber from the runtime cache
-// above - same offline outcome as the shell-hosted navigation this Chamber
-// would have gotten if you were already inside the app instead of loading
-// it fresh.
+// Offline, a denylisted navigation has no network to reach: serve the cached
+// shell instead of the browser's error page.
 setCatchHandler(async ({ request }) => {
   if (request.mode === "navigate") {
     const shell = await matchPrecache("index.html");
@@ -105,13 +55,9 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
       await self.clients.claim();
-      const keptCaches = new Set([CHAMBER_REMOTES_CACHE, VENDOR_CACHE]);
+      // The retired Chamber-bundle and vendor runtime caches.
       const cacheNames = await caches.keys();
-      await Promise.all(
-        cacheNames
-          .filter((name) => (name.startsWith("chamber-remotes-") || name.startsWith("vendor-")) && !keptCaches.has(name))
-          .map((name) => caches.delete(name))
-      );
+      await Promise.all(cacheNames.filter((name) => name.startsWith("chamber-remotes-") || name.startsWith("vendor-")).map((name) => caches.delete(name)));
     })()
   );
 });

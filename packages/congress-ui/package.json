@@ -8,7 +8,6 @@
   "exports": {
     ".": "./src/index.tsx",
     "./styles.css": "./src/styles.css",
-    "./styles.remote.css": "./src/styles.remote.css",
     "./shared.css": "./src/shared.css"
   },
   "scripts": {

@@ -1,11 +1,10 @@
 import { useRef, useState, type CSSProperties } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { ChamberRegistryEntry, FeedItem } from "@congress/shared-types";
+import type { FeedItem } from "@congress/shared-types";
 import {
   ChamberHeader,
   CapitolMark,
   ChamberMark,
-  fetchRegistry,
   preloadRoute,
   resolveChamberPath,
   staggerDelayMs,
@@ -21,12 +20,6 @@ import { HomeAsks } from "@/components/HomeAsks";
 import { GearIcon } from "@/components/TabBar";
 import { feedQueryKey, fetchFeed } from "@/lib/feedApi";
 import { formatPreviewTime } from "@/lib/formatPreviewTime";
-
-function findView(registry: ChamberRegistryEntry[] | undefined, chamber: string, viewId: string) {
-  const entry = registry?.find((c) => c.name === chamber);
-  const view = entry?.views?.find((v) => v.id === viewId);
-  return entry && view ? { entry, view } : null;
-}
 
 // The owner's pinned views - fixed shortcuts above the ranked feed, the way
 // stories sit above a feed. Pinning happens in Settings -> Home.
@@ -53,17 +46,12 @@ function PinnedViews() {
   );
 }
 
-function FeedEntry({ item, registry }: { item: FeedItem; registry: ChamberRegistryEntry[] | undefined }) {
+function FeedEntry({ item }: { item: FeedItem }) {
   const nav = useStackNav();
   if (item.kind === "view") {
     const core = findCoreView(item.chamber, item.viewId);
-    if (core) {
-      const source = { name: core.source.name, displayName: core.source.displayName, status: "active" as const };
-      return <ViewSlot chamber={source} view={core.view} Card={core.view.Card} reason={item.reason} />;
-    }
-    const found = findView(registry, item.chamber, item.viewId);
-    if (!found) return null;
-    return <ViewSlot chamber={found.entry} view={found.view} reason={item.reason} />;
+    if (!core?.view.Card) return null;
+    return <ViewSlot source={core.source} view={core.view} Card={core.view.Card} reason={item.reason} />;
   }
   // The item's own information, inline - tapping still opens the exhibit.
   const preview = item.preview;
@@ -71,7 +59,7 @@ function FeedEntry({ item, registry }: { item: FeedItem; registry: ChamberRegist
   // unless it only repeats it (an all-day event's "Today").
   const time = preview?.time ? formatPreviewTime(preview.time) : undefined;
   const reason = item.reason && item.reason !== time ? item.reason : undefined;
-  const href = resolveChamberPath(item.url, item.chamber, true);
+  const href = resolveChamberPath(item.url, item.chamber);
   return (
     <section className="feed-card">
       <button type="button" className="feed-exhibit" onPointerDown={() => void preloadRoute(href)} onClick={() => nav.push(href)}>
@@ -117,7 +105,6 @@ function FeedSkeleton() {
 // server-side, see services/congress/src/feed.ts).
 export function HomePage() {
   useAppliedTheme();
-  const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
   const feed = useQuery({ queryKey: feedQueryKey, queryFn: fetchFeed, refetchInterval: 60_000 });
   const keys = (feed.data ?? []).map(feedKey);
   const feedRef = useRef<HTMLDivElement>(null);
@@ -156,7 +143,7 @@ export function HomePage() {
                 data-flip-key={key}
                 className={introIndex === undefined ? undefined : "motion-rise"}
                 style={introIndex === undefined ? undefined : ({ "--stagger": `${staggerDelayMs(introIndex)}ms` } as CSSProperties)}>
-                <FeedEntry item={item} registry={registry} />
+                <FeedEntry item={item} />
               </div>
             );
           })}

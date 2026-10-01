@@ -49,8 +49,7 @@ describe("mountStaticFrontend", () => {
     mkdirSync(join(fixture, "frontend", "dist", "assets"), { recursive: true });
     writeFileSync(join(fixture, "frontend", "dist", "index.html"), "<html>shell</html>");
     writeFileSync(join(fixture, "frontend", "dist", "assets", "app-abc123.js"), "console.log(1)");
-    writeFileSync(join(fixture, "frontend", "dist", "remote-entry.js"), "export {};");
-    process.chdir(fixture);
+        process.chdir(fixture);
     mountStaticFrontend(app);
   });
 
@@ -95,8 +94,8 @@ describe("mountStaticFrontend", () => {
     expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
   });
 
-  it("caches the deliberately unhashed entry files only briefly, so a redeploy is visible", async () => {
-    const res = await app.request("/remote-entry.js");
+  it("caches the unhashed shell only briefly, so a redeploy is visible", async () => {
+    const res = await app.request("/index.html");
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("public, max-age=60, must-revalidate");
   });

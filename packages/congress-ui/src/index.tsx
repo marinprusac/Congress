@@ -10,6 +10,7 @@ export { ExhibitInlineField } from "./ExhibitInlineField.js";
 export { useResolvedExhibits } from "./useResolvedExhibits.js";
 export { stripFrontmatter } from "./frontmatter.js";
 export { navigateToExhibit } from "./navigateToExhibit.js";
+export { resolveChamberPath } from "./ShellHostContext.js";
 export { ChamberLayout } from "./ChamberLayout.js";
 export { ChamberHeader } from "./ChamberHeader.js";
 export { useExhibitConnections } from "./useExhibitConnections.js";
@@ -25,7 +26,6 @@ export {
 export { useBackNavigation, ChamberIndexRedirect } from "./chamberNav.js";
 export { ChamberMark, CapitolMark, getChamberIcon } from "./ChamberMarks.js";
 export { ViewCard } from "./ViewCard.js";
-export { fetchRegistry } from "./registry.js";
 export { useAiRunStream, fetchAiSettings, aiSettingsQueryKey, type AiRunStreamState, type AiToolCall } from "./useAiRunStream.js";
 export {
   useAiStream,
@@ -39,16 +39,10 @@ export {
 } from "./aiStream.js";
 export { ChatMarkdown } from "./ChatMarkdown.js";
 export { useKeyboardInset } from "./useKeyboardInset.js";
-export { fetchEventCatalog } from "./eventCatalog.js";
-export type { EventCatalogEntry } from "./eventCatalog.js";
-export { TriggerEventPicker } from "./TriggerEventPicker.js";
-export { markShellHosted, useShellHosted, resolveChamberPath } from "./ShellHostContext.js";
 export { preventPinchZoom } from "./preventZoom.js";
 export { resolveApiBase, parseJsonResponse, assertDeleteOk } from "./api.js";
 export { createQueryClient } from "./queryClient.js";
 export { PersistedQueryProvider } from "./queryPersistence.js";
-export { loadRemoteModule, evictRemoteModule } from "./remoteModule.js";
-export type { RemoteModule } from "./remoteModule.js";
 export { PageHeader } from "./PageHeader.js";
 export { useSearchableList, useListRowPrefetch } from "./listPage.js";
 export { ListSearchInput, ListLoadingState, ListErrorState, ListEmptyState } from "./ListStates.js";

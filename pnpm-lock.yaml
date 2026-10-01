@@ -212,12 +212,6 @@ importers:
       web-push:
         specifier: ^3.6.7
         version: 3.6.7
-      workbox-cacheable-response:
-        specifier: ^7.4.1
-        version: 7.4.1
-      workbox-expiration:
-        specifier: ^7.4.1
-        version: 7.4.1
       workbox-precaching:
         specifier: ^7.4.1
         version: 7.4.1

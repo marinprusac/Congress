@@ -76,27 +76,9 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
-  build: {
-    rollupOptions: {
-      // Resolved at runtime via the importmap in index.html against the
-      // single shared copy built by vite.vendor.config.ts - see that file's
-      // comment for why. Chamber remote entries share the same import map
-      // (and so the same live module instances) once mounted into this
-      // shell, which is the whole point.
-      external: [
-        "react",
-        "react-dom",
-        "react-dom/client",
-        "react-router-dom",
-        "@tanstack/react-query",
-        "react/jsx-runtime",
-        "@congress/congress-ui",
-      ],
-    },
-  },
   server: {
     proxy: {
-      // Congress's own API (registry/settings/exhibits/layout/notifications/...).
+      // Congress's own API (settings/records/exhibits/notifications/...).
       "/congress": PROXY_TARGET,
       // Session auth (LoginGate) - server.ts mounts these at top-level
       // "/auth", not under "/congress/*", so they need their own rule here.
