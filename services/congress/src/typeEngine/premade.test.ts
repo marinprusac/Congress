@@ -61,10 +61,18 @@ describe("installPremades", () => {
     installPremades([PERSON, CHAT]);
     const chat = getTypeByPremadeKey("chat")!;
     const hidden = chat.definition.fields.filter((f) => f.options.hidden).map((f) => f.slug);
-    expect(hidden).toEqual(["unread", "has_unread", "last_from_me", "group"]);
+    expect(hidden).toEqual(["last_at", "preview", "unread", "has_unread", "last_from_me", "group"]);
     // Still stored, so feed rules keep working.
     const hasUnread = chat.definition.fields.find((f) => f.slug === "has_unread")!;
     expect(chat.definition.feedRules[0]!.and).toContainEqual({ field: hasUnread.id, value: true });
+  });
+
+  it("adds a local Muted field that the feed rule excludes", () => {
+    installPremades([PERSON, CHAT]);
+    const chat = getTypeByPremadeKey("chat")!;
+    const muted = chat.definition.fields.find((f) => f.slug === "muted")!;
+    expect(muted.options.hidden).toBeFalsy();
+    expect(chat.definition.feedRules[0]!.and).toContainEqual({ field: muted.id, value: false });
   });
 
   it("refuses a hidden required field", () => {
