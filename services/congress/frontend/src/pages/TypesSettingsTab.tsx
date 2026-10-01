@@ -11,7 +11,7 @@ const actorLabel = (actor: string) => (actor === "premade" ? "Congress" : actor 
 
 function describeField(f: FieldDefinition): string {
   const bits: string[] = [f.options.target ? `${f.options.many ? "many " : ""}${f.options.target}` : f.kind];
-  for (const key of ["required", "unique", "readonly"] as const) if (f.options[key]) bits.push(key);
+  for (const key of ["required", "unique", "readonly", "hidden"] as const) if (f.options[key]) bits.push(key);
   return bits.join(" · ");
 }
 

@@ -77,5 +77,14 @@ export const EMAIL: Premade = {
     ],
     // Cutover: in use.
     [{ op: "set_type_meta", hidden: false }],
+    // Not editable and not worth showing: kept for feed rules, search and the AI.
+    [
+      { op: "set_field_options", field: "unread", options: { hidden: true } },
+      { op: "set_field_options", field: "inbox", options: { hidden: true } },
+      { op: "set_field_options", field: "category", options: { hidden: true } },
+      { op: "set_field_options", field: "important", options: { hidden: true } },
+      { op: "set_field_options", field: "messages", options: { hidden: true } },
+      { op: "set_field_options", field: "account", options: { hidden: true } },
+    ],
   ],
 };

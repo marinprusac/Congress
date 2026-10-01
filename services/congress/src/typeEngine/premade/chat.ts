@@ -59,5 +59,12 @@ export const CHAT: Premade = {
     ],
     // Cutover: in use.
     [{ op: "set_type_meta", hidden: false }],
+    // Not editable and not worth showing: kept for feed rules, search and the AI.
+    [
+      { op: "set_field_options", field: "unread", options: { hidden: true } },
+      { op: "set_field_options", field: "has_unread", options: { hidden: true } },
+      { op: "set_field_options", field: "last_from_me", options: { hidden: true } },
+      { op: "set_field_options", field: "group", options: { hidden: true } },
+    ],
   ],
 };

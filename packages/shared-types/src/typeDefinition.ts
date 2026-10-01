@@ -34,6 +34,8 @@ export const fieldOptionsSchema = z
     many: z.boolean().optional(),
     // Written only by the engine (e.g. a toggle's stamp), never by input.
     readonly: z.boolean().optional(),
+    // Kept and readable by the AI, but not shown on the record screen.
+    hidden: z.boolean().optional(),
     // Text only: one value per line, each a lookup key (lookupOrCreate).
     key: z.enum(KEY_KINDS).nullable().optional(),
   })
