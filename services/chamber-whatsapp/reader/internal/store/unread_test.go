@@ -18,7 +18,7 @@ func unreadOf(t *testing.T, s *Store, chat string) (int, bool) {
 func rollbackUnread(t *testing.T, s *Store, v int) {
 	t.Helper()
 	_, err := s.db.Exec(`DROP INDEX messages_unread; ALTER TABLE messages DROP COLUMN read_at;
-		ALTER TABLE chats DROP COLUMN marked_unread; PRAGMA user_version = ` + strconv.Itoa(v))
+		ALTER TABLE chats DROP COLUMN marked_unread; ALTER TABLE chats DROP COLUMN muted_until; PRAGMA user_version = ` + strconv.Itoa(v))
 	must(t, err)
 }
 

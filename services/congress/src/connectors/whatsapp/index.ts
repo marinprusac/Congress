@@ -24,6 +24,7 @@ export const whatsappConnector = defineConnector({
         { slug: "preview", kind: "text", label: "Last message text" },
         { slug: "unread", kind: "number", label: "Unread" },
         { slug: "hasUnread", kind: "boolean", label: "Has unread" },
+        { slug: "muted", kind: "boolean", label: "Muted" },
         { slug: "lastFromMe", kind: "boolean", label: "Last from you" },
         { slug: "isGroup", kind: "boolean", label: "Group" },
         { slug: "phone", kind: "text", label: "Phone" },

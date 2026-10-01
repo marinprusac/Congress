@@ -117,6 +117,11 @@ func (h *Handler) Handle(evt any) {
 		if err := h.MarkChatAsRead(ctx, e); err != nil {
 			h.log.Error("apply mark chat read", "chat", e.JID, "err", err)
 		}
+	case *events.Mute:
+		h.touch(ctx, true)
+		if err := h.Mute(ctx, e); err != nil {
+			h.log.Error("apply mute", "chat", e.JID, "err", err)
+		}
 	case *events.AppStateSyncComplete:
 		// The initial full sync stores address-book names without emitting Contact events.
 		go h.SyncContacts(ctx)
@@ -273,6 +278,29 @@ func (h *Handler) MarkChatAsRead(ctx context.Context, e *events.MarkChatAsRead) 
 	return h.st.SetChatRead(ctx, chat, "", h.now().UnixMilli())
 }
 
+// mutedUntil converts WhatsApp's mute end (seconds; -1 or a far-future value
+// = forever) to epoch ms, with -1 meaning forever and 0 not muted.
+func mutedUntil(seconds int64, nowMs int64) int64 {
+	if seconds < 0 || seconds > 4102444800 { // before 1970 or after 2100
+		return -1
+	}
+	if ms := seconds * 1000; ms > nowMs {
+		return ms
+	}
+	return 0
+}
+
+// Mute applies the phone's mute or unmute of a chat.
+func (h *Handler) Mute(ctx context.Context, e *events.Mute) error {
+	info := types.MessageInfo{MessageSource: types.MessageSource{Chat: e.JID}}
+	chat := h.resolveChat(ctx, &info)
+	until := int64(0)
+	if a := e.Action; a != nil && a.GetMuted() {
+		until = mutedUntil(a.GetMuteEndTimestamp(), h.now().UnixMilli())
+	}
+	return h.st.SetMuted(ctx, chat.String(), chat.Server == types.GroupServer, until)
+}
+
 // HistorySync stores the conversations the phone sends after pairing (and later top-ups).
 func (h *Handler) HistorySync(ctx context.Context, e *events.HistorySync) {
 	d := e.Data
@@ -302,6 +330,11 @@ func (h *Handler) HistorySync(ctx context.Context, e *events.HistorySync) {
 		var fake types.MessageInfo
 		fake.Chat = chat
 		resolved := h.resolveChat(ctx, &fake)
+		if end := conv.GetMuteEndTime(); end > 0 {
+			if until := mutedUntil(int64(end), h.now().UnixMilli()); until != 0 {
+				_ = h.st.SetMuted(ctx, resolved.String(), resolved.Server == types.GroupServer, until)
+			}
+		}
 		// The phone's own unread count (absent = 0), so a fresh pairing isn't all unread.
 		if err := h.st.ApplyHistoryUnread(ctx, resolved.String(), int(conv.GetUnreadCount()), conv.GetMarkedAsUnread(), h.now().UnixMilli()); err != nil {
 			h.log.Error("history unread state", "chat", chat, "err", err)

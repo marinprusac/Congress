@@ -102,6 +102,25 @@ describe("the WhatsApp connector's chats", () => {
     expect((await app.request("/settings", { method: "PUT", body: "{}" })).status).toBe(400);
   });
 
+  it("inherits the phone's mute, and notices a timed mute ending", async () => {
+    type Muteable = (typeof chats)[number] & { mutedUntil?: number };
+    const [ana, bob] = chats as [Muteable, Muteable, Muteable];
+    ana.mutedUntil = -1;
+    bob.mutedUntil = Date.now() + 60_000;
+    await syncWhatsapp(ctx);
+    expect(chatRecord(getChatRow(ANA)!).values.muted).toBe(true);
+    expect(chatRecord(getChatRow(BOB)!).values.muted).toBe(true);
+    expect(chatRecord(getChatRow(GROUP)!).values.muted).toBe(false);
+    // Bob's mute lapses without the reader saying anything.
+    bob.mutedUntil = Date.now() - 1;
+    emitted.length = 0;
+    await syncWhatsapp(ctx);
+    expect(emitted.map((e) => e.key)).toEqual([BOB]);
+    expect(chatRecord(getChatRow(BOB)!).values.muted).toBe(false);
+    delete ana.mutedUntil;
+    delete bob.mutedUntil;
+  });
+
   it("marks read only in the reader, never telling WhatsApp", async () => {
     const rec = await whatsappConnector.push!.act(ctx, "chat", ANA, "markReadLocally", {});
     expect(rec.values).toMatchObject({ unread: 0, hasUnread: false });
