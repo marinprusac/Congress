@@ -20,7 +20,11 @@ export interface ReaderChat {
   lastRevoked?: boolean;
   unreadCount?: number;
   markedUnread?: boolean;
+  mutedUntil?: number;
 }
+
+// The reader's mute (0 none, -1 forever, else epoch ms) as of now.
+export const isMuted = (until: number, now = Date.now()): boolean => until === -1 || until > now;
 
 // A 1:1 chat with a phone number (not a group, not a hidden-number "lid" contact).
 export const phoneOf = (jid: string): string | null => {
@@ -56,6 +60,7 @@ export function chatRecord(c: ChatRow): SourceRecord {
       preview: preview(c),
       unread: c.unreadCount,
       hasUnread,
+      muted: c.muted,
       lastFromMe: c.lastFromMe,
       isGroup: c.isGroup,
       phone: phoneOf(c.jid) ?? "",
@@ -78,6 +83,8 @@ const rowOf = (c: ReaderChat) => ({
   lastRevoked: c.lastRevoked ?? false,
   unreadCount: c.unreadCount ?? 0,
   markedUnread: c.markedUnread ?? false,
+  mutedUntil: c.mutedUntil ?? 0,
+  muted: isMuted(c.mutedUntil ?? 0),
 });
 
 // Upserts a chat; returns whether anything a record shows changed.

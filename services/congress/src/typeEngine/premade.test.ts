@@ -67,11 +67,12 @@ describe("installPremades", () => {
     expect(chat.definition.feedRules[0]!.and).toContainEqual({ field: hasUnread.id, value: true });
   });
 
-  it("adds a local Muted field that the feed rule excludes", () => {
+  it("fills Muted from WhatsApp and keeps muted chats out of the feed", () => {
     installPremades([PERSON, CHAT]);
     const chat = getTypeByPremadeKey("chat")!;
     const muted = chat.definition.fields.find((f) => f.slug === "muted")!;
     expect(muted.options.hidden).toBeFalsy();
+    expect(chat.definition.bindings[0]!.fields).toContainEqual({ source: "muted", target: muted.id, mode: "pull" });
     expect(chat.definition.feedRules[0]!.and).toContainEqual({ field: muted.id, value: false });
   });
 

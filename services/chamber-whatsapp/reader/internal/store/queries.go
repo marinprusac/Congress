@@ -30,6 +30,7 @@ type ChatRow struct {
 	LastRevoked   bool   `json:"lastRevoked"`
 	UnreadCount   int    `json:"unreadCount"`
 	MarkedUnread  bool   `json:"markedUnread"`
+	MutedUntil    int64  `json:"mutedUntil"`
 }
 
 // Unread incoming messages in chat alias c (served by the messages_unread index).
@@ -113,7 +114,7 @@ func (s *Store) listChats(ctx context.Context, limit int, cursor string, unreadO
 	rows, err := s.db.QueryContext(ctx, fmt.Sprintf(`
 		SELECT c.jid, `+chatName("c", "ct")+`, c.is_group, c.last_message_at,
 			coalesce(m.text, ''), coalesce(m.type, ''), coalesce(m.from_me, 0), coalesce(`+fmt.Sprintf(contactName, "sc")+`, ''),
-			m.revoked_at IS NOT NULL, `+unreadCount+`, c.marked_unread
+			m.revoked_at IS NOT NULL, `+unreadCount+`, c.marked_unread, c.muted_until
 		FROM chats c
 		LEFT JOIN contacts ct ON ct.jid = c.jid
 		LEFT JOIN messages m ON m.rowid = (
@@ -129,7 +130,7 @@ func (s *Store) listChats(ctx context.Context, limit int, cursor string, unreadO
 	out := []ChatRow{}
 	for rows.Next() {
 		var r ChatRow
-		if err := rows.Scan(&r.JID, &r.Name, &r.IsGroup, &r.LastMessageAt, &r.LastText, &r.LastType, &r.LastFromMe, &r.LastSender, &r.LastRevoked, &r.UnreadCount, &r.MarkedUnread); err != nil {
+		if err := rows.Scan(&r.JID, &r.Name, &r.IsGroup, &r.LastMessageAt, &r.LastText, &r.LastType, &r.LastFromMe, &r.LastSender, &r.LastRevoked, &r.UnreadCount, &r.MarkedUnread, &r.MutedUntil); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -139,8 +140,8 @@ func (s *Store) listChats(ctx context.Context, limit int, cursor string, unreadO
 
 func (s *Store) Chat(ctx context.Context, jid string) (*ChatRow, error) {
 	var r ChatRow
-	err := s.db.QueryRowContext(ctx, `SELECT c.jid, `+chatName("c", "ct")+`, c.is_group, c.last_message_at, `+unreadCount+`, c.marked_unread
-		FROM chats c LEFT JOIN contacts ct ON ct.jid = c.jid WHERE c.jid = ?`, jid).Scan(&r.JID, &r.Name, &r.IsGroup, &r.LastMessageAt, &r.UnreadCount, &r.MarkedUnread)
+	err := s.db.QueryRowContext(ctx, `SELECT c.jid, `+chatName("c", "ct")+`, c.is_group, c.last_message_at, `+unreadCount+`, c.marked_unread, c.muted_until
+		FROM chats c LEFT JOIN contacts ct ON ct.jid = c.jid WHERE c.jid = ?`, jid).Scan(&r.JID, &r.Name, &r.IsGroup, &r.LastMessageAt, &r.UnreadCount, &r.MarkedUnread, &r.MutedUntil)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -287,7 +288,7 @@ func (s *Store) SearchMessages(ctx context.Context, q, chat string, limit int) (
 // SearchChats matches chat and contact names.
 func (s *Store) SearchChats(ctx context.Context, q string, limit int) ([]ChatRow, error) {
 	like := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(strings.TrimSpace(q)) + "%"
-	rows, err := s.db.QueryContext(ctx, `SELECT c.jid, `+chatName("c", "ct")+` AS n, c.is_group, c.last_message_at, `+unreadCount+`, c.marked_unread
+	rows, err := s.db.QueryContext(ctx, `SELECT c.jid, `+chatName("c", "ct")+` AS n, c.is_group, c.last_message_at, `+unreadCount+`, c.marked_unread, c.muted_until
 		FROM chats c LEFT JOIN contacts ct ON ct.jid = c.jid
 		WHERE c.last_message_at > 0 AND (n LIKE ? ESCAPE '\' OR c.jid LIKE ? ESCAPE '\')
 		ORDER BY c.last_message_at DESC LIMIT ?`, like, like, limit)
@@ -298,7 +299,7 @@ func (s *Store) SearchChats(ctx context.Context, q string, limit int) ([]ChatRow
 	out := []ChatRow{}
 	for rows.Next() {
 		var r ChatRow
-		if err := rows.Scan(&r.JID, &r.Name, &r.IsGroup, &r.LastMessageAt, &r.UnreadCount, &r.MarkedUnread); err != nil {
+		if err := rows.Scan(&r.JID, &r.Name, &r.IsGroup, &r.LastMessageAt, &r.UnreadCount, &r.MarkedUnread, &r.MutedUntil); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
