@@ -24,7 +24,7 @@ export function CapitolMark(props: IconProps) {
 // Fallback for a Chamber that's offline, unregistered, or never shipped its
 // own icon (frontend/public/icons/mark.svg - see fetchChamberIconMarkup
 // below). Always renders something, so nothing ever needs to hardcode a
-// per-Chamber SVG in this shared package - see docs/creating-a-chamber.md.
+// per-Chamber SVG in this shared package - see docs/writing-a-connector.md.
 function DefaultChamberMark(props: IconProps) {
   return (
     <svg viewBox="0 0 256 256" fill="currentColor" {...props}>

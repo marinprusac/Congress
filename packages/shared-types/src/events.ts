@@ -13,17 +13,11 @@ export const DEFAULT_ACTOR = "system";
 export const actorSchema = z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9:_.-]*$/i);
 export type Actor = z.infer<typeof actorSchema>;
 
-// Published by a Chamber that wants something to happen when a condition
-// only it can detect becomes true - "task is due soon", "event starting in
-// 5 min" - without knowing or caring whether anything is listening.
-// Congress never stores these or inspects `type`/`payload` itself - it
-// immediately push-relays a publish (POST /congress/events/publish) to
-// every currently-active Chamber whose own declared subscriptions
-// (chamberSubscriptionSchema below) match, POSTing to that Chamber's own
-// fixed-convention POST /api/events/receive. `type` is conventionally
-// "<chamber>.<event>" (e.g. "tasks.due_soon") so it's self-namespacing
-// without a separate chamber filter downstream - see manifestEventSchema
-// (manifest.ts) for how a Chamber declares its own catalog of these.
+// A domain event published in-process (by a record type, a connector or the AI)
+// when a condition worth announcing becomes true - "task is due soon", "mail
+// received" - without knowing whether anything is listening. `type` is
+// conventionally "<source>.<event>" (e.g. "task.due_soon"); manifestEventSchema
+// (manifest.ts) is how a source declares its catalog of these.
 export const eventPublishRequestSchema = z.object({
   chamber: z.string().min(1),
   type: z.string().min(1),
@@ -33,41 +27,13 @@ export const eventPublishRequestSchema = z.object({
 });
 export type EventPublishRequest = z.infer<typeof eventPublishRequestSchema>;
 
-// What a subscribing Chamber's own POST /api/events/receive is handed - one
-// per matched publish, delivered directly rather than read off a stored
-// log, so there's no `id`/cursor here the way there used to be. A Chamber
-// that needs to keep its own record of what it's received (e.g. Deputy
-// Chamber buffering toward its next periodic checkup) does so in its own
-// storage, keyed however it likes - this shape is just the wire delivery.
+// A published event as Congress's log rules and the AI's observers receive it
+// (occurredAt always stamped).
 export const eventDeliverySchema = z.object({
   chamber: z.string(),
   type: z.string(),
   payload: z.record(z.string(), z.unknown()),
   occurredAt: z.string(),
-  // Absent on a delivery from a Congress older than this field.
   actor: actorSchema.optional(),
 });
 export type EventDelivery = z.infer<typeof eventDeliverySchema>;
-
-// A locally-numbered event, for a Chamber that keeps its own short-lived
-// buffer of received deliveries (see chamber-deputy's pending_checkup_events)
-// and wants a stable id to dedupe/order by within that buffer - `id` here is
-// only ever meaningful to whoever assigned it, never a Congress-wide id.
-export const eventLogEntrySchema = z.object({
-  id: z.number().int(),
-  chamber: z.string(),
-  type: z.string(),
-  payload: z.record(z.string(), z.unknown()),
-  occurredAt: z.string(),
-  actor: actorSchema.optional(),
-});
-export type EventLogEntry = z.infer<typeof eventLogEntrySchema>;
-
-// One entry in a Chamber's dynamic event interest list (its module's
-// `subscriptions()`), so Congress only relays what could interest it. `type`
-// "*" means every event type. The Chamber still does its own precise
-// matching in `onEvent`.
-export const chamberSubscriptionSchema = z.object({
-  type: z.string().min(1),
-});
-export type ChamberSubscription = z.infer<typeof chamberSubscriptionSchema>;

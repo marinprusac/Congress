@@ -47,7 +47,7 @@ export function NotificationsPage() {
     // A notification's url is relative to its emitting Chamber's own root
     // (e.g. "/e/3"); Congress's own events (chamber "congress") are already
     // root-relative.
-    nav.push(n.chamber === "congress" ? n.chamberUrl : resolveChamberPath(n.chamberUrl, n.chamber, true));
+    nav.push(n.chamber === "congress" ? n.chamberUrl : resolveChamberPath(n.chamberUrl, n.chamber));
   }
 
   return (

@@ -6,6 +6,6 @@ export function useChatNavigation() {
   const nav = useStackNav();
   return {
     onNavigatePath: (path: string) => nav.push(path),
-    onNavigateExhibit: (result: { chamber: string; url: string }) => nav.push(resolveChamberPath(result.url, result.chamber, true)),
+    onNavigateExhibit: (result: { chamber: string; url: string }) => nav.push(resolveChamberPath(result.url, result.chamber)),
   };
 }

@@ -21,7 +21,7 @@ export function cacheControlFor(path: string): string | undefined {
     return "public, max-age=31536000, immutable";
   }
   const lastSegment = path.slice(path.lastIndexOf("/") + 1);
-  if (lastSegment === "index.html" || lastSegment === "remote-entry.js" || lastSegment === "remote-entry.css") {
+  if (lastSegment === "index.html") {
     return "public, max-age=60, must-revalidate";
   }
   return undefined;
@@ -65,8 +65,8 @@ export function mountStaticFrontend(app: App): void {
     })
   );
   // Only a request that actually looks like a static asset (a recognized
-  // file extension on the last path segment - remote-entry.js,
-  // vendor/react-query.js, a mistyped asset URL, ...) 404s instead of
+  // file extension on the last path segment - a mistyped
+  // asset URL, a build step that never ran, ...) 404s instead of
   // silently getting index.html's markup back with a 200 - without this, a
   // build step that never ran (e.g. a skipped `build:vendor`) failed
   // completely silently: the browser got a 200 for a `.js` URL whose body

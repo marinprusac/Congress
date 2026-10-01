@@ -1,9 +1,9 @@
 # Deployment
 
 Congress runs on a single Hetzner VPS (`178.105.180.7`) as **one** plain
-`systemd` unit (`congress-core`) bound to `127.0.0.1`, no Docker. Every
-Chamber is a module loaded into that one process - there are no Chamber
-units or ports.
+`systemd` unit (`congress-core`) bound to `127.0.0.1`, no Docker. Everything
+(types, connectors, views, the AI) runs in that one process; the only other
+unit is the WhatsApp reader daemon (below).
 
 This deviates from the project brief's original access model (Tailscale-only,
 no public listener, network membership as the sole access control — brief
@@ -21,17 +21,19 @@ decision. See "Access control" below for what that means in practice.
 - Port: this VPS already runs other services on `3000` and `4000`, so
   Congress's production port differs from its dev default: **`8000`**,
   bound to `127.0.0.1`. The only thing reachable from outside the box at all
-  is Caddy, on 80/443. Chambers have no ports.
+  is Caddy, on 80/443.
 - `services/congress/.env` (untracked, created by hand on the server) sets
   `NODE_ENV=production`, `PORT=8000`, `CONGRESS_INTERNAL_TOKEN` (now only
   gating the MCP endpoints the AI's `claude` subprocess calls),
   `CONGRESS_MASTER_PASSWORD_HASH` and `SESSION_SECRET` (see
   `services/congress/.env.example`).
-- Each Chamber keeps its own config in `services/chamber-<name>/.env`
-  (Traccar, Google OAuth, ...), read by Congress for that Chamber only.
-  Leftover keys from the process era (`PORT`, `HOST`, `CAPITOL_URL`, ...)
-  are simply ignored. Each Chamber's SQLite file stays in its own
-  `services/chamber-<name>/data/`.
+- Connector setup (Traccar, the Hevy key, the health ingest token, ...) is
+  entered in Settings → Connectors and stored in each connector's own cache
+  DB under `services/congress/data/connectors/`. Google OAuth credentials
+  are `GOOGLE_OAUTH_*` in `services/congress/.env`. The only other `.env`
+  is `services/chamber-whatsapp/.env` (`WA_READER_SOCKET`), shared with the
+  wa-reader daemon. Old per-Chamber `.env` files and `data/` directories
+  are leftovers and can be deleted once convenient.
 
 ## wa-reader (WhatsApp)
 
@@ -47,9 +49,9 @@ pairing are in `services/chamber-whatsapp/reader/README.md`.
 `congress-core` (`infra/systemd/congress-core.service`) is the only unit:
 `User=marin`, `WorkingDirectory=/srv/congress/services/congress`,
 `ExecStart=/usr/bin/pnpm run start`, `Restart=on-failure`. It starts every
-Chamber in-process (`services/congress/src/chambers/loader.ts`); a Chamber
-that fails to start (bad config, a crash in its `start()`) is logged, marked
-offline, and skipped rather than taking Congress down.
+connector in-process (`services/congress/src/connectors/registry.ts`); a
+connector that fails to start is logged and shown as offline in Settings →
+Connectors rather than taking Congress down.
 
 `remote-apply.sh`'s restart step requires **passwordless `sudo` for
 `systemctl restart` and `systemctl reload`** for the `marin` user (it calls
@@ -61,14 +63,11 @@ deploy). This isn't set up by any script here — add it by hand once, e.g. via
 marin ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart congress-*, /usr/bin/systemctl reload caddy
 ```
 
-## Adding a new Chamber's infra
+## Adding a connector, type or view
 
-Nothing per-Chamber on the infra side. `pnpm create-chamber` adds the new
-Chamber to Congress's module list, `build-artifacts.sh` discovers it by
-globbing `services/chamber-*/`, and Caddy only ever points at Congress. The
-one manual step: if the Chamber needs config, create
-`services/chamber-<name>/.env` on the server (untracked) from its
-`.env.example`, then deploy.
+Nothing on the infra side: they are code in `services/congress`, Caddy only
+ever points at Congress, and `build-artifacts.sh` builds the one frontend.
+See `docs/writing-a-connector.md`.
 
 ## Google connector and Mail (one-time)
 
@@ -127,8 +126,9 @@ master-password cookie:
 - Because the cookie is `Strict`, the Google connector's OAuth callback
   (a cross-site redirect from Google) is exempt from the session check; its
   single-use `state`, minted only by the session-gated `/start`, authorises it.
-- Everything that carries real data — `/congress/registry`, `/api/:chamber/*`
-  (the gateway to every Chamber), and the frontend — requires that cookie.
+- Everything that carries real data — `/congress/*` and the frontend —
+  requires that cookie (a connector's webhooks, e.g. Health Auto Export's,
+  check their own token instead).
   `/health`, `/manifest`, and the static frontend shell stay open (nothing
   sensitive, and the login page itself has to load unauthenticated).
 - `/mcp` is gated separately, by the existing `CONGRESS_INTERNAL_TOKEN`
@@ -167,9 +167,8 @@ on a GitHub-hosted runner, which:
    `infra/deploy/pre-push-hook-checks` already ran on the laptop before the
    push was even allowed, now re-run as a real gate: if either fails here,
    nothing below happens and production is untouched.
-2. Runs `infra/deploy/build-artifacts.sh <sha>` — builds every service's
-   frontend (`build:web`, Congress's `build:vendor`, every Chamber's
-   `build:remote`) and precompresses the output, exactly what
+2. Runs `infra/deploy/build-artifacts.sh <sha>` — builds the frontend
+   (`build:web`) and precompresses the output, exactly what
    `sync-deploy.sh` used to do, just on the runner instead of on the VPS.
 3. `rsync`s the whole working tree (minus `infra/deploy/rsync-exclude.txt`'s
    `.git`/`node_modules`/`.env`/`data`/`dev-dist`) to `/srv/congress` over
@@ -211,12 +210,7 @@ the private half only needs to exist as that GitHub secret from then on.
 ## First-time server bootstrap
 
 This is what setting up a fresh VPS from scratch looks like today, for the
-full current set of services (Congress plus every `chamber-*` service in
-`services/`). (The very first VPS setup only had Capitol + Notes live at this
-stage and the reference block here used to reflect that snapshot rather than
-the current system — since corrected. If you're adding a *new* Chamber to an
-already-running server rather than bootstrapping from zero, see "Adding a new
-Chamber's infra" above instead.)
+full current set: Congress plus the wa-reader daemon.
 
 Nothing here is cloned from git anymore — the server only ever receives
 files pushed by CI (see "Deploy: GitHub Actions → server" above), so
@@ -239,8 +233,8 @@ sudo apt-get install -y rsync                     # if not already present
 
 # Create services/congress/.env by hand (untracked) from its .env.example:
 # NODE_ENV=production, PORT=8000, CONGRESS_INTERNAL_TOKEN,
-# CONGRESS_MASTER_PASSWORD_HASH and SESSION_SECRET. Then each Chamber's own
-# services/chamber-<name>/.env from its .env.example, for the ones that
+# CONGRESS_MASTER_PASSWORD_HASH and SESSION_SECRET. Then
+# services/chamber-whatsapp/.env from its .env.example, for the one that
 # need config (map's Traccar, fitness's Hevy key, ...).
 
 cd /srv/congress

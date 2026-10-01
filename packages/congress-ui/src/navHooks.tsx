@@ -1,6 +1,5 @@
 import { forwardRef, useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore, type ComponentProps, type MouseEvent } from "react";
 import { Link, useLocation, useNavigate, useNavigationType, type NavigateFunction, type To } from "react-router-dom";
-import { useShellHosted } from "./ShellHostContext.js";
 import { isPlainClick, runNavigation } from "./motion.js";
 import { getNavEngine, NavEngine, publishNavEngine, SETTLE_TIMEOUT_MS, type NavDeps, type NavTransition, type PushOptions } from "./navEngine.js";
 import { parseNavState, type NavState, type NavTab } from "./navStack.js";
@@ -22,7 +21,6 @@ export interface StackNav {
 
 export function useStackNav(): StackNav {
   const navigate = useNavigate();
-  const shellHosted = useShellHosted();
   return useMemo(
     () => ({
       push(to, options = {}) {
@@ -38,12 +36,10 @@ export function useStackNav(): StackNav {
         }
         const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
         if (idx > 0) navigate(-1);
-        else if (shellHosted) navigate("/");
-        // Standalone, "home" is Congress's root, outside this Chamber's router.
-        else window.location.assign("/");
+        else navigate("/");
       },
     }),
-    [navigate, shellHosted]
+    [navigate]
   );
 }
 

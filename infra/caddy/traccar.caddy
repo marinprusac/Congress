@@ -1,5 +1,5 @@
 # Reverse proxy for the self-hosted Traccar GPS server, which chamber-map
-# (services/chamber-map) polls for location - see docs/creating-a-chamber.md
+# (the location connector) polls for location - see docs/writing-a-connector.md
 # and the Map Chamber's own README/plan for why. Not part of the Congress
 # Node monorepo itself - it runs as its own Docker container (see
 # /opt/traccar/docker-compose.yml on the server, same pattern as this box's

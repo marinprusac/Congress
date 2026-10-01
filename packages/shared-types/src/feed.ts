@@ -45,8 +45,6 @@ export const feedCandidateSchema = z.discriminatedUnion("kind", [
 ]);
 export type FeedCandidate = z.infer<typeof feedCandidateSchema>;
 
-export const chamberFeedResponseSchema = z.object({ items: z.array(feedCandidateSchema) });
-export type ChamberFeedResponse = z.infer<typeof chamberFeedResponseSchema>;
 
 // What GET /congress/feed returns: candidates from every active Chamber,
 // merged and ranked, with exhibits resolved to a name/url (a candidate whose

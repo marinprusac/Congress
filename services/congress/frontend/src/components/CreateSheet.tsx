@@ -1,16 +1,14 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChamberMark, fetchRegistry, resolveChamberPath, usePresence, useStackNav } from "@congress/congress-ui";
+import { ChamberMark, usePresence, useStackNav } from "@congress/congress-ui";
 import { canCreate, CUSTOM_NEW, fetchTypes } from "@/lib/recordsApi";
 import { TYPES_KEY } from "@/records/RecordPage";
 
-// The "+" sheet: every kind of Exhibit the active Chambers let the owner
-// create (manifest.exhibitTypes). Picking one opens that Chamber's own
-// editor on a new, unsaved Exhibit - the Chamber still owns creation.
+// The "+" sheet: every kind of record the owner can create by hand; picking
+// one opens its editor on a new, unsaved record.
 export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const nav = useStackNav();
   const { mounted, state } = usePresence(open);
-  const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
   const { data: types } = useQuery({ queryKey: TYPES_KEY, queryFn: fetchTypes });
 
   useEffect(() => {
@@ -24,17 +22,9 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
 
   if (!mounted) return null;
 
-  // Runtime types first (core), then what each active Chamber offers.
-  const options = [
-    ...(types ?? [])
-      .filter((t) => !t.definition.hidden && (canCreate(t.definition) || CUSTOM_NEW.has(t.definition.slug)))
-      .map((t) => ({ chamber: "e", type: t.definition.slug, label: t.definition.label, path: `/e/new/${t.definition.slug}` })),
-    ...(registry ?? [])
-      .filter((c) => c.status === "active")
-      .flatMap((c) =>
-        (c.exhibitTypes ?? []).map((t) => ({ chamber: c.name, type: t.type, label: t.label, path: resolveChamberPath(t.createPath, c.name, true) }))
-      ),
-  ];
+  const options = (types ?? [])
+    .filter((t) => !t.definition.hidden && (canCreate(t.definition) || CUSTOM_NEW.has(t.definition.slug)))
+    .map((t) => ({ chamber: "e", type: t.definition.slug, label: t.definition.label, path: `/e/new/${t.definition.slug}` }));
 
   return (
     <>

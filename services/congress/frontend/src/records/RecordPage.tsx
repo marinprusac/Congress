@@ -173,7 +173,7 @@ export function RecordPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [titleField?.slug, startField?.slug]);
 
-  const onNavigate = (r: Extract<CapitolExhibitResolveResult, { url: string }>) => navigateToExhibit("e", r, navigate, true);
+  const onNavigate = (r: Extract<CapitolExhibitResolveResult, { url: string }>) => navigateToExhibit(r, navigate);
 
   const createMutation = useMutation({
     mutationFn: async (draft: Values) => {

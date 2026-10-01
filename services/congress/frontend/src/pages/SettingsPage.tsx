@@ -1,24 +1,12 @@
-import {
-  Component,
-  lazy,
-  Suspense,
-  useEffect,
-  useState,
-  type ComponentType,
-  type LazyExoticComponent,
-  type ReactNode,
-} from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import {
   ChamberHeader,
-  ChamberMark,
   useAppliedTheme,
   useCapitolSettings,
   capitolSettingsQueryKey,
   updateCapitolSettings,
-  fetchRegistry,
-  loadRemoteModule,
   useBackNavigation,
 } from "@congress/congress-ui";
 import { SignOutControl } from "@/components/LoginGate";
@@ -46,90 +34,7 @@ function SettingsGearIcon() {
   );
 }
 
-interface ChamberSettingsPanel {
-  name: string;
-  displayName: string;
-}
-
-// Resolves every active Chamber's own `settings` export (see RemoteModule)
-// out of that Chamber's own remote-entry.js, fetching it on demand the same
-// way ChamberHost does for a full Chamber visit - opening Settings is itself
-// the trigger, there's no separate eager preload to lean on. A Chamber with
-// nothing configurable, or one that fails to load, is simply excluded from
-// the tab strip rather than shown broken. Only
-// serializable {name, displayName} pairs go into this query's data - Congress
-// wraps every query in PersistedQueryProvider, which round-trips cached data
-// through IndexedDB via JSON, and a live component reference doesn't survive
-// that (silently becomes undefined on rehydrate, so a tab could crash the
-// whole shell days after this query last actually ran). The Component itself
-// is resolved separately below, the same in-memory-only way the home feed
-// resolves a view card (see getViewComponent in components/ViewSlot.tsx).
-function useChamberSettingsPanels(chambers: { name: string; displayName: string }[]) {
-  const key = chambers.map((c) => c.name).join(",");
-  return useQuery({
-    queryKey: ["settings-panels", key],
-    queryFn: async (): Promise<ChamberSettingsPanel[]> => {
-      const resolved = await Promise.all(
-        chambers.map(async (c) => {
-          try {
-            const mod = await loadRemoteModule(c.name);
-            return mod.settings ? { name: c.name, displayName: c.displayName } : null;
-          } catch {
-            return null;
-          }
-        })
-      );
-      return resolved.filter((panel): panel is ChamberSettingsPanel => panel !== null);
-    },
-    enabled: chambers.length > 0,
-  });
-}
-
-// Mirrors getViewComponent's own pattern (components/ViewSlot.tsx) - a
-// plain in-memory Map, never react-query, so the
-// resolved component itself never touches the persisted cache above.
-const settingsComponentCache = new Map<string, LazyExoticComponent<ComponentType>>();
-
-function getSettingsComponent(chamberName: string): LazyExoticComponent<ComponentType> {
-  let component = settingsComponentCache.get(chamberName);
-  if (!component) {
-    component = lazy(async () => {
-      const mod = await loadRemoteModule(chamberName);
-      if (!mod.settings) throw new Error(`Chamber "${chamberName}" has no settings panel`);
-      return { default: mod.settings };
-    });
-    settingsComponentCache.set(chamberName, component);
-  }
-  return component;
-}
-
-// Isolates a broken settings panel to its own tab instead of letting an
-// uncaught render error (a genuine bug in that Chamber's own code, same
-// class of failure ChamberHost's own ChamberErrorBoundary guards against)
-// propagate past this root's own createRoot() and blank the entire shell -
-// confirmed by testing, same as that boundary's own comment.
-interface SettingsPanelErrorBoundaryState {
-  failed: boolean;
-}
-class SettingsPanelErrorBoundary extends Component<{ chamberName: string; children: ReactNode }, SettingsPanelErrorBoundaryState> {
-  state: SettingsPanelErrorBoundaryState = { failed: false };
-
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-
-  render() {
-    if (this.state.failed) {
-      return <p className="font-mono text-sm text-alert">{this.props.chamberName}'s settings failed to load.</p>;
-    }
-    return this.props.children;
-  }
-}
-
-// Congress-owned settings (dark mode) plus sign-out - previously exposed
-// through Capitol's own Settings page even though it's not Capitol's (see
-// CapitolSettings' own comment in shared-types), now the one default tab
-// here instead, alongside every other Chamber's own.
+// Dark mode and sign-out.
 function GeneralTab() {
   const queryClient = useQueryClient();
   const { data, isLoading, isError } = useCapitolSettings();
@@ -167,12 +72,10 @@ function GeneralTab() {
   );
 }
 
-// Unified Settings - one page, reached from the tab bar's Settings entry
-// instead of a gear icon on every Chamber's own header. Every
-// Chamber's own settings content (previously each Chamber's own routed
-// /settings page) is mounted here as one tab-category, resolved from that
-// Chamber's own remote entry the same way the home feed resolves view cards
-// - see useChamberSettingsPanels above and RemoteModule's `settings` field.
+const SETTINGS_TABS = ["general", "home", "logs", "ai", "accounts", "types"];
+
+// Unified Settings, reached from the tab bar; "?from=<tab>" opens one
+// (e.g. the AI-paused banners' "?from=ai").
 export function SettingsPage() {
   useAppliedTheme();
   const back = useBackNavigation();
@@ -183,27 +86,7 @@ export function SettingsPage() {
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get("from");
 
-  const { data: registry } = useQuery({ queryKey: ["congress", "registry"], queryFn: fetchRegistry });
-  const activeChambers = (registry ?? []).filter((c) => c.status === "active");
-  const { data: panels } = useChamberSettingsPanels(
-    activeChambers.map((c) => ({ name: c.name, displayName: c.displayName }))
-  );
-
-  const [tab, setTab] = useState<string>(requestedTab ?? "general");
-  // The requested Chamber might not actually have a settings panel (or
-  // might not even be a real/active Chamber) - only knowable once `panels`
-  // itself has resolved, so this can't just be the initial state above.
-  // Once it's known one way or the other, a still-missing tab falls back to
-  // General rather than leaving the page stuck on a tab strip entry that
-  // will never appear (see the fallback render below for the loading gap
-  // in between).
-  useEffect(() => {
-    if (!panels || tab === "general" || tab === "home" || tab === "logs" || tab === "ai" || tab === "accounts" || tab === "types") return;
-    if (!panels.some((panel) => panel.name === tab)) setTab("general");
-  }, [panels, tab]);
-
-  const activePanel = (panels ?? []).find((p) => p.name === tab);
-  const ActivePanelComponent = activePanel ? getSettingsComponent(activePanel.name) : null;
+  const [tab, setTab] = useState<string>(SETTINGS_TABS.includes(requestedTab ?? "") ? (requestedTab as string) : "general");
 
   return (
     <div className="chamber-shell">
@@ -269,19 +152,6 @@ export function SettingsPage() {
           >
             Types
           </button>
-          {(panels ?? []).map((panel) => (
-            <button
-              key={panel.name}
-              type="button"
-              role="tab"
-              aria-selected={tab === panel.name}
-              className={tab === panel.name ? "settings-tab active" : "settings-tab"}
-              onClick={() => setTab(panel.name)}
-            >
-              <ChamberMark name={panel.name} className="settings-tab-icon" />
-              {panel.displayName}
-            </button>
-          ))}
         </div>
         <section className="settings-tab-panel">
           {tab === "general" ? (
@@ -296,18 +166,7 @@ export function SettingsPage() {
             <ConnectorsTab />
           ) : tab === "types" ? (
             <TypesSettingsTab />
-          ) : ActivePanelComponent && activePanel ? (
-            <SettingsPanelErrorBoundary key={activePanel.name} chamberName={activePanel.displayName}>
-              <Suspense fallback={<p className="font-mono text-sm text-dust">Loading —</p>}>
-                <ActivePanelComponent />
-              </Suspense>
-            </SettingsPanelErrorBoundary>
-          ) : (
-            // Either the panel list hasn't resolved yet, or it just has and
-            // the effect above is about to redirect this tab to General -
-            // either way there's nothing to render for `tab` yet.
-            <p className="font-mono text-sm text-dust">Loading —</p>
-          )}
+          ) : null}
         </section>
       </main>
     </div>

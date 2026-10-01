@@ -1,17 +1,12 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { markShellHosted, openInTab, preventPinchZoom, PersistedQueryProvider, ToastHost, NAV_TABS, type NavTab } from "@congress/congress-ui";
+import { openInTab, preventPinchZoom, PersistedQueryProvider, ToastHost, NAV_TABS, type NavTab } from "@congress/congress-ui";
 import { queryClient } from "@/lib/queryClient";
 import { notifyAppUpdated } from "@/lib/api";
 import { App } from "@/App";
 import "./index.css";
 
-// Capitol always acts as the shell (see ChamberHost) - this is what tells
-// ChamberPicker/ChamberHeader it's safe to use <Link> for cross-app jumps
-// here, not just for Capitol's own internal routes. Must run before the
-// first render, and before any Chamber's remote entry could possibly mount.
-markShellHosted();
 preventPinchZoom();
 // iOS only applies :active (press feedback, motion.css) with a touch listener.
 document.addEventListener("touchstart", () => {}, { passive: true });
