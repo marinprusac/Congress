@@ -23,7 +23,6 @@ import {
   disconnectAccount,
   getAccessToken,
   googleConnectorStatus,
-  importLegacyAccounts,
   requestedScopes,
   upsertAccountFromOAuth,
 } from "./accounts.js";
@@ -164,28 +163,6 @@ describe("accounts", () => {
     insert(1);
     await expect(disconnectAccount(1)).resolves.toBe(true);
     expect(vi.mocked(publishEvent).mock.calls[0]![0]).toMatchObject({ type: "google.account_disconnected", payload: { accountId: 1 } });
-  });
-
-  it("imports legacy accounts keeping free ids and matching known subs", () => {
-    insert(1);
-    const now = new Date();
-    const legacy = (id: number, sub: string) => ({
-      id,
-      label: "L",
-      email: "l@example.com",
-      googleSub: sub,
-      accessToken: "a",
-      refreshToken: "r",
-      scope: CAL,
-      tokenExpiry: now,
-      needsReconnect: false,
-      connectedAt: now,
-    });
-    const map = importLegacyAccounts([legacy(5, "sub-1"), legacy(2, "new-2"), legacy(1, "new-1")]);
-    expect(map.get(5)).toBe(1);
-    expect(map.get(2)).toBe(2);
-    expect(map.get(1)).not.toBe(1);
-    expect(db.select().from(googleAccounts).all()).toHaveLength(3);
   });
 });
 

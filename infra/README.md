@@ -273,7 +273,7 @@ first deploy that contains this change:
    (`legacyImport.ts`; both `data/` dirs survive the rsync `--delete` via
    `rsync-exclude.txt`). Check `journalctl -u congress-core` for the
    `Legacy Capitol/Logs import:` line. Once it has run, the old directories
-   can be deleted, and so can `legacyImport.ts`.
+   can be deleted (the importer is gone from the code).
 
 ## Retiring the Automation Chamber (one-time)
 
@@ -303,5 +303,4 @@ and references. Check Chats -> Memory afterwards. Then, on the server:
 Keep `services/chamber-deputy/data/` until the import has been checked; the
 rest of that directory (`.env`, `node_modules`) can go right away. Migration
 `0029` removes Deputy's registry row, cached exhibits and event settings.
-Once the import has run in production, `ai/legacyDirectivesImport.ts` and
-`ai/legacyImport.ts` can be deleted.
+The import has run; its code is removed.

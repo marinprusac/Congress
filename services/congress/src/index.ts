@@ -7,27 +7,21 @@ import { startTypeEngine } from "./typeEngine/index.js";
 import { startBackups, stopBackups } from "./typeEngine/backups.js";
 import { collectOrphans } from "./typeEngine/files.js";
 import { startTimeTriggers, stopTimeTriggers } from "./typeEngine/triggers.js";
-import { importLegacyChamberData } from "./legacyImport.js";
 import { startEventCatalogSync, stopEventCatalogSync } from "./eventCatalogSync.js";
 import { startHistoryPruneSweep, stopHistoryPruneSweep } from "./eventHistory.js";
-import { importLegacyDeputySettings } from "./ai/legacyImport.js";
 import { startAiRetentionSweep, stopAiRetentionSweep } from "./ai/retention.js";
 import { recoverInterruptedThreads } from "./ai/chat.js";
 import { startAskTimer, stopAskTimer } from "./ai/asks.js";
 import { startTrackingScheduler, stopTrackingScheduler } from "./ai/tracking.js";
 import { listTracking } from "./ai/memory.js";
 import { startProactive, stopProactive } from "./ai/proactive.js";
-import { importLegacyDirectives } from "./ai/legacyDirectivesImport.js";
 import { startConnectors, stopConnectors } from "./connectors/registry.js";
 import { startBindings, stopBindings } from "./typeEngine/bindings/runtime.js";
 import { CONNECTORS } from "./connectors/list.js";
 
 runMigrations();
 startTypeEngine();
-importLegacyChamberData();
-importLegacyDeputySettings();
 recoverInterruptedThreads();
-await importLegacyDirectives();
 // Bindings listen first, so the connectors' first sync is pulled in.
 startBindings();
 await startConnectors(CONNECTORS);
