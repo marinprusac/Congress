@@ -65,6 +65,28 @@ export const CHAT: Premade = {
       { op: "set_field_options", field: "has_unread", options: { hidden: true } },
       { op: "set_field_options", field: "last_from_me", options: { hidden: true } },
       { op: "set_field_options", field: "group", options: { hidden: true } },
+      { op: "set_field_options", field: "last_at", options: { hidden: true } },
+      { op: "set_field_options", field: "preview", options: { hidden: true } },
+    ],
+    // Muted chats stay out of the feed. Local only; the sync never touches it.
+    [
+      { op: "add_field", slug: "muted", label: "Muted", kind: "boolean" },
+      {
+        op: "set_feed_rules",
+        rules: [
+          {
+            when: { op: "within_last", field: "last_at", hours: 24 },
+            and: [
+              { field: "has_unread", value: true },
+              { field: "last_from_me", value: false },
+              { field: "muted", value: false },
+            ],
+            score: 50,
+            reason: "Unread",
+            preview: ["preview"],
+          },
+        ],
+      },
     ],
   ],
 };
