@@ -290,6 +290,7 @@ export function validateDefinition(def: TypeDefinition): string[] {
     if (f.kind === "enum" && !(f.options.options?.length)) errors.push(`enum "${f.slug}" needs options`);
     if (f.kind === "relation" && !f.options.target) errors.push(`relation "${f.slug}" needs a target type`);
     if (f.options.readonly && f.options.required) errors.push(`"${f.slug}" can't be both readonly and required`);
+    if (f.options.hidden && f.options.required) errors.push(`"${f.slug}" can't be both hidden and required`);
   }
   const isTime = (f: FieldDefinition) => f.kind === "datetime" || f.kind === "date";
   for (const { when } of def.feedRules) {
@@ -350,6 +351,7 @@ function normalizeOptions(kind: FieldKind, options: FieldOptions): FieldOptions 
   if (options.required) out.required = true;
   if (options.indexed) out.indexed = true;
   if (options.readonly) out.readonly = true;
+  if (options.hidden) out.hidden = true;
   if (options.unique && kind !== "boolean" && kind !== "richtext" && kind !== "file" && !(kind === "relation" && options.many)) out.unique = true;
   if (options.searchable && (kind === "text" || kind === "richtext")) out.searchable = true;
   if (kind === "number" && options.integer) out.integer = true;

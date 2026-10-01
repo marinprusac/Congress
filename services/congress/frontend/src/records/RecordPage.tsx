@@ -129,7 +129,7 @@ export function RecordPage() {
   const [latField, lonField, radiusField] = [live(point?.latitude), live(point?.longitude), live(point?.radius)];
   const rangeIds = new Set([startField?.id, endField?.id, allDayField?.id, latField?.id, lonField?.id, radiusField?.id].filter(Boolean));
   const properties =
-    def?.fields.filter((f) => !f.retired && f !== titleField && f !== bodyField && !actionFields.has(f.id) && !rangeIds.has(f.id)) ?? [];
+    def?.fields.filter((f) => !f.retired && !f.options.hidden && f !== titleField && f !== bodyField && !actionFields.has(f.id) && !rangeIds.has(f.id)) ?? [];
   const binding = recordQuery.data?.binding ?? null;
   const locked = new Set(binding?.locked ?? []);
   const createsAtSource = Boolean(def?.bindings.some((b) => b.create));

@@ -4,6 +4,7 @@ import { getTypeByPremadeKey, publish } from "./store.js";
 import { installPremades, type Premade } from "./premade/index.js";
 import { NOTE } from "./premade/note.js";
 import { PERSON } from "./premade/person.js";
+import { CHAT } from "./premade/chat.js";
 
 beforeAll(() => runExhibitsMigrations());
 
@@ -54,5 +55,29 @@ describe("installPremades", () => {
       ["birthday", "date", null],
       ["notes", "richtext", null],
     ]);
+  });
+
+  it("hides Chat's non-editable bookkeeping fields from the record screen", () => {
+    installPremades([PERSON, CHAT]);
+    const chat = getTypeByPremadeKey("chat")!;
+    const hidden = chat.definition.fields.filter((f) => f.options.hidden).map((f) => f.slug);
+    expect(hidden).toEqual(["unread", "has_unread", "last_from_me", "group"]);
+    // Still stored, so feed rules keep working.
+    const hasUnread = chat.definition.fields.find((f) => f.slug === "has_unread")!;
+    expect(chat.definition.feedRules[0]!.and).toContainEqual({ field: hasUnread.id, value: true });
+  });
+
+  it("refuses a hidden required field", () => {
+    expect(() =>
+      publish({
+        ops: [
+          { op: "create_type", slug: "gizmo", label: "Gizmo" },
+          { op: "add_field", slug: "name", label: "Name", kind: "text", options: { required: true, hidden: true } },
+          { op: "set_title_field", field: "name" },
+        ],
+        actor: "test",
+        origin: "custom",
+      }),
+    ).toThrow(/hidden and required/);
   });
 });

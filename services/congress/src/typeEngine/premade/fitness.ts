@@ -43,6 +43,10 @@ export const WORKOUT: Premade = {
     ],
     // Cutover: in use.
     [{ op: "set_type_meta", hidden: false }],
+    // Not editable and not worth showing: kept for feed rules, search and the AI.
+    [
+      { op: "set_field_options", field: "exercise_count", options: { hidden: true } },
+    ],
   ],
 };
 
@@ -76,5 +80,9 @@ export const ROUTINE: Premade = {
       { op: "set_type_meta", hidden: true },
     ],
     [{ op: "set_type_meta", hidden: false }],
+    // Not editable and not worth showing: kept for feed rules, search and the AI.
+    [
+      { op: "set_field_options", field: "exercise_count", options: { hidden: true } },
+    ],
   ],
 };

@@ -122,13 +122,13 @@ function describeField(f: FieldDefinition): string {
   if (o.target) bits[0] = `${o.many ? "links" : "link"} to ${o.target}`;
   if (o.key) bits.push(`${o.key} key`);
   if (o.options) bits.push(o.options.map((x) => x.label).join("/"));
-  for (const key of ["required", "unique", "searchable", "indexed", "integer", "readonly"] as const) if (o[key]) bits.push(key);
+  for (const key of ["required", "unique", "searchable", "indexed", "integer", "readonly", "hidden"] as const) if (o[key]) bits.push(key);
   return bits.join(", ");
 }
 
 function optionChanges(a: FieldOptions, b: FieldOptions): string[] {
   const out: string[] = [];
-  for (const key of ["required", "unique", "searchable", "indexed", "integer", "readonly", "many"] as const) {
+  for (const key of ["required", "unique", "searchable", "indexed", "integer", "readonly", "hidden", "many"] as const) {
     if (Boolean(a[key]) !== Boolean(b[key])) out.push(`${key} ${b[key] ? "on" : "off"}`);
   }
   if (a.target !== b.target) out.push(`target ${b.target ?? "none"}`);
