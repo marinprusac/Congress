@@ -1,18 +1,4 @@
-// Errors of the Google connector's token helper (callers catch them to report per-account problems), and the legacy account row shape.
-
-// A retired Chamber's pre-connector account row, handed over once on migration.
-export interface LegacyGoogleAccount {
-  id: number;
-  label: string;
-  email: string;
-  googleSub: string;
-  accessToken: string;
-  refreshToken: string;
-  scope: string;
-  tokenExpiry: Date;
-  needsReconnect: boolean;
-  connectedAt: Date;
-}
+// Errors of the Google connector's token helper; callers catch them to report per-account problems.
 
 export class GoogleConnectorUnavailableError extends Error {
   constructor() {

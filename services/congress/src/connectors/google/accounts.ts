@@ -5,7 +5,6 @@ import {
   GoogleAccountNotFoundError,
   GoogleConnectorUnavailableError,
   GoogleScopeMissingError,
-  type LegacyGoogleAccount,
 } from "../../kit/googleErrors.js";
 import { db } from "../../db/client.js";
 import { googleAccounts } from "../../db/schema.js";
@@ -177,37 +176,4 @@ export async function getAccessToken(accountId: number, scopes: string[]): Promi
   const next = refresh(row).finally(() => inflight.delete(row.id));
   inflight.set(row.id, next);
   return next;
-}
-
-// A Chamber's pre-connector accounts. Keeps each id when it's free, so the
-// Chamber's stored account ids (and exhibit ids) stay valid.
-export function importLegacyAccounts(rows: LegacyGoogleAccount[]): Map<number, number> {
-  const idMap = new Map<number, number>();
-  for (const legacy of rows) {
-    const bySub = db.select().from(googleAccounts).where(eq(googleAccounts.googleSub, legacy.googleSub)).get();
-    if (bySub) {
-      idMap.set(legacy.id, bySub.id);
-      continue;
-    }
-    const idTaken = getRow(legacy.id) !== undefined;
-    const row = db
-      .insert(googleAccounts)
-      .values({
-        ...(idTaken ? {} : { id: legacy.id }),
-        label: legacy.label,
-        email: legacy.email,
-        googleSub: legacy.googleSub,
-        accessToken: legacy.accessToken,
-        refreshToken: legacy.refreshToken,
-        scope: legacy.scope,
-        tokenExpiry: legacy.tokenExpiry,
-        needsReconnect: legacy.needsReconnect,
-        connectedAt: legacy.connectedAt,
-        updatedAt: new Date(),
-      })
-      .returning()
-      .get();
-    idMap.set(legacy.id, row.id);
-  }
-  return idMap;
 }

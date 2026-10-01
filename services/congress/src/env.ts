@@ -37,9 +37,6 @@ const envSchema = z.object({
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default("mailto:congress@example.com"),
-  // One-time import of the retired Logs Chamber's own SQLite file -
-  // see legacyImport.ts. Unset/missing files are simply skipped.
-  LEGACY_LOGS_DB_PATH: z.string().default("../chamber-logs/data/logs.sqlite3"),
   // Claude credentials for the AI engine (ai/engine.ts). Both optional, and
   // an empty string counts as unset: without either, `claude` falls back to
   // whatever `claude auth login` left for this OS user. CLAUDE_CODE_OAUTH_TOKEN
@@ -47,9 +44,6 @@ const envSchema = z.object({
   // ANTHROPIC_API_KEY bills metered Console usage instead.
   ANTHROPIC_API_KEY: z.string().optional(),
   CLAUDE_CODE_OAUTH_TOKEN: z.string().optional(),
-  // One-time import of Deputy's AI settings row (context prompt, model,
-  // budget) from before the engine moved here - see ai/legacyImport.ts.
-  LEGACY_DEPUTY_DB_PATH: z.string().default("../chamber-deputy/data/deputy.sqlite3"),
   // Google connector (connectors/google). Unset falls back to the Calendar
   // Chamber's .env, where these lived before the connector existed.
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),

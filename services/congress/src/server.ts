@@ -51,9 +51,6 @@ mountManifestAndHealth(app, capitolManifest);
 
 app.route("/auth", authRoutes);
 
-// No Chambers remain; the shell still asks (removed with its last caller).
-app.get("/congress/registry", requireSession, (c) => c.json([]));
-
 // Public/unauthenticated - see serveChamberIcon's own comment for why.
 app.get("/congress/chambers/:name/icon", (c) => serveChamberIcon(c, c.req.param("name")));
 

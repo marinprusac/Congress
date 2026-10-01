@@ -71,7 +71,6 @@ describe("routes that went away with Chamber processes", () => {
 
 describe("session-only routes", () => {
   const cases: { method: string; path: string; body?: unknown }[] = [
-    { method: "GET", path: "/congress/registry" },
     { method: "GET", path: "/congress/settings" },
     { method: "PUT", path: "/congress/settings", body: { darkMode: true } },
     { method: "GET", path: "/congress/exhibits/search?q=x" },
@@ -149,12 +148,7 @@ describe("request validation", () => {
   });
 });
 
-describe("no Chambers", () => {
-  it("has an empty registry", async () => {
-    const res = await app.request("/congress/registry", { headers: session() }, bindings());
-    await expect(res.json()).resolves.toEqual([]);
-  });
-
+describe("retired Chamber paths", () => {
   it("404s any /api path that isn't a route, rather than serving the shell", async () => {
     const res = await app.request("/api/notes/anything", { headers: session() }, bindings());
     expect(res.status).toBe(404);
