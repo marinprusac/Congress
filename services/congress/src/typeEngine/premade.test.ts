@@ -62,18 +62,15 @@ describe("installPremades", () => {
     const chat = getTypeByPremadeKey("chat")!;
     const hidden = chat.definition.fields.filter((f) => f.options.hidden).map((f) => f.slug);
     expect(hidden).toEqual(["last_at", "preview", "unread", "has_unread", "last_from_me", "group"]);
-    // Still stored, so feed rules keep working.
-    const hasUnread = chat.definition.fields.find((f) => f.slug === "has_unread")!;
-    expect(chat.definition.feedRules[0]!.and).toContainEqual({ field: hasUnread.id, value: true });
   });
 
-  it("fills Muted from WhatsApp and keeps muted chats out of the feed", () => {
+  it("fills Muted from WhatsApp and keeps chats out of the feed", () => {
     installPremades([PERSON, CHAT]);
     const chat = getTypeByPremadeKey("chat")!;
     const muted = chat.definition.fields.find((f) => f.slug === "muted")!;
     expect(muted.options.hidden).toBeFalsy();
     expect(chat.definition.bindings[0]!.fields).toContainEqual({ source: "muted", target: muted.id, mode: "pull" });
-    expect(chat.definition.feedRules[0]!.and).toContainEqual({ field: muted.id, value: false });
+    expect(chat.definition.feedRules).toEqual([]);
   });
 
   it("refuses a hidden required field", () => {

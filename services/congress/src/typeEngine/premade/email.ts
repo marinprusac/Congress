@@ -86,5 +86,7 @@ export const EMAIL: Premade = {
       { op: "set_field_options", field: "messages", options: { hidden: true } },
       { op: "set_field_options", field: "account", options: { hidden: true } },
     ],
+    // Out of the feed entirely: too noisy. Still searchable.
+    [{ op: "set_feed_rules", rules: [] }],
   ],
 };

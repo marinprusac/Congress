@@ -92,5 +92,7 @@ export const CHAT: Premade = {
     ],
     // Muted comes from WhatsApp (the phone's mute), never edited here.
     [{ op: "set_binding", binding: { ...BINDING, fields: [...BINDING.fields, { source: "muted", target: "muted", mode: "pull" }] } }],
+    // Out of the feed entirely: too noisy. Still searchable.
+    [{ op: "set_feed_rules", rules: [] }],
   ],
 };

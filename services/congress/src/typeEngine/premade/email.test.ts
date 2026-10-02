@@ -52,12 +52,12 @@ describe("the Email premade bound to Gmail", () => {
     expect(() => updateRecord(byThread("t1").id, { subject: "Changed" }, { actor: "me" })).toThrow(RecordLockedError);
   });
 
-  it("puts unread primary mail in the feed", () => {
+  it("keeps mail out of the feed", () => {
     const t = getTypeBySlug("email")!;
     const def = t.definition;
     const rows = (sql: string, params: Stored[]) => exhibitsSqlite.prepare(sql).all(...params) as Record<string, Stored>[];
     const ids = feedCandidatesFor(def, new Date(), rows, (r) => titleOf(def, r)).map((c) => (c.kind === "exhibit" ? c.exhibitId : ""));
-    expect(ids).toEqual([byThread("t1").id]);
+    expect(ids).toEqual([]);
   });
 
   it("reads bodies live and marks a thread read through Gmail", async () => {
