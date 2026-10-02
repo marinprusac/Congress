@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { RouteCommitSignal, StackNavigator } from "@congress/congress-ui";
+import { ChamberLayout, ChamberMark, RouteCommitSignal, StackNavigator } from "@congress/congress-ui";
 import { LoginGate } from "@/components/LoginGate";
 import { TabBar } from "@/components/TabBar";
 import { SettingsPage } from "@/pages/SettingsPage";
@@ -66,8 +66,10 @@ export function App() {
         <Route path="/map/settings" element={<Navigate to="/settings?from=accounts" replace />} />
         <Route path="/map/*" element={<Navigate to="/map" replace />} />
         {/* WhatsApp: the chat list and a chat's messages (whatsapp connector; read-only). */}
-        <Route path="/whatsapp" element={<ChatsPage />} />
-        <Route path="/whatsapp/c/:jid" element={<ChatPage />} />
+        <Route element={<ChamberLayout icon={<ChamberMark name="whatsapp" className="h-8 w-8 text-ink" />} title="WhatsApp" ownChamber="whatsapp" />}>
+          <Route path="/whatsapp" element={<ChatsPage />} />
+          <Route path="/whatsapp/c/:jid" element={<ChatPage />} />
+        </Route>
         <Route path="/whatsapp/settings" element={<Navigate to="/settings?from=accounts" replace />} />
         <Route path="/whatsapp/*" element={<Navigate to="/whatsapp" replace />} />
         {/* Every runtime exhibit type's records (typeEngine). */}
