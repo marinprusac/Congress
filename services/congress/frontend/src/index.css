@@ -24,7 +24,7 @@
   justify-content: space-around;
   height: var(--mobile-nav-height);
   padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
-  border-top: 1px solid var(--color-dust);
+  border-top: var(--rule-heavy);
   background-color: var(--color-parchment);
 }
 
@@ -32,9 +32,15 @@
   position: relative;
   display: flex;
   flex: 1 1 0;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--color-dust);
+  gap: 0.15rem;
+  color: var(--color-ink);
+}
+
+.shell-tab + .shell-tab {
+  box-shadow: inset 1px 0 0 var(--color-ink);
 }
 
 .shell-tab svg {
@@ -42,13 +48,19 @@
   height: 1.4rem;
 }
 
-.shell-tab:hover,
+/* The active fill is the sliding indicator on a phone (see below) and the
+   tab itself on the desktop rail, so the label flips to the ground colour. */
 .shell-tab.active {
-  color: var(--color-ink);
+  color: var(--color-parchment);
 }
 
 .shell-tab-label {
-  display: none;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1;
 }
 
 /* The central "+" - the one filled control in the bar. */
@@ -56,14 +68,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2rem;
-  background-color: var(--color-accent);
-  color: var(--color-parchment);
+  width: 2.2rem;
+  height: 1.7rem;
+  border: var(--border-heavy);
+  background-color: var(--color-highlight);
+  color: #111110;
+  box-shadow: var(--shadow-hard-sm);
 }
 
 .shell-tab-badge--accent {
   background-color: var(--color-accent) !important;
+}
+
+/* Over the filled active tab the badge needs its own edge. */
+.shell-tab-badge {
+  outline: 2px solid var(--color-parchment);
 }
 
 .shell-tab-badge {
@@ -115,28 +134,29 @@
     justify-content: flex-start;
     gap: 0.5rem;
     padding: calc(1rem + env(safe-area-inset-top, 0px)) 0 1rem env(safe-area-inset-left, 0px);
+    gap: 0;
     border-top: none;
-    border-right: 1px solid var(--color-dust);
+    border-right: var(--rule-heavy);
   }
 
   .shell-tab {
     flex: 0 0 auto;
-    flex-direction: column;
     gap: 0.25rem;
-    padding: 0.6rem 0;
+    padding: 0.8rem 0;
+    box-shadow: inset 0 1px 0 var(--color-ink);
+  }
+
+  .shell-tab + .shell-tab {
+    box-shadow: inset 0 1px 0 var(--color-ink);
+  }
+
+  .shell-tab.active {
+    background-color: var(--color-ink);
   }
 
   .shell-tab-label {
-    display: block;
-    font-family: var(--font-mono);
     font-size: 0.6rem;
-    text-transform: uppercase;
     letter-spacing: 0.08em;
-  }
-
-  /* Settings sits at the bottom of the rail. */
-  .shell-tab--settings {
-    margin-top: auto;
   }
 
   .shell-tab-badge {
@@ -626,13 +646,13 @@
 
 /* ---- Motion (tokens and keyframes live in congress-ui's motion.css) ---- */
 
-/* Sliding active-tab marker along the top edge of the phone tab bar. */
+/* The sliding active-tab fill behind the phone tab bar. */
 .shell-tab-indicator {
   position: absolute;
-  top: -1px;
+  top: 0;
+  bottom: 0;
   left: env(safe-area-inset-left, 0px);
   width: calc((100% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / 5);
-  height: 2px;
   background-color: var(--color-ink);
   translate: calc(var(--tab-index, 0) * 100%) 0;
   transition:
