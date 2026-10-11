@@ -85,7 +85,7 @@ export type ManifestEvent = z.infer<typeof manifestEventSchema>;
 // appears in the live registry Congress's own eventCatalogSync.ts iterates to
 // auto-derive event_settings rows. This is that catalog entry, hand-written
 // here instead, so Congress's own events are still configurable
-// (notify/record toggles) from Settings -> Logs like any other Chamber's
+// (notify toggle) from Settings -> Logs like any other Chamber's
 // declared events - see eventCatalogSync.ts's synthetic-chamber merge and
 // registry.ts's actual publish sites.
 export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
@@ -115,7 +115,7 @@ export const CONGRESS_SYNTHETIC_EVENTS: ManifestEvent[] = [
   {
     type: "logs.rule_updated",
     label: "Log rule updated",
-    description: "The owner changed a per-event-type record/notify setting - useful for spotting why an expected notification went quiet.",
+    description: "The owner changed a per-event-type notify setting - useful for spotting why an expected notification went quiet.",
     payloadFields: { eventType: { type: "string" }, label: { type: "string" } },
   },
   {

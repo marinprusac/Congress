@@ -137,10 +137,9 @@ export function registerTools(server: McpServer) {
     {
       title: "Update Event Settings",
       description:
-        "Update an event type's settings - whether to record firings to Congress's durable history and/or push a templated notification, independently. There is no create/delete: every known event type already has a row.",
+        "Update an event type's settings - its history retention and whether to push a templated notification. Every event is always recorded to history. There is no create/delete: every known event type already has a row.",
       inputSchema: {
         eventType: z.string().min(1),
-        recordToHistory: z.boolean().optional(),
         historyRetentionMs: z.number().int().positive().nullable().optional(),
         notify: z.boolean().optional(),
         notifyTitleTemplate: z.string().nullable().optional(),

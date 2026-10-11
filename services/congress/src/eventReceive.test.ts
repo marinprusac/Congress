@@ -36,7 +36,6 @@ function settingsFor(eventType: string, overrides: SettingsOverrides = {}) {
       chamber: "tasks",
       label: "Task due soon",
       description: "A task is coming up",
-      recordToHistory: false,
       notify: false,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -57,7 +56,7 @@ function deliver(type: string, payload: Record<string, unknown> = {}) {
 
 describe("action signatures", () => {
   it("records who performed the action alongside the event", async () => {
-    settingsFor("tasks.created", { recordToHistory: true });
+    settingsFor("tasks.created");
     await handleReceivedEvent({
       chamber: "tasks",
       type: "tasks.created",
@@ -69,7 +68,7 @@ describe("action signatures", () => {
   });
 
   it("reads an event with no actor back as system, and filters by actor", async () => {
-    settingsFor("tasks.created", { recordToHistory: true });
+    settingsFor("tasks.created");
     await deliver("tasks.created");
     await handleReceivedEvent({ chamber: "tasks", type: "tasks.created", payload: {}, occurredAt: "2026-03-01T09:00:00.000Z", actor: "me" });
 
@@ -79,7 +78,7 @@ describe("action signatures", () => {
   });
 
   it("counts a row from before the actor column existed as system", async () => {
-    settingsFor("tasks.created", { recordToHistory: true });
+    settingsFor("tasks.created");
     db.insert(eventHistory)
       .values({ chamber: "tasks", type: "tasks.created", payloadJson: "{}", occurredAt: new Date(), expiresAt: new Date(Date.now() + 1e6) })
       .run();
@@ -96,36 +95,26 @@ describe("an event type with no settings row", () => {
   });
 });
 
-describe("an inert settings row", () => {
-  it("does nothing when both actions are off, and does not record a firing", async () => {
+describe("recording and notifying", () => {
+  it("always records, without notifying by default", async () => {
     settingsFor("tasks.due_soon");
-    await deliver("tasks.due_soon");
-
-    expect(listHistory()).toHaveLength(0);
-    expect(listNotifications().notifications).toHaveLength(0);
-    expect(db.select().from(eventSettings).get()?.lastFiredAt).toBeNull();
-  });
-});
-
-describe("the two actions gate independently", () => {
-  it("records without notifying", async () => {
-    settingsFor("tasks.due_soon", { recordToHistory: true });
     await deliver("tasks.due_soon");
 
     expect(listHistory()).toHaveLength(1);
     expect(listNotifications().notifications).toHaveLength(0);
+    expect(db.select().from(eventSettings).get()?.lastFiredAt).not.toBeNull();
   });
 
-  it("notifies without recording", async () => {
+  it("records and notifies when notify is on", async () => {
     settingsFor("tasks.due_soon", { notify: true });
     await deliver("tasks.due_soon");
 
-    expect(listHistory()).toHaveLength(0);
+    expect(listHistory()).toHaveLength(1);
     expect(listNotifications().notifications).toHaveLength(1);
   });
 
   it("does both when both are on", async () => {
-    settingsFor("tasks.due_soon", { recordToHistory: true, notify: true });
+    settingsFor("tasks.due_soon", { notify: true });
     await deliver("tasks.due_soon");
 
     expect(listHistory()).toHaveLength(1);
@@ -195,7 +184,7 @@ describe("notification deduplication", () => {
   it("records every firing in history even as notifications collapse", async () => {
     // History is genuinely append-only: it shows what happened over time,
     // including repeats. The inbox shows current state.
-    settingsFor("tasks.due_soon", { recordToHistory: true, notify: true });
+    settingsFor("tasks.due_soon", { notify: true });
     await deliver("tasks.due_soon");
     await deliver("tasks.due_soon");
 
@@ -229,7 +218,7 @@ describe("notification deduplication", () => {
 
 describe("lastFiredAt", () => {
   it("is stamped when an action actually ran", async () => {
-    settingsFor("tasks.due_soon", { recordToHistory: true });
+    settingsFor("tasks.due_soon");
     await deliver("tasks.due_soon");
     expect(db.select().from(eventSettings).get()?.lastFiredAt).not.toBeNull();
   });
@@ -238,7 +227,7 @@ describe("lastFiredAt", () => {
 
 describe("history retention", () => {
   it("computes an expiry from the event type's own retention at write time", async () => {
-    settingsFor("tasks.due_soon", { recordToHistory: true, historyRetentionMs: 60_000 });
+    settingsFor("tasks.due_soon", { historyRetentionMs: 60_000 });
     await deliver("tasks.due_soon");
 
     const row = db.select().from(eventHistory).get()!;
@@ -246,7 +235,7 @@ describe("history retention", () => {
   });
 
   it("falls back to the 90-day default when the event type sets no retention", async () => {
-    settingsFor("tasks.due_soon", { recordToHistory: true });
+    settingsFor("tasks.due_soon");
     await deliver("tasks.due_soon");
 
     const row = db.select().from(eventHistory).get()!;
@@ -254,7 +243,7 @@ describe("history retention", () => {
   });
 
   it("keeps the event's own occurredAt rather than the moment it was received", async () => {
-    settingsFor("tasks.due_soon", { recordToHistory: true });
+    settingsFor("tasks.due_soon");
     await deliver("tasks.due_soon");
     expect(listHistory()[0]?.occurredAt).toBe("2026-03-01T08:00:00.000Z");
   });

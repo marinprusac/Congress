@@ -92,7 +92,7 @@ describe("the e namespace", () => {
 
   it("adds catalog entries for visible types only", async () => {
     syncEventCatalog();
-    expect(await getEventSettingsByType("book.created")).toMatchObject({ chamber: "types", recordToHistory: true, notify: false });
+    expect(await getEventSettingsByType("book.created")).toMatchObject({ chamber: "types", notify: false });
     expect(await getEventSettingsByType("secret.created")).toBeFalsy();
   });
 });

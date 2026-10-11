@@ -54,7 +54,7 @@ export function EventSettingsListPage({ onOpen }: { onOpen: (eventType: string) 
                 <span className="truncate font-display text-lg text-ink">{row.label}</span>
               </span>
               <span className="shrink-0 font-mono text-xs text-dust">
-                {[row.recordToHistory && "Recording", row.notify && "Notifying"].filter(Boolean).join(" · ") || "Off"}
+                {row.notify ? "Notifying" : "Recording"}
               </span>
             </button>
           ))}

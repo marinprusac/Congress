@@ -7,14 +7,11 @@ import { getLocalSource } from "./exhibitSources.js";
 import { listConnectors } from "./connectors/runtime.js";
 
 // Keeps Congress's known event-type catalog current with its own live
-// Chamber registry, so every event type any registered Chamber declares in
-// its own manifest (manifest.events, shared-types) automatically gets a
-// settings row - no user-facing create/delete, see eventSettings.ts. Only
-// ever inserts rows for newly-seen event types (with the "record by
-// default, don't notify" starting point) and refreshes the cached display
-// fields (chamber/label/description) on existing ones; never touches the
-// owner's own configured toggles/thresholds, and never deletes a row for an
-// event type that's temporarily missing (e.g. that Chamber is offline).
+// registry, so every declared event type automatically gets a settings row -
+// no user-facing create/delete, see eventSettings.ts. Inserts rows for
+// newly-seen types (notify off), refreshes the cached display fields on
+// existing ones without touching the owner's own configuration, and deletes
+// rows for types no longer declared.
 export function syncEventCatalog(): void {
   const knownTypes = new Set(db.select({ eventType: eventSettings.eventType }).from(eventSettings).all().map((row) => row.eventType));
   const now = new Date();
@@ -27,7 +24,8 @@ export function syncEventCatalog(): void {
 
   const typeCatalog = getLocalSource("e") ? typeEventCatalog() : [];
   const connectorCatalog = listConnectors().flatMap((c) => (c.events?.length ? [{ name: c.name, events: c.events }] : []));
-  for (const chamber of [...syntheticChambers, ...typeCatalog, ...connectorCatalog]) {
+  const catalog = [...syntheticChambers, ...typeCatalog, ...connectorCatalog];
+  for (const chamber of catalog) {
     for (const event of chamber.events) {
       const payloadFieldsJson = event.payloadFields ? JSON.stringify(event.payloadFields) : null;
       if (knownTypes.has(event.type)) {
@@ -44,7 +42,6 @@ export function syncEventCatalog(): void {
           label: event.label,
           description: event.description ?? null,
           payloadFieldsJson,
-          recordToHistory: true,
           notify: false,
           createdAt: now,
           updatedAt: now,
@@ -54,6 +51,12 @@ export function syncEventCatalog(): void {
     }
   }
 
+  // An event type nothing declares any more (a removed type, a retired
+  // connector) can never fire, so it doesn't get to clutter the list.
+  const declared = new Set(catalog.flatMap((c) => c.events.map((e) => e.type)));
+  for (const eventType of knownTypes) {
+    if (!declared.has(eventType)) db.delete(eventSettings).where(eq(eventSettings.eventType, eventType)).run();
+  }
 }
 
 const EVENT_CATALOG_SYNC_INTERVAL_MS = 5 * 60 * 1000;

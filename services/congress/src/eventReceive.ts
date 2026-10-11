@@ -14,19 +14,15 @@ export async function handleReceivedEvent(event: EventDelivery): Promise<void> {
   const row = getEventSettingsRowByType(event.type);
   if (!row) return;
 
-  let fired = false;
-
-  if (row.recordToHistory) {
-    recordHistory({
-      chamber: event.chamber,
-      type: event.type,
-      payload: event.payload,
-      actor: event.actor,
-      occurredAt: new Date(event.occurredAt),
-      retentionMs: row.historyRetentionMs,
-    });
-    fired = true;
-  }
+  // Every event is recorded, always; only the push is configurable.
+  recordHistory({
+    chamber: event.chamber,
+    type: event.type,
+    payload: event.payload,
+    actor: event.actor,
+    occurredAt: new Date(event.occurredAt),
+    retentionMs: row.historyRetentionMs,
+  });
 
   if (row.notify) {
     // The dedupe key template is an optional field the owner rarely fills
@@ -40,8 +36,7 @@ export async function handleReceivedEvent(event: EventDelivery): Promise<void> {
     // the notification bell attributes/icons it correctly - this Chamber
     // is just the one deciding whether/what to push, not the source.
     pushNotification({ chamber: event.chamber, dedupeKey, title, body, chamberUrl });
-    fired = true;
   }
 
-  if (fired) await markEventSettingsFired(event.type);
+  await markEventSettingsFired(event.type);
 }

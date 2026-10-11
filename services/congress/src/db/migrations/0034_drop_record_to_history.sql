@@ -1,0 +1,1 @@
+ALTER TABLE `event_settings` DROP COLUMN `record_to_history`;

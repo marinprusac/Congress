@@ -43,7 +43,6 @@ describe("publishEvent -> log rules", () => {
         eventType: "inproc.test_event",
         chamber: "inproc",
         label: "In-process test",
-        recordToHistory: true,
         notify: false,
         createdAt: new Date(),
         updatedAt: new Date(),

@@ -14,7 +14,6 @@ export const eventSettingsSummarySchema = z.object({
   // Known {{payload.x}} paths for this event type, for the notify-template
   // inputs' field picker - null when the publisher declared no fields.
   payloadFields: z.record(z.string(), manifestEventFieldSchema).nullable(),
-  recordToHistory: z.boolean(),
   historyRetentionMs: z.number().int().positive().nullable(),
   notify: z.boolean(),
   notifyTitleTemplate: z.string().nullable(),
@@ -34,7 +33,6 @@ export type EventSettingsDetail = z.infer<typeof eventSettingsDetailSchema>;
 // read-only, refreshed by eventCatalogSync.ts, not editable through this
 // request.
 export const updateEventSettingsRequestSchema = z.object({
-  recordToHistory: z.boolean().optional(),
   historyRetentionMs: z.number().int().positive().nullable().optional(),
   notify: z.boolean().optional(),
   notifyTitleTemplate: z.string().nullable().optional(),

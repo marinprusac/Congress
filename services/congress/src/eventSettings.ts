@@ -12,7 +12,6 @@ function toSummary(row: typeof eventSettings.$inferSelect): EventSettingsSummary
     label: row.label,
     description: row.description,
     payloadFields: row.payloadFieldsJson ? JSON.parse(row.payloadFieldsJson) : null,
-    recordToHistory: row.recordToHistory,
     historyRetentionMs: row.historyRetentionMs,
     notify: row.notify,
     notifyTitleTemplate: row.notifyTitleTemplate,
@@ -52,7 +51,6 @@ export async function updateEventSettings(eventType: string, input: UpdateEventS
   if (!existing) return null;
 
   const next = {
-    recordToHistory: input.recordToHistory ?? existing.recordToHistory,
     historyRetentionMs: input.historyRetentionMs !== undefined ? input.historyRetentionMs : existing.historyRetentionMs,
     notify: input.notify ?? existing.notify,
     notifyTitleTemplate: input.notifyTitleTemplate !== undefined ? input.notifyTitleTemplate : existing.notifyTitleTemplate,

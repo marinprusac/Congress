@@ -54,7 +54,6 @@ export function EventSettingsDetailPage({ eventType, onBack }: { eventType: stri
     if (rowQuery.data && initializedEventTypeRef.current !== rowQuery.data.eventType) {
       const r = rowQuery.data;
       const loaded: UpdateEventSettingsRequest = {
-        recordToHistory: r.recordToHistory,
         historyRetentionMs: r.historyRetentionMs,
         notify: r.notify,
         notifyTitleTemplate: r.notifyTitleTemplate,
@@ -99,25 +98,15 @@ export function EventSettingsDetailPage({ eventType, onBack }: { eventType: stri
 
       <div className="mb-6 space-y-6">
         <div>
-          <label className="flex items-center gap-2 font-mono text-sm text-ink">
-            <input type="checkbox" checked={draft.recordToHistory ?? false} onChange={(e) => set("recordToHistory", e.target.checked)} />
-            Record to history
-          </label>
-          {draft.recordToHistory && (
-            <div className="mt-3 grid grid-cols-1 gap-4 pl-6 sm:grid-cols-2">
-              <div>
-                <FormLabel>Retention (days, optional)</FormLabel>
-                <input
-                  type="number"
-                  min={1}
-                  placeholder="90 (default)"
-                  value={draft.historyRetentionMs ? Math.round(draft.historyRetentionMs / MS_PER_DAY) : ""}
-                  onChange={(e) => set("historyRetentionMs", e.target.value ? Number(e.target.value) * MS_PER_DAY : null)}
-                  className={inputClass}
-                />
-              </div>
-            </div>
-          )}
+          <FormLabel>History retention (days, optional)</FormLabel>
+          <input
+            type="number"
+            min={1}
+            placeholder="90 (default)"
+            value={draft.historyRetentionMs ? Math.round(draft.historyRetentionMs / MS_PER_DAY) : ""}
+            onChange={(e) => set("historyRetentionMs", e.target.value ? Number(e.target.value) * MS_PER_DAY : null)}
+            className={inputClass}
+          />
         </div>
 
         <div>

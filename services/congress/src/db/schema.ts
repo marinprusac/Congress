@@ -88,7 +88,6 @@ export const eventSettings = sqliteTable(
     // {{payload.x}} paths instead of requiring the owner to already know the
     // shape. Null for an event type whose publisher declared no fields.
     payloadFieldsJson: text("payload_fields_json"),
-    recordToHistory: integer("record_to_history", { mode: "boolean" }).notNull().default(true),
     // How long a history row this event type writes sticks around before
     // being pruned. Null means "use eventHistory.ts's own
     // DEFAULT_HISTORY_RETENTION_MS" - deliberately not a single global
@@ -116,7 +115,7 @@ export const eventSettings = sqliteTable(
   (table) => [index("event_settings_chamber_idx").on(table.chamber)]
 );
 
-// The durable record a "recordToHistory" event type writes to - genuinely
+// The durable record every event writes to - genuinely
 // append-only, unlike `notifications` below: every matching firing gets its
 // own row, including repeats of a still-true condition, since a history is
 // meant to show what actually happened over time, not just current state.

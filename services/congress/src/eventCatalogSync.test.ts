@@ -61,7 +61,6 @@ describe("syncEventCatalog", () => {
         chamber: "tasks",
         label: "Task due soon",
         payloadFieldsJson: JSON.stringify({ taskId: { type: "string" } }),
-        recordToHistory: true,
         notify: true,
         notifyTitleTemplate: "{{payload.name}} is due",
         createdAt: new Date(),
@@ -103,5 +102,20 @@ describe("syncEventCatalog (Congress's own events)", () => {
 
     expect(getEventSettingsRowByType("google.account_connected")?.chamber).toBe("congress");
     expect(getEventSettingsRowByType("logs.rule_updated")?.chamber).toBe("congress");
+  });
+});
+
+describe("syncEventCatalog (stale types)", () => {
+  it("deletes rows for event types nothing declares any more", () => {
+    stubRegistry([{ name: "tasks", events: [{ type: "tasks.created", label: "Task created" }] }]);
+    syncEventCatalog();
+    db.insert(eventSettings)
+      .values({ eventType: "tasks.retired", chamber: "tasks", label: "Retired", notify: false, createdAt: new Date(), updatedAt: new Date() })
+      .run();
+
+    syncEventCatalog();
+
+    expect(getEventSettingsRowByType("tasks.retired")).toBeUndefined();
+    expect(getEventSettingsRowByType("tasks.created")).toBeDefined();
   });
 });
