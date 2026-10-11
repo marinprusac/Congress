@@ -51,143 +51,167 @@ a[download] {
   padding-right: env(safe-area-inset-right);
 }
 
-/* Deliberately terse - a title bar, not a masthead. No border-bottom: the
-   page's own content starts right away, with only its own spacing (not a
-   drawn rule) separating it from the header above. */
+/* The slim bar every page has: back square, mono eyebrow, heavy title,
+   actions on the right, all over one 5px rule. Home swaps in the nameplate
+   variant below. The row (not the header) carries the rule so it lines up
+   with .chamber-main's centred column. */
 .chamber-header {
   position: relative;
-  padding: 0.85rem 1.5rem;
+  padding: 0.75rem 1.5rem 0;
 }
 
-/* Mobile: this is the first thing on every page, above the fold, on a
-   screen with much less vertical room to give it than desktop - the
-   desktop padding/title size above eats a disproportionate share of a
-   phone viewport otherwise. */
-@media (max-width: 640px) {
-  .chamber-header {
-    padding: 0.6rem 1.25rem 0.5rem;
-  }
-}
-
-/* Mobile default: title row, then actions (search + nav) stacked below it
-   full-width - there's no room to fit a search field beside a 2.25rem
-   title on a phone screen. */
 .chamber-header-row {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding-bottom: 0.6rem;
+  border-bottom: var(--rule-heavy);
+}
+
+@media (min-width: 641px) {
+  .chamber-header {
+    padding: 1.1rem 1.5rem 0;
+  }
 }
 
 /* Back button + eyebrow/title, side by side. */
 .chamber-header-lead {
   display: flex;
+  min-width: 0;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.7rem;
 }
 
-/* A real ~44pt tap target around a small chevron - the only way back from a
-   Chamber page besides the tab bar. */
+/* A pressable square, ~40px: the only way back from a page besides the
+   tab bar. */
 .chamber-header-back {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  margin-left: -0.75rem;
-  color: var(--color-slate);
+  width: 2.25rem;
+  height: 2.25rem;
+  border: var(--border-heavy);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-hard-sm);
+  transition: translate var(--dur-fast, 80ms), box-shadow var(--dur-fast, 80ms);
 }
 
-.chamber-header-back:hover {
-  color: var(--color-accent);
+.chamber-header-back:active {
+  translate: 3px 3px;
+  box-shadow: none;
 }
 
 .chamber-header-back svg {
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 1.2rem;
+  height: 1.2rem;
 }
 
-@media (min-width: 641px) {
-  .chamber-header-row {
-    flex-direction: row;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-  }
-}
-
-/* "Congress" eyebrow above the title - matches CapitolHeader's own, so
-   every Chamber's header reads as part of the same system Capitol's does. */
+/* "Congress" eyebrow above the title. */
 .chamber-eyebrow {
   display: block;
-  margin-bottom: 0.1rem;
+  margin-bottom: 0.15rem;
   font-family: var(--font-mono);
-  font-size: 0.6em;
+  font-size: 0.55rem;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--color-dust);
+  letter-spacing: 0.12em;
+  color: var(--color-slate);
 }
 
 .chamber-title-link {
   display: flex;
+  min-width: 0;
   align-items: center;
-  gap: 0.5rem;
 }
 
 .chamber-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-family: var(--font-display);
-  font-size: 1.4rem;
+  font-size: 1.55rem;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
   color: var(--color-ink);
 }
 
-@media (max-width: 640px) {
+@media (min-width: 641px) {
   .chamber-title {
-    font-size: 1.15rem;
+    font-size: 1.9rem;
   }
 }
 
 .chamber-header-actions {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
-  gap: 1.25rem;
+  gap: 0.75rem;
 }
 
-/* A Chamber's own extra header link (Deputy's Directives/History, ...) -
-   same terse mono-uppercase treatment the old
-   ChamberPicker sub-nav links used, just relocated into the header. */
+/* Home's nameplate: just the wordmark and the gear. */
+.chamber-header--nameplate .chamber-title {
+  font-size: 2.3rem;
+  letter-spacing: -0.035em;
+}
+
+@media (min-width: 641px) {
+  .chamber-header--nameplate .chamber-title {
+    font-size: 3.1rem;
+  }
+}
+
+/* A header action in words ("Mark all read", ...): a small hard-shadow button. */
 .chamber-header-link {
+  padding: 0.4rem 0.6rem;
+  border: var(--border-heavy);
+  background: var(--color-paper);
+  box-shadow: var(--shadow-hard-sm);
   font-family: var(--font-mono);
-  font-size: 0.75em;
+  font-size: 0.6rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-slate);
+  letter-spacing: 0.08em;
+  color: var(--color-ink);
+  white-space: nowrap;
 }
 
-.chamber-header-link:hover,
+.chamber-header-link:active {
+  translate: 3px 3px;
+  box-shadow: none;
+}
+
 .chamber-header-link.active {
-  color: var(--color-accent);
+  background: var(--color-highlight);
+  color: #111110;
 }
 
-/* Settings gear, and the model for any other icon-only header button - a
-   real ~44pt tap target regardless of the icon's own visual size, same
-   idiom as Congress's own .notification-bell-trigger. */
+/* Settings gear, and the model for any other icon-only header button: a
+   pressable square, same family as the back button. */
 .chamber-header-icon-link {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  color: var(--color-slate);
+  width: 2.25rem;
+  height: 2.25rem;
+  border: var(--border-heavy);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-hard-sm);
 }
 
-.chamber-header-icon-link:hover {
-  color: var(--color-accent);
+.chamber-header-icon-link:active {
+  translate: 3px 3px;
+  box-shadow: none;
 }
 
 .chamber-header-icon-link svg {
-  width: 1.3rem;
-  height: 1.3rem;
+  width: 1.2rem;
+  height: 1.2rem;
 }
 
 .chamber-main {

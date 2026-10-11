@@ -3,16 +3,16 @@ import { useQuery } from "@tanstack/react-query";
 import type { FeedItem } from "@congress/shared-types";
 import {
   ChamberHeader,
-  CapitolMark,
-  ChamberMark,
   getExhibitIcon,
   preloadRoute,
   resolveChamberPath,
+  sourceColorStyle,
   staggerDelayMs,
   StackLink,
   useAppliedTheme,
   useCapitolSettings,
   useFlipList,
+  useSourceColor,
   useStackNav,
 } from "@congress/congress-ui";
 import { ViewSlot, viewHref } from "@/components/ViewSlot";
@@ -22,26 +22,32 @@ import { GearIcon } from "@/components/TabBar";
 import { feedQueryKey, fetchFeed } from "@/lib/feedApi";
 import { formatPreviewTime } from "@/lib/formatPreviewTime";
 
-// The owner's pinned views - fixed shortcuts above the ranked feed, the way
-// stories sit above a feed. Pinning happens in Settings -> Home.
+// One pinned view: its source square (coloured by its source) and label.
+function PinnedView({ source, view }: { source: { name: string }; view: { id: string; label: string; fullPath?: string } }) {
+  const color = useSourceColor(source.name);
+  return (
+    <StackLink to={viewHref(source.name, view)} className="home-pin" style={sourceColorStyle(color)}>
+      <span className="home-pin-mark" />
+      {view.label}
+    </StackLink>
+  );
+}
+
+// The owner's pinned views - fixed shortcuts under the nameplate, ahead of
+// the ranked feed. Pinning happens in Settings -> Home.
 function PinnedViews() {
   const { data: settings } = useCapitolSettings();
   const sources = useViewSources();
   const pinned = (settings?.pinnedViews ?? []).map((p) => findViewSource(sources, p.chamber, p.viewId)).filter((v) => v !== null);
 
   return (
-    <nav className="home-stories" aria-label="Pinned views">
+    <nav className="home-rail" aria-label="Pinned views">
       {pinned.map(({ source, view }) => (
-        <StackLink key={`${source.name}:${view.id}`} to={viewHref(source.name, view)} className="home-story">
-          <span className="home-story-bubble">
-            <ChamberMark name={source.name} />
-          </span>
-          <span className="home-story-label">{view.label}</span>
-        </StackLink>
+        <PinnedView key={`${source.name}:${view.id}`} source={source} view={view} />
       ))}
-      <StackLink to="/settings?from=home" className="home-story home-story--add" aria-label="Pin a view">
-        <span className="home-story-bubble">+</span>
-        <span className="home-story-label">Pin</span>
+      <StackLink to="/settings?from=home" className="home-pin home-pin--add" aria-label="Pin a view">
+        <span className="home-pin-mark" />
+        Pin
       </StackLink>
     </nav>
   );
@@ -120,11 +126,11 @@ export function HomePage() {
   return (
     <div className="chamber-shell">
       <ChamberHeader
-        icon={<CapitolMark className="h-6 w-6 text-ink" />}
+        variant="nameplate"
         title="Congress"
         titleHref=""
         extraActions={
-          <StackLink to="/settings" className="home-settings-link" aria-label="Settings">
+          <StackLink to="/settings" className="chamber-header-icon-link" aria-label="Settings">
             <GearIcon />
           </StackLink>
         }
