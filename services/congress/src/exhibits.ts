@@ -121,17 +121,18 @@ function cacheResolved(
       .from(exhibitRefs)
       .where(eq(exhibitRefs.sourceId, id))
       .all();
+    const type = typeOf?.(id) ?? existing?.type ?? "";
     syncExhibit({
       chamber,
       id,
-      type: typeOf?.(id) ?? existing?.type ?? "",
+      type,
       name: result.name,
       url: result.url,
       outgoingRefs: refs.map((r) => r.targetId),
       manualRefs: refs.filter((r) => r.isManual).map((r) => r.targetId),
     });
 
-    return { id, chamber, name: result.name, url: result.url };
+    return { id, chamber, name: result.name, url: result.url, type: type || undefined };
   });
 }
 
@@ -191,7 +192,7 @@ async function resolveCanonical(
     if (cached) {
       results[index] = cached.deleted
         ? { id: ref.id, chamber: cached.chamber, deleted: true }
-        : { id: ref.id, chamber: cached.chamber, name: cached.name, url: cached.url };
+        : { id: ref.id, chamber: cached.chamber, name: cached.name, url: cached.url, type: cached.type || undefined };
       return;
     }
     const misses = missesByChamber.get(ref.chamber) ?? [];

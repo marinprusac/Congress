@@ -6,7 +6,7 @@ export const PLACE: Premade = {
   key: "place",
   batches: [
     [
-      { op: "create_type", slug: "place", label: "Place", pluralLabel: "Places", icon: "map" },
+      { op: "create_type", slug: "place", label: "Place", pluralLabel: "Places" },
       { op: "add_field", slug: "name", label: "Name", kind: "text", options: { required: true, searchable: true } },
       { op: "set_title_field", field: "name" },
       { op: "add_field", slug: "latitude", label: "Latitude", kind: "number", options: { required: true } },
@@ -20,5 +20,7 @@ export const PLACE: Premade = {
     ],
     // Cutover: in use.
     [{ op: "set_type_meta", hidden: false }],
+    // Icons arrived after the first install, so existing types get them in a later batch.
+    [{ op: "set_type_meta", icon: "map-pin" }],
   ],
 };

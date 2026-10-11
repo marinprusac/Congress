@@ -57,7 +57,8 @@ export type CapitolExhibitSearchResult = z.infer<typeof capitolExhibitSearchResu
 // states per the spec, must render differently and `unavailable` should be
 // retried rather than treated as a confirmed deletion.
 export const capitolExhibitResolveResultSchema = z.union([
-  z.object({ id: z.string(), chamber: z.string(), name: z.string(), url: z.string() }),
+  // `type` is the record type's slug (namespace "e"), which picks the icon.
+  z.object({ id: z.string(), chamber: z.string(), name: z.string(), url: z.string(), type: z.string().optional() }),
   z.object({ id: z.string(), chamber: z.string(), deleted: z.literal(true) }),
   z.object({ id: z.string(), chamber: z.string(), unavailable: z.literal(true) }),
 ]);
@@ -70,7 +71,7 @@ export type CapitolExhibitResolveResult = z.infer<typeof capitolExhibitResolveRe
 // connection between two Exhibits is a single fact, not "this one's
 // incoming" vs. "this one's outgoing".
 export const exhibitRefEntrySchema = z.union([
-  z.object({ id: z.string(), chamber: z.string(), name: z.string(), url: z.string(), isManual: z.boolean() }),
+  z.object({ id: z.string(), chamber: z.string(), name: z.string(), url: z.string(), type: z.string().optional(), isManual: z.boolean() }),
   z.object({ id: z.string(), chamber: z.string(), deleted: z.literal(true), isManual: z.boolean() }),
   z.object({ id: z.string(), chamber: z.string(), unavailable: z.literal(true), isManual: z.boolean() }),
 ]);

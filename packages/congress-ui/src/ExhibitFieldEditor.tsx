@@ -18,7 +18,7 @@ interface ExhibitFieldEditorProps {
   // rendering.
   className: string;
   wrapperClassName?: string;
-  renderIcon: (chamber: string) => ReactNode;
+  renderIcon: (chamber: string, type?: string) => ReactNode;
   onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
   // Opt-in "Create <query>" affordance for a Chamber whose own exhibits can
   // be quick-created from here (only Notes, today) - resolves to the newly

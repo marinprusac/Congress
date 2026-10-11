@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AI_MESSAGE_MAX_LENGTH } from "@congress/shared-types";
-import { ExhibitFieldEditor, getChamberIcon } from "@congress/congress-ui";
+import { ExhibitFieldEditor, getExhibitIcon } from "@congress/congress-ui";
 import { setComposing } from "./useVisualViewport";
 
 const DRAFT_PREFIX = "congress.chat.draft.";
@@ -100,7 +100,7 @@ export function Composer({ draftKey, onSend, running, onStop, stopping, disabled
           placeholder={placeholder}
           className="chat-composer-editor"
           wrapperClassName="exhibit-field chat-composer-editor-wrap"
-          renderIcon={(chamber) => getChamberIcon(chamber)}
+          renderIcon={getExhibitIcon}
           autoFocus={autoFocus}
           onSubmitKey={() => {
             if (!sendsOnEnter()) return false;

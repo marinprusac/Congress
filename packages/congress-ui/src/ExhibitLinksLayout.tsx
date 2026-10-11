@@ -13,7 +13,7 @@ interface AddReferenceControlProps {
   existingIds: Set<string>;
   onAdd: (result: CapitolExhibitSearchResult) => Promise<void>;
   onCreate?: (title: string) => Promise<CapitolExhibitSearchResult>;
-  renderIcon?: (chamber: string) => ReactNode;
+  renderIcon?: (chamber: string, type?: string) => ReactNode;
 }
 
 // The "+" trigger in a links panel header - an explicit way to attach a
@@ -155,7 +155,7 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
                 select(result);
               }}
             >
-              {renderIcon && <span className="exhibit-picker-icon">{renderIcon(result.chamber)}</span>}
+              {renderIcon && <span className="exhibit-picker-icon">{renderIcon(result.chamber, result.type)}</span>}
               <span className="exhibit-picker-name">{result.name}</span>
             </div>
           ))}
@@ -187,7 +187,7 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
 interface LinksPanelProps {
   title: string;
   results: ExhibitRefEntry[];
-  renderIcon?: (chamber: string) => ReactNode;
+  renderIcon?: (chamber: string, type?: string) => ReactNode;
   onNavigate?: (result: Extract<ExhibitRefEntry, { url: string }>) => void;
   className: string;
   addControl?: ReactNode;
@@ -239,7 +239,7 @@ interface ExhibitLinksLayoutProps {
   // exhibitRefs.ts, which applies them for real once a create mutation
   // returns the exhibit's real id.
   exhibitId: string | null;
-  renderIcon?: (chamber: string) => ReactNode;
+  renderIcon?: (chamber: string, type?: string) => ReactNode;
   onNavigate?: (result: Extract<ExhibitRefEntry, { url: string }>) => void;
   children: ReactNode;
   // The page's own action bar (Edit/Delete/Share/...) - kept separate from

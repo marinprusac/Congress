@@ -11,7 +11,7 @@ import type { CapitolExhibitResolveResult } from "@congress/shared-types";
 // latest value through a stable ref" pattern NoteViewPage already uses for
 // its draftTitle/draftContent refs.
 export interface ExhibitEditorRuntimeData {
-  renderIcon?: (chamber: string) => ReactNode;
+  renderIcon?: (chamber: string, type?: string) => ReactNode;
   onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
   resultsByToken: Map<string, CapitolExhibitResolveResult>;
 }

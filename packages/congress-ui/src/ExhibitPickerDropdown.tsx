@@ -26,7 +26,7 @@ export interface ExhibitPickerState {
 
 interface ExhibitPickerDropdownProps {
   picker: ExhibitPickerState;
-  renderIcon: (chamber: string) => ReactNode;
+  renderIcon: (chamber: string, type?: string) => ReactNode;
   className?: string;
 }
 
@@ -115,7 +115,7 @@ export function ExhibitPickerDropdown({ picker, renderIcon, className }: Exhibit
             picker.select(result);
           }}
         >
-          <span className="exhibit-picker-icon">{renderIcon(result.chamber)}</span>
+          <span className="exhibit-picker-icon">{renderIcon(result.chamber, result.type)}</span>
           <span className="exhibit-picker-name">{result.name}</span>
         </div>
       ))}

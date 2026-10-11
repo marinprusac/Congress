@@ -66,7 +66,7 @@ describe("the e namespace", () => {
       { id: "nope", chamber: "gone-chamber" },
     ]);
     expect(results).toEqual([
-      { id: dune, chamber: "e", name: "Dune", url: `/${dune}` },
+      { id: dune, chamber: "e", name: "Dune", url: `/${dune}`, type: "book" },
       { id: gone, chamber: "e", deleted: true },
       { id: "nope", chamber: "gone-chamber", unavailable: true },
     ]);

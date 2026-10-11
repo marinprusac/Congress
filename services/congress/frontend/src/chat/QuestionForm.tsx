@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { answerSchemaFor, type AskAnswerValue, type AskField } from "@congress/shared-types";
-import { ExhibitInlineField, getChamberIcon, showToast } from "@congress/congress-ui";
+import { ExhibitInlineField, getExhibitIcon, showToast } from "@congress/congress-ui";
 import { AskAnswerError, aiAsksQueryKey, aiThreadQueryKey, answerAsk } from "@/lib/aiApi";
 
 type Values = Record<string, AskAnswerValue | undefined>;
@@ -126,7 +126,7 @@ function FieldInput({ field, value, onChange, disabled }: { field: AskField; val
           readOnly={disabled}
           placeholder="Type @ to pick"
           className="ask-input ask-exhibit"
-          renderIcon={(chamber) => getChamberIcon(chamber)}
+          renderIcon={getExhibitIcon}
         />
       );
   }

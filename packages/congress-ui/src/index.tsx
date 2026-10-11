@@ -25,6 +25,7 @@ export {
 } from "./useAppliedTheme.js";
 export { useBackNavigation, ChamberIndexRedirect } from "./chamberNav.js";
 export { ChamberMark, CapitolMark, getChamberIcon } from "./ChamberMarks.js";
+export { ExhibitTypeIcon, getExhibitIcon, setExhibitTypeIcons } from "./ExhibitTypeIcon.js";
 export { ViewCard } from "./ViewCard.js";
 export { useAiRunStream, fetchAiSettings, aiSettingsQueryKey, type AiRunStreamState, type AiToolCall } from "./useAiRunStream.js";
 export {

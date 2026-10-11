@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EXHIBIT_ICONS } from "./exhibitIcons.js";
 
 // Runtime exhibit types: a definition is data (never code), rendered by
 // Congress's generic record UI and backed by a real SQLite table.
@@ -169,14 +170,14 @@ export const operationSchema = z.discriminatedUnion("op", [
     slug: slugSchema,
     label: z.string().min(1).max(60),
     pluralLabel: z.string().min(1).max(60).optional(),
-    icon: z.string().max(40).optional(),
+    icon: z.enum(EXHIBIT_ICONS).optional(),
   }),
   z.object({
     op: z.literal("set_type_meta"),
     slug: slugSchema.optional(),
     label: z.string().min(1).max(60).optional(),
     pluralLabel: z.string().min(1).max(60).optional(),
-    icon: z.string().max(40).optional(),
+    icon: z.enum(EXHIBIT_ICONS).optional(),
     eventPrefix: slugSchema.optional(),
     hidden: z.boolean().optional(),
     autoCreate: z.enum(AUTO_CREATE).optional(),

@@ -52,9 +52,10 @@ describe("type routes", () => {
     expect(list.find((t) => t.definition.slug === "secret")).toMatchObject({ recordCount: 1, forked: false });
 
     const versions = (await (await call("/congress/types/task/versions")).json()) as { version: number; changes: { text: string }[] }[];
-    expect(versions.map((v) => v.version)).toEqual([2, 1]);
-    expect(versions[0]!.changes).toEqual([{ area: "type", text: "Show type" }]);
-    expect(versions[1]!.changes[0]).toEqual({ area: "type", text: "Create type “Task” (Tasks), hidden" });
+    expect(versions.map((v) => v.version)).toEqual([3, 2, 1]);
+    expect(versions[0]!.changes).toEqual([{ area: "type", text: "Change icon to square-check" }]);
+    expect(versions[1]!.changes).toEqual([{ area: "type", text: "Show type" }]);
+    expect(versions[2]!.changes[0]).toEqual({ area: "type", text: "Create type “Task” (Tasks), hidden" });
   });
 
   it("upload a file raw and serve it back inline, ranged and as a download", async () => {

@@ -25,7 +25,7 @@ export interface UseExhibitEditorCoreOptions {
   readOnly?: boolean;
   placeholder?: string;
   mode: "multiline" | "inline";
-  renderIcon: (chamber: string) => ReactNode;
+  renderIcon: (chamber: string, type?: string) => ReactNode;
   onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
   onCreate?: (title: string) => Promise<CapitolExhibitSearchResult>;
   onEnter?: () => void;

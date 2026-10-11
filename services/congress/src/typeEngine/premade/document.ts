@@ -5,7 +5,7 @@ export const DOCUMENT: Premade = {
   key: "document",
   batches: [
     [
-      { op: "create_type", slug: "document", label: "Document", pluralLabel: "Documents", icon: "document" },
+      { op: "create_type", slug: "document", label: "Document", pluralLabel: "Documents" },
       { op: "add_field", slug: "title", label: "Title", kind: "text", options: { required: true, searchable: true } },
       { op: "set_title_field", field: "title" },
       { op: "add_field", slug: "file", label: "File", kind: "file", options: { required: true } },
@@ -15,5 +15,7 @@ export const DOCUMENT: Premade = {
     ],
     // Cutover: visible once the Documents Chamber's data is imported.
     [{ op: "set_type_meta", hidden: false }],
+    // Icons arrived after the first install, so existing types get them in a later batch.
+    [{ op: "set_type_meta", icon: "file-text" }],
   ],
 };

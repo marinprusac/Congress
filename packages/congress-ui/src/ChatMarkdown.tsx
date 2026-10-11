@@ -3,7 +3,7 @@ import ReactMarkdown, { defaultUrlTransform, type Components } from "react-markd
 import remarkGfm from "remark-gfm";
 import type { CapitolExhibitResolveResult } from "@congress/shared-types";
 import { ExhibitChip } from "./ExhibitChip.js";
-import { getChamberIcon } from "./ChamberMarks.js";
+import { getExhibitIcon } from "./ExhibitTypeIcon.js";
 import { useResolvedExhibits } from "./useResolvedExhibits.js";
 import { EXHIBIT_HREF_PREFIX, exhibitTokensToLinks, trimPartialToken } from "./chatMarkdownText.js";
 
@@ -27,7 +27,7 @@ function ChatExhibitChip({ token, label, onNavigate }: { token: string; label: s
       result={result}
       fallbackLabel={label}
       className="exhibit-chip chat-exhibit-chip"
-      renderIcon={(chamber) => getChamberIcon(chamber)}
+      renderIcon={getExhibitIcon}
       onNavigate={onNavigate}
     />
   );

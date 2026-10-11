@@ -1,5 +1,5 @@
 import type { CapitolExhibitResolveResult, RelatedGroup } from "@congress/shared-types";
-import { ExhibitChip, FormLabel, getChamberIcon } from "@congress/congress-ui";
+import { ExhibitChip, FormLabel, getExhibitIcon } from "@congress/congress-ui";
 
 // Reverse relations: records elsewhere whose relation field links here.
 export function RelatedSection({
@@ -18,7 +18,7 @@ export function RelatedSection({
           </FormLabel>
           <div className="flex flex-wrap gap-2">
             {g.records.map((r) => (
-              <ExhibitChip key={r.id} result={{ ...r, chamber: "e" }} renderIcon={(c) => getChamberIcon(c)} onNavigate={onNavigate} />
+              <ExhibitChip key={r.id} result={{ ...r, chamber: "e" }} renderIcon={getExhibitIcon} onNavigate={onNavigate} />
             ))}
             {g.total > g.records.length && <span className="self-center font-mono text-xs text-dust">and {g.total - g.records.length} more</span>}
           </div>

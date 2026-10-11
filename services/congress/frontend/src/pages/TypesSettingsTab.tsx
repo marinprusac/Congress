@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { FieldDefinition, TypeOverview } from "@congress/shared-types";
+import { ExhibitTypeIcon } from "@congress/congress-ui";
 import { fetchTypeOverviews, fetchTypeVersions } from "@/lib/recordsApi";
 
 // Read-only: types change only through the AI's builder mode.
@@ -50,11 +51,14 @@ function TypeRow({ type }: { type: TypeOverview }) {
   return (
     <li className="border-t border-dust py-3">
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-baseline justify-between gap-3 text-left">
-        <span className="min-w-0">
+        <span className="flex min-w-0 items-baseline gap-3">
+          <ExhibitTypeIcon name={def.icon} className="h-5 w-5 shrink-0 translate-y-0.5 text-dust" />
+          <span className="min-w-0">
           <span className="font-display text-lg text-ink">{def.pluralLabel}</span>
           {def.hidden && <span className="ml-2 font-mono text-xs uppercase text-dust">Hidden</span>}
           <span className="block font-mono text-xs text-dust">
             {originLabel(type)} · v{type.version} · {type.recordCount} {type.recordCount === 1 ? "record" : "records"}
+          </span>
           </span>
         </span>
         <span className="shrink-0 font-mono text-xs uppercase text-accent">{open ? "Close" : "Details"}</span>

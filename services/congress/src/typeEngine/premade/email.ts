@@ -13,7 +13,7 @@ export const EMAIL: Premade = {
   key: "email",
   batches: [
     [
-      { op: "create_type", slug: "email", label: "Email", pluralLabel: "Emails", icon: "mail" },
+      { op: "create_type", slug: "email", label: "Email", pluralLabel: "Emails" },
       { op: "add_field", slug: "subject", label: "Subject", kind: "text", options: { required: true, searchable: true } },
       { op: "set_title_field", field: "subject" },
       { op: "add_field", slug: "from", label: "From", kind: "text", options: { searchable: true } },
@@ -88,5 +88,7 @@ export const EMAIL: Premade = {
     ],
     // Out of the feed entirely: too noisy. Still searchable.
     [{ op: "set_feed_rules", rules: [] }],
+    // Icons arrived after the first install, so existing types get them in a later batch.
+    [{ op: "set_type_meta", icon: "mail" }],
   ],
 };

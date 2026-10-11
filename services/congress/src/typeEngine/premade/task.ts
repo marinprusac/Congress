@@ -6,7 +6,7 @@ export const TASK: Premade = {
   key: "task",
   batches: [
     [
-      { op: "create_type", slug: "task", label: "Task", pluralLabel: "Tasks", icon: "task" },
+      { op: "create_type", slug: "task", label: "Task", pluralLabel: "Tasks" },
       { op: "add_field", slug: "title", label: "Title", kind: "text", options: { required: true, searchable: true } },
       { op: "set_title_field", field: "title" },
       { op: "add_field", slug: "due", label: "Due", kind: "date", options: { indexed: true } },
@@ -46,5 +46,7 @@ export const TASK: Premade = {
     ],
     // Cutover: visible once the Tasks Chamber's data is imported.
     [{ op: "set_type_meta", hidden: false }],
+    // Icons arrived after the first install, so existing types get them in a later batch.
+    [{ op: "set_type_meta", icon: "square-check" }],
   ],
 };

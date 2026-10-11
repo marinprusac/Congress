@@ -3,13 +3,13 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChamberHeader,
-  ChamberMark,
+  ExhibitTypeIcon,
   ConfirmSheet,
   ExhibitActionBar,
   ExhibitFieldEditor,
   ExhibitLinksLayout,
   flushDraftConnections,
-  getChamberIcon,
+  getExhibitIcon,
   navigateToExhibit,
   resolveEditorIdentity,
   showToast,
@@ -319,7 +319,7 @@ export function RecordPage() {
 
   const header = (
     <ChamberHeader
-      icon={<ChamberMark name="e" className="h-6 w-6 text-ink" />}
+      icon={<ExhibitTypeIcon name={def?.icon} className="h-6 w-6 text-ink" />}
       title={def?.label ?? "Record"}
       titleHref=""
       onBack={back}
@@ -431,7 +431,7 @@ export function RecordPage() {
             <ExhibitLinksLayout
               exhibitId={recordId}
               hideIds={shownLinks}
-              renderIcon={(chamber) => getChamberIcon(chamber)}
+              renderIcon={getExhibitIcon}
               onNavigate={onNavigate}
               editable
               onCreateReference={type && creatable ? (title) => quickCreateRecord(type, title) : undefined}
@@ -484,7 +484,7 @@ export function RecordPage() {
                   minRows={3}
                   placeholder="Start writing. Type @ to reference a note, event, or other Exhibit."
                   className="w-full bg-parchment p-3 font-body text-base text-ink focus-within:outline-none"
-                  renderIcon={(chamber) => getChamberIcon(chamber)}
+                  renderIcon={getExhibitIcon}
                   onNavigate={onNavigate}
                   onCreate={type ? (title) => quickCreateRecord(type, title) : undefined}
                 />

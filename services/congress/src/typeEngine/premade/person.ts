@@ -5,7 +5,7 @@ export const PERSON: Premade = {
   key: "person",
   batches: [
     [
-      { op: "create_type", slug: "person", label: "Person", pluralLabel: "People", icon: "person" },
+      { op: "create_type", slug: "person", label: "Person", pluralLabel: "People" },
       { op: "add_field", slug: "name", label: "Name", kind: "text", options: { required: true, searchable: true } },
       { op: "set_title_field", field: "name" },
       { op: "add_field", slug: "emails", label: "Emails", kind: "text", options: { key: "email", searchable: true } },
@@ -15,5 +15,7 @@ export const PERSON: Premade = {
       { op: "set_layout", body: "notes" },
       { op: "set_type_meta", autoCreate: "corresponded" },
     ],
+    // Icons arrived after the first install, so existing types get them in a later batch.
+    [{ op: "set_type_meta", icon: "user" }],
   ],
 };

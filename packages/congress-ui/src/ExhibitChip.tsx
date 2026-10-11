@@ -6,7 +6,7 @@ import type { CapitolExhibitResolveResult } from "@congress/shared-types";
 // `onNavigate` typed to match instead of the plain base shape.
 interface ExhibitChipProps<T extends CapitolExhibitResolveResult> {
   result: T;
-  renderIcon?: (chamber: string) => ReactNode;
+  renderIcon?: (chamber: string, type?: string) => ReactNode;
   onNavigate?: (result: Extract<T, { url: string }>) => void;
   className?: string;
   // Label captured at reference-insertion time (the markdown link's alias
@@ -42,7 +42,7 @@ export function ExhibitChip<T extends CapitolExhibitResolveResult = CapitolExhib
     );
   }
 
-  const icon = renderIcon?.(result.chamber);
+  const icon = renderIcon?.(result.chamber, result.type);
 
   return (
     <a

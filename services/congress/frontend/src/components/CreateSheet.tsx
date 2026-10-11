@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChamberMark, usePresence, useStackNav } from "@congress/congress-ui";
+import { ExhibitTypeIcon, usePresence, useStackNav } from "@congress/congress-ui";
 import { canCreate, CUSTOM_NEW, fetchTypes } from "@/lib/recordsApi";
 import { TYPES_KEY } from "@/records/RecordPage";
 
@@ -24,7 +24,7 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
 
   const options = (types ?? [])
     .filter((t) => !t.definition.hidden && (canCreate(t.definition) || CUSTOM_NEW.has(t.definition.slug)))
-    .map((t) => ({ chamber: "e", type: t.definition.slug, label: t.definition.label, path: `/e/new/${t.definition.slug}` }));
+    .map((t) => ({ chamber: "e", type: t.definition.slug, icon: t.definition.icon, label: t.definition.label, path: `/e/new/${t.definition.slug}` }));
 
   return (
     <>
@@ -42,7 +42,7 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
               nav.push(option.path);
             }}
           >
-            <ChamberMark name={option.chamber} />
+            <ExhibitTypeIcon name={option.icon} />
             {option.label}
           </button>
         ))}

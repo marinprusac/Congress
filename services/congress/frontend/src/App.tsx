@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { ChamberLayout, ChamberMark, RouteCommitSignal, StackNavigator } from "@congress/congress-ui";
 import { LoginGate } from "@/components/LoginGate";
 import { TabBar } from "@/components/TabBar";
+import { TypeIconSync } from "@/components/TypeIconSync";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { HomePage } from "@/pages/HomePage";
 import { ChatIndex, ChatLayout } from "@/chat/ChatLayout";
@@ -30,6 +31,7 @@ export function App() {
     // every route already has.
     <LoginGate>
       <RouteCommitSignal />
+      <TypeIconSync />
       {/* One stack of pages per tab, kept equal to browser history. */}
       <StackNavigator />
       {/* The shell's one navigation (Home · Search · + · Notifications ·

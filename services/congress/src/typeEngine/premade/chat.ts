@@ -29,7 +29,7 @@ export const CHAT: Premade = {
   key: "chat",
   batches: [
     [
-      { op: "create_type", slug: "chat", label: "Chat", pluralLabel: "Chats", icon: "chat" },
+      { op: "create_type", slug: "chat", label: "Chat", pluralLabel: "Chats" },
       { op: "add_field", slug: "name", label: "Name", kind: "text", options: { required: true, searchable: true } },
       { op: "set_title_field", field: "name" },
       { op: "add_field", slug: "last_at", label: "Last message", kind: "datetime", options: { indexed: true } },
@@ -94,5 +94,7 @@ export const CHAT: Premade = {
     [{ op: "set_binding", binding: { ...BINDING, fields: [...BINDING.fields, { source: "muted", target: "muted", mode: "pull" }] } }],
     // Out of the feed entirely: too noisy. Still searchable.
     [{ op: "set_feed_rules", rules: [] }],
+    // Icons arrived after the first install, so existing types get them in a later batch.
+    [{ op: "set_type_meta", icon: "message-square" }],
   ],
 };

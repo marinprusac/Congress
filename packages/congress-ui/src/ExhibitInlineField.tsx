@@ -10,7 +10,7 @@ interface ExhibitInlineFieldProps {
   placeholder?: string;
   className: string;
   wrapperClassName?: string;
-  renderIcon: (chamber: string) => ReactNode;
+  renderIcon: (chamber: string, type?: string) => ReactNode;
   onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
   onCreate?: (title: string) => Promise<CapitolExhibitSearchResult>;
   autoFocus?: boolean;

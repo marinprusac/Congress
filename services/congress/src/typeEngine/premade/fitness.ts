@@ -7,7 +7,7 @@ export const WORKOUT: Premade = {
   key: "workout",
   batches: [
     [
-      { op: "create_type", slug: "workout", label: "Workout", pluralLabel: "Workouts", icon: "fitness" },
+      { op: "create_type", slug: "workout", label: "Workout", pluralLabel: "Workouts" },
       { op: "add_field", slug: "title", label: "Title", kind: "text", options: { required: true, searchable: true } },
       { op: "set_title_field", field: "title" },
       { op: "add_field", slug: "start", label: "Start", kind: "datetime", options: { indexed: true } },
@@ -47,6 +47,8 @@ export const WORKOUT: Premade = {
     [
       { op: "set_field_options", field: "exercise_count", options: { hidden: true } },
     ],
+    // Icons arrived after the first install, so existing types get them in a later batch.
+    [{ op: "set_type_meta", icon: "dumbbell" }],
   ],
 };
 
@@ -54,7 +56,7 @@ export const ROUTINE: Premade = {
   key: "routine",
   batches: [
     [
-      { op: "create_type", slug: "routine", label: "Routine", pluralLabel: "Routines", icon: "fitness" },
+      { op: "create_type", slug: "routine", label: "Routine", pluralLabel: "Routines" },
       { op: "add_field", slug: "title", label: "Title", kind: "text", options: { required: true, searchable: true } },
       { op: "set_title_field", field: "title" },
       { op: "add_field", slug: "folder", label: "Folder", kind: "text" },
@@ -84,5 +86,7 @@ export const ROUTINE: Premade = {
     [
       { op: "set_field_options", field: "exercise_count", options: { hidden: true } },
     ],
+    // Icons arrived after the first install, so existing types get them in a later batch.
+    [{ op: "set_type_meta", icon: "list-checks" }],
   ],
 };

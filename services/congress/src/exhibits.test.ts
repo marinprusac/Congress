@@ -142,8 +142,8 @@ describe("resolveExhibits", () => {
     cached("task-2", "tasks", "Two");
 
     await expect(resolveExhibits([{ id: "note-1", chamber: "notes" }, { id: "task-2", chamber: "tasks" }])).resolves.toEqual([
-      { id: "note-1", chamber: "notes", name: "One", url: "/x/note-1" },
-      { id: "task-2", chamber: "tasks", name: "Two", url: "/x/task-2" },
+      { id: "note-1", chamber: "notes", name: "One", url: "/x/note-1", type: "note" },
+      { id: "task-2", chamber: "tasks", name: "Two", url: "/x/task-2", type: "note" },
     ]);
   });
 
@@ -205,7 +205,7 @@ describe("getConnections", () => {
     syncExhibit({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-2"] });
 
     await expect(getConnections("note-1")).resolves.toEqual([
-      { id: "task-2", chamber: "tasks", name: "Two", url: "/x/task-2", isManual: false },
+      { id: "task-2", chamber: "tasks", name: "Two", url: "/x/task-2", type: "note", isManual: false },
     ]);
   });
 
@@ -215,7 +215,7 @@ describe("getConnections", () => {
     syncExhibit({ chamber: "tasks", id: "task-2", type: "task", name: "Two", url: "/t/2", outgoingRefs: ["note-1"] });
 
     await expect(getConnections("note-1")).resolves.toEqual([
-      { id: "task-2", chamber: "tasks", name: "Two", url: "/t/2", isManual: false },
+      { id: "task-2", chamber: "tasks", name: "Two", url: "/t/2", type: "task", isManual: false },
     ]);
   });
 

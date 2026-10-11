@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ChamberHeader,
   ChamberMark,
+  ExhibitTypeIcon,
   resolveChamberPath,
   StackLink,
   useAppliedTheme,
@@ -85,7 +86,7 @@ export function SearchPage() {
             className="search-row"
             onClick={() => nav.push(resolveChamberPath(result.url, result.chamber))}
           >
-            <ChamberMark name={result.chamber} />
+            {result.chamber === "e" ? <ExhibitTypeIcon type={result.type} /> : <ChamberMark name={result.chamber} />}
             <span className="search-row-name">{result.name}</span>
             <span className="search-row-meta">{result.chamber === "e" ? (typeLabels.get(result.type) ?? result.type) : (displayNames.get(result.chamber) ?? result.chamber)}</span>
           </button>

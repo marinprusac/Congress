@@ -4,7 +4,7 @@ import {
   ExhibitChip,
   ExhibitFieldEditor,
   FormLabel,
-  getChamberIcon,
+  getExhibitIcon,
   showToast,
   useResolvedExhibits,
 } from "@congress/congress-ui";
@@ -35,7 +35,7 @@ export function FieldControl({ field, value, onChange, onNavigate }: FieldProps)
           onChange={onChange}
           minRows={1}
           className="w-full bg-parchment p-2 font-body text-base text-ink focus-within:outline-none"
-          renderIcon={(chamber) => getChamberIcon(chamber)}
+          renderIcon={getExhibitIcon}
           onNavigate={onNavigate}
         />
       );
@@ -153,7 +153,7 @@ export function ReadonlyValue({ field, value, onNavigate }: { field: FieldDefini
         readOnly
         minRows={1}
         className="w-full font-body text-base text-slate"
-        renderIcon={(chamber) => getChamberIcon(chamber)}
+        renderIcon={getExhibitIcon}
         onNavigate={onNavigate}
       />
     );
@@ -185,7 +185,7 @@ function ReadonlyRelation({ value, onNavigate }: { value: RecordValue | undefine
     <div className="flex flex-wrap items-center gap-2">
       {ids.map((id) => {
         const hit = resultsByToken.get(`exhibit:e:${id}`);
-        return hit ? <ExhibitChip key={id} result={hit} renderIcon={(c) => getChamberIcon(c)} onNavigate={onNavigate} /> : <span key={id} className="font-mono text-xs text-dust">…</span>;
+        return hit ? <ExhibitChip key={id} result={hit} renderIcon={getExhibitIcon} onNavigate={onNavigate} /> : <span key={id} className="font-mono text-xs text-dust">…</span>;
       })}
     </div>
   );
@@ -327,7 +327,7 @@ function RelationControl({ field, value, onChange, onNavigate }: FieldProps) {
             const hit = resultsByToken.get(`exhibit:e:${id}`);
             return (
               <span key={id} className="inline-flex min-w-0 items-center gap-1">
-                {hit ? <ExhibitChip result={hit} renderIcon={(c) => getChamberIcon(c)} onNavigate={onNavigate} /> : <span className="font-mono text-xs text-dust">…</span>}
+                {hit ? <ExhibitChip result={hit} renderIcon={getExhibitIcon} onNavigate={onNavigate} /> : <span className="font-mono text-xs text-dust">…</span>}
                 <button type="button" aria-label="Remove" className="tap-target font-mono text-xs text-dust" onClick={() => set(ids.filter((x) => x !== id))}>
                   ×
                 </button>

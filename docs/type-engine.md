@@ -22,3 +22,7 @@ The shape: what used to be Chambers is **exhibit types** defined at runtime (eac
   - **Drafts:** ops (or a rollback) collect in `type_drafts` (`drafts.ts`) against a base version. `previewPublish` shows exactly what publishing would do (read-only preflight counts, the same code `commit` runs), and `diff.ts` describes it in sentences.
   - **Publishing:** each publish is its own `type_publish` ask, frozen by a hash of the draft. Approval publishes exactly that (`publishDraft`), and a draft that changed or went stale fails instead. A publish to a premade type marks it forked.
   - **Settings → Types** is read-only: types plus version history with diffs.
+
+## Type icons
+
+Every type has an `icon`: a lucide name from `EXHIBIT_ICONS` (`packages/shared-types/src/exhibitIcons.ts`, curated, kebab-case). `create_type`/`set_type_meta` reject names outside the list, and the builder guide lists them. Stored definitions are lenient: `normalizeExhibitIcon` maps pre-lucide values (`note`, `fitness`, ...) and anything unknown to `file`. The frontend maps each name to its component in `packages/congress-ui/src/ExhibitTypeIcon.tsx` (a static map, so the list and the bundle stay in step; `Record<ExhibitIconName, …>` fails typecheck on a missing one). Resolve and connection results for records carry `type`, and `TypeIconSync` feeds slug → icon to `getExhibitIcon`, which chips and pickers use for namespace `e`. To add an icon: add it to `EXHIBIT_ICONS` and to that map.

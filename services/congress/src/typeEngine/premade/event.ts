@@ -6,7 +6,7 @@ export const EVENT: Premade = {
   key: "event",
   batches: [
     [
-      { op: "create_type", slug: "event", label: "Event", pluralLabel: "Events", icon: "calendar" },
+      { op: "create_type", slug: "event", label: "Event", pluralLabel: "Events" },
       { op: "add_field", slug: "title", label: "Title", kind: "text", options: { required: true, searchable: true } },
       { op: "set_title_field", field: "title" },
       { op: "add_field", slug: "start", label: "Start", kind: "datetime", options: { required: true, indexed: true } },
@@ -106,5 +106,7 @@ export const EVENT: Premade = {
       },
       { op: "set_type_meta", hidden: false },
     ],
+    // Icons arrived after the first install, so existing types get them in a later batch.
+    [{ op: "set_type_meta", icon: "calendar" }],
   ],
 };
