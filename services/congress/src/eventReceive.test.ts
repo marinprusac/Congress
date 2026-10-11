@@ -14,7 +14,7 @@ vi.mock("./pushSubscriptions.js", () => ({
 
 import { db, runMigrations } from "./db/client.js";
 import { eventHistory, eventSettings, notifications } from "./db/schema.js";
-import { handleReceivedEvent } from "./eventReceive.js";
+import { expiryFor, handleReceivedEvent } from "./eventReceive.js";
 import { listHistory } from "./eventHistory.js";
 import { listNotifications } from "./notifications.js";
 
@@ -246,5 +246,26 @@ describe("history retention", () => {
     settingsFor("tasks.due_soon");
     await deliver("tasks.due_soon");
     expect(listHistory()[0]?.occurredAt).toBe("2026-03-01T08:00:00.000Z");
+  });
+});
+
+describe("notification expiry", () => {
+  it("expires by payload staleAt, defaults to a day, and null means never", () => {
+    const now = 1_000_000;
+    expect(expiryFor({ staleAt: now + 5 }, now)?.getTime()).toBe(now + 5);
+    expect(expiryFor({}, now)?.getTime()).toBe(now + 86_400_000);
+    expect(expiryFor({ staleAt: null }, now)).toBeNull();
+  });
+
+  it("stores the expiry on the notification and skips one that is already stale", async () => {
+    settingsFor("tasks.soon", { notify: true });
+    await deliver("tasks.soon", { staleAt: Date.now() + 60_000 });
+    const [row] = db.select().from(notifications).all();
+    expect(row!.expiresAt!.getTime()).toBeGreaterThan(Date.now());
+
+    db.run(sql`delete from notifications`);
+    await deliver("tasks.soon", { staleAt: Date.now() - 1000 });
+    expect(db.select().from(notifications).all()).toHaveLength(0);
+    expect(listHistory()).toHaveLength(2);
   });
 });

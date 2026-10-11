@@ -9,6 +9,7 @@ import { collectOrphans } from "./typeEngine/files.js";
 import { startTimeTriggers, stopTimeTriggers } from "./typeEngine/triggers.js";
 import { startEventCatalogSync, stopEventCatalogSync } from "./eventCatalogSync.js";
 import { startHistoryPruneSweep, stopHistoryPruneSweep } from "./eventHistory.js";
+import { startNotificationExpirySweep, stopNotificationExpirySweep } from "./notifications.js";
 import { startAiRetentionSweep, stopAiRetentionSweep } from "./ai/retention.js";
 import { recoverInterruptedThreads } from "./ai/chat.js";
 import { startAskTimer, stopAskTimer } from "./ai/asks.js";
@@ -40,6 +41,7 @@ startBackups(
 );
 await startTimeTriggers();
 startHistoryPruneSweep();
+startNotificationExpirySweep();
 startAiRetentionSweep();
 startAskTimer();
 startTrackingScheduler(() => listTracking(["active"]));
@@ -51,6 +53,7 @@ async function shutdown() {
   stopBackups();
   stopTimeTriggers();
   stopHistoryPruneSweep();
+  stopNotificationExpirySweep();
   stopAiRetentionSweep();
   stopAskTimer();
   stopTrackingScheduler();

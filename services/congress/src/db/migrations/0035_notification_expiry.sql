@@ -1,0 +1,1 @@
+ALTER TABLE `notifications` ADD `expires_at` integer;

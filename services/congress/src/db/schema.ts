@@ -166,6 +166,9 @@ export const notifications = sqliteTable(
     chamberUrl: text("chamber_url"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     readAt: integer("read_at", { mode: "timestamp_ms" }),
+    // When the notification goes stale and drops out of the inbox on its own;
+    // null = stays until the owner dismisses it (e.g. an AI ask).
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
   },
   (table) => [
     uniqueIndex("notifications_chamber_dedupe_key_idx").on(table.chamber, table.dedupeKey),

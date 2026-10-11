@@ -1,4 +1,4 @@
-import { eq, and, desc, isNull } from "drizzle-orm";
+import { eq, and, desc, isNull, lte, gt, or, isNotNull } from "drizzle-orm";
 import type { Notification, NotificationPushRequest } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { notifications } from "./db/schema.js";
@@ -24,7 +24,14 @@ function toNotification(row: typeof notifications.$inferSelect): Notification {
 // polled again) nag the bell repeatedly, so `readAt` is only cleared when
 // the visible content actually changed, or the row didn't exist yet.
 // `silent`: inbox only, no Web Push to devices (e.g. a quiet AI ask).
-export function pushNotification(push: NotificationPushRequest, opts: { silent?: boolean } = {}): void {
+// `expiresAt`: when the notification goes stale and leaves the inbox by itself.
+export function pushNotification(
+  push: NotificationPushRequest,
+  opts: { silent?: boolean; expiresAt?: Date | null } = {}
+): void {
+  // An expired row re-pushed is a fresh notification, not an unchanged one.
+  purgeExpiredNotifications();
+  const expiresAt = opts.expiresAt ?? null;
   const existing = db
     .select()
     .from(notifications)
@@ -44,6 +51,7 @@ export function pushNotification(push: NotificationPushRequest, opts: { silent?:
         chamberUrl,
         createdAt: new Date(),
         readAt: null,
+        expiresAt,
       })
       .run();
     if (!opts.silent) notifyDevices(push.title, body, push.chamber, chamberUrl);
@@ -52,13 +60,31 @@ export function pushNotification(push: NotificationPushRequest, opts: { silent?:
 
   const changed = existing.title !== push.title || existing.body !== body || existing.chamberUrl !== chamberUrl;
   db.update(notifications)
-    .set({ title: push.title, body, chamberUrl, readAt: changed ? null : existing.readAt })
+    .set({ title: push.title, body, chamberUrl, expiresAt, readAt: changed ? null : existing.readAt })
     .where(eq(notifications.id, existing.id))
     .run();
   // Same gate as the readAt reset above - an unchanged re-push (the same
   // still-true condition, polled again) must not buzz every subscribed
   // device on every poll tick, only a genuinely new or changed notification.
   if (changed && !opts.silent) notifyDevices(push.title, body, push.chamber, chamberUrl);
+}
+
+// Stale notifications are deleted, not just hidden: an expired row has
+// nothing left to compare a re-push against.
+export function purgeExpiredNotifications(now = new Date()): number {
+  return db.delete(notifications).where(and(isNotNull(notifications.expiresAt), lte(notifications.expiresAt, now))).run().changes;
+}
+
+const PURGE_INTERVAL_MS = 60_000;
+let purgeInterval: ReturnType<typeof setInterval> | undefined;
+
+export function startNotificationExpirySweep(): void {
+  purgeInterval = setInterval(() => purgeExpiredNotifications(), PURGE_INTERVAL_MS);
+  purgeInterval.unref?.();
+}
+
+export function stopNotificationExpirySweep(): void {
+  if (purgeInterval) clearInterval(purgeInterval);
 }
 
 export function dismissNotificationByKey(chamber: string, dedupeKey: string): void {
@@ -80,6 +106,7 @@ function notifyDevices(title: string, body: string | null, chamber: string, cham
 // upsert/change-detection above still has something to compare a re-push
 // against; only this listing hides it.
 export function listNotifications(): { notifications: Notification[]; unreadCount: number } {
+  purgeExpiredNotifications();
   const rows = db
     .select()
     .from(notifications)

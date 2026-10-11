@@ -6,6 +6,18 @@ import { getEventSettingsRowByType, markEventSettingsFired, resolveNotify } from
 import { pushNotification } from "./notifications.js";
 import { recordHistory } from "./eventHistory.js";
 
+// An event-driven notification is a moment, not a record: it leaves the inbox
+// at the payload's `staleAt` (epoch ms; null = until something else clears it)
+// or, absent that, after a day.
+const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
+
+export function expiryFor(payload: Record<string, unknown>, now = Date.now()): Date | null {
+  const stale = payload.staleAt;
+  if (stale === null) return null;
+  if (typeof stale === "number" && Number.isFinite(stale)) return new Date(stale);
+  return new Date(now + DEFAULT_TTL_MS);
+}
+
 // Handed to mountEventReceiveRoute (@congress/chamber-kit) - looks up the
 // single settings row for this event type (auto-derived by
 // eventCatalogSync.ts, one row per type) and runs its two independent
@@ -36,7 +48,10 @@ export async function handleReceivedEvent(event: EventDelivery): Promise<void> {
     // Preserve the original emitting chamber's identity (e.g. "tasks") so
     // the notification bell attributes/icons it correctly - this Chamber
     // is just the one deciding whether/what to push, not the source.
-    pushNotification({ chamber: event.chamber, dedupeKey, title, body, chamberUrl });
+    const expiresAt = expiryFor(event.payload);
+    // Already stale on arrival (the moment passed): nothing to show.
+    if (expiresAt && expiresAt.getTime() <= Date.now()) return void (await markEventSettingsFired(event.type));
+    pushNotification({ chamber: event.chamber, dedupeKey, title, body, chamberUrl }, { expiresAt });
   }
 
   await markEventSettingsFired(event.type);

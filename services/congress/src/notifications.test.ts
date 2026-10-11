@@ -18,6 +18,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   pushNotification,
+  purgeExpiredNotifications,
 } from "./notifications.js";
 
 beforeAll(() => runMigrations(migrationsDir("congress")));
@@ -174,5 +175,31 @@ describe("reading and dismissing", () => {
     push({ dedupeKey: "newer", title: "Newer" });
 
     expect(listNotifications().notifications.map((n) => n.title)).toEqual(["Newer", "Older"]);
+  });
+});
+
+describe("expiry", () => {
+  it("drops a notification from the inbox once it has expired", () => {
+    pushNotification({ chamber: "tasks", dedupeKey: "a", title: "A" }, { expiresAt: new Date(Date.now() + 60_000) });
+    expect(listNotifications().notifications).toHaveLength(1);
+    db.update(notifications).set({ expiresAt: new Date(Date.now() - 1) }).run();
+    expect(listNotifications().notifications).toHaveLength(0);
+    expect(db.select().from(notifications).all()).toHaveLength(0);
+  });
+
+  it("keeps a notification with no expiry", () => {
+    push();
+    expect(purgeExpiredNotifications(new Date(Date.now() + 10 * 365 * 86_400_000))).toBe(0);
+    expect(listNotifications().notifications).toHaveLength(1);
+  });
+
+  it("treats a re-push of an expired notification as new: unread and buzzing", () => {
+    pushNotification({ chamber: "tasks", dedupeKey: "a", title: "A" }, { expiresAt: new Date(Date.now() + 60_000) });
+    markAllNotificationsRead();
+    db.update(notifications).set({ expiresAt: new Date(Date.now() - 1) }).run();
+    vi.mocked(sendWebPush).mockClear();
+    push({ dedupeKey: "a", title: "A" });
+    expect(listNotifications().unreadCount).toBe(1);
+    expect(sendWebPush).toHaveBeenCalledTimes(1);
   });
 });

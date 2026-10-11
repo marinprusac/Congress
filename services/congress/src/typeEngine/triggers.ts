@@ -8,6 +8,7 @@ import { andClauses } from "./feedRules.js";
 import { EVENT_SOURCE, eventPayload, onRecordWrite, titleOf } from "./records.js";
 import { addDays, dayOf, endOfDay, ownerZone, refreshOwnerZone, startOfDay } from "./zone.js";
 import { publishEvent } from "../events.js";
+import { dismissNotificationByKey } from "../notifications.js";
 import type { Stored } from "./casts.js";
 
 // Time-trigger ladders: each record's state on a ladder is the latest step it
@@ -74,6 +75,11 @@ function staleStep(def: TypeDefinition, trigger: TimeTrigger, row: Row | undefin
   return instant !== null && isStale(step, instant, now);
 }
 
+function rowInstant(def: TypeDefinition, trigger: TimeTrigger, row: Row | undefined, zone: string): number | null {
+  const f = ladderField(def, trigger);
+  return f && row ? instantOf(f, row[f.column] ?? null, trigger.anchor, zone) : null;
+}
+
 function currentStep(def: TypeDefinition, trigger: TimeTrigger, row: Row | undefined, now: number, zone: string): Step | null {
   const f = ladderField(def, trigger);
   if (!f || !row) return null;
@@ -88,20 +94,29 @@ function storedStates(typeId: string, ladder: string, recordId?: string): Map<st
   return new Map(exhibitsDb.select().from(recordTriggerState).where(where).all().map((r) => [r.recordId, r.state]));
 }
 
-function publish(t: StoredType, event: string, id: string, title: string): void {
-  publishEvent({ chamber: EVENT_SOURCE, type: `${t.definition.eventPrefix}.${event}`, payload: eventPayload(t, id, title) });
+// `staleAt`: a "before" step's notification is moot once its moment arrives;
+// other steps stay until the ladder moves on (see transition); undefined = default expiry.
+function publish(t: StoredType, event: string, id: string, title: string, staleAt?: number | null): void {
+  publishEvent({ chamber: EVENT_SOURCE, type: `${t.definition.eventPrefix}.${event}`, payload: { ...eventPayload(t, id, title), ...(staleAt !== undefined ? { staleAt } : {}) } });
+}
+
+// Drops the notification a ladder step left behind (key as in resolveNotify).
+function dismissStep(t: StoredType, event: string, id: string): void {
+  dismissNotificationByKey(EVENT_SOURCE, `${t.definition.eventPrefix}.${event}-${id}`);
 }
 
 // Moves one record from `prev` to `cur`, publishing and storing the change.
 // `silent` stores the state without publishing (a backfill of past records).
-function transition(t: StoredType, trigger: TimeTrigger, id: string, title: string, cur: Step | null, prev: string | undefined, now: number, silent = false): void {
+function transition(t: StoredType, trigger: TimeTrigger, id: string, title: string, cur: Step | null, prev: string | undefined, now: number, silent = false, instant: number | null = null): void {
+  // The ladder moved on or cleared: the previous step's notification is stale.
+  if (prev !== undefined && cur?.event !== prev) dismissStep(t, prev, id);
   if (cur && cur.event !== prev) {
     exhibitsDb
       .insert(recordTriggerState)
       .values({ recordId: id, typeId: t.id, ladder: trigger.field, state: cur.event, firedAt: new Date(now) })
       .onConflictDoUpdate({ target: [recordTriggerState.recordId, recordTriggerState.ladder], set: { state: cur.event, firedAt: new Date(now) } })
       .run();
-    if (!silent) publish(t, cur.event, id, title);
+    if (!silent) publish(t, cur.event, id, title, cur.offsetMinutes < 0 ? instant : null);
   } else if (!cur && prev !== undefined) {
     exhibitsDb.delete(recordTriggerState).where(and(eq(recordTriggerState.recordId, id), eq(recordTriggerState.ladder, trigger.field))).run();
     if (trigger.clearEvent && !silent) publish(t, trigger.clearEvent.event, id, title);
@@ -140,7 +155,7 @@ export function evaluateRecord(t: StoredType, id: string, deleted?: RecordDto, n
     if (!cur && prev === undefined) continue;
     const titleRow = row ?? (deleted ? undefined : (exhibitsSqlite.prepare(`SELECT * FROM ${quoteIdent(def.tableName)} WHERE "id" = ?`).get(id) as Row | undefined));
     const title = deleted ? titleFromDto(def, deleted) : titleRow ? titleOf(def, titleRow) : "";
-    transition(t, trigger, id, title, cur, prev, now, quiet || staleStep(def, trigger, row, cur, now, zone));
+    transition(t, trigger, id, title, cur, prev, now, quiet || staleStep(def, trigger, row, cur, now, zone), rowInstant(def, trigger, row, zone));
   }
 }
 
@@ -172,7 +187,7 @@ export function evaluateAll(now = Date.now()): void {
         const id = String(row.id);
         seen.add(id);
         const cur = currentStep(def, trigger, row, now, zone);
-        transition(t, trigger, id, titleOf(def, row), cur, stored.get(id), now, !known || staleStep(def, trigger, row, cur, now, zone));
+        transition(t, trigger, id, titleOf(def, row), cur, stored.get(id), now, !known || staleStep(def, trigger, row, cur, now, zone), rowInstant(def, trigger, row, zone));
       }
       if (!known) markLadderKnown(t, trigger);
       // Stored states whose record no longer qualifies fall out of the ladder.

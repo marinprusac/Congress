@@ -8,6 +8,9 @@ import { recordTriggerState } from "./db/schema.js";
 import { getTypeBySlug, publish } from "./store.js";
 import { createRecord, deleteRecord, getRecord, updateRecord } from "./records.js";
 import { typeEventCatalog } from "./source.js";
+import { db } from "../db/client.js";
+import { notifications } from "../db/schema.js";
+import { pushNotification } from "../notifications.js";
 import { evaluateAll, MAX_TIMEOUT_MS, nextWakeAt, startTimeTriggers, stepReached, stopTimeTriggers } from "./triggers.js";
 
 // Zagreb is UTC+2 until 25 Oct: a date's day ends at 22:00Z.
@@ -172,5 +175,24 @@ describe("time-trigger ladders", () => {
     expect(seen()).toEqual([]);
     // Due 1 Jun ends at 22:00Z that day; due_soon is 24h before.
     expect(nextWakeAt()).toBe(Date.parse("2027-05-31T22:00:00Z"));
+  });
+});
+
+describe("ladder notifications", () => {
+  const key = (event: string, id: string) => `chore.${event}-${id}`;
+
+  it("stamps a before-step with its moment and dismisses it when the ladder moves on", () => {
+    // Earlier tests moved the fake clock; a day out is always inside the 24h due_soon window.
+    const due = new Date(Date.now() + 12 * 3_600_000).toISOString().slice(0, 10);
+    const rec = createRecord("chore", { title: "Stamp", due });
+    const soon = events.find((e) => e.type === "chore.due_soon" && (e.payload as { recordId: string }).recordId === rec.id);
+    const staleAt = (soon!.payload as { staleAt: number }).staleAt;
+    expect(staleAt).toBeGreaterThan(Date.now());
+    expect(staleAt - Date.now()).toBeLessThan(2 * 86_400_000);
+
+    pushNotification({ chamber: "types", dedupeKey: key("due_soon", rec.id), title: "Due soon" });
+    updateRecord(rec.id, { done: true });
+    expect(db.select().from(notifications).all().some((n) => n.dedupeKey === key("due_soon", rec.id))).toBe(false);
+    deleteRecord(rec.id);
   });
 });
