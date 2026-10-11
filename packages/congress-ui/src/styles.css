@@ -36,15 +36,6 @@
   --color-alert: #a6231f;
   --color-highlight: #ffe14a;
 
-  /* Source palette: a type's colour is one of these keys (see shared-types
-     sourceColors.ts). --src-on-* is the text colour that reads on each. */
-  --color-src-cobalt: #2b44ff;
-  --color-src-tomato: #ff5a36;
-  --color-src-mint: #3fd0a0;
-  --color-src-mustard: #ffc61a;
-  --color-src-lilac: #b9a6ff;
-  --color-src-ink: #1c1c1a;
-
   --font-display: "Fraunces", serif;
   --font-body: "IBM Plex Sans Condensed", sans-serif;
   --font-mono: "IBM Plex Mono", monospace;
@@ -69,8 +60,6 @@
   --color-dust: #57534a;
   --color-accent: #7fbf9e;
   --color-alert: #e08a80;
-  --color-src-cobalt: #6f82ff;
-  --color-src-ink: #ece8e0;
 }
 
 html[data-theme="dark"] {
@@ -87,6 +76,21 @@ html[data-theme="dark"] {
   --rule-heavy: 5px solid var(--color-ink);
   --on-src-cobalt: #ffffff;
   --on-src: #111110;
+
+  /* Source palette: a type's colour is one of these keys (see shared-types
+     sourceColors.ts). Plain properties, not @theme, because the frontend
+     builds the name at runtime and Tailwind would drop them as unused. */
+  --color-src-cobalt: #2b44ff;
+  --color-src-tomato: #ff5a36;
+  --color-src-mint: #3fd0a0;
+  --color-src-mustard: #ffc61a;
+  --color-src-lilac: #b9a6ff;
+  --color-src-ink: #1c1c1a;
+}
+
+:root[data-theme="dark"] {
+  --color-src-cobalt: #6f82ff;
+  --color-src-ink: #ece8e0;
 }
 
 @layer base {

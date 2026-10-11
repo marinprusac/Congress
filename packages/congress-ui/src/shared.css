@@ -65,7 +65,7 @@ a[download] {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  max-width: 72rem;
+  max-width: 69rem;
   margin: 0 auto;
   padding-bottom: 0.6rem;
   border-bottom: var(--rule-heavy);

@@ -1,5 +1,5 @@
 import { Component, Suspense, useEffect, useState, type ComponentType, type ReactNode } from "react";
-import { ChamberMark, resolveChamberPath, StackLink } from "@congress/congress-ui";
+import { resolveChamberPath, sourceColorStyle, StackLink, useSourceColor } from "@congress/congress-ui";
 import type { ManifestView } from "@congress/shared-types";
 
 class ViewErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -51,14 +51,15 @@ export function ViewSlot({
   full?: boolean;
   Card: ComponentType;
 }) {
+  const color = useSourceColor(source.name);
   // A view with nothing to show inline has no place in the feed (it's
   // reached through Search and the pinned row) - see rankFeed.
   if (!view.card) return null;
 
+  // The header reads as a figure caption: the view's label in its source's colour.
   return (
-    <section className="feed-card">
+    <section className={full ? "feed-card" : "feed-card feed-card--figure"} style={sourceColorStyle(color)}>
       <header className="feed-card-header">
-        <ChamberMark name={source.name} />
         <span className="feed-card-title">{view.label}</span>
         {reason && <span className="feed-card-reason">{reason}</span>}
         {!full && (

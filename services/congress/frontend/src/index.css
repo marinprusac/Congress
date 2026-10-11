@@ -209,29 +209,67 @@
 .home-feed {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.15rem;
+  /* room for the cards' hard shadows */
+  padding-right: 4px;
+  padding-bottom: 4px;
 }
 
-/* One feed card - a Chamber's view (its own component inside Congress's
-   frame) or a single exhibit. */
+.feed-slot > .feed-card {
+  height: 100%;
+}
+
+/* Desktop: a 12-column grid, in ranker order. The lead takes two thirds of
+   its row, records a third, view cards a half. */
+@media (min-width: 641px) {
+  .home-feed {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 1.4rem;
+  }
+
+  .feed-slot--lead {
+    grid-column: span 8;
+  }
+
+  .feed-slot--item,
+  .home-feed > .feed-skeleton {
+    grid-column: span 4;
+  }
+
+  .feed-slot--view {
+    grid-column: span 6;
+  }
+}
+
+/* One feed card: a record, or a view shown as a figure under a caption. */
 .feed-card {
-  border: 1px solid var(--color-dust);
-  background: var(--color-parchment);
+  border: var(--border-heavy);
+  background: var(--color-paper);
+  box-shadow: var(--shadow-hard);
+  transition: translate var(--dur-press) var(--ease-out), box-shadow var(--dur-press) var(--ease-out);
 }
 
+@media (hover: hover) {
+  .feed-card:has(> .feed-exhibit:hover),
+  .feed-card--figure:hover {
+    translate: -2px -2px;
+    box-shadow: 6px 6px 0 var(--color-ink);
+  }
+}
+
+.feed-card:has(> .feed-exhibit:active) {
+  translate: 4px 4px;
+  box-shadow: none;
+}
+
+/* The caption line over a view card. */
 .feed-card-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.55rem 0.75rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-dust) 50%, transparent);
-}
-
-.feed-card-header svg {
-  width: 1rem;
-  height: 1rem;
-  flex-shrink: 0;
-  color: var(--color-slate);
+  gap: 0.6rem;
+  padding: 0.4rem 0.7rem;
+  border-bottom: var(--border-heavy);
 }
 
 .feed-card-title {
@@ -240,11 +278,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding: 0 0.4rem;
+  border: var(--border-heavy);
+  background: var(--src, var(--color-paper));
+  color: var(--on-src, var(--color-ink));
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.62rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--color-slate);
 }
 
 /* The reason gives way (truncates) before the view's own title does. */
@@ -256,18 +298,21 @@
   white-space: nowrap;
   text-align: right;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--color-accent);
+  font-size: 0.65rem;
+  color: var(--color-slate);
 }
 
 .feed-card-open {
   flex-shrink: 0;
-  padding-left: 0.25rem;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.65rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-accent);
+  letter-spacing: 0.06em;
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 
 /* A view card's body has a fixed height: the Chamber's own component was
@@ -284,7 +329,7 @@
   min-height: 20rem;
 }
 
-/* A single exhibit: its own information inline (time, facts, an excerpt),
+/* A single record: its own information inline (time, facts, an excerpt),
    the whole card tappable. */
 .feed-exhibit {
   display: flex;
@@ -292,26 +337,44 @@
   flex-direction: column;
   align-items: stretch;
   gap: 0.3rem;
-  padding: 0.85rem 0.75rem;
+  padding: 0.8rem 0.85rem 0.85rem;
   text-align: left;
 }
 
-.feed-exhibit-head {
+/* Type label (underlined in the type's colour) and why it is here. */
+.feed-kicker {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
+  justify-content: space-between;
   gap: 0.75rem;
+}
+
+.feed-kicker-label {
+  padding-bottom: 1px;
+  border-bottom: 3px solid var(--src, var(--color-ink));
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.feed-kicker-reason {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--color-ink);
 }
 
 .feed-exhibit-time,
 .feed-exhibit-fields {
-  padding-left: 2.05rem;
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--color-slate);
 }
 
 .feed-exhibit-body {
-  padding-left: 2.05rem;
   font-size: 0.9rem;
   line-height: 1.4;
   color: var(--color-ink);
@@ -321,30 +384,37 @@
   -webkit-box-orient: vertical;
 }
 
-.feed-exhibit-head svg {
-  width: 1.3rem;
-  height: 1.3rem;
-  flex-shrink: 0;
-  color: var(--color-slate);
-}
-
 /* The full title, wrapping if it must - context goes on the lines below. */
 .feed-exhibit-name {
   min-width: 0;
-  flex: 1;
   overflow-wrap: anywhere;
   font-family: var(--font-display);
-  font-size: 1.05rem;
-  line-height: 1.3;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.2;
   color: var(--color-ink);
 }
 
-.feed-exhibit-reason {
-  color: var(--color-accent);
+/* The lead story: the first ranked record, set as a headline. */
+.feed-card--lead .feed-exhibit {
+  gap: 0.4rem;
 }
 
-.feed-exhibit:hover .feed-exhibit-name {
-  color: var(--color-accent);
+.feed-card--lead .feed-exhibit-name {
+  margin-top: 0.15rem;
+  font-size: 1.8rem;
+  font-weight: 900;
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+}
+
+.feed-card--lead .feed-exhibit-time {
+  margin-top: 0.15rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--color-ink);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--color-ink);
 }
 
 /* ---- Search ---- */
@@ -632,15 +702,7 @@
   }
 }
 
-/* Tappable cards and rows: a tint (rows) or a slight give (cards). */
-.feed-card {
-  transition: scale var(--dur-press) var(--ease-out);
-}
-
-.feed-card:has(> .feed-exhibit:active) {
-  scale: 0.985;
-}
-
+/* Tappable rows: a tint. Feed cards press onto their shadow (see .feed-card). */
 .feed-exhibit:active,
 .search-row:active,
 .create-sheet-option:active {
@@ -673,7 +735,8 @@
   flex-direction: column;
   gap: 0.55rem;
   padding: 0.95rem 0.75rem;
-  border-color: color-mix(in srgb, var(--color-dust) 50%, transparent);
+  border-color: color-mix(in srgb, var(--color-dust) 60%, transparent);
+  box-shadow: none;
 }
 
 .feed-skeleton-body {

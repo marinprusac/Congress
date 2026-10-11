@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import type { FeedItem } from "@congress/shared-types";
 import {
   ChamberHeader,
-  getExhibitIcon,
   preloadRoute,
   resolveChamberPath,
   sourceColorStyle,
@@ -20,6 +19,8 @@ import { findCoreView, findView as findViewSource, useViewSources } from "@/view
 import { HomeAsks } from "@/components/HomeAsks";
 import { GearIcon } from "@/components/TabBar";
 import { feedQueryKey, fetchFeed } from "@/lib/feedApi";
+import { feedSlots } from "@/lib/feedLayout";
+import { fetchTypes, TYPES_KEY } from "@/lib/recordsApi";
 import { formatPreviewTime } from "@/lib/formatPreviewTime";
 
 // One pinned view: its source square (coloured by its source) and label.
@@ -53,40 +54,41 @@ function PinnedViews() {
   );
 }
 
-function FeedEntry({ item }: { item: FeedItem }) {
+// A record: a kicker (its type, in the type's colour, and why it is here),
+// then its own information inline. The whole card opens the record.
+function ExhibitCard({ item, lead, typeLabel }: { item: Extract<FeedItem, { kind: "exhibit" }>; lead: boolean; typeLabel?: string }) {
   const nav = useStackNav();
-  if (item.kind === "view") {
-    const core = findCoreView(item.chamber, item.viewId);
-    if (!core?.view.Card) return null;
-    return <ViewSlot source={core.source} view={core.view} Card={core.view.Card} reason={item.reason} />;
-  }
-  // The item's own information, inline - tapping still opens the exhibit.
+  const color = useSourceColor(item.chamber, item.type);
   const preview = item.preview;
-  // The title gets its line to itself; the reason joins the time below it,
-  // unless it only repeats it (an all-day event's "Today", or a range ending today).
+  // The reason sits in the kicker, unless it only repeats the time (an
+  // all-day event's "Today", or a range ending today).
   const time = preview?.time ? formatPreviewTime(preview.time) : undefined;
   const repeatsTime = item.reason === time || (preview?.time?.allDay && item.reason === "Today");
   const reason = item.reason && !repeatsTime ? item.reason : undefined;
   const href = resolveChamberPath(item.url, item.chamber);
   return (
-    <section className="feed-card">
+    <section className={lead ? "feed-card feed-card--lead" : "feed-card"} style={sourceColorStyle(color)}>
       <button type="button" className="feed-exhibit" onPointerDown={() => void preloadRoute(href)} onClick={() => nav.push(href)}>
-        <span className="feed-exhibit-head">
-          {getExhibitIcon(item.chamber, item.type)}
-          <span className="feed-exhibit-name">{preview?.title ?? item.name}</span>
+        <span className="feed-kicker">
+          <span className="feed-kicker-label">{typeLabel ?? item.type ?? item.chamber}</span>
+          {reason && <span className="feed-kicker-reason">{reason}</span>}
         </span>
-        {(time || reason) && (
-          <span className="feed-exhibit-time">
-            {time}
-            {time && reason && " · "}
-            {reason && <span className="feed-exhibit-reason">{reason}</span>}
-          </span>
-        )}
+        <span className="feed-exhibit-name">{preview?.title ?? item.name}</span>
+        {time && <span className="feed-exhibit-time">{time}</span>}
         {preview?.fields && preview.fields.length > 0 && <span className="feed-exhibit-fields">{preview.fields.join(" · ")}</span>}
         {preview?.body && <span className="feed-exhibit-body">{preview.body}</span>}
       </button>
     </section>
   );
+}
+
+function FeedEntry({ item, lead, typeLabel }: { item: FeedItem; lead: boolean; typeLabel?: string }) {
+  if (item.kind === "view") {
+    const core = findCoreView(item.chamber, item.viewId);
+    if (!core?.view.Card) return null;
+    return <ViewSlot source={core.source} view={core.view} Card={core.view.Card} reason={item.reason} />;
+  }
+  return <ExhibitCard item={item} lead={lead} typeLabel={typeLabel} />;
 }
 
 function feedKey(item: FeedItem): string {
@@ -115,6 +117,9 @@ export function HomePage() {
   useAppliedTheme();
   const feed = useQuery({ queryKey: feedQueryKey, queryFn: fetchFeed, refetchInterval: 60_000 });
   const keys = (feed.data ?? []).map(feedKey);
+  const slots = feedSlots(feed.data ?? []);
+  const { data: types } = useQuery({ queryKey: TYPES_KEY, queryFn: fetchTypes });
+  const typeLabels = new Map((types ?? []).map((t) => [t.definition.slug, t.definition.label]));
   const feedRef = useRef<HTMLDivElement>(null);
   useFlipList(feedRef, keys);
   // Cards rise in only when the feed arrives after a skeleton, not when it
@@ -142,16 +147,17 @@ export function HomePage() {
         {feed.isError && <p className="font-mono text-sm text-alert">Couldn't load the feed.</p>}
         {feed.data && feed.data.length === 0 && <p className="font-mono text-sm text-dust">— Nothing here yet —</p>}
         <div className="home-feed" ref={feedRef}>
-          {(feed.data ?? []).map((item) => {
+          {(feed.data ?? []).map((item, i) => {
             const key = feedKey(item);
+            const slot = slots[i] ?? "item";
             const introIndex = introKeys.current?.get(key);
             return (
               <div
                 key={key}
                 data-flip-key={key}
-                className={introIndex === undefined ? undefined : "motion-rise"}
+                className={`feed-slot feed-slot--${slot}${introIndex === undefined ? "" : " motion-rise"}`}
                 style={introIndex === undefined ? undefined : ({ "--stagger": `${staggerDelayMs(introIndex)}ms` } as CSSProperties)}>
-                <FeedEntry item={item} />
+                <FeedEntry item={item} lead={slot === "lead"} typeLabel={item.kind === "exhibit" && item.type ? typeLabels.get(item.type) : undefined} />
               </div>
             );
           })}
