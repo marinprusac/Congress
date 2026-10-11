@@ -110,7 +110,7 @@ export async function getFeed(): Promise<FeedItem[]> {
     const hit = resolved.get(item.exhibitId);
     // Deleted or currently unresolvable exhibits just drop out of the feed.
     if (!hit || "deleted" in hit || "unavailable" in hit) continue;
-    items.push({ ...item, name: hit.name, url: hit.url });
+    items.push({ ...item, name: hit.name, url: hit.url, type: hit.type });
   }
   return items;
 }

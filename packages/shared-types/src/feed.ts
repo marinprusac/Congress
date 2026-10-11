@@ -67,6 +67,8 @@ export const feedItemSchema = z.discriminatedUnion("kind", [
     exhibitId: z.string(),
     name: z.string(),
     url: z.string(),
+    // Record type slug (namespace "e"); picks the icon.
+    type: z.string().optional(),
     score: feedScoreSchema,
     reason: z.string().optional(),
     preview: feedPreviewSchema.optional(),

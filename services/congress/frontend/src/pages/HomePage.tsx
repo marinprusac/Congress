@@ -5,6 +5,7 @@ import {
   ChamberHeader,
   CapitolMark,
   ChamberMark,
+  getExhibitIcon,
   preloadRoute,
   resolveChamberPath,
   staggerDelayMs,
@@ -64,7 +65,7 @@ function FeedEntry({ item }: { item: FeedItem }) {
     <section className="feed-card">
       <button type="button" className="feed-exhibit" onPointerDown={() => void preloadRoute(href)} onClick={() => nav.push(href)}>
         <span className="feed-exhibit-head">
-          <ChamberMark name={item.chamber} />
+          {getExhibitIcon(item.chamber, item.type)}
           <span className="feed-exhibit-name">{preview?.title ?? item.name}</span>
         </span>
         {(time || reason) && (
