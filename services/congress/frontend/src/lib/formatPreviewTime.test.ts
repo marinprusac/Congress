@@ -23,4 +23,8 @@ describe("formatPreviewTime", () => {
   it("reads an all-day date as a local date, not UTC midnight", () => {
     expect(formatPreviewTime({ start: "2026-09-27", end: "2026-09-28", allDay: true }, now)).toBe("Today");
   });
+
+  it("shows a multi-day all-day event as a range through its last day", () => {
+    expect(formatPreviewTime({ start: "2026-09-26", end: "2026-09-28", allDay: true }, now)).toBe("Yesterday – Today");
+  });
 });

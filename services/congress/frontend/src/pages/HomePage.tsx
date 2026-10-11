@@ -57,9 +57,10 @@ function FeedEntry({ item }: { item: FeedItem }) {
   // The item's own information, inline - tapping still opens the exhibit.
   const preview = item.preview;
   // The title gets its line to itself; the reason joins the time below it,
-  // unless it only repeats it (an all-day event's "Today").
+  // unless it only repeats it (an all-day event's "Today", or a range ending today).
   const time = preview?.time ? formatPreviewTime(preview.time) : undefined;
-  const reason = item.reason && item.reason !== time ? item.reason : undefined;
+  const repeatsTime = item.reason === time || (preview?.time?.allDay && item.reason === "Today");
+  const reason = item.reason && !repeatsTime ? item.reason : undefined;
   const href = resolveChamberPath(item.url, item.chamber);
   return (
     <section className="feed-card">

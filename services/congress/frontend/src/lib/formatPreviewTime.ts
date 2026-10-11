@@ -20,8 +20,16 @@ export function formatPreviewTime(time: PreviewTime, now = new Date()): string {
   const prefix = time.label ? `${time.label} ` : "";
   if (time.allDay) {
     // All-day dates are plain "YYYY-MM-DD" - read them as local dates, not UTC.
-    const [y, m, d] = time.start.slice(0, 10).split("-").map(Number);
-    return `${prefix}${dayWord(new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1), now)}`;
+    const localDate = (iso: string) => {
+      const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+      return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1);
+    };
+    const first = localDate(time.start);
+    // The end date is exclusive (Google's convention): the last day is the one before.
+    const last = time.end ? localDate(time.end) : first;
+    last.setDate(last.getDate() - 1);
+    if (last.getTime() <= first.getTime()) return `${prefix}${dayWord(first, now)}`;
+    return `${prefix}${dayWord(first, now)} – ${dayWord(last, now)}`;
   }
   const start = new Date(time.start);
   let text = `${prefix}${dayWord(start, now)} ${clock(start)}`;
