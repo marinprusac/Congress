@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { EXHIBIT_ICONS } from "./exhibitIcons.js";
+import { SOURCE_COLORS } from "./sourceColors.js";
 
 // Runtime exhibit types: a definition is data (never code), rendered by
 // Congress's generic record UI and backed by a real SQLite table.
@@ -152,6 +153,8 @@ export const typeDefinitionSchema = z.object({
   label: z.string().min(1).max(60),
   pluralLabel: z.string().min(1).max(60),
   icon: z.string().max(40),
+  // Absent until picked; the frontend then derives one from the slug.
+  color: z.enum(SOURCE_COLORS).optional(),
   tableName: z.string(),
   titleField: z.string().nullable(),
   fields: z.array(fieldDefinitionSchema),
@@ -184,6 +187,7 @@ export const operationSchema = z.discriminatedUnion("op", [
     label: z.string().min(1).max(60),
     pluralLabel: z.string().min(1).max(60).optional(),
     icon: z.enum(EXHIBIT_ICONS).optional(),
+    color: z.enum(SOURCE_COLORS).optional(),
   }),
   z.object({
     op: z.literal("set_type_meta"),
@@ -191,6 +195,7 @@ export const operationSchema = z.discriminatedUnion("op", [
     label: z.string().min(1).max(60).optional(),
     pluralLabel: z.string().min(1).max(60).optional(),
     icon: z.enum(EXHIBIT_ICONS).optional(),
+    color: z.enum(SOURCE_COLORS).optional(),
     eventPrefix: slugSchema.optional(),
     hidden: z.boolean().optional(),
     autoCreate: z.enum(AUTO_CREATE).optional(),

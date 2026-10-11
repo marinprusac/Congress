@@ -96,5 +96,7 @@ export const CHAT: Premade = {
     [{ op: "set_feed_rules", rules: [] }],
     // Icons arrived after the first install, so existing types get them in a later batch.
     [{ op: "set_type_meta", icon: "message-square" }],
+    // The source colour (feed kicker, pins, chips).
+    [{ op: "set_type_meta", color: "mint" }],
   ],
 };

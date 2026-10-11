@@ -13,8 +13,8 @@ describe("installPremades", () => {
     installPremades([NOTE]);
     installPremades([NOTE]);
     const note = getTypeByPremadeKey("note")!;
-    expect(note).toMatchObject({ version: 3, origin: "premade", premadeBatch: 3, forked: false });
-    expect(note.definition).toMatchObject({ slug: "note", hidden: false, tableName: "x_note", icon: "sticky-note" });
+    expect(note).toMatchObject({ version: 4, origin: "premade", premadeBatch: 4, forked: false });
+    expect(note.definition).toMatchObject({ slug: "note", hidden: false, tableName: "x_note", icon: "sticky-note", color: "ink" });
     expect(note.definition.fields.map((f) => [f.slug, f.kind])).toEqual([
       ["title", "text"],
       ["body", "richtext"],
@@ -27,7 +27,7 @@ describe("installPremades", () => {
     const next: Premade = { ...NOTE, batches: [...NOTE.batches, [{ op: "set_type_meta", icon: "notebook" }]] };
     installPremades([next]);
     installPremades([next]);
-    expect(getTypeByPremadeKey("note")).toMatchObject({ version: 4, premadeBatch: 4 });
+    expect(getTypeByPremadeKey("note")).toMatchObject({ version: 5, premadeBatch: 5 });
   });
 
   it("marks a type forked when the owner's edits break a batch, without throwing", () => {
@@ -39,15 +39,15 @@ describe("installPremades", () => {
       batches: [...NOTE.batches, [{ op: "set_type_meta", icon: "notebook" }], [{ op: "rename_field", field: "pinned", label: "Starred" }]],
     };
     expect(() => installPremades([next])).not.toThrow();
-    expect(getTypeByPremadeKey("note")).toMatchObject({ forked: true, premadeBatch: 4 });
+    expect(getTypeByPremadeKey("note")).toMatchObject({ forked: true, premadeBatch: 5 });
     warn.mockRestore();
   });
 
   it("installs Person with email/phone keys and the corresponded auto-create policy", () => {
     installPremades([PERSON]);
     const person = getTypeByPremadeKey("person")!;
-    expect(person).toMatchObject({ version: 2, origin: "premade", forked: false });
-    expect(person.definition).toMatchObject({ slug: "person", icon: "user", pluralLabel: "People", autoCreate: "corresponded", hidden: false });
+    expect(person).toMatchObject({ version: 3, origin: "premade", forked: false });
+    expect(person.definition).toMatchObject({ slug: "person", icon: "user", color: "lilac", pluralLabel: "People", autoCreate: "corresponded", hidden: false });
     expect(person.definition.fields.map((f) => [f.slug, f.kind, f.options.key ?? null])).toEqual([
       ["name", "text", null],
       ["emails", "text", "email"],

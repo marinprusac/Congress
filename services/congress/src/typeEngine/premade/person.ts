@@ -17,5 +17,7 @@ export const PERSON: Premade = {
     ],
     // Icons arrived after the first install, so existing types get them in a later batch.
     [{ op: "set_type_meta", icon: "user" }],
+    // The source colour (feed kicker, pins, chips).
+    [{ op: "set_type_meta", color: "lilac" }],
   ],
 };

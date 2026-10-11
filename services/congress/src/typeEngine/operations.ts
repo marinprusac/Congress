@@ -45,6 +45,7 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       label: op.label,
       pluralLabel: op.pluralLabel ?? `${op.label}s`,
       icon: op.icon ?? "file",
+      ...(op.color !== undefined ? { color: op.color } : {}),
       tableName: uniqueName(`x_${op.slug}`, taken),
       titleField: null,
       fields: [],
@@ -71,6 +72,7 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       if (op.label !== undefined) d.label = op.label;
       if (op.pluralLabel !== undefined) d.pluralLabel = op.pluralLabel;
       if (op.icon !== undefined) d.icon = op.icon;
+      if (op.color !== undefined) d.color = op.color;
       if (op.eventPrefix !== undefined) d.eventPrefix = op.eventPrefix;
       if (op.hidden !== undefined) d.hidden = op.hidden;
       if (op.autoCreate !== undefined) d.autoCreate = op.autoCreate;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { FieldDefinition, TypeOverview } from "@congress/shared-types";
-import { ExhibitTypeIcon } from "@congress/congress-ui";
+import { ExhibitTypeIcon, sourceColorStyle, useSourceColor } from "@congress/congress-ui";
 import { fetchTypeOverviews, fetchTypeVersions } from "@/lib/recordsApi";
 
 // Read-only: types change only through the AI's builder mode.
@@ -45,6 +45,7 @@ function Versions({ slug }: { slug: string }) {
 function TypeRow({ type }: { type: TypeOverview }) {
   const [open, setOpen] = useState(false);
   const def = type.definition;
+  const color = useSourceColor("e", def.slug);
   const active = def.fields.filter((f) => !f.retired);
   const retired = def.fields.length - active.length;
 
@@ -53,6 +54,11 @@ function TypeRow({ type }: { type: TypeOverview }) {
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-baseline justify-between gap-3 text-left">
         <span className="flex min-w-0 items-baseline gap-3">
           <ExhibitTypeIcon name={def.icon} className="h-5 w-5 shrink-0 translate-y-0.5 text-dust" />
+          <span
+            aria-label={`Colour: ${color}`}
+            className="inline-block h-3.5 w-3.5 shrink-0 translate-y-1 border-2 border-ink"
+            style={{ ...sourceColorStyle(color), background: "var(--src)" }}
+          />
           <span className="min-w-0">
           <span className="font-display text-lg text-ink">{def.pluralLabel}</span>
           {def.hidden && <span className="ml-2 font-mono text-xs uppercase text-dust">Hidden</span>}

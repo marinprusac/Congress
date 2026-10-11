@@ -36,6 +36,7 @@ export function diffDefinitions(before: TypeDefinition | null, after: TypeDefini
       add("type", `Rename type “${before.label}” (${before.pluralLabel}) → “${after.label}” (${after.pluralLabel})`);
     }
     if (before.icon !== after.icon) add("type", `Change icon to ${after.icon || "none"}`);
+    if (before.color !== after.color) add("type", `Change colour to ${after.color ?? "automatic"}`);
     if (before.eventPrefix !== after.eventPrefix) add("type", `Event prefix ${before.eventPrefix} → ${after.eventPrefix}`);
     if (before.hidden !== after.hidden) add("type", after.hidden ? "Hide type" : "Show type");
   }

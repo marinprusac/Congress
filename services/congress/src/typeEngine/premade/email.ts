@@ -90,5 +90,7 @@ export const EMAIL: Premade = {
     [{ op: "set_feed_rules", rules: [] }],
     // Icons arrived after the first install, so existing types get them in a later batch.
     [{ op: "set_type_meta", icon: "mail" }],
+    // The source colour (feed kicker, pins, chips).
+    [{ op: "set_type_meta", color: "tomato" }],
   ],
 };

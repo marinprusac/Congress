@@ -49,6 +49,8 @@ export const WORKOUT: Premade = {
     ],
     // Icons arrived after the first install, so existing types get them in a later batch.
     [{ op: "set_type_meta", icon: "dumbbell" }],
+    // The source colour (feed kicker, pins, chips).
+    [{ op: "set_type_meta", color: "mustard" }],
   ],
 };
 
@@ -88,5 +90,7 @@ export const ROUTINE: Premade = {
     ],
     // Icons arrived after the first install, so existing types get them in a later batch.
     [{ op: "set_type_meta", icon: "list-checks" }],
+    // The source colour (feed kicker, pins, chips).
+    [{ op: "set_type_meta", color: "mustard" }],
   ],
 };

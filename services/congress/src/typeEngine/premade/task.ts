@@ -48,5 +48,7 @@ export const TASK: Premade = {
     [{ op: "set_type_meta", hidden: false }],
     // Icons arrived after the first install, so existing types get them in a later batch.
     [{ op: "set_type_meta", icon: "square-check" }],
+    // The source colour (feed kicker, pins, chips).
+    [{ op: "set_type_meta", color: "mint" }],
   ],
 };
