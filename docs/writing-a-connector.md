@@ -63,7 +63,7 @@ for a connector's `read.detail` goes in `connectors/live/` (keyed
 
 ## Rules that apply to all of it
 
-- Ship tests with it (CLAUDE.md): fake the upstream, assert the stateful bits.
+- Ship tests with it (CLAUDE.md, "Commands"): fake the upstream, assert the stateful bits.
 - Verify the UI at 375px.
 - Nothing is ever sent to WhatsApp; Gmail is never sent or deleted from.
 - Production checks are read-only.
