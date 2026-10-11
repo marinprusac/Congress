@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EditorState } from "@codemirror/state";
-import { markdown } from "@codemirror/lang-markdown";
-import { Autolink, Table } from "@lezer/markdown";
-import { ensureSyntaxTree } from "@codemirror/language";
-import { parseTable, splitTableRow } from "./tableExtension.js";
+import { findPipeRuns, parseTable, serializeTable, splitTableRow } from "./tableExtension.js";
 
 describe("splitTableRow", () => {
   it("handles outer pipes, escaped pipes and padding", () => {
@@ -18,18 +14,27 @@ describe("parseTable", () => {
     expect(t?.header).toEqual(["A", "B"]);
     expect(t?.align).toEqual(["left", "right"]);
     expect(t?.rows).toEqual([["1", "2"], ["3", ""]]);
+    expect(t?.hasDelimiter).toBe(true);
   });
-  it("rejects text without a delimiter row", () => {
-    expect(parseTable("| A | B |\n| 1 | 2 |")).toBeNull();
+  it("accepts a block without a delimiter row", () => {
+    const t = parseTable("| A | B |\n| 1 | 2 |");
+    expect(t?.rows).toEqual([["1", "2"]]);
+    expect(t?.hasDelimiter).toBe(false);
   });
 });
 
-describe("markdown parser", () => {
-  it("yields a Table node with the GFM Table extension", () => {
-    const doc = "| A | B |\n|---|---|\n| 1 | 2 |\n";
-    const state = EditorState.create({ doc, extensions: [markdown({ extensions: [Autolink, Table] })] });
-    const names: string[] = [];
-    ensureSyntaxTree(state, doc.length, 5000)!.iterate({ enter: (n) => void names.push(n.name) });
-    expect(names).toContain("Table");
+describe("serializeTable", () => {
+  it("round-trips, escaping pipes and keeping a missing delimiter missing", () => {
+    const bare = parseTable("| A | B |\n| 1 | x \\| y |")!;
+    expect(serializeTable(bare)).toBe("| A | B |\n| 1 | x \\| y |");
+    const full = parseTable("| A | B |\n| :-- | --: |\n| 1 | 2 |")!;
+    expect(serializeTable(full)).toBe("| A | B |\n| :--- | ---: |\n| 1 | 2 |");
+  });
+});
+
+describe("findPipeRuns", () => {
+  it("finds runs of 2+ pipe lines only", () => {
+    const lines = ["text", "| a |", "text", "| a | b |", "| 1 | 2 |", "| 3 | 4 |", ""];
+    expect(findPipeRuns(lines)).toEqual([{ start: 3, end: 5 }]);
   });
 });

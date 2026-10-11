@@ -15,7 +15,7 @@ import type { ExhibitEditorRuntimeRef } from "./runtime.js";
 import { exhibitEditorTheme, markdownHighlightStyle } from "./theme.js";
 import { createLivePreviewExtension } from "./livePreviewExtension.js";
 import { createLinkClickExtension } from "./linkClickExtension.js";
-import { Autolink, Table } from "@lezer/markdown";
+import { Autolink } from "@lezer/markdown";
 import { createTableExtension } from "./tableExtension.js";
 import { createSingleLineExtension } from "./singleLineExtension.js";
 
@@ -239,9 +239,10 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
 
       const extensions: Extension[] = [
         history(),
-        // Autolink makes a bare https://... a link node (ctrl+click-able); Table
-        // parses GFM tables so they can render as real tables (tableExtension).
-        markdown({ extensions: [Autolink, Table] }),
+        // Autolink makes a bare https://... a link node (green, ctrl+click-able)
+        // without pulling in the rest of GFM; pipe tables are handled by
+        // tableExtension, which scans lines itself.
+        markdown({ extensions: [Autolink] }),
         markdownHighlightStyle,
         createLivePreviewExtension(mode),
         createLinkClickExtension(),
