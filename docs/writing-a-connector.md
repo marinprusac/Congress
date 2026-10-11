@@ -57,7 +57,7 @@ Only for a genuine screen that is not a list of records (a map, a timeline, a
 chart). Put it in `frontend/src/views/<name>/`, add a route in `App.tsx`, list
 it in `views/coreViews.ts` (`type` = the type whose use shows it; a `Card`
 component puts it in the feed), add the path to the service worker's shell
-allowlist (`sw.ts`) and an icon in `gateway.ts`'s `CORE_ICONS`. A live renderer
+allowlist (`sw.ts`) and an icon in `gateway.ts`'s `CORE_ICONS`. Its feed caption and pinned square take their colour from `CHAMBER_COLORS` in `congress-ui/src/sourceColor.ts` (keyed by the source's `name`; an unlisted source is ink), so add an entry there. A live renderer
 for a connector's `read.detail` goes in `connectors/live/` (keyed
 `connector:kind`), and its setup panel in `connectors/panels.tsx`.
 
