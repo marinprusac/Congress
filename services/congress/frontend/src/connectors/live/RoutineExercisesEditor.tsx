@@ -90,7 +90,7 @@ export function RoutineExercisesEditor({ exercises, onLeafChange, onStructuralCh
     <div className="space-y-6">
       {exercises.length === 0 && <p className="font-mono text-sm text-dust">— No exercises yet —</p>}
       {exercises.map((exercise, exerciseIndex) => (
-        <div key={exerciseIndex} className="border border-dust p-3">
+        <div key={exerciseIndex} className="panel p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="font-display text-lg text-ink">{exercise.name}</h3>
             <div className="flex items-center gap-2 font-mono text-xs">
@@ -118,7 +118,7 @@ export function RoutineExercisesEditor({ exercises, onLeafChange, onStructuralCh
               type="number"
               value={exercise.restSeconds ?? ""}
               onChange={(e) => updateExercise(exerciseIndex, { restSeconds: numberOrNull(e.target.value) })}
-              className="w-16 border border-dust bg-parchment px-1 py-0.5 font-mono text-sm text-ink"
+              className="w-16 border-2 border-ink bg-paper px-1 py-0.5 font-mono text-sm text-ink"
             />
           </div>
 
@@ -129,7 +129,7 @@ export function RoutineExercisesEditor({ exercises, onLeafChange, onStructuralCh
                 <select
                   value={set.type}
                   onChange={(e) => updateSet(exerciseIndex, setIndex, { type: e.target.value as DraftSet["type"] })}
-                  className="border border-dust bg-parchment px-1 py-1 text-xs text-ink"
+                  className="border-2 border-ink bg-paper px-1 py-1 text-xs text-ink"
                 >
                   {SET_TYPE_OPTIONS.map((type) => (
                     <option key={type} value={type}>
@@ -142,14 +142,14 @@ export function RoutineExercisesEditor({ exercises, onLeafChange, onStructuralCh
                   placeholder="kg"
                   value={set.weightKg ?? ""}
                   onChange={(e) => updateSet(exerciseIndex, setIndex, { weightKg: numberOrNull(e.target.value) })}
-                  className="w-16 border border-dust bg-parchment px-1 py-1 text-ink placeholder:text-dust"
+                  className="w-16 border-2 border-ink bg-paper px-1 py-1 text-ink placeholder:text-dust"
                 />
                 <input
                   type="number"
                   placeholder="reps"
                   value={set.reps ?? ""}
                   onChange={(e) => updateSet(exerciseIndex, setIndex, { reps: numberOrNull(e.target.value) })}
-                  className="w-16 border border-dust bg-parchment px-1 py-1 text-ink placeholder:text-dust"
+                  className="w-16 border-2 border-ink bg-paper px-1 py-1 text-ink placeholder:text-dust"
                 />
                 <input
                   type="number"
@@ -157,7 +157,7 @@ export function RoutineExercisesEditor({ exercises, onLeafChange, onStructuralCh
                   title="Rep range start"
                   value={set.repRangeStart ?? ""}
                   onChange={(e) => updateSet(exerciseIndex, setIndex, { repRangeStart: numberOrNull(e.target.value) })}
-                  className="w-14 border border-dust bg-parchment px-1 py-1 text-ink placeholder:text-dust"
+                  className="w-14 border-2 border-ink bg-paper px-1 py-1 text-ink placeholder:text-dust"
                 />
                 <span className="text-dust">–</span>
                 <input
@@ -166,7 +166,7 @@ export function RoutineExercisesEditor({ exercises, onLeafChange, onStructuralCh
                   title="Rep range end"
                   value={set.repRangeEnd ?? ""}
                   onChange={(e) => updateSet(exerciseIndex, setIndex, { repRangeEnd: numberOrNull(e.target.value) })}
-                  className="w-14 border border-dust bg-parchment px-1 py-1 text-ink placeholder:text-dust"
+                  className="w-14 border-2 border-ink bg-paper px-1 py-1 text-ink placeholder:text-dust"
                 />
                 <button
                   type="button"

@@ -41,7 +41,7 @@ export function LocationPanel({ status }: { status: ConnectorStatus }) {
             type="number"
             defaultValue={Math.round(s[key] / scale)}
             onBlur={(e) => Number(e.target.value) > 0 && Number(e.target.value) * scale !== s[key] && saveS.mutate({ [key]: Number(e.target.value) * scale })}
-            className="w-20 border border-dust bg-parchment px-1 py-0.5 text-right text-ink"
+            className="w-20 border-2 border-ink bg-paper px-1 py-0.5 text-right text-ink"
           />
           {unit}
         </span>
@@ -62,10 +62,10 @@ export function LocationPanel({ status }: { status: ConnectorStatus }) {
           saveT.mutate();
         }}
       >
-        <input placeholder="Traccar URL" value={traccar.url} onChange={(e) => setTraccar({ ...traccar, url: e.target.value })} className="min-w-0 border border-dust bg-parchment px-2 py-1.5 text-sm text-ink placeholder:text-dust" />
-        <input placeholder="Token" type="password" autoComplete="off" value={traccar.token} onChange={(e) => setTraccar({ ...traccar, token: e.target.value })} className="min-w-0 border border-dust bg-parchment px-2 py-1.5 text-sm text-ink placeholder:text-dust" />
+        <input placeholder="Traccar URL" value={traccar.url} onChange={(e) => setTraccar({ ...traccar, url: e.target.value })} className="min-w-0 border-2 border-ink bg-paper px-2 py-1.5 text-sm text-ink placeholder:text-dust" />
+        <input placeholder="Token" type="password" autoComplete="off" value={traccar.token} onChange={(e) => setTraccar({ ...traccar, token: e.target.value })} className="min-w-0 border-2 border-ink bg-paper px-2 py-1.5 text-sm text-ink placeholder:text-dust" />
         <div className="flex items-center gap-2">
-          <input placeholder="Device id" inputMode="numeric" value={traccar.deviceId} onChange={(e) => setTraccar({ ...traccar, deviceId: e.target.value })} className="min-w-0 flex-1 border border-dust bg-parchment px-2 py-1.5 text-sm text-ink placeholder:text-dust" />
+          <input placeholder="Device id" inputMode="numeric" value={traccar.deviceId} onChange={(e) => setTraccar({ ...traccar, deviceId: e.target.value })} className="min-w-0 flex-1 border-2 border-ink bg-paper px-2 py-1.5 text-sm text-ink placeholder:text-dust" />
           <button type="submit" disabled={!traccar.url || !traccar.token || !Number(traccar.deviceId) || saveT.isPending} className="tap-target uppercase tracking-wide text-accent disabled:text-dust">
             Save
           </button>
@@ -80,7 +80,7 @@ export function LocationPanel({ status }: { status: ConnectorStatus }) {
           {number("staleThresholdMs", "Warn when silent for", MIN * 60, "h")}
         </div>
       )}
-      <button type="button" disabled={rebuild.isPending} onClick={() => rebuild.mutate()} className="tap-target uppercase tracking-wide text-accent hover:underline disabled:text-dust">
+      <button type="button" disabled={rebuild.isPending} onClick={() => rebuild.mutate()} className="btn">
         {rebuild.isPending ? "Rebuilding —" : "Rebuild history"}
       </button>
     </div>

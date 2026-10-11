@@ -35,9 +35,9 @@ function AccountRow({ account }: { account: Account }) {
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 autoFocus
-                className="min-w-0 border border-dust bg-parchment px-2 py-1 font-mono text-base text-ink"
+                className="min-w-0 border-2 border-ink bg-paper px-2 py-1 font-mono text-base text-ink"
               />
-              <button type="submit" className="font-mono text-xs uppercase text-accent">
+              <button type="submit" className="btn">
                 Save
               </button>
             </form>
@@ -61,7 +61,7 @@ function AccountRow({ account }: { account: Account }) {
       {account.needsReconnect && (
         <p className="mt-2 font-mono text-xs text-alert">
           Access was revoked.{" "}
-          <a href={connectHref} className="uppercase text-accent hover:underline">
+          <a href={connectHref} className="btn">
             Reconnect
           </a>
         </p>
@@ -70,7 +70,7 @@ function AccountRow({ account }: { account: Account }) {
         account.missing.map((m) => (
           <p key={m.chamber} className="mt-2 font-mono text-xs text-dust">
             {m.displayName} needs more access.{" "}
-            <a href={connectHref} className="uppercase text-accent hover:underline">
+            <a href={connectHref} className="btn">
               Grant
             </a>
           </p>
@@ -127,7 +127,7 @@ function GoogleAccounts() {
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-display text-xl text-ink">Google</h3>
         {data?.configured && (
-          <a href={googleConnectHref()} className="font-mono text-xs uppercase tracking-wide text-accent hover:underline">
+          <a href={googleConnectHref()} className="btn">
             + Connect account
           </a>
         )}

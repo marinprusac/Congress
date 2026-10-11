@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChamberHeader, ChamberMark, ListLoadingState, StackLink, useAppliedTheme, useBackNavigation } from "@congress/congress-ui";
+import { ChamberHeader, ListLoadingState, StackLink, useAppliedTheme, useBackNavigation } from "@congress/congress-ui";
 import { fetchRecord } from "@/lib/recordsApi";
 import { addDays, buildTimeline, buildWeek, localDateKey, MIN_BLOCK_MINUTES, startOfWeek, type CalendarItem } from "./calendarViews";
 import { formatClockTime, formatDayLabel, formatWeekMonths } from "./format";
@@ -68,7 +68,7 @@ function CalendarShell({ children }: { children: ReactNode }) {
   const back = useBackNavigation();
   return (
     <div className="chamber-shell">
-      <ChamberHeader icon={<ChamberMark name="events" className="h-6 w-6 text-ink" />} title="Calendar" titleHref="" onBack={back} />
+      <ChamberHeader title="Calendar" titleHref="" onBack={back} />
       <main className="chamber-main">{children}</main>
     </div>
   );
@@ -252,7 +252,7 @@ function WeekView() {
           <button type="button" className="px-2 py-1 text-dust hover:text-ink" aria-label="Previous week" onClick={() => setWeekStart((w) => addDays(w, -7))}>
             ‹
           </button>
-          <button type="button" className="border border-dust/40 px-2 py-1 text-ink hover:border-ink" onClick={() => setWeekStart(startOfWeek(new Date()))}>
+          <button type="button" className="btn" onClick={() => setWeekStart(startOfWeek(new Date()))}>
             Today
           </button>
           <button type="button" className="px-2 py-1 text-dust hover:text-ink" aria-label="Next week" onClick={() => setWeekStart((w) => addDays(w, 7))}>

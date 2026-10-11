@@ -44,7 +44,7 @@ function PendingVisitCard({ visit, places }: { visit: Visit; places: PlaceSummar
   const pending = saveMutation.isPending || assignMutation.isPending || adhocMutation.isPending || ignoreMutation.isPending;
 
   return (
-    <div className="mb-8 border border-dust p-4">
+    <div className="mb-8 panel p-4">
       <p className="mb-3 font-mono text-xs text-dust">
         Arrived {new Date(visit.arrivedAt).toLocaleString()}
         {visit.durationMinutes !== null ? ` — dwelling ${formatDuration(visit.durationMinutes)}` : ""}
@@ -61,7 +61,7 @@ function PendingVisitCard({ visit, places }: { visit: Visit; places: PlaceSummar
           <select
             value={existingPlaceId}
             onChange={(e) => setExistingPlaceId(e.target.value)}
-            className="mb-0 w-full min-w-0 flex-1 border border-dust bg-parchment px-3 py-2 font-display text-xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+            className="mb-0 w-full min-w-0 flex-1 border-2 border-ink bg-paper px-3 py-2 font-display text-xl text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
           >
             <option value="">This is already one of my places —</option>
             {places.map((p) => (
@@ -73,7 +73,7 @@ function PendingVisitCard({ visit, places }: { visit: Visit; places: PlaceSummar
           <button
             disabled={!existingPlaceId || pending}
             onClick={() => assignMutation.mutate()}
-            className="shrink-0 border border-accent px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-accent hover:bg-accent hover:text-parchment disabled:opacity-50"
+            className="btn btn--primary shrink-0"
           >
             Use this place
           </button>
@@ -87,7 +87,7 @@ function PendingVisitCard({ visit, places }: { visit: Visit; places: PlaceSummar
       <button
         disabled={!name.trim() || visit.clusterLatitude === null || pending}
         onClick={() => saveMutation.mutate()}
-        className="mb-4 border border-accent px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-accent hover:bg-accent hover:text-parchment disabled:opacity-50"
+        className="btn btn--primary mb-4"
       >
         Save as new place
       </button>
@@ -99,7 +99,7 @@ function PendingVisitCard({ visit, places }: { visit: Visit; places: PlaceSummar
         <button
           disabled={!adhocLabel.trim() || pending}
           onClick={() => adhocMutation.mutate()}
-          className="shrink-0 border border-dust px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-slate hover:border-accent hover:text-accent disabled:opacity-50"
+          className="btn shrink-0"
         >
           Label just this once
         </button>

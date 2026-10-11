@@ -37,7 +37,7 @@ export function ExerciseTemplatePicker({ onSelect }: { onSelect: (template: Exer
 
   return (
     <div className="field-picker" ref={wrapperRef}>
-      <button type="button" className="tap-target border border-dust px-3 py-2 font-mono text-sm text-ink hover:border-accent" onClick={() => setOpen((o) => !o)}>
+      <button type="button" className="btn" onClick={() => setOpen((o) => !o)}>
         + Add exercise
       </button>
       {open && (

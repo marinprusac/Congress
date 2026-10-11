@@ -114,7 +114,7 @@ function FileControl({ value, onChange }: FieldProps) {
     return (
       <div>
         {input}
-        <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} className="tap-target font-mono text-sm text-accent hover:underline disabled:text-dust">
+        <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} className="btn">
           {busy ? "Uploading —" : "Choose file"}
         </button>
       </div>

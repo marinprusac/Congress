@@ -3,7 +3,6 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChamberHeader,
-  ExhibitTypeIcon,
   ConfirmSheet,
   ExhibitActionBar,
   ExhibitFieldEditor,
@@ -319,7 +318,6 @@ export function RecordPage() {
 
   const header = (
     <ChamberHeader
-      icon={<ExhibitTypeIcon name={def?.icon} className="h-6 w-6 text-ink" />}
       title={def?.label ?? "Record"}
       titleHref=""
       onBack={back}

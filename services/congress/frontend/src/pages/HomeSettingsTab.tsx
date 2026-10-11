@@ -69,7 +69,7 @@ export function HomeSettingsTab() {
               <ChamberMark name={chamber.name} className="h-4 w-4 shrink-0 text-slate" />
               <span className="min-w-0 flex-1 truncate text-ink">{view.label}</span>
               <span className="font-mono text-xs text-dust">{chamber.displayName}</span>
-              <button type="button" className="tap-target font-mono text-xs text-accent" onClick={() => mutation.mutate([...pinned, key])}>
+              <button type="button" className="btn" onClick={() => mutation.mutate([...pinned, key])}>
                 Pin
               </button>
             </li>

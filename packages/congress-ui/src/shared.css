@@ -356,7 +356,7 @@ a[download] {
   place-content: center;
   width: 1.25rem;
   height: 1.25rem;
-  border: 1.5px solid var(--color-dust);
+  border: 2px solid var(--color-ink);
   background: var(--color-parchment);
   cursor: pointer;
 }
@@ -395,9 +395,11 @@ a[download] {
 }
 
 .note-link,
+/* A resolved exhibit reads as highlighted text, marked in its type's colour. */
 .exhibit-chip[data-exhibit-state="resolved"] {
-  color: var(--color-accent);
+  color: var(--color-ink);
   text-decoration: none;
+  box-shadow: inset 0 -0.45em 0 color-mix(in srgb, var(--src, var(--color-highlight)) 55%, transparent);
 }
 
 /* ExhibitMarkdown's react-markdown output styling - used by Notes' own
@@ -483,7 +485,7 @@ a[download] {
 }
 
 .note-prose blockquote {
-  border-left: 2px solid var(--color-dust);
+  border-left: 4px solid var(--color-ink);
   padding-left: 1em;
   margin: 0.75em 0;
   color: var(--color-slate);
@@ -579,7 +581,7 @@ a[download] {
 
 .exhibit-links-divider {
   grid-area: divider;
-  border-top: 1px solid var(--color-dust);
+  border-top: var(--border-heavy);
 }
 
 .exhibit-links-actions {
@@ -609,7 +611,7 @@ a[download] {
   }
 
   .exhibit-links-panel-connections {
-    border-left: 1px solid var(--color-dust);
+    border-left: var(--border-heavy);
     padding-left: 1.25rem;
     margin-left: 1.25rem;
   }
@@ -676,7 +678,8 @@ a[download] {
 }
 
 .exhibit-picker-option.active {
-  background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  background-color: var(--color-highlight);
+  color: #111110;
 }
 
 .exhibit-picker-icon svg {
@@ -706,10 +709,12 @@ a[download] {
    References panel header - lets a reference be attached explicitly instead
    of only via a "[[" token in body text. */
 .exhibit-ref-add-trigger {
+  border: var(--border-heavy);
+  background: var(--color-paper);
   font-family: var(--font-mono);
   font-size: 1em;
   line-height: 1;
-  color: var(--color-slate);
+  color: var(--color-ink);
   padding-left: 0.3em;
   padding-right: 0.3em;
 }
@@ -824,8 +829,8 @@ a[download] {
 
 .exhibit-ref-add-input {
   width: 100%;
-  border: 1px solid var(--color-dust);
-  background: var(--color-parchment);
+  border: var(--border-heavy);
+  background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-mono);
   /* Never below 16px: iOS Safari zooms the whole page in on focus of any
@@ -1106,8 +1111,9 @@ a[download] {
   align-items: center;
   justify-content: center;
   width: 2.75rem;
-  border: 1px solid var(--color-dust);
-  background-color: var(--color-parchment);
+  border: var(--border-heavy);
+  background-color: var(--color-highlight);
+  box-shadow: var(--shadow-hard-sm);
   font-family: var(--font-mono);
   font-size: 1.4em;
   line-height: 1;
@@ -1211,8 +1217,9 @@ a[download] {
   max-width: min(18rem, 100%);
   overflow-wrap: anywhere;
   padding: 0.85rem 0.9rem;
-  background-color: var(--color-parchment);
-  border: 1px solid var(--color-dust);
+  background-color: var(--color-paper);
+  border: var(--border-heavy);
+  box-shadow: var(--shadow-hard-sm);
   cursor: pointer;
 }
 
@@ -1282,4 +1289,11 @@ a[download] {
   border-color: var(--color-alert);
   color: var(--color-alert);
   box-shadow: 3px 3px 0 var(--color-alert);
+}
+
+/* A boxed group of settings or controls: a card on its shadow. */
+.panel {
+  border: var(--border-heavy);
+  background-color: var(--color-paper);
+  box-shadow: var(--shadow-hard-sm);
 }

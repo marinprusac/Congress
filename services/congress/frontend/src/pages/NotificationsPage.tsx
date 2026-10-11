@@ -13,15 +13,6 @@ import {
 } from "@congress/congress-ui";
 import { useNotifications } from "@/lib/notifications";
 
-function BellIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-6 w-6 text-ink" aria-hidden="true">
-      <path d="M6 9a6 6 0 0 1 12 0c0 3.5 1 5 2 6H4c1-1 2-2.5 2-6Z" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M9.5 18a2.5 2.5 0 0 0 5 0" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 // The owner's inbox - every Logs rule's "notify" lands here (and as a Web
 // Push). A tab of its own now, where it used to be a bell dropdown.
 export function NotificationsPage() {
@@ -53,7 +44,6 @@ export function NotificationsPage() {
   return (
     <div className="chamber-shell">
       <ChamberHeader
-        icon={<BellIcon />}
         title="Notifications"
         titleHref=""
         extraActions={

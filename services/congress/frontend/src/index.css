@@ -542,12 +542,13 @@
 
 .create-sheet-title {
   padding: 0.7rem 0.9rem;
-  border-bottom: 1px solid var(--color-dust);
+  border-bottom: var(--border-heavy);
   font-family: var(--font-mono);
   font-size: 0.7rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-dust);
+  letter-spacing: 0.1em;
+  color: var(--color-ink);
 }
 
 .create-sheet-option {
@@ -673,7 +674,8 @@
 .shell-tab-indicator {
   position: absolute;
   top: 0;
-  bottom: 0;
+  /* Stops above the home-indicator strip, so the labels sit centred in the fill. */
+  bottom: env(safe-area-inset-bottom, 0px);
   left: env(safe-area-inset-left, 0px);
   width: calc((100% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / 5);
   background-color: var(--color-ink);
@@ -817,7 +819,7 @@
 /* HTML email frame - always light, like the email itself was designed. */
 .mail-html {
   overflow: hidden;
-  border: 1px solid var(--color-dust);
+  border: var(--border-heavy);
   background: #fff;
 }
 .mail-html iframe {
@@ -839,4 +841,13 @@
   font-family: var(--font-mono, monospace);
   font-size: 0.75rem;
   text-align: left;
+}
+
+/* The source colour square in front of each "+" option. */
+.create-sheet-mark {
+  flex: none;
+  width: 0.9rem;
+  height: 0.9rem;
+  border: var(--border-heavy);
+  background: var(--src, var(--color-paper));
 }

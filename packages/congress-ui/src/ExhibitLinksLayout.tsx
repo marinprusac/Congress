@@ -197,7 +197,7 @@ interface LinksPanelProps {
 function LinksPanel({ title, results, renderIcon, onNavigate, className, addControl, onRemove }: LinksPanelProps) {
   return (
     <aside className={className}>
-      <h3 className="mb-2 font-mono text-xs uppercase tracking-wide text-dust">{title}</h3>
+      <h3 className="mb-2 border-b-2 border-ink pb-1 font-mono text-xs font-semibold uppercase tracking-wide text-ink">{title}</h3>
       {results.length === 0 ? (
         <p className="font-mono text-sm text-dust">—</p>
       ) : (

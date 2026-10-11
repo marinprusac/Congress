@@ -15,15 +15,6 @@ import { useViewSources } from "@/views/coreViews";
 import { fetchTypes } from "@/lib/recordsApi";
 import { TYPES_KEY } from "@/records/RecordPage";
 
-function SearchIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" className="h-6 w-6 text-ink" aria-hidden="true">
-      <circle cx="11" cy="11" r="6.5" />
-      <path d="m20 20-4.2-4.2" />
-    </svg>
-  );
-}
-
 // Search doubles as the way into everything: before typing, every view
 // Congress offers (the catalog) and the most recent records; while typing,
 // matching views and records.
@@ -50,7 +41,7 @@ export function SearchPage() {
 
   return (
     <div className="chamber-shell">
-      <ChamberHeader icon={<SearchIcon />} title="Search" titleHref="" />
+      <ChamberHeader title="Search" titleHref="" />
       <main className="chamber-main">
         <input
           type="search"

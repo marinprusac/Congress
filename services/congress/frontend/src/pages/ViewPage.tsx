@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { ChamberHeader, ChamberMark, useAppliedTheme, useBackNavigation } from "@congress/congress-ui";
+import { ChamberHeader, useAppliedTheme, useBackNavigation } from "@congress/congress-ui";
 import { ViewSlot } from "@/components/ViewSlot";
 import { findCoreView } from "@/views/coreViews";
 
@@ -13,7 +13,7 @@ export function ViewPage() {
 
   return (
     <div className="chamber-shell">
-      <ChamberHeader icon={<ChamberMark name={chamber} className="h-6 w-6 text-ink" />} title={core?.source.displayName ?? chamber} titleHref="" onBack={back} />
+      <ChamberHeader title={core?.source.displayName ?? chamber} titleHref="" onBack={back} />
       <main className="chamber-main">
         {core?.view.Card ? (
           <ViewSlot source={core.source} view={core.view} Card={core.view.Card} full />

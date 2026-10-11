@@ -232,9 +232,8 @@ html:has(.chat-page) body {
   width: calc(100% - 2rem);
   margin: 0 1rem 0.5rem;
   padding: 0.55rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--color-dust) 60%, transparent);
-  border-radius: var(--radius-sharp);
-  background: transparent;
+  border: var(--border-heavy);
+  background: var(--color-paper);
   color: var(--color-ink);
   font-size: 16px;
 }
@@ -267,7 +266,7 @@ html:has(.chat-page) body {
 }
 
 .chat-list-link.active {
-  background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  background-color: color-mix(in srgb, var(--color-highlight) 45%, transparent);
 }
 
 .chat-list-main {
@@ -524,15 +523,15 @@ html:has(.chat-page) body {
 
 .chat-state {
   padding: 0.6rem 0.8rem;
-  border-left: 3px solid var(--color-dust);
-  background-color: color-mix(in srgb, var(--color-dust) 8%, var(--color-parchment));
+  border: var(--border-heavy);
+  border-color: var(--color-dust);
+  background-color: var(--color-paper);
   font-size: 0.95rem;
   overflow-wrap: anywhere;
 }
 
 .chat-state--error {
-  border-left-color: var(--color-alert);
-  background-color: color-mix(in srgb, var(--color-alert) 7%, var(--color-parchment));
+  border-color: var(--color-alert);
 }
 
 .chat-state-actions {
@@ -689,8 +688,8 @@ html:has(.chat-page) body {
 .chat-md-code pre {
   overflow-x: auto;
   padding: 0.7rem 0.8rem;
-  border-radius: var(--radius-sharp);
-  background-color: color-mix(in srgb, var(--color-ink) 6%, var(--color-parchment));
+  border: var(--border-heavy);
+  background-color: var(--color-paper);
   font-size: 0.85rem;
   line-height: 1.45;
 }
@@ -800,7 +799,7 @@ html:has(.chat-page) body {
   gap: 0.1rem;
   margin: 0.2rem 0 0.2rem 0.2rem;
   padding-left: 0.7rem;
-  border-left: 2px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+  border-left: 2px solid var(--color-ink);
 }
 
 .chat-activity-note {
@@ -1018,14 +1017,16 @@ html:has(.chat-page) body {
 
 .chat-suggestion {
   padding: 0.5rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--color-dust) 55%, transparent);
-  border-radius: var(--radius-sharp);
+  border: var(--border-heavy);
+  background: var(--color-paper);
+  box-shadow: var(--shadow-hard-sm);
   font-size: 0.9rem;
   text-align: left;
 }
 
-.chat-suggestion:hover {
-  border-color: var(--color-accent);
+.chat-suggestion:active {
+  translate: 3px 3px;
+  box-shadow: none;
 }
 
 .chat-placeholder {
@@ -1078,16 +1079,16 @@ html:has(.chat-page) body {
   width: 100%;
   margin: 0.5rem 0 0.75rem;
   padding: 0.6rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--color-dust) 70%, transparent);
-  border-radius: var(--radius-sharp);
-  background: transparent;
+  border: var(--border-heavy);
+  background: var(--color-paper);
   color: var(--color-ink);
   font-size: 16px;
 }
 
 .chat-sheet-save {
-  background-color: var(--color-accent);
-  color: var(--color-parchment);
+  background-color: var(--color-highlight);
+  color: #111110;
+  border: var(--border-heavy);
 }
 
 /* ---- Motion ---- */
@@ -1109,4 +1110,11 @@ html:has(.chat-page) body {
 
 .chat-jump {
   animation: motion-rise var(--dur-fast) var(--ease-out) both;
+}
+
+/* The assistant's reply sits under a rule, like a printed answer. */
+.chat-msg--assistant {
+  margin-top: 0.9rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--color-ink);
 }

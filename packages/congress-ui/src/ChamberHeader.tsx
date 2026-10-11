@@ -3,8 +3,6 @@ import { StackLink } from "./navHooks.js";
 import { resolveChamberPath } from "./ShellHostContext.js";
 
 interface ChamberHeaderProps {
-  // Not rendered any more (the bar carries no icon); kept so callers don't change.
-  icon?: ReactNode;
   title: string;
   // "nameplate" is Home's big wordmark; every other page is the slim "bar".
   variant?: "bar" | "nameplate";

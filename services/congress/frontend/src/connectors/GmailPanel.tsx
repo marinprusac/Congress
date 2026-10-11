@@ -19,7 +19,7 @@ export function GmailPanel({ status }: { status: ConnectorStatus }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 font-mono text-xs text-slate">
         <span>{status.syncing || sync.isPending ? "Syncing —" : syncedAgo(status.lastSyncedAt)}</span>
-        <button type="button" disabled={sync.isPending} onClick={() => sync.mutate()} className="tap-target uppercase tracking-wide text-accent hover:underline disabled:text-dust">
+        <button type="button" disabled={sync.isPending} onClick={() => sync.mutate()} className="btn">
           Sync now
         </button>
       </div>
@@ -44,7 +44,7 @@ export function GmailPanel({ status }: { status: ConnectorStatus }) {
           {(!a.hasAccess || !a.canMarkRead || a.needsReconnect) && (
             <p className="font-mono text-xs text-dust">
               {a.hasAccess && !a.canMarkRead ? "Can't mark mail read yet. " : ""}
-              <a href={googleConnectHref({ returnTo: "/settings?from=accounts" })} className="uppercase text-accent hover:underline">
+              <a href={googleConnectHref({ returnTo: "/settings?from=accounts" })} className="btn">
                 {a.hasAccess ? "Grant access" : "Connect Gmail"}
               </a>
             </p>

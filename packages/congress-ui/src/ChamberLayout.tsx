@@ -4,7 +4,6 @@ import { ChamberHeader } from "./ChamberHeader.js";
 import { useBackNavigation } from "./chamberNav.js";
 
 interface ChamberLayoutProps {
-  icon: ReactNode;
   title: string;
   // Identifies this Chamber (kept for callers; the header no longer links
   // anywhere Chamber-relative).
@@ -19,12 +18,12 @@ interface ChamberLayoutProps {
 // Congress's tab bar (Home · Search · + · Notifications · Settings) is the
 // one way around, and a Chamber's pages are reached from the home feed,
 // Search and the "+" sheet.
-export function ChamberLayout({ icon, title, ownChamber, extraActions }: ChamberLayoutProps) {
+export function ChamberLayout({ title, ownChamber, extraActions }: ChamberLayoutProps) {
   const back = useBackNavigation();
 
   return (
     <div className="chamber-shell">
-      <ChamberHeader icon={icon} title={title} ownChamber={ownChamber} titleHref="" onBack={back} extraActions={extraActions} />
+      <ChamberHeader title={title} ownChamber={ownChamber} titleHref="" onBack={back} extraActions={extraActions} />
       <main className="chamber-main">
         <Outlet />
       </main>

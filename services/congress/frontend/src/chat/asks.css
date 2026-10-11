@@ -5,10 +5,9 @@
   flex-direction: column;
   gap: 0.45rem;
   padding: 0.8rem 0.9rem;
-  border: 1px solid color-mix(in srgb, var(--color-dust) 45%, transparent);
-  border-left: 3px solid var(--color-accent);
-  border-radius: var(--radius-sharp);
-  background-color: color-mix(in srgb, var(--color-accent) 4%, var(--color-parchment));
+  border: var(--border-heavy);
+  background-color: var(--color-paper);
+  box-shadow: var(--shadow-hard-sm);
   min-width: 0;
 }
 
@@ -19,8 +18,9 @@
 }
 
 .ask-card--closed {
-  border-left-color: var(--color-dust);
+  border-color: var(--color-dust);
   background-color: var(--color-parchment);
+  box-shadow: none;
 }
 
 .ask-card-head {
@@ -102,9 +102,8 @@
   width: 100%;
   min-height: 2.6rem;
   padding: 0.5rem 0.65rem;
-  border: 1px solid color-mix(in srgb, var(--color-dust) 70%, transparent);
-  border-radius: var(--radius-sharp);
-  background-color: var(--color-parchment);
+  border: var(--border-heavy);
+  background-color: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-body);
   font-size: 16px;
@@ -154,16 +153,17 @@
 .ask-chip {
   min-height: 2.5rem;
   padding: 0.4rem 0.85rem;
-  border: 1px solid color-mix(in srgb, var(--color-dust) 70%, transparent);
-  border-radius: 0;
-  background-color: var(--color-parchment);
+  border: var(--border-heavy);
+  background-color: var(--color-paper);
+  box-shadow: var(--shadow-hard-sm);
   font-size: 0.95rem;
 }
 
 .ask-chip.selected {
-  border-color: var(--color-accent);
-  background-color: var(--color-accent);
-  color: var(--color-parchment);
+  background-color: var(--color-highlight);
+  color: #111110;
+  box-shadow: none;
+  translate: 3px 3px;
 }
 
 .ask-chip:disabled {
@@ -195,7 +195,9 @@
   justify-content: center;
   min-height: 2.6rem;
   padding: 0 1.1rem;
-  border-radius: var(--radius-sharp);
+  border: var(--border-heavy);
+  box-shadow: var(--shadow-hard-sm);
+  font-weight: 600;
   font-family: var(--font-mono);
   font-size: 0.75rem;
   letter-spacing: 0.06em;
@@ -204,8 +206,8 @@
 
 .ask-submit {
   align-self: flex-start;
-  background-color: var(--color-accent);
-  color: var(--color-parchment);
+  background-color: var(--color-highlight);
+  color: #111110;
 }
 
 .ask-buttons .ask-submit {
@@ -213,12 +215,14 @@
 }
 
 .ask-secondary {
-  border: 1px solid color-mix(in srgb, var(--color-dust) 70%, transparent);
+  background-color: var(--color-paper);
 }
 
 .ask-danger {
-  background-color: var(--color-alert);
-  color: var(--color-parchment);
+  background-color: var(--color-paper);
+  color: var(--color-alert);
+  border-color: var(--color-alert);
+  box-shadow: 3px 3px 0 var(--color-alert);
 }
 
 .ask-submit:disabled,
@@ -279,7 +283,9 @@
   width: 1.3rem;
   height: 1.3rem;
   border-radius: 0;
-  background-color: color-mix(in srgb, var(--color-ink) 9%, transparent);
+  border: var(--border-heavy);
+  background-color: var(--color-highlight);
+  color: #111110;
   font-family: var(--font-mono);
   font-size: 0.7rem;
   line-height: 1.3rem;
@@ -401,17 +407,31 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.45rem 0.9rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-dust) 45%, transparent);
-  background-color: color-mix(in srgb, var(--color-accent) 8%, var(--color-parchment));
+  border-bottom: var(--border-heavy);
+  background-color: color-mix(in srgb, var(--color-highlight) 40%, var(--color-parchment));
   font-family: var(--font-mono);
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-slate);
+  color: var(--color-ink);
 }
 
 .builder-banner button {
   color: var(--color-alert);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.ask-card--proposal,
+.ask-card--builder_request,
+.ask-card--type_publish {
+  background-color: color-mix(in srgb, var(--color-highlight) 22%, var(--color-paper));
+}
+
+.ask-submit:active:not(:disabled),
+.ask-secondary:active:not(:disabled),
+.ask-danger:active:not(:disabled),
+.ask-chip:active:not(:disabled) {
+  translate: 3px 3px;
+  box-shadow: none;
 }

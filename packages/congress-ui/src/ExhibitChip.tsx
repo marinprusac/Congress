@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { sourceColorStyle, useSourceColor } from "./sourceColor.js";
 import type { CapitolExhibitResolveResult } from "@congress/shared-types";
 
 // Generic over T so a caller with a richer per-ref shape (e.g.
@@ -26,6 +27,7 @@ export function ExhibitChip<T extends CapitolExhibitResolveResult = CapitolExhib
   className,
   fallbackLabel,
 }: ExhibitChipProps<T>) {
+  const color = useSourceColor("chamber" in result ? result.chamber : "", "type" in result ? (result.type as string | undefined) : undefined);
   if ("deleted" in result) {
     return (
       <span className={className} data-exhibit-state="deleted" title="This was deleted">
@@ -48,6 +50,7 @@ export function ExhibitChip<T extends CapitolExhibitResolveResult = CapitolExhib
     <a
       className={className}
       data-exhibit-state="resolved"
+      style={sourceColorStyle(color)}
       href={result.url}
       onClick={(e) => {
         if (!onNavigate) return;

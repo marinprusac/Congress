@@ -75,7 +75,7 @@ export function PushNotificationsSection() {
             type="button"
             disabled={busy}
             onClick={status === "on" ? disable : enable}
-            className="mt-3 border border-dust px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-ink hover:border-accent hover:text-accent disabled:opacity-50"
+            className="btn mt-3"
           >
             {status === "on" ? "Disable on this device" : "Enable on this device"}
           </button>

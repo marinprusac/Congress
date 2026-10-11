@@ -50,7 +50,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
             autoFocus
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mb-3 w-full border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink focus:border-accent focus:outline-none"
+            className="mb-3 w-full border-2 border-ink bg-paper px-3 py-2 font-mono text-base text-ink focus:border-accent focus:outline-none"
           />
           {error && <p className="mb-3 font-mono text-xs text-alert">{error}</p>}
           <button

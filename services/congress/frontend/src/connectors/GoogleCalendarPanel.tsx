@@ -51,7 +51,7 @@ export function GoogleCalendarPanel({ status }: { status: ConnectorStatus }) {
               ))}
             </select>
           </label>
-          <button type="button" disabled={sync.isPending} onClick={() => sync.mutate()} className="tap-target uppercase tracking-wide text-accent hover:underline disabled:text-dust">
+          <button type="button" disabled={sync.isPending} onClick={() => sync.mutate()} className="btn">
             Sync now
           </button>
         </div>

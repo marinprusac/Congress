@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
-import { ChamberHeader, ChamberMark, StackLink, useAppliedTheme, useBackNavigation } from "@congress/congress-ui";
+import { ChamberHeader, StackLink, useAppliedTheme, useBackNavigation } from "@congress/congress-ui";
 import { fetchVisits, fetchTrips, fetchVisit, fetchVisitActiveAt, fetchPollHealth } from "./api";
 import { trackingFreshness } from "./freshness";
 import { useMapTileUrl, useMapTileClassName, MAP_TILE_ATTRIBUTION } from "./mapTiles";
@@ -113,7 +113,7 @@ export function MapShell({ title, children }: { title: string; children: React.R
   const back = useBackNavigation();
   return (
     <div className="chamber-shell">
-      <ChamberHeader icon={<ChamberMark name="map" className="h-6 w-6 text-ink" />} title={title} titleHref="" onBack={back} />
+      <ChamberHeader title={title} titleHref="" onBack={back} />
       <main className="chamber-main">{children}</main>
     </div>
   );

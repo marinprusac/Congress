@@ -9,7 +9,7 @@ const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const deviceZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const inputClass =
-  "w-full border border-dust bg-parchment px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
+  "w-full border-2 border-ink bg-paper px-3 py-2 font-mono text-sm text-ink focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
 
 // Settings -> AI: the one pause switch and daily budget shared by the chat
 // and every other run, the proactive AI's own controls, and the run log.
@@ -69,7 +69,7 @@ export function AiSettingsTab() {
 
   return (
     <section>
-      <div className="mb-6 border border-dust p-4">
+      <div className="panel mb-6 p-4">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="font-display text-lg text-ink">{settings.paused ? "Paused" : "Active"}</p>
@@ -86,7 +86,7 @@ export function AiSettingsTab() {
             onClick={() => pauseMutation.mutate(!settings.paused)}
             disabled={pauseMutation.isPending}
             className={`border px-4 py-2 font-mono text-xs uppercase tracking-wide disabled:opacity-50 ${
-              settings.paused ? "border-accent text-accent hover:bg-accent hover:text-parchment" : "border-alert text-alert hover:bg-alert hover:text-parchment"
+              settings.paused ? "btn btn--primary" : "btn btn--danger"
             }`}
           >
             {settings.paused ? "Resume" : "Pause"}
@@ -132,7 +132,7 @@ export function AiSettingsTab() {
           </div>
         </div>
 
-        <StackLink to="/chat/memory" className="mb-6 flex items-center justify-between border border-dust p-4 text-ink hover:border-accent">
+        <StackLink to="/chat/memory" className="panel mb-6 flex items-center justify-between p-4 text-ink">
           <span>
             <span className="block font-display text-lg">Memory</span>
             <span className="block font-mono text-xs text-dust">What Congress is tracking and knows about you</span>
@@ -199,7 +199,7 @@ export function AiSettingsTab() {
                 className={inputClass}
               />
               {draft.timeZone !== deviceZone() ? (
-                <button type="button" className="self-start shrink-0 border border-dust px-3 py-2 font-mono text-xs uppercase text-ink" onClick={() => setDraft((d) => ({ ...d, timeZone: deviceZone() }))}>
+                <button type="button" className="btn self-start shrink-0" onClick={() => setDraft((d) => ({ ...d, timeZone: deviceZone() }))}>
                   Use {deviceZone()}
                 </button>
               ) : null}

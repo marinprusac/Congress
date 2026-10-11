@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChamberHeader, ChamberMark, showToast, useAppliedTheme, useBackNavigation, useDraftCreate, useStackNav } from "@congress/congress-ui";
+import { ChamberHeader, showToast, useAppliedTheme, useBackNavigation, useDraftCreate, useStackNav } from "@congress/congress-ui";
 import { createRoutine, fetchRoutineFolders } from "@/lib/fitnessApi";
 import { RoutineExercisesEditor, toRoutineExerciseInput, type DraftExercise } from "@/connectors/live/RoutineExercisesEditor";
 
@@ -49,7 +49,7 @@ export function NewRoutinePage() {
 
   return (
     <div className="chamber-shell">
-      <ChamberHeader icon={<ChamberMark name="fitness" className="h-6 w-6 text-ink" />} title="New routine" titleHref="" onBack={back} />
+      <ChamberHeader title="New routine" titleHref="" onBack={back} />
       <main className="chamber-main">
         <div className="mb-6 border-b border-dust pb-4">
           <input

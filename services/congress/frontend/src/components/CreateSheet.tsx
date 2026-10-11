@@ -1,8 +1,20 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExhibitTypeIcon, usePresence, useStackNav } from "@congress/congress-ui";
+import { ExhibitTypeIcon, sourceColorStyle, usePresence, useSourceColor, useStackNav } from "@congress/congress-ui";
 import { canCreate, CUSTOM_NEW, fetchTypes } from "@/lib/recordsApi";
 import { TYPES_KEY } from "@/records/RecordPage";
+
+// One kind of record in the sheet, led by its source colour.
+function CreateOption({ type, icon, label, onPick }: { type: string; icon: string; label: string; onPick: () => void }) {
+  const color = useSourceColor("e", type);
+  return (
+    <button type="button" className="create-sheet-option" onClick={onPick}>
+      <span className="create-sheet-mark" style={sourceColorStyle(color)} aria-hidden="true" />
+      <ExhibitTypeIcon name={icon} />
+      {label}
+    </button>
+  );
+}
 
 // The "+" sheet: every kind of record the owner can create by hand; picking
 // one opens its editor on a new, unsaved record.
@@ -33,18 +45,16 @@ export function CreateSheet({ open, onClose }: { open: boolean; onClose: () => v
         <div className="create-sheet-title">New —</div>
         {options.length === 0 && <p className="p-4 font-mono text-xs text-dust">Nothing to create right now.</p>}
         {options.map((option) => (
-          <button
+          <CreateOption
             key={`${option.chamber}:${option.type}`}
-            type="button"
-            className="create-sheet-option"
-            onClick={() => {
+            type={option.type}
+            icon={option.icon}
+            label={option.label}
+            onPick={() => {
               onClose();
               nav.push(option.path);
             }}
-          >
-            <ExhibitTypeIcon name={option.icon} />
-            {option.label}
-          </button>
+          />
         ))}
       </div>
     </>

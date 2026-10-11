@@ -46,7 +46,7 @@ export function MapPointControl({ value, onChange, hasRadius, readOnly }: { valu
                   step={10}
                   value={radius}
                   onChange={(e) => onChange({ ...value, radius: Number(e.target.value) || DEFAULT_RADIUS })}
-                  className="w-16 border border-dust bg-parchment px-1 py-0.5 text-ink"
+                  className="w-16 border-2 border-ink bg-paper px-1 py-0.5 text-ink"
                 />
                 m
               </label>

@@ -36,13 +36,14 @@
   flex-direction: column;
   gap: 0.4rem;
   padding: 0.8rem 0.9rem;
-  border: 1px solid color-mix(in srgb, var(--color-dust) 45%, transparent);
-  border-left: 3px solid var(--color-accent);
-  border-radius: var(--radius-sharp);
+  border: var(--border-heavy);
+  background-color: var(--color-paper);
+  box-shadow: var(--shadow-hard-sm);
 }
 
 .memory-card--inactive {
-  border-left-color: var(--color-dust);
+  border-color: var(--color-dust);
+  box-shadow: none;
   opacity: 0.85;
 }
 
@@ -129,9 +130,8 @@
   width: 100%;
   min-height: 2.5rem;
   padding: 0.45rem 0.6rem;
-  border: 1px solid color-mix(in srgb, var(--color-dust) 70%, transparent);
-  border-radius: var(--radius-sharp);
-  background-color: var(--color-parchment);
+  border: var(--border-heavy);
+  background-color: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-body);
   font-size: 16px;

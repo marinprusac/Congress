@@ -75,7 +75,7 @@ function MessageCard({ message, expanded, onToggle }: { message: Message; expand
               {message.attachments.map((a) =>
                 a.url ? (
                   <li key={a.partId} className="min-w-0 max-w-full">
-                    <a href={a.url} className="tap-target block max-w-full truncate border border-dust px-2 py-1 font-mono text-xs text-accent hover:underline">
+                    <a href={a.url} className="btn block max-w-full truncate">
                       {a.filename} · {formatSize(a.size)}
                     </a>
                   </li>
@@ -106,7 +106,7 @@ export function GmailThread({ recordId, binding, runAction }: LiveProps) {
     return (
       <p className="font-mono text-sm text-alert">
         Couldn't load it from Gmail{query.error instanceof Error ? `: ${query.error.message}` : ""}.{" "}
-        <a href={googleConnectHref({ returnTo: `/e/${recordId}` })} className="uppercase text-accent hover:underline">
+        <a href={googleConnectHref({ returnTo: `/e/${recordId}` })} className="btn">
           Reconnect
         </a>
       </p>

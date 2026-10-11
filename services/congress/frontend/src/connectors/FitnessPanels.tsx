@@ -20,7 +20,7 @@ export function HevyPanel({ status }: { status: ConnectorStatus }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 font-mono text-xs text-slate">
         <span>{status.syncing || sync.isPending ? "Syncing —" : syncedAgo(status.lastSyncedAt)}</span>
-        <button type="button" disabled={sync.isPending || !data?.hasKey} onClick={() => sync.mutate()} className="tap-target uppercase tracking-wide text-accent hover:underline disabled:text-dust">
+        <button type="button" disabled={sync.isPending || !data?.hasKey} onClick={() => sync.mutate()} className="btn">
           Sync now
         </button>
       </div>
@@ -39,9 +39,9 @@ export function HevyPanel({ status }: { status: ConnectorStatus }) {
           value={key}
           onChange={(e) => setKey(e.target.value)}
           placeholder={data?.hasKey ? "API key set — paste a new one" : "Hevy API key"}
-          className="min-w-0 flex-1 border border-dust bg-parchment px-2 py-1.5 font-mono text-sm text-ink placeholder:text-dust"
+          className="min-w-0 flex-1 border-2 border-ink bg-paper px-2 py-1.5 font-mono text-sm text-ink placeholder:text-dust"
         />
-        <button type="submit" disabled={!key.trim() || save.isPending} className="tap-target shrink-0 font-mono text-xs uppercase tracking-wide text-accent disabled:text-dust">
+        <button type="submit" disabled={!key.trim() || save.isPending} className="btn shrink-0">
           Save
         </button>
       </form>
@@ -80,7 +80,7 @@ export function HealthPanel({ status }: { status: ConnectorStatus }) {
         type="button"
         disabled={rotate.isPending}
         onClick={() => rotate.mutate()}
-        className="tap-target uppercase tracking-wide text-accent hover:underline disabled:text-dust"
+        className="btn"
       >
         {data?.hasToken ? "Replace token" : "Make a token"}
       </button>

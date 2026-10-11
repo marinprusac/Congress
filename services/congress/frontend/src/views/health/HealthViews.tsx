@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ChamberHeader, ChamberMark, useAppliedTheme, useBackNavigation, ViewCard } from "@congress/congress-ui";
+import { ChamberHeader, useAppliedTheme, useBackNavigation, ViewCard } from "@congress/congress-ui";
 import { fetchHealthLatest, fetchHealthSeries, type HealthMetric, type HealthMetricType } from "@/lib/fitnessApi";
 import { mergeCalories } from "./format";
 
@@ -94,7 +94,7 @@ export function HealthPage() {
   const back = useBackNavigation();
   return (
     <div className="chamber-shell">
-      <ChamberHeader icon={<ChamberMark name="fitness" className="h-6 w-6 text-ink" />} title="Health" titleHref="" onBack={back} />
+      <ChamberHeader title="Health" titleHref="" onBack={back} />
       <main className="chamber-main">
         <Metric type="weight" label="Weight" format={kg} />
         <Metric type="sleepAsleep" label="Sleep" format={hours} />

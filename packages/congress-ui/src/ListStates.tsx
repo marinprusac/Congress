@@ -33,7 +33,7 @@ export function ListSearchInput({
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="list-search-input border border-dust bg-parchment px-3 py-2 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+        className="list-search-input border-2 border-ink bg-paper px-3 py-2 font-mono text-base text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
       />
       {newHref && (
         <StackLink to={newHref} className="list-search-new" aria-label={newLabel} title={newLabel}>
