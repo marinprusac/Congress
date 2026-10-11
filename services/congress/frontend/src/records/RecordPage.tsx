@@ -339,12 +339,12 @@ export function RecordPage() {
           <article>
             {titleField && locked.has(titleField.slug) && (
               // Kept by the source: shown whole, wrapping, rather than as a one-line input.
-              <div className="mb-6 border-b border-dust pb-4">
-                <h1 className="break-words font-display text-3xl text-ink">{String(current[titleField.slug] ?? "") || "Untitled"}</h1>
+              <div className="mb-6 border-b-2 border-ink pb-4">
+                <h1 className="break-words font-display text-3xl font-black tracking-tight text-ink">{String(current[titleField.slug] ?? "") || "Untitled"}</h1>
               </div>
             )}
             {titleField && !locked.has(titleField.slug) && (
-              <div className="mb-6 border-b border-dust pb-4">
+              <div className="mb-6 border-b-2 border-ink pb-4">
                 <input
                   ref={titleRef}
                   readOnly={locked.has(titleField.slug)}
@@ -353,7 +353,7 @@ export function RecordPage() {
                   onChange={(e) => set(titleField.slug, e.target.value)}
                   onBlur={() => draftCreate.attempt()}
                   placeholder={isDraft ? titleField.label : "Untitled"}
-                  className="w-full font-display text-3xl text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+                  className="w-full font-display text-3xl font-black tracking-tight text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
                 />
               </div>
             )}
@@ -440,7 +440,7 @@ export function RecordPage() {
               actions={
                 <ExhibitActionBar>
                   {isDraft ? (
-                    <button onClick={() => nav.pop()} className="tap-target text-slate hover:underline">
+                    <button onClick={() => nav.pop()} className="btn">
                       Cancel
                     </button>
                   ) : (
@@ -450,7 +450,7 @@ export function RecordPage() {
                           key={a.id}
                           disabled={actionMutation.isPending}
                           onClick={() => actionMutation.mutate(a.id)}
-                          className="tap-target text-accent hover:underline disabled:text-dust"
+                          className="btn"
                         >
                           {a.label}
                         </button>
@@ -458,13 +458,13 @@ export function RecordPage() {
                       {def.actions.map((a) => {
                         const f = def.fields.find((x) => x.id === a.field);
                         return (
-                          <button key={a.field} onClick={() => toggle(a.field)} className="tap-target text-accent hover:underline">
+                          <button key={a.field} onClick={() => toggle(a.field)} className="btn">
                             {f && current[f.slug] === true ? a.on : a.off}
                           </button>
                         );
                       })}
                       {!binding?.lockReason && bound?.delete !== "never" && (
-                        <button onClick={() => setConfirmingDelete(true)} className="tap-target text-alert hover:underline">
+                        <button onClick={() => setConfirmingDelete(true)} className="btn btn--danger">
                           Delete
                         </button>
                       )}

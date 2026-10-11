@@ -441,8 +441,9 @@
 
 .search-input {
   width: 100%;
-  border: 1px solid var(--color-dust);
-  background: var(--color-parchment);
+  border: var(--border-heavy);
+  background: var(--color-paper);
+  box-shadow: var(--shadow-hard);
   padding: 0.65rem 0.75rem;
   font-family: var(--font-mono);
   font-size: 1rem;
@@ -451,16 +452,19 @@
 
 .search-input:focus {
   outline: 2px solid var(--color-accent);
-  outline-offset: -1px;
+  outline-offset: 2px;
 }
 
 .search-section-title {
-  margin: 1.5rem 0 0.5rem;
+  margin: 1.75rem 0 0.25rem;
+  padding-bottom: 0.25rem;
+  border-bottom: var(--border-heavy);
   font-family: var(--font-mono);
   font-size: 0.7rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-dust);
+  letter-spacing: 0.1em;
+  color: var(--color-ink);
 }
 
 .search-row {
@@ -497,7 +501,9 @@
 }
 
 .search-row:hover .search-row-name {
-  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 
 /* ---- "+" create sheet ----
@@ -574,24 +580,41 @@
 /* ---- Notifications page ---- */
 
 .notification-list {
-  border-top: 1px solid var(--color-dust);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding-right: 4px;
 }
 
+/* Read items lie flat; unread ones sit on their shadow, under a yellow marker. */
 .notification-item {
   display: flex;
   align-items: flex-start;
   gap: 0.6rem;
-  padding: 0.75rem 0.25rem;
-  border-bottom: 1px solid var(--color-dust);
+  padding: 0.7rem 0.75rem;
+  border: 2px solid var(--color-dust);
   cursor: pointer;
+  transition: translate var(--dur-press) var(--ease-out), box-shadow var(--dur-press) var(--ease-out);
 }
 
 .notification-item--unread {
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  border-color: var(--color-ink);
+  background: var(--color-paper);
+  box-shadow: var(--shadow-hard-sm);
 }
 
-.notification-item:hover {
-  background: color-mix(in srgb, var(--color-ink) 5%, transparent);
+.notification-item--unread::before {
+  content: "";
+  flex: none;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-top: 0.3rem;
+  border: var(--border-heavy);
+  background: var(--color-highlight);
+}
+
+.notification-item--unread .notification-item-title {
+  font-weight: 600;
 }
 
 .notification-item-icon {
@@ -637,7 +660,7 @@
 
 .notification-item-dismiss {
   flex-shrink: 0;
-  color: var(--color-dust);
+  color: var(--color-ink);
 }
 
 .notification-item-dismiss:hover {
@@ -730,9 +753,20 @@
 }
 
 .search-row:active,
-.create-sheet-option:active,
-.notification-item:active {
-  background-color: color-mix(in srgb, var(--color-ink) 6%, transparent);
+.create-sheet-option:active {
+  background-color: var(--color-ink);
+  color: var(--color-parchment);
+}
+
+.search-row:active svg,
+.search-row:active .search-row-meta,
+.create-sheet-option:active svg {
+  color: var(--color-parchment);
+}
+
+.notification-item--unread:active {
+  translate: 3px 3px;
+  box-shadow: none;
 }
 
 .home-pin:active .home-pin-mark {

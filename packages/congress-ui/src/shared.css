@@ -263,11 +263,11 @@ a[download] {
    a tab below the fold. */
 .settings-tabs {
   display: flex;
-  gap: 1.5rem;
+  gap: 0.5rem;
   overflow-x: auto;
-  padding-bottom: 0.75rem;
+  padding: 0 4px 0.75rem 0;
   margin-bottom: 1.5rem;
-  border-bottom: 1px solid var(--color-dust);
+  border-bottom: var(--border-heavy);
 }
 
 .settings-tab {
@@ -279,18 +279,19 @@ a[download] {
   font-size: 0.8em;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--color-dust);
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid transparent;
+  color: var(--color-ink);
+  padding: 0.35rem 0.6rem;
+  border: 2px solid transparent;
 }
 
 .settings-tab:hover {
-  color: var(--color-ink);
+  border-color: var(--color-ink);
 }
 
 .settings-tab.active {
-  color: var(--color-accent);
-  border-bottom-color: var(--color-accent);
+  background: var(--color-ink);
+  color: var(--color-parchment);
+  border-color: var(--color-ink);
 }
 
 .settings-tab-icon {
@@ -618,9 +619,9 @@ a[download] {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 1.25rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--color-dust);
+  gap: 0.9rem;
+  padding: 1rem 4px 0 0;
+  border-top: var(--border-heavy);
   font-family: var(--font-mono);
   font-size: 0.75rem;
   text-transform: uppercase;
