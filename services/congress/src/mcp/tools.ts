@@ -137,7 +137,7 @@ export function registerTools(server: McpServer) {
     {
       title: "Update Event Settings",
       description:
-        "Update an event type's settings - its history retention and whether to push a templated notification. Every event is always recorded to history. There is no create/delete: every known event type already has a row.",
+        "Update an event type's settings - its history retention and whether to push a templated notification. Every event is always recorded to history. Events of exhibit types are the exception for notifications: those are set in the type's definition (builder mode, set_event_notifications) and ignored here. There is no create/delete: every known event type already has a row.",
       inputSchema: {
         eventType: z.string().min(1),
         historyRetentionMs: z.number().int().positive().nullable().optional(),

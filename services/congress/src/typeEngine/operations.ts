@@ -52,6 +52,7 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       actions: [],
       feedRules: [],
       timeTriggers: [],
+      eventNotifications: [],
       eventPrefix: op.slug,
       hidden: false,
       autoCreate: "never",
@@ -209,6 +210,10 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       }));
       return d;
     }
+    case "set_event_notifications": {
+      d.eventNotifications = op.notifications;
+      return d;
+    }
     case "set_feed_rules": {
       d.feedRules = op.rules.map((rule) => {
         const w = rule.when;
@@ -316,6 +321,11 @@ export function validateDefinition(def: TypeDefinition): string[] {
     if (seen.has(e)) errors.push(`event "${e}" is used twice`);
     seen.add(e);
   }
+  const known = new Set(seen);
+  for (const n of def.eventNotifications) {
+    if (!known.has(n.event)) errors.push(`notification for unknown event "${n.event}" (this type's events: ${[...known].join(", ")})`);
+  }
+  if (new Set(def.eventNotifications.map((n) => n.event)).size !== def.eventNotifications.length) errors.push("an event is listed twice in notifications");
   return errors;
 }
 

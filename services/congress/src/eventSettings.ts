@@ -3,8 +3,47 @@ import type { EventSettingsSummary, UpdateEventSettingsRequest } from "@congress
 import { db } from "./db/client.js";
 import { eventSettings } from "./db/schema.js";
 import { publishEvent } from "./events.js";
+import { listTypes } from "./typeEngine/store.js";
+
+export interface NotifyConfig {
+  managedByType: string | null;
+  notify: boolean;
+  titleTemplate: string | null;
+  bodyTemplate: string | null;
+  urlTemplate: string | null;
+  dedupeKeyTemplate: string | null;
+}
+
+// An exhibit type's events are configured in its definition (eventNotifications);
+// every other event type keeps its own columns here.
+export function resolveNotify(row: typeof eventSettings.$inferSelect): NotifyConfig {
+  if (row.chamber === "types") {
+    for (const t of listTypes({ includeHidden: true })) {
+      const prefix = `${t.definition.eventPrefix}.`;
+      if (!row.eventType.startsWith(prefix)) continue;
+      const entry = t.definition.eventNotifications.find((n) => n.event === row.eventType.slice(prefix.length));
+      return {
+        managedByType: t.definition.slug,
+        notify: !!entry,
+        titleTemplate: entry?.title ?? null,
+        bodyTemplate: entry?.body ?? "{{payload.title}}",
+        urlTemplate: "{{payload.url}}",
+        dedupeKeyTemplate: `${row.eventType}-{{payload.recordId}}`,
+      };
+    }
+  }
+  return {
+    managedByType: null,
+    notify: row.notify,
+    titleTemplate: row.notifyTitleTemplate,
+    bodyTemplate: row.notifyBodyTemplate,
+    urlTemplate: row.notifyUrlTemplate,
+    dedupeKeyTemplate: row.notifyDedupeKeyTemplate,
+  };
+}
 
 function toSummary(row: typeof eventSettings.$inferSelect): EventSettingsSummary {
+  const n = resolveNotify(row);
   return {
     id: row.id,
     eventType: row.eventType,
@@ -13,11 +52,12 @@ function toSummary(row: typeof eventSettings.$inferSelect): EventSettingsSummary
     description: row.description,
     payloadFields: row.payloadFieldsJson ? JSON.parse(row.payloadFieldsJson) : null,
     historyRetentionMs: row.historyRetentionMs,
-    notify: row.notify,
-    notifyTitleTemplate: row.notifyTitleTemplate,
-    notifyBodyTemplate: row.notifyBodyTemplate,
-    notifyUrlTemplate: row.notifyUrlTemplate,
-    notifyDedupeKeyTemplate: row.notifyDedupeKeyTemplate,
+    managedByType: n.managedByType,
+    notify: n.notify,
+    notifyTitleTemplate: n.titleTemplate,
+    notifyBodyTemplate: n.bodyTemplate,
+    notifyUrlTemplate: n.urlTemplate,
+    notifyDedupeKeyTemplate: n.dedupeKeyTemplate,
     lastFiredAt: row.lastFiredAt ? row.lastFiredAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -49,6 +89,12 @@ export async function getEventSettingsByType(eventType: string): Promise<EventSe
 export async function updateEventSettings(eventType: string, input: UpdateEventSettingsRequest): Promise<EventSettingsSummary | null> {
   const existing = getEventSettingsRowByType(eventType);
   if (!existing) return null;
+
+  // A type's events notify per its definition, never from these columns.
+  const managed = resolveNotify(existing).managedByType !== null;
+  if (managed) {
+    input = input.historyRetentionMs !== undefined ? { historyRetentionMs: input.historyRetentionMs } : {};
+  }
 
   const next = {
     historyRetentionMs: input.historyRetentionMs !== undefined ? input.historyRetentionMs : existing.historyRetentionMs,

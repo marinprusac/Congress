@@ -85,6 +85,10 @@ export function diffDefinitions(before: TypeDefinition | null, after: TypeDefini
     if (!after.timeTriggers.length) add("triggers", "Remove all time triggers");
     for (const t of after.timeTriggers) add("triggers", `Time trigger: ${describeTrigger(after, t)}`);
   }
+  if (changed(before?.eventNotifications, after.eventNotifications)) {
+    if (!after.eventNotifications.length) add("notifications", "No event notifies");
+    for (const n of after.eventNotifications) add("notifications", `Notify on ${after.eventPrefix}.${n.event}${n.title ? `: "${n.title}"` : ""}`);
+  }
   const prevBindings = new Map((before?.bindings ?? []).map((b) => [b.id, b]));
   for (const b of after.bindings) {
     const p = prevBindings.get(b.id);

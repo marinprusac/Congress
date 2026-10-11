@@ -2,7 +2,7 @@ import type { EventDelivery } from "@congress/shared-types";
 // interpolate is shared with chamber-automation (and Congress's own relay
 // filter) rather than re-declared here - see chamber-kit's eventMatching.ts.
 import { interpolate } from "./kit/interpolate.js";
-import { getEventSettingsRowByType, markEventSettingsFired } from "./eventSettings.js";
+import { getEventSettingsRowByType, markEventSettingsFired, resolveNotify } from "./eventSettings.js";
 import { pushNotification } from "./notifications.js";
 import { recordHistory } from "./eventHistory.js";
 
@@ -24,14 +24,15 @@ export async function handleReceivedEvent(event: EventDelivery): Promise<void> {
     retentionMs: row.historyRetentionMs,
   });
 
-  if (row.notify) {
+  const n = resolveNotify(row);
+  if (n.notify) {
     // The dedupe key template is an optional field the owner rarely fills
     // in - default to a key scoped to this event type so repeat firings
     // still update the one notification in place instead of piling up.
-    const dedupeKey = row.notifyDedupeKeyTemplate ? interpolate(row.notifyDedupeKeyTemplate, event.payload) : `type-${row.eventType}`;
-    const title = row.notifyTitleTemplate ? interpolate(row.notifyTitleTemplate, event.payload) : row.label;
-    const body = row.notifyBodyTemplate ? interpolate(row.notifyBodyTemplate, event.payload) : (row.description ?? undefined);
-    const chamberUrl = row.notifyUrlTemplate ? interpolate(row.notifyUrlTemplate, event.payload) : undefined;
+    const dedupeKey = n.dedupeKeyTemplate ? interpolate(n.dedupeKeyTemplate, event.payload) : `type-${row.eventType}`;
+    const title = n.titleTemplate ? interpolate(n.titleTemplate, event.payload) : row.label;
+    const body = n.bodyTemplate ? interpolate(n.bodyTemplate, event.payload) : (row.description ?? undefined);
+    const chamberUrl = n.urlTemplate ? interpolate(n.urlTemplate, event.payload) : undefined;
     // Preserve the original emitting chamber's identity (e.g. "tasks") so
     // the notification bell attributes/icons it correctly - this Chamber
     // is just the one deciding whether/what to push, not the source.

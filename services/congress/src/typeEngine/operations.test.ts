@@ -121,6 +121,15 @@ describe("time triggers, toggle events and new kinds", () => {
     triggers: [{ field, and: [{ field: "done", value: false }], steps: [{ event, label: "Soon", offsetMinutes: -60 }] }],
   });
 
+  it("accepts notifications for the type's own events and rejects unknown ones", () => {
+    const ok = build([...withDue, ladder(), { op: "set_event_notifications", notifications: [{ event: "created" }, { event: "due_soon", title: "{{payload.title}} is due" }] }]);
+    expect(ok.errors).toEqual([]);
+    expect(ok.def.eventNotifications).toHaveLength(2);
+
+    const bad = build([...withDue, { op: "set_event_notifications", notifications: [{ event: "nope" }] }]);
+    expect(bad.errors.join()).toContain('unknown event "nope"');
+  });
+
   it("resolves ladder and stamp fields to ids", () => {
     const { def, errors } = build([
       ...withDue,

@@ -12,9 +12,11 @@ import {
 } from "../exhibits.js";
 import { getFeed } from "../feed.js";
 import { syncEventCatalog } from "../eventCatalogSync.js";
-import { getEventSettingsByType } from "../eventSettings.js";
+import { getEventSettingsByType, updateEventSettings } from "../eventSettings.js";
+import { listNotifications } from "../notifications.js";
+import { handleReceivedEvent } from "../eventReceive.js";
 import { runExhibitsMigrations } from "./db/client.js";
-import { publish } from "./store.js";
+import { getTypeBySlug, publish } from "./store.js";
 import { createRecord, deleteRecord } from "./records.js";
 import { typeEngineSource } from "./source.js";
 
@@ -94,5 +96,29 @@ describe("the e namespace", () => {
     syncEventCatalog();
     expect(await getEventSettingsByType("book.created")).toMatchObject({ chamber: "types", notify: false });
     expect(await getEventSettingsByType("secret.created")).toBeFalsy();
+  });
+
+  it("notifies per the type's own definition, not the settings columns", async () => {
+    syncEventCatalog();
+    const fire = () =>
+      handleReceivedEvent({
+        chamber: "types",
+        type: "book.created",
+        payload: { recordId: "r1", title: "Dune", url: "/e/r1" },
+        occurredAt: new Date().toISOString(),
+      });
+    await fire();
+    expect(listNotifications().notifications).toHaveLength(0);
+
+    // The settings request can't switch it on for a type event.
+    await updateEventSettings("book.created", { notify: true });
+    await fire();
+    expect(listNotifications().notifications).toHaveLength(0);
+    expect(await getEventSettingsByType("book.created")).toMatchObject({ managedByType: "book", notify: false });
+
+    publish({ actor: "test", ops: [{ op: "set_event_notifications", notifications: [{ event: "created" }] }], typeId: getTypeBySlug("book")!.id });
+    await fire();
+    expect(await getEventSettingsByType("book.created")).toMatchObject({ notify: true });
+    expect(listNotifications().notifications.map((n) => [n.title, n.body])).toEqual([["Book created", "Dune"]]);
   });
 });

@@ -109,6 +109,12 @@ export function EventSettingsDetailPage({ eventType, onBack }: { eventType: stri
           />
         </div>
 
+        {row.managedByType ? (
+          <p className="font-mono text-sm text-dust">
+            {row.notify ? "Pushes a notification." : "Doesn't push a notification."} Set by the {row.managedByType} type — ask the AI to change it
+            in builder mode.
+          </p>
+        ) : (
         <div>
           <label className="flex items-center gap-2 font-mono text-sm text-ink">
             <input type="checkbox" checked={draft.notify ?? false} onChange={(e) => set("notify", e.target.checked)} />
@@ -196,6 +202,7 @@ export function EventSettingsDetailPage({ eventType, onBack }: { eventType: stri
             </div>
           )}
         </div>
+        )}
       </div>
 
       <div className="mt-10">

@@ -101,6 +101,17 @@ export const timeTriggerSchema = z.object({
 });
 export type TimeTrigger = z.infer<typeof timeTriggerSchema>;
 
+// An event of this type that pushes a notification to the owner. `event` is
+// the name under the type's eventPrefix (created, a toggle's event, a
+// trigger step). Title/body are {{payload.x}} templates over recordId, type,
+// title and url; unset, the title is the event's label and the body the record's title.
+export const eventNotificationSchema = z.object({
+  event: slugSchema,
+  title: z.string().max(120).optional(),
+  body: z.string().max(300).optional(),
+});
+export type EventNotification = z.infer<typeof eventNotificationSchema>;
+
 // A binding wires a connector's source records into this type. `sync` fields
 // are pulled and pushed back; `pull` fields are only pulled (read-only when bound).
 const connectorName = z.string().regex(/^[a-z][a-z0-9-]{0,40}$/);
@@ -154,6 +165,8 @@ export const typeDefinitionSchema = z.object({
   actions: z.array(typeActionSchema),
   feedRules: z.array(feedRuleSchema),
   timeTriggers: z.array(timeTriggerSchema).default([]),
+  // Which of this type's events notify the owner; every event is recorded regardless.
+  eventNotifications: z.array(eventNotificationSchema).default([]),
   eventPrefix: slugSchema,
   hidden: z.boolean(),
   autoCreate: z.enum(AUTO_CREATE).default("never"),
@@ -202,6 +215,7 @@ export const operationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("set_actions"), actions: z.array(typeActionSchema).max(5) }),
   z.object({ op: z.literal("set_feed_rules"), rules: z.array(feedRuleSchema).max(10) }),
   z.object({ op: z.literal("set_time_triggers"), triggers: z.array(timeTriggerSchema).max(3) }),
+  z.object({ op: z.literal("set_event_notifications"), notifications: z.array(eventNotificationSchema).max(20) }),
   // Adds or replaces the binding for this connector + source kind.
   z.object({ op: z.literal("set_binding"), binding: bindingSchema.omit({ id: true }) }),
   z.object({ op: z.literal("remove_binding"), connector: connectorName, kind: sourceSlug }),
@@ -253,7 +267,7 @@ export type RecordDto = z.infer<typeof recordDtoSchema>;
 
 // One human-readable line of a definition diff (Settings → Types, publish asks).
 export const definitionChangeSchema = z.object({
-  area: z.enum(["type", "fields", "layout", "actions", "feed", "triggers", "bindings"]),
+  area: z.enum(["type", "fields", "layout", "actions", "feed", "triggers", "notifications", "bindings"]),
   text: z.string(),
 });
 export type DefinitionChange = z.infer<typeof definitionChangeSchema>;
