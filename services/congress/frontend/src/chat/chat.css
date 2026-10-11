@@ -85,14 +85,13 @@ html:has(.chat-page) body {
   align-items: center;
   gap: 0.5rem;
   min-height: 3.5rem;
-  padding: 0.5rem 0.75rem 0.5rem 0.5rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-dust) 40%, transparent);
+  padding: 0.5rem 0.75rem 0.5rem 0.75rem;
+  border-bottom: var(--rule-heavy);
   flex: 0 0 auto;
 }
 
 .chat-list-header {
   padding: 0.75rem 1rem 0.75rem 1rem;
-  border-bottom: none;
 }
 
 .chat-header-text {
@@ -105,20 +104,23 @@ html:has(.chat-page) body {
   font-size: 0.65rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--color-dust);
+  color: var(--color-slate);
 }
 
 .chat-title {
   font-family: var(--font-display);
-  font-size: 1.1rem;
-  line-height: 1.25;
+  font-size: 1.3rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .chat-title--large {
-  font-size: 1.75rem;
+  font-size: 2.1rem;
+  letter-spacing: -0.035em;
 }
 
 .chat-subtitle {
@@ -135,9 +137,20 @@ html:has(.chat-page) body {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: var(--border-heavy);
+  background: var(--color-paper);
   color: var(--color-ink);
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.chat-back:active,
+.chat-icon-button:active,
+.chat-new:active,
+.chat-send:active:not(:disabled) {
+  translate: 3px 3px;
+  box-shadow: none;
 }
 
 .chat-back svg,
@@ -150,15 +163,17 @@ html:has(.chat-page) body {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  height: 2.5rem;
-  padding: 0 0.85rem;
-  background-color: var(--color-accent);
-  color: var(--color-parchment);
+  height: 2.25rem;
+  padding: 0 0.8rem;
+  border: var(--border-heavy);
+  background-color: var(--color-highlight);
+  color: #111110;
+  box-shadow: var(--shadow-hard-sm);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  border-radius: var(--radius-sharp);
 }
 
 .chat-memory-link {
@@ -445,8 +460,10 @@ html:has(.chat-page) body {
 .chat-user-bubble {
   max-width: min(85%, 36rem);
   padding: 0.5rem 0.8rem;
-  border-radius: var(--radius-sharp);
-  background-color: color-mix(in srgb, var(--color-ink) 7%, var(--color-parchment));
+  border: var(--border-heavy);
+  background-color: var(--color-highlight);
+  color: #111110;
+  box-shadow: var(--shadow-hard-sm);
   overflow-wrap: anywhere;
 }
 
@@ -874,7 +891,7 @@ html:has(.chat-page) body {
 }
 
 .chat-thread > .chat-composer {
-  border-top: 1px solid color-mix(in srgb, var(--color-dust) 30%, transparent);
+  border-top: var(--border-heavy);
   max-width: none;
 }
 
@@ -898,13 +915,14 @@ html:has(.chat-page) body {
   max-height: 9.5rem;
   overflow-y: auto;
   padding: 0.45rem 0.7rem;
-  border: 1px solid color-mix(in srgb, var(--color-dust) 70%, transparent);
-  border-radius: var(--radius-sharp);
-  background-color: var(--color-parchment);
+  border: var(--border-heavy);
+  background-color: var(--color-paper);
+  box-shadow: var(--shadow-hard-sm);
 }
 
 .chat-composer-editor:focus-within {
-  border-color: var(--color-accent);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 /* 16px keeps iOS from zooming in on focus. */
@@ -931,9 +949,10 @@ html:has(.chat-page) body {
   justify-content: center;
   width: 2.75rem;
   height: 2.75rem;
-  border-radius: var(--radius-sharp);
-  background-color: var(--color-accent);
-  color: var(--color-parchment);
+  border: var(--border-heavy);
+  background-color: var(--color-highlight);
+  color: #111110;
+  box-shadow: var(--shadow-hard-sm);
   transition: opacity 0.15s ease;
 }
 
@@ -948,6 +967,7 @@ html:has(.chat-page) body {
 
 .chat-send--stop {
   background-color: var(--color-ink);
+  color: var(--color-parchment);
 }
 
 .chat-jump {
