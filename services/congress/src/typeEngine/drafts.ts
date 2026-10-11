@@ -16,6 +16,7 @@ import {
   type PublishResult,
 } from "./store.js";
 import { ulid } from "./ulid.js";
+import { deleteType, previewDeleteType } from "./deleteType.js";
 
 // Builder mode's drafts: ops (or a rollback) collected against a base version,
 // previewed, and published only as a whole.
@@ -132,6 +133,7 @@ export function setDraftOps(id: string, ops: unknown[], mode: "append" | "replac
     return res.data;
   });
   const next = mode === "append" ? [...(JSON.parse(r.opsJson) as Operation[]), ...parsed] : parsed;
+  if (next.some((o) => o.op === "delete_type") && next.length > 1) throw new DraftError("delete_type must be the draft's only op");
   if (next.length > 100) throw new DraftError("a draft holds at most 100 ops");
   exhibitsDb.update(typeDrafts).set({ opsJson: JSON.stringify(next), problemsJson: null, updatedAt: new Date() }).where(eq(typeDrafts.id, id)).run();
   return getDraft(id);
@@ -145,7 +147,11 @@ export function discardDraft(id: string): Draft {
 
 export function previewDraft(id: string): PublishPreview & { draft: Draft } {
   const draft = getDraft(id);
-  const base = draft.rollbackTo !== null ? previewRollback(draft.typeId!, draft.rollbackTo) : previewPublish(draft.typeId ?? undefined, draft.ops);
+  const deleting = draft.ops.some((o) => o.op === "delete_type");
+  if (deleting && !draft.typeId) throw new DraftError("delete_type needs an existing type");
+  const base = deleting
+    ? previewDeleteType(draft.typeId!)
+    : draft.rollbackTo !== null ? previewRollback(draft.typeId!, draft.rollbackTo) : previewPublish(draft.typeId ?? undefined, draft.ops);
   const errors = [...base.errors];
   if (draft.stale) errors.unshift("the type changed since this draft started; start a new draft");
   if (draft.rollbackTo === null && !draft.ops.length) errors.push("the draft has no ops");
@@ -166,8 +172,11 @@ export function publishDraft(id: string, actor: string, expectedHash?: string): 
 
   let result: PublishResult;
   try {
-    result =
-      draft.rollbackTo !== null
+    const deleting = draft.ops.some((o) => o.op === "delete_type");
+    if (deleting && !draft.typeId) throw new DraftError("delete_type needs an existing type");
+    result = deleting
+      ? deleteType(draft.typeId!, actor)
+      : draft.rollbackTo !== null
         ? rollback(draft.typeId!, draft.rollbackTo, actor)
         : publish({ typeId: draft.typeId ?? undefined, ops: draft.ops, actor });
   } catch (err) {

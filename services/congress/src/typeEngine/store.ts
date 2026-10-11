@@ -62,6 +62,12 @@ function ensureLoaded(): void {
   loaded = true;
 }
 
+// A deleted type leaves the cache (its rows are already gone).
+export function forgetType(typeId: string): void {
+  cache.delete(typeId);
+  for (const fn of listeners) fn();
+}
+
 export function reloadTypes(): void {
   loaded = false;
   ensureLoaded();

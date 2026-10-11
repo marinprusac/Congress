@@ -1,8 +1,8 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import type { FieldDefinition, RecordDto, RecordValue, RelatedGroup, TypeAction, TypeDefinition } from "@congress/shared-types";
 import { extractOutgoingExhibitRefs } from "../kit/wikilinks.js";
 import { exhibitsDb, exhibitsSqlite } from "./db/client.js";
-import { records, recordRefs } from "./db/schema.js";
+import { records, recordRefs, bindingOutbox, bindingShadows, legacyAliases } from "./db/schema.js";
 import { getType, getTypeBySlug, listTypes, type StoredType } from "./store.js";
 import { activeFields } from "./operations.js";
 import { isJoinField, quoteIdent } from "./ddl.js";
@@ -72,7 +72,7 @@ export function onRecordWrite(fn: RecordWriteListener): () => void {
   return () => writeListeners.delete(fn);
 }
 
-function notifyWrite(t: StoredType, id: string, deleted: RecordDto | undefined, info: WriteInfo): void {
+export function notifyWrite(t: StoredType, id: string, deleted: RecordDto | undefined, info: WriteInfo): void {
   for (const fn of writeListeners) {
     try {
       fn(t, id, deleted, info);
@@ -482,6 +482,28 @@ export function deleteRecord(id: string, opts: { actor?: string; fromSource?: bo
     emit(t, "deleted", dto, opts.actor);
     notifyWrite(t, id, dto, { op: "delete", changed: [], actor: opts.actor, fromSource: opts.fromSource });
   }
+}
+
+// Type deletion: removes a type's records and everything hanging off them, with
+// no events and no pushes to sources. Run inside the caller's transaction, before
+// the type's tables are dropped. Returns what to re-sync afterwards.
+export function purgeRecords(t: StoredType): { ids: string[]; unlinked: { t: StoredType; id: string }[]; fileIds: string[] } {
+  const def = t.definition;
+  const ids = idsOfType(t.id);
+  const gone = new Set(ids);
+  const unlinked = new Map<string, { t: StoredType; id: string }>();
+  const fileIds: string[] = [];
+  for (const id of ids) {
+    const row = readRow(def, id);
+    if (row) fileIds.push(...fileIdsIn(def, row));
+    for (const u of unlinkEverywhere(id, def.slug)) if (!gone.has(u.id)) unlinked.set(u.id, u);
+    exhibitsDb.delete(recordRefs).where(or(eq(recordRefs.recordId, id), eq(recordRefs.targetExhibitId, id))).run();
+    exhibitsDb.delete(bindingShadows).where(eq(bindingShadows.recordId, id)).run();
+    exhibitsDb.delete(bindingOutbox).where(eq(bindingOutbox.recordId, id)).run();
+    exhibitsDb.delete(legacyAliases).where(eq(legacyAliases.recordId, id)).run();
+    deleteKeys(id);
+  }
+  return { ids, unlinked: [...unlinked.values()], fileIds };
 }
 
 // Bindings: the record mirroring a source record, and (re)linking one.

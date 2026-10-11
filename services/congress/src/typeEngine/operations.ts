@@ -210,6 +210,8 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       }));
       return d;
     }
+    case "delete_type":
+      throw new OperationError("delete_type is applied by publishing a draft that holds only it");
     case "set_event_notifications": {
       d.eventNotifications = op.notifications;
       return d;

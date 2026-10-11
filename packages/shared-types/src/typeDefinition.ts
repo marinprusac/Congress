@@ -215,6 +215,8 @@ export const operationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("set_actions"), actions: z.array(typeActionSchema).max(5) }),
   z.object({ op: z.literal("set_feed_rules"), rules: z.array(feedRuleSchema).max(10) }),
   z.object({ op: z.literal("set_time_triggers"), triggers: z.array(timeTriggerSchema).max(3) }),
+  // Deletes the whole type and its records; must be a draft's only op.
+  z.object({ op: z.literal("delete_type") }),
   z.object({ op: z.literal("set_event_notifications"), notifications: z.array(eventNotificationSchema).max(20) }),
   // Adds or replaces the binding for this connector + source kind.
   z.object({ op: z.literal("set_binding"), binding: bindingSchema.omit({ id: true }) }),
