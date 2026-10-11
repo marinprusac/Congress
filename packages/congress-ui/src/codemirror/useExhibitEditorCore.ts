@@ -15,7 +15,8 @@ import type { ExhibitEditorRuntimeRef } from "./runtime.js";
 import { exhibitEditorTheme, markdownHighlightStyle } from "./theme.js";
 import { createLivePreviewExtension } from "./livePreviewExtension.js";
 import { createLinkClickExtension } from "./linkClickExtension.js";
-import { Autolink } from "@lezer/markdown";
+import { Autolink, Table } from "@lezer/markdown";
+import { createTableExtension } from "./tableExtension.js";
 import { createSingleLineExtension } from "./singleLineExtension.js";
 
 export interface UseExhibitEditorCoreOptions {
@@ -238,12 +239,13 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
 
       const extensions: Extension[] = [
         history(),
-        // Autolink makes a bare https://... a link node (green, ctrl+click-able)
-        // without pulling in the rest of GFM (tables, task lists, strikethrough).
-        markdown({ extensions: [Autolink] }),
+        // Autolink makes a bare https://... a link node (ctrl+click-able); Table
+        // parses GFM tables so they can render as real tables (tableExtension).
+        markdown({ extensions: [Autolink, Table] }),
         markdownHighlightStyle,
         createLivePreviewExtension(mode),
         createLinkClickExtension(),
+        ...(mode === "multiline" ? [createTableExtension(runtimeRef.current)] : []),
         exhibitEditorTheme,
         EditorView.lineWrapping,
         ...createExhibitChipExtensions(runtimeRef.current),

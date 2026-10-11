@@ -22,6 +22,19 @@ export const exhibitEditorTheme = EditorView.theme({
   ".cm-line": { padding: 0 },
   "&.cm-focused": { outline: "none" },
   ".cm-placeholder": { color: "var(--color-dust)" },
+  ".cm-md-table": { overflowX: "auto", maxWidth: "100%", margin: "0.5em 0", cursor: "text" },
+  ".cm-md-table table": { borderCollapse: "collapse", fontSize: "0.95em" },
+  ".cm-md-table th, .cm-md-table td": {
+    border: "1px solid color-mix(in srgb, var(--color-dust) 45%, transparent)",
+    padding: "0.3em 0.6em",
+    textAlign: "left",
+    verticalAlign: "top",
+  },
+  ".cm-md-table th": {
+    fontWeight: "700",
+    backgroundColor: "color-mix(in srgb, var(--color-dust) 15%, transparent)",
+  },
+  ".cm-md-table code": { fontFamily: "var(--font-mono)" },
   ".cm-selectionBackground": {
     backgroundColor: "color-mix(in srgb, var(--color-accent) 20%, transparent) !important",
   },
