@@ -33,7 +33,7 @@ export function LiveValues({ binding }: { binding: Binding }) {
   return (
     <section className="mb-6 min-w-0 space-y-2 border-t border-dust pt-4">
       <h2 className="flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-dust">
-        {color && <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: color }} />}
+        {color && <span aria-hidden className="inline-block h-2.5 w-2.5" style={{ background: color }} />}
         From {binding.label}
       </h2>
       {rest.map(([key, v]) => (

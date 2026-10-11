@@ -51,7 +51,7 @@ export function TodayMapWidget() {
       emptyLabel="— Nowhere recorded yet today —"
     >
       {markers.length > 0 && (
-        <div className="h-full w-full overflow-hidden rounded" data-nav-swipe-ignore>
+        <div className="h-full w-full overflow-hidden" data-nav-swipe-ignore>
           <MapContainer
             center={[markers[0]!.latitude!, markers[0]!.longitude!]}
             zoom={12}

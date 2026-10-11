@@ -25,12 +25,25 @@
 @source "./";
 
 @theme {
-  --color-parchment: #f7f6f3;
+  /* Newsprint ground; --color-paper is the lighter stock cards, sheets and
+     inputs sit on. */
+  --color-parchment: #ebe5d3;
+  --color-paper: #fbf8ef;
   --color-ink: #1c1c1a;
   --color-slate: #3a3936;
   --color-dust: #8b8880;
   --color-accent: #2b4a3e;
   --color-alert: #a6231f;
+  --color-highlight: #ffe14a;
+
+  /* Source palette: a type's colour is one of these keys (see shared-types
+     sourceColors.ts). --src-on-* is the text colour that reads on each. */
+  --color-src-cobalt: #2b44ff;
+  --color-src-tomato: #ff5a36;
+  --color-src-mint: #3fd0a0;
+  --color-src-mustard: #ffc61a;
+  --color-src-lilac: #b9a6ff;
+  --color-src-ink: #1c1c1a;
 
   --font-display: "Fraunces", serif;
   --font-body: "IBM Plex Sans Condensed", sans-serif;
@@ -49,16 +62,31 @@
    below, so overriding them here is sufficient to retheme the whole app -
    no per-component dark rules needed. */
 :root[data-theme="dark"] {
-  --color-parchment: #1a1917;
+  --color-parchment: #161614;
+  --color-paper: #211f1c;
   --color-ink: #ece8e0;
   --color-slate: #a8a49b;
   --color-dust: #57534a;
   --color-accent: #7fbf9e;
   --color-alert: #e08a80;
+  --color-src-cobalt: #6f82ff;
+  --color-src-ink: #ece8e0;
 }
 
 html[data-theme="dark"] {
   color-scheme: dark;
+}
+
+/* Hard-shadow language: solid offset, never blurred. Plain custom
+   properties (not @theme) so they are always emitted. */
+:root {
+  --shadow-hard: 4px 4px 0 var(--color-ink);
+  --shadow-hard-sm: 3px 3px 0 var(--color-ink);
+  --shadow-hard-up: 4px -4px 0 var(--color-ink);
+  --border-heavy: 2px solid var(--color-ink);
+  --rule-heavy: 5px solid var(--color-ink);
+  --on-src-cobalt: #ffffff;
+  --on-src: #111110;
 }
 
 @layer base {

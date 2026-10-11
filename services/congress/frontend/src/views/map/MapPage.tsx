@@ -283,7 +283,7 @@ function DayMap() {
       )}
 
       <div
-        className="mb-4 h-80 overflow-hidden rounded border border-dust"
+        className="mb-4 h-80 overflow-hidden border border-dust"
         data-nav-swipe-ignore
       >
         <MapContainer

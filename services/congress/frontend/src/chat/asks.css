@@ -155,7 +155,7 @@
   min-height: 2.5rem;
   padding: 0.4rem 0.85rem;
   border: 1px solid color-mix(in srgb, var(--color-dust) 70%, transparent);
-  border-radius: 999px;
+  border-radius: 0;
   background-color: var(--color-parchment);
   font-size: 0.95rem;
 }
@@ -278,7 +278,7 @@
   flex: 0 0 auto;
   width: 1.3rem;
   height: 1.3rem;
-  border-radius: 999px;
+  border-radius: 0;
   background-color: color-mix(in srgb, var(--color-ink) 9%, transparent);
   font-family: var(--font-mono);
   font-size: 0.7rem;

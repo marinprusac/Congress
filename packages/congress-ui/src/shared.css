@@ -631,9 +631,9 @@ a[download] {
   position: fixed;
   z-index: 50;
   overflow-y: auto;
-  border: 1px solid var(--color-dust);
-  background-color: var(--color-parchment);
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 20%, transparent);
+  border: var(--border-heavy);
+  background-color: var(--color-paper);
+  box-shadow: var(--shadow-hard);
 }
 
 .exhibit-picker-dropdown[hidden] {
@@ -756,9 +756,9 @@ a[download] {
   flex-direction: column;
   max-height: 40vh;
   overflow-y: auto;
-  border: 1px solid var(--color-dust);
-  background-color: var(--color-parchment);
-  box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
+  border: var(--border-heavy);
+  background-color: var(--color-paper);
+  box-shadow: var(--shadow-hard-up);
 }
 
 @media (min-width: 641px) {
@@ -771,7 +771,7 @@ a[download] {
     width: max-content;
     min-width: 12rem;
     max-height: 20rem;
-    box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 15%, transparent);
+    box-shadow: var(--shadow-hard);
   }
 }
 
@@ -818,9 +818,9 @@ a[download] {
 .exhibit-ref-add-dropdown {
   max-height: 40vh;
   overflow-y: auto;
-  border: 1px solid var(--color-dust);
-  background-color: var(--color-parchment);
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-ink) 15%, transparent);
+  border: var(--border-heavy);
+  background-color: var(--color-paper);
+  box-shadow: var(--shadow-hard);
 }
 
 @media (min-width: 641px) {
@@ -927,10 +927,10 @@ a[download] {
   left: 0;
   right: 0;
   bottom: var(--mobile-nav-height, 0px);
-  border: 1px solid var(--color-dust);
-  background: var(--color-parchment);
+  border: var(--border-heavy);
+  background: var(--color-paper);
   padding: 1.25rem;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-hard-up);
   font-size: 1rem;
 }
 
@@ -942,7 +942,7 @@ a[download] {
     top: 50%;
     transform: translate(-50%, -50%);
     width: min(24rem, calc(100vw - 2rem));
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-hard);
   }
 }
 
@@ -984,9 +984,15 @@ a[download] {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 0.5em 1em;
-  border: 1px solid var(--color-alert);
+  border: 2px solid var(--color-alert);
   color: var(--color-alert);
   background: transparent;
+  box-shadow: 3px 3px 0 var(--color-alert);
+}
+
+.confirm-sheet-confirm:active {
+  transform: translate(3px, 3px);
+  box-shadow: none;
 }
 
 .confirm-sheet-confirm:hover {
@@ -1025,15 +1031,16 @@ a[download] {
   font-size: 0.8em;
   max-width: 24rem;
   padding: 0.6em 1em;
-  border: 1px solid var(--color-ink);
-  background: var(--color-ink);
-  color: var(--color-parchment);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  border: var(--border-heavy);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-hard);
 }
 
 .toast-error {
   border-color: var(--color-alert);
-  background: var(--color-alert);
+  color: var(--color-alert);
+  box-shadow: 4px 4px 0 var(--color-alert);
 }
 
 
@@ -1061,7 +1068,7 @@ a[download] {
 .list-search-row .list-search-input {
   flex: 1;
   min-width: 0;
-  box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
+  box-shadow: var(--shadow-hard-up);
 }
 
 /* The "+" button docked beside the search input - replaces the old "New"
@@ -1091,7 +1098,7 @@ a[download] {
    the "lifted above content" shadow - a static inline "+" elsewhere in a
    page's own flow doesn't. */
 .list-search-row .list-search-new {
-  box-shadow: 0 -2px 12px color-mix(in srgb, var(--color-ink) 20%, transparent);
+  box-shadow: var(--shadow-hard-up);
 }
 
 @media (min-width: 641px) {
@@ -1209,3 +1216,45 @@ a[download] {
   cursor: default;
 }
 
+/* ---- Hard-shadow button ----
+   The one button language: 2px ink border, solid offset shadow, mono caps.
+   Pressing it moves it onto the shadow. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.75rem;
+  border: var(--border-heavy);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-hard-sm);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  transition: translate var(--dur-fast, 80ms), box-shadow var(--dur-fast, 80ms);
+}
+
+.btn:active {
+  translate: 3px 3px;
+  box-shadow: none;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+.btn--primary {
+  background: var(--color-highlight);
+  color: #111110;
+}
+
+.btn--danger {
+  border-color: var(--color-alert);
+  color: var(--color-alert);
+  box-shadow: 3px 3px 0 var(--color-alert);
+}

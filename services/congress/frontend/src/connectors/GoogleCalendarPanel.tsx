@@ -89,7 +89,7 @@ export function GoogleCalendarPanel({ status }: { status: ConnectorStatus }) {
                     checked={cal.selected}
                     onChange={(e) => select.mutate({ accountId: account.id, calendarId: cal.id, selected: e.target.checked })}
                   />
-                  <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: cal.color ?? "var(--color-dust)" }} />
+                  <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0" style={{ background: cal.color ?? "var(--color-dust)" }} />
                   <span className="min-w-0 truncate">{cal.summary}</span>
                 </label>
               </li>

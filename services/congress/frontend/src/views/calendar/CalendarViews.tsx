@@ -146,7 +146,7 @@ function TimelineView() {
                       {formatClockTime(entry.nowMs)}
                     </span>
                     <span className="relative h-px flex-1 bg-alert">
-                      <span className="absolute -left-[3px] -top-[2.5px] h-1.5 w-1.5 rounded-full bg-alert" />
+                      <span className="absolute -left-[3px] -top-[2.5px] h-1.5 w-1.5 bg-alert" />
                     </span>
                   </div>
                 );
@@ -279,7 +279,7 @@ function WeekView() {
                   <div key={day.dateKey} className="py-1 text-center">
                     <div className={`font-mono text-[10px] uppercase ${isToday ? "text-accent" : "text-dust"}`}>{WEEKDAY_FORMAT.format(day.date)}</div>
                     <div
-                      className={`mx-auto grid h-7 w-7 place-items-center rounded-full font-display text-base ${
+                      className={`mx-auto grid h-7 w-7 place-items-center font-display text-base ${
                         isToday ? "bg-accent text-parchment" : "text-ink"
                       }`}
                     >
@@ -360,7 +360,7 @@ function WeekView() {
                   })}
                   {isToday && (
                     <div className="pointer-events-none absolute inset-x-0 z-10 h-px bg-alert" style={{ top: (nowMin / 60) * HOUR_PX }} aria-hidden="true">
-                      <span className="absolute -left-[3px] -top-[2.5px] h-1.5 w-1.5 rounded-full bg-alert" />
+                      <span className="absolute -left-[3px] -top-[2.5px] h-1.5 w-1.5 bg-alert" />
                     </div>
                   )}
                 </div>

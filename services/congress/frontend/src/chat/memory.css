@@ -86,7 +86,7 @@
 
 .memory-chip {
   padding: 0.15rem 0.5rem;
-  border-radius: 999px;
+  border-radius: 0;
   background-color: color-mix(in srgb, var(--color-ink) 7%, transparent);
   font-family: var(--font-mono);
   font-size: 0.68rem;

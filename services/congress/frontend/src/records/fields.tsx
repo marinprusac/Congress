@@ -123,7 +123,7 @@ function FileControl({ value, onChange }: FieldProps) {
   return (
     <div className="space-y-2">
       {input}
-      {file.mime.startsWith("image/") && <img src={fileUrl(file.id)} alt={file.name} className="max-h-72 max-w-full rounded border border-dust object-contain" />}
+      {file.mime.startsWith("image/") && <img src={fileUrl(file.id)} alt={file.name} className="max-h-72 max-w-full border border-2 border-ink object-contain" />}
       <p className="break-all font-mono text-sm text-ink">
         {file.name} <span className="text-dust">· {formatBytes(file.size)}</span>
       </p>
