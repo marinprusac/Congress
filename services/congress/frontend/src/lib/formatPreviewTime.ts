@@ -26,7 +26,7 @@ export function formatPreviewTime(time: PreviewTime, now = new Date()): string {
     };
     const first = localDate(time.start);
     // The end date is exclusive (Google's convention): the last day is the one before.
-    const last = time.end ? localDate(time.end) : first;
+    const last = localDate(time.end ?? time.start);
     last.setDate(last.getDate() - 1);
     if (last.getTime() <= first.getTime()) return `${prefix}${dayWord(first, now)}`;
     return `${prefix}${dayWord(first, now)} – ${dayWord(last, now)}`;

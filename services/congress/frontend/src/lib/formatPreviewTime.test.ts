@@ -27,4 +27,8 @@ describe("formatPreviewTime", () => {
   it("shows a multi-day all-day event as a range through its last day", () => {
     expect(formatPreviewTime({ start: "2026-09-26", end: "2026-09-28", allDay: true }, now)).toBe("Yesterday – Today");
   });
+
+  it("keeps a single all-day date with no end on its own day", () => {
+    expect(formatPreviewTime({ label: "Due", start: "2026-09-28", allDay: true }, now)).toBe("Due Tomorrow");
+  });
 });
