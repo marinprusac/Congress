@@ -1,8 +1,8 @@
 export * from "./manifest.js";
-export * from "./exhibits.js";
-export * from "./exhibitIcons.js";
+export * from "./records.js";
+export * from "./recordIcons.js";
 export * from "./sourceColors.js";
-export * from "./exhibitTokens.js";
+export * from "./recordTokens.js";
 export * from "./settings.js";
 export * from "./notifications.js";
 export * from "./push.js";
@@ -14,3 +14,4 @@ export * from "./aiAsks.js";
 export * from "./aiMemory.js";
 export * from "./google.js";
 export * from "./typeDefinition.js";
+export * from "./titlePrefix.js";

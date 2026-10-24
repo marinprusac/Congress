@@ -7,7 +7,7 @@ import { app } from "../../server.js";
 import { runMigrations } from "../../db/client.js";
 import { onEventPublished, type PublishedEvent } from "../../events.js";
 import { startTypeEngine } from "../index.js";
-import { exhibitsSqlite } from "../db/client.js";
+import { recordsSqlite } from "../db/client.js";
 import { getTypeBySlug } from "../store.js";
 import { startTimeTriggers, stopTimeTriggers } from "../triggers.js";
 import { createRecord, getRecord, listRecords, RecordLockedError, titleOf, updateRecord } from "../records.js";
@@ -111,7 +111,7 @@ describe("the Event premade bound to Google Calendar", () => {
   it("pushes an edit to the owner's own event", async () => {
     const mine = byGoogleId("mine");
     g.state.replies[`PATCH ${EVENTS}/mine`] = ev("mine", { title: "Planning v2", updated: "u2" });
-    updateRecord(mine.id, { title: "Planning v2", location: "Room [[exhibit:e:01aaaaaaaaaaaaaaaaaaaaaaaa|4]]" }, { actor: "me" });
+    updateRecord(mine.id, { title: "Planning v2", location: "Room [[record:e:01aaaaaaaaaaaaaaaaaaaaaaaa|4]]" }, { actor: "me" });
     await flushOutbox();
     const patch = g.state.calls.filter((c) => c.method === "PATCH").at(-1)!;
     expect(patch.url).toContain("sendUpdates=none");
@@ -134,14 +134,14 @@ describe("the Event premade bound to Google Calendar", () => {
     const going = local("Going on", -600_000, 600_000);
     const soon = local("Soon", 3_600_000, 7_200_000);
     const hidden = local("Hidden", -600_000, 600_000, { hidden: true });
-    const query = (sql: string, params: Stored[]) => exhibitsSqlite.prepare(sql).all(...params) as Record<string, Stored>[];
+    const query = (sql: string, params: Stored[]) => recordsSqlite.prepare(sql).all(...params) as Record<string, Stored>[];
     const candidates = feedCandidatesFor(def, now, query, (row) => titleOf(def, row));
-    const reason = (id: string) => candidates.filter((c) => c.kind === "exhibit" && c.exhibitId === id).map((c) => c.reason);
+    const reason = (id: string) => candidates.filter((c) => c.kind === "record" && c.recordId === id).map((c) => c.reason);
     expect(reason(going)).toEqual(["Happening now"]);
     expect(reason(soon)).toEqual(["Soon"]);
     expect(reason(hidden)).toEqual([]);
-    const preview = candidates.find((c) => c.kind === "exhibit" && c.exhibitId === going)!;
-    expect(preview.kind === "exhibit" && preview.preview?.time).toEqual({ start: at(-600_000), end: at(600_000) });
+    const preview = candidates.find((c) => c.kind === "record" && c.recordId === going)!;
+    expect(preview.kind === "record" && preview.preview?.time).toEqual({ start: at(-600_000), end: at(600_000) });
   });
 });
 

@@ -16,12 +16,12 @@ import { authRoutes, requireSession } from "./sessionAuth.js";
 import { capitolManifest } from "./manifest.js";
 import { serveChamberIcon } from "./gateway.js";
 import {
-  searchExhibits,
-  resolveExhibits,
+  searchRecords,
+  resolveRecords,
   getConnections,
   addManualConnection,
   removeManualConnection,
-} from "./exhibits.js";
+} from "./records.js";
 import { getSettings, updateSettings } from "./settings.js";
 import { publishEvent } from "./events.js";
 import { listEventSettings, getEventSettingsByType, updateEventSettings } from "./eventSettings.js";
@@ -42,7 +42,7 @@ import { registerWebTools } from "./mcp/webTools.js";
 
 // Chamber included per-ref since an id that never synced has no cache row to
 // infer the owning chamber from.
-const capitolExhibitResolveRequestSchema = z.object({
+const capitolRecordResolveRequestSchema = z.object({
   refs: z.array(z.object({ id: z.string(), chamber: z.string() })),
 });
 
@@ -77,7 +77,7 @@ app.route("/congress/ai", aiRoutes);
 app.route("/congress/connectors/google", googleConnectorRoutes);
 app.route("/congress/connectors", connectorRoutes);
 
-// Runtime exhibit types and their records (typeEngine/).
+// Runtime record types and their records (typeEngine/).
 app.route("/congress", typeRoutes);
 
 // One row per known event type, auto-derived from the live registry - no
@@ -156,50 +156,50 @@ app.post("/congress/events/app-updated", requireSession, async (c) => {
 });
 
 // An empty query is meaningful here - it asks each Chamber for its most
-// recent Exhibits, which is what the "[[" picker shows before anything has
+// recent Records, which is what the "[[" picker shows before anything has
 // been typed.
-app.get("/congress/exhibits/search", requireSession, async (c) => {
-  const results = await searchExhibits(c.req.query("q") ?? "");
+app.get("/congress/refs/search", requireSession, async (c) => {
+  const results = await searchRecords(c.req.query("q") ?? "");
   return c.json({ results });
 });
 
-app.post("/congress/exhibits/resolve", requireSession, async (c) => {
+app.post("/congress/refs/resolve", requireSession, async (c) => {
   const body = await c.req.json().catch(() => null);
-  const parsed = capitolExhibitResolveRequestSchema.safeParse(body);
+  const parsed = capitolRecordResolveRequestSchema.safeParse(body);
   if (!parsed.success) {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
-  const results = await resolveExhibits(parsed.data.refs);
+  const results = await resolveRecords(parsed.data.refs);
   return c.json({ results });
 });
 
-app.get("/congress/exhibits/:id/connections", requireSession, async (c) => {
+app.get("/congress/refs/:id/connections", requireSession, async (c) => {
   const connections = await getConnections(c.req.param("id"));
   return c.json({ connections });
 });
 
-// Adds a manual connection from the Exhibit currently being viewed (`:id`,
-// always already-cached - it's the record on screen) to a picked Exhibit
-// (`targetExhibitId`). Shares its logic with the create_exhibit_connection MCP tool via
+// Adds a manual connection from the Record currently being viewed (`:id`,
+// always already-cached - it's the record on screen) to a picked Record
+// (`targetRecordId`). Shares its logic with the create_record_connection MCP tool via
 // addManualConnection.
-app.post("/congress/exhibits/:id/connections", requireSession, async (c) => {
+app.post("/congress/refs/:id/connections", requireSession, async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = manualRefRequestSchema.safeParse(body);
   if (!parsed.success) {
     return c.json({ error: "invalid_request", issues: parsed.error.flatten() }, 400);
   }
-  const result = await addManualConnection(c.req.param("id"), parsed.data.targetExhibitId, parsed.data.targetChamber);
+  const result = await addManualConnection(c.req.param("id"), parsed.data.targetRecordId, parsed.data.targetChamber);
   if ("error" in result) return c.json(result, 404);
   return c.json(result);
 });
 
-// Removes a manual connection between `:id` (the Exhibit currently being
-// viewed) and `:otherExhibitId`, regardless of which of the two the
+// Removes a manual connection between `:id` (the Record currently being
+// viewed) and `:otherRecordId`, regardless of which of the two the
 // underlying row happens to be stored on - see getManualConnectionOwner.
-// Shares its logic with the delete_exhibit_connection MCP tool via
+// Shares its logic with the delete_record_connection MCP tool via
 // removeManualConnection, same reasoning as the POST route above.
-app.delete("/congress/exhibits/:id/connections/:otherExhibitId", requireSession, async (c) => {
-  const result = await removeManualConnection(c.req.param("id"), c.req.param("otherExhibitId"));
+app.delete("/congress/refs/:id/connections/:otherRecordId", requireSession, async (c) => {
+  const result = await removeManualConnection(c.req.param("id"), c.req.param("otherRecordId"));
   if ("error" in result) return c.json(result, 404);
   return c.json(result);
 });
@@ -215,7 +215,7 @@ app.all("/api/*", (c) => c.json({ error: "not_found" }, 404));
 app.use("/mcp", (c, next) => withRunContext(parseRunContext((h) => c.req.header(h)), next));
 app.use("/mcp/*", (c, next) => withRunContext(parseRunContext((h) => c.req.header(h)), next));
 
-// Runtime exhibit types' tools (typeEngine/mcpTools.ts), rebuilt per request.
+// Runtime record types' tools (typeEngine/mcpTools.ts), rebuilt per request.
 const typesMcpApp = createMcpApp("types", registerTypeTools, env.CONGRESS_INTERNAL_TOKEN);
 app.all("/mcp/types", (c) => typesMcpApp.fetch(c.req.raw, c.env));
 

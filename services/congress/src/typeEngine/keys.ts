@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import type { KeyKind, TypeDefinition } from "@congress/shared-types";
-import { exhibitsDb, exhibitsSqlite } from "./db/client.js";
+import { recordsDb, recordsSqlite } from "./db/client.js";
 import { recordKeys } from "./db/schema.js";
 import { activeFields } from "./operations.js";
 import { quoteIdent } from "./ddl.js";
@@ -46,20 +46,20 @@ export function hasKeys(def: TypeDefinition): boolean {
 
 // Call inside the record write's transaction; a clash throws and rolls it back.
 export function writeKeys(typeId: string, def: TypeDefinition, id: string, row: Record<string, Stored>): void {
-  exhibitsDb.delete(recordKeys).where(eq(recordKeys.recordId, id)).run();
+  recordsDb.delete(recordKeys).where(eq(recordKeys.recordId, id)).run();
   for (const k of keysOf(def, row)) {
     const taken = findByKey(typeId, k.kind, k.value);
     if (taken) throw new KeyConflictError(k.fieldSlug, k.kind, k.value);
-    exhibitsDb.insert(recordKeys).values({ typeId, kind: k.kind, value: k.value, recordId: id, fieldId: k.fieldId }).run();
+    recordsDb.insert(recordKeys).values({ typeId, kind: k.kind, value: k.value, recordId: id, fieldId: k.fieldId }).run();
   }
 }
 
 export function deleteKeys(id: string): void {
-  exhibitsDb.delete(recordKeys).where(eq(recordKeys.recordId, id)).run();
+  recordsDb.delete(recordKeys).where(eq(recordKeys.recordId, id)).run();
 }
 
 export function findByKey(typeId: string, kind: KeyKind, value: string): string | undefined {
-  return exhibitsDb
+  return recordsDb
     .select({ id: recordKeys.recordId })
     .from(recordKeys)
     .where(and(eq(recordKeys.typeId, typeId), eq(recordKeys.kind, kind), eq(recordKeys.value, value)))
@@ -68,7 +68,7 @@ export function findByKey(typeId: string, kind: KeyKind, value: string): string 
 
 // Keys the definition implies for every record, and which of them clash.
 function scan(def: TypeDefinition): { rows: { id: string; keys: KeyRow[] }[]; clashes: Map<string, number> } {
-  const all = exhibitsSqlite.prepare(`SELECT * FROM ${quoteIdent(def.tableName)}`).all() as Record<string, Stored>[];
+  const all = recordsSqlite.prepare(`SELECT * FROM ${quoteIdent(def.tableName)}`).all() as Record<string, Stored>[];
   const rows = all.map((r) => ({ id: String(r.id), keys: keysOf(def, r) }));
   const counts = new Map<string, number>();
   for (const r of rows) for (const k of r.keys) counts.set(`${k.kind} ${k.value}`, (counts.get(`${k.kind} ${k.value}`) ?? 0) + 1);
@@ -83,11 +83,11 @@ export function keyClashes(def: TypeDefinition): { label: string; count: number 
 
 // After a publish that changed which fields are keys; inside its transaction.
 export function rebuildKeys(typeId: string, def: TypeDefinition): void {
-  exhibitsDb.delete(recordKeys).where(eq(recordKeys.typeId, typeId)).run();
+  recordsDb.delete(recordKeys).where(eq(recordKeys.typeId, typeId)).run();
   const { rows } = scan(def);
   for (const r of rows) {
     for (const k of r.keys) {
-      exhibitsDb.insert(recordKeys).values({ typeId, kind: k.kind, value: k.value, recordId: r.id, fieldId: k.fieldId }).run();
+      recordsDb.insert(recordKeys).values({ typeId, kind: k.kind, value: k.value, recordId: r.id, fieldId: k.fieldId }).run();
     }
   }
 }

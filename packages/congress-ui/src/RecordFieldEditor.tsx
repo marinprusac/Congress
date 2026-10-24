@@ -1,14 +1,14 @@
 import type { ReactNode } from "react";
-import type { CapitolExhibitResolveResult, CapitolExhibitSearchResult } from "@congress/shared-types";
-import { useExhibitEditorCore } from "./codemirror/useExhibitEditorCore.js";
-import { ExhibitPickerDropdown } from "./ExhibitPickerDropdown.js";
+import type { CapitolRecordResolveResult, CapitolRecordSearchResult } from "@congress/shared-types";
+import { useRecordEditorCore } from "./codemirror/useRecordEditorCore.js";
+import { RecordPickerDropdown } from "./RecordPickerDropdown.js";
 
-interface ExhibitFieldEditorProps {
+interface RecordFieldEditorProps {
   value: string;
   onChange: (value: string) => void;
   // Renders as a live-previewed, un-editable surface (chips still resolve
-  // and navigate) - a full replacement for both ExhibitTextarea (edit) and
-  // ExhibitAnnotatedText/ExhibitMarkdown (read-only view): one component,
+  // and navigate) - a full replacement for both RecordTextarea (edit) and
+  // RecordAnnotatedText/RecordMarkdown (read-only view): one component,
   // one always-live surface, instead of a separate view/edit mode pair.
   readOnly?: boolean;
   placeholder?: string;
@@ -19,11 +19,11 @@ interface ExhibitFieldEditorProps {
   className: string;
   wrapperClassName?: string;
   renderIcon: (chamber: string, type?: string) => ReactNode;
-  onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
-  // Opt-in "Create <query>" affordance for a Chamber whose own exhibits can
+  onNavigate?: (result: Extract<CapitolRecordResolveResult, { url: string }>) => void;
+  // Opt-in "Create <query>" affordance for a Chamber whose own records can
   // be quick-created from here (only Notes, today) - resolves to the newly
-  // created Exhibit, inserted exactly like a picked search result.
-  onCreate?: (title: string) => Promise<CapitolExhibitSearchResult>;
+  // created Record, inserted exactly like a picked search result.
+  onCreate?: (title: string) => Promise<CapitolRecordSearchResult>;
   // Approximate minimum height, in text rows - CM6 otherwise sizes to its
   // content with no minimum, which reads as an oddly cramped empty field.
   minRows?: number;
@@ -34,25 +34,25 @@ interface ExhibitFieldEditorProps {
 
 // The shared multi-line editing/viewing surface: full Markdown (headers,
 // lists, emphasis, links) live-previewed Obsidian-style, plus "@"-triggered
-// exhibit chips that render as atomic, invisible-as-code widgets at all
-// times - not just in a separate read-only view. Replaces ExhibitTextarea,
-// ExhibitMarkdown, and ExhibitAnnotatedText for every multi-line body/
+// record chips that render as atomic, invisible-as-code widgets at all
+// times - not just in a separate read-only view. Replaces RecordTextarea,
+// RecordMarkdown, and RecordAnnotatedText for every multi-line body/
 // description field across every Chamber.
-export function ExhibitFieldEditor({
+export function RecordFieldEditor({
   value,
   onChange,
   readOnly = false,
   placeholder,
   className,
-  wrapperClassName = "exhibit-field",
+  wrapperClassName = "record-field",
   renderIcon,
   onNavigate,
   onCreate,
   minRows,
   autoFocus,
   onSubmitKey,
-}: ExhibitFieldEditorProps) {
-  const { containerRef, picker } = useExhibitEditorCore({
+}: RecordFieldEditorProps) {
+  const { containerRef, picker } = useRecordEditorCore({
     value,
     onChange,
     readOnly,
@@ -72,7 +72,7 @@ export function ExhibitFieldEditor({
         className={className}
         style={minRows ? { minHeight: `calc(${minRows} * 1.6em)` } : undefined}
       />
-      {!readOnly && <ExhibitPickerDropdown picker={picker} renderIcon={renderIcon} className="exhibit-picker-dropdown" />}
+      {!readOnly && <RecordPickerDropdown picker={picker} renderIcon={renderIcon} className="record-picker-dropdown" />}
     </div>
   );
 }

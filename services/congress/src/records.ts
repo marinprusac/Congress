@@ -1,15 +1,15 @@
 import { and, eq, inArray, or } from "drizzle-orm";
 import type {
-  ExhibitResolveResult,
-  ExhibitSyncRequest,
-  CapitolExhibitSearchResult,
-  CapitolExhibitResolveResult,
-  ExhibitRefEntry,
+  RecordResolveResult,
+  RecordSyncRequest,
+  CapitolRecordSearchResult,
+  CapitolRecordResolveResult,
+  RecordRefEntry,
 } from "@congress/shared-types";
 import { buildChipToken } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { exhibitCache, exhibitRefs } from "./db/schema.js";
-import { canonicalId, canonicalIds, getLocalSource, listLocalSources } from "./exhibitSources.js";
+import { canonicalId, canonicalIds, getLocalSource, listLocalSources } from "./recordSources.js";
 
 // Runs the upsert + delete-and-reinsert as one transaction with a single
 // multi-row insert, rather than a `.run()` per row - better-sqlite3 wraps
@@ -17,7 +17,7 @@ import { canonicalId, canonicalIds, getLocalSource, listLocalSources } from "./e
 // per statement under synchronous=NORMAL), and this fires on every note/
 // task/document/place/automation write, which with Notes' autosave means
 // every 1.2 seconds while typing.
-export function syncExhibit(push: ExhibitSyncRequest): void {
+export function syncRecord(push: RecordSyncRequest): void {
   // Refs to replaced (legacy) ids point at their replacement instead.
   const aliases = canonicalIds([...push.outgoingRefs, ...(push.manualRefs ?? [])]);
   if (aliases.size > 0) {
@@ -75,13 +75,13 @@ export function syncExhibit(push: ExhibitSyncRequest): void {
   });
 }
 
-export async function searchExhibits(query: string): Promise<CapitolExhibitSearchResult[]> {
+export async function searchRecords(query: string): Promise<CapitolRecordSearchResult[]> {
   // Stable sort by score (missing -> 0): one relevance-ranked list across every source.
   const local = listLocalSources().flatMap((source) => {
     try {
       return source.search(query).map((r) => ({ ...r, chamber: source.namespace }));
     } catch (err) {
-      console.warn(`[exhibits] ${source.namespace} search failed: ${(err as Error).message}`);
+      console.warn(`[records] ${source.namespace} search failed: ${(err as Error).message}`);
       return [];
     }
   });
@@ -89,7 +89,7 @@ export async function searchExhibits(query: string): Promise<CapitolExhibitSearc
 }
 
 // Resolves every id in one in-process source; an unknown namespace is unavailable.
-async function resolveManyLive(ids: string[], chamber: string): Promise<CapitolExhibitResolveResult[]> {
+async function resolveManyLive(ids: string[], chamber: string): Promise<CapitolRecordResolveResult[]> {
   const local = getLocalSource(chamber);
   if (!local) return ids.map((id) => ({ id, chamber, unavailable: true }));
   return cacheResolved(chamber, ids, new Map(local.resolve(ids).map((r) => [r.id, r])), local.typeOf);
@@ -99,30 +99,30 @@ async function resolveManyLive(ids: string[], chamber: string): Promise<CapitolE
 function cacheResolved(
   chamber: string,
   ids: string[],
-  byId: Map<string, ExhibitResolveResult>,
+  byId: Map<string, RecordResolveResult>,
   typeOf?: (id: string) => string | null
-): CapitolExhibitResolveResult[] {
+): CapitolRecordResolveResult[] {
   return ids.map((id) => {
     const result = byId.get(id);
     if (!result) return { id, chamber, unavailable: true };
 
     if ("deleted" in result) {
-      syncExhibit({ chamber, id, type: "", name: "", url: "", deleted: true, outgoingRefs: [] });
+      syncRecord({ chamber, id, type: "", name: "", url: "", deleted: true, outgoingRefs: [] });
       return { id, chamber, deleted: true };
     }
 
-    // A Chamber's live resolve doesn't carry `type` (only /exhibits/search
+    // A Chamber's live resolve doesn't carry `type` (only /records/search
     // does), so a never-before-cached id gets an empty type here - harmless,
     // since rendering only needs chamber (for the icon) + name + url.
     const existing = db.select().from(exhibitCache).where(eq(exhibitCache.id, id)).get();
-    // Re-sync keeps the exhibit's refs as they are, manual flags included.
+    // Re-sync keeps the record's refs as they are, manual flags included.
     const refs = db
       .select({ targetId: exhibitRefs.targetId, isManual: exhibitRefs.isManual })
       .from(exhibitRefs)
       .where(eq(exhibitRefs.sourceId, id))
       .all();
     const type = typeOf?.(id) ?? existing?.type ?? "";
-    syncExhibit({
+    syncRecord({
       chamber,
       id,
       type,
@@ -136,16 +136,16 @@ function cacheResolved(
   });
 }
 
-export async function resolveOneLive(id: string, chamber: string): Promise<CapitolExhibitResolveResult> {
+export async function resolveOneLive(id: string, chamber: string): Promise<CapitolRecordResolveResult> {
   const [result] = await resolveManyLive([id], chamber);
   return result!;
 }
 
 // A legacy id resolves as its replacement, keyed by the id asked for.
-export async function resolveExhibits(
+export async function resolveRecords(
   refs: { id: string; chamber: string }[],
   prefetchedCache?: Map<string, typeof exhibitCache.$inferSelect>
-): Promise<CapitolExhibitResolveResult[]> {
+): Promise<CapitolRecordResolveResult[]> {
   const aliases = canonicalIds(refs.map((r) => r.id));
   if (aliases.size === 0) return resolveCanonical(refs, prefetchedCache);
   const effective = refs.map((r) => {
@@ -162,7 +162,7 @@ async function resolveCanonical(
   // other reasons (getConnections, below) reuse that same batch instead of
   // this function re-querying the exact same ids a second time.
   prefetchedCache?: Map<string, typeof exhibitCache.$inferSelect>
-): Promise<CapitolExhibitResolveResult[]> {
+): Promise<CapitolRecordResolveResult[]> {
   if (refs.length === 0) return [];
 
   // One `IN` lookup for every id's cache row, instead of one SELECT per
@@ -184,7 +184,7 @@ async function resolveCanonical(
         .map((row) => [row.id, row])
     );
 
-  const results = new Array<CapitolExhibitResolveResult>(refs.length);
+  const results = new Array<CapitolRecordResolveResult>(refs.length);
   const missesByChamber = new Map<string, { index: number; id: string }[]>();
 
   refs.forEach((ref, index) => {
@@ -218,8 +218,8 @@ async function resolveCanonical(
   return results;
 }
 
-// Which Chamber owns an Exhibit id, per the resolution cache - used to route
-// a manual-ref add/remove to the right Chamber's own "/api/exhibits/:id/refs"
+// Which Chamber owns a Record id, per the resolution cache - used to route
+// a manual-ref add/remove to the right Chamber's own "/api/records/:id/refs"
 // regardless of which Chamber's page the request originated from. Unlike
 // resolveOneLive, this never falls back to guessing: an id with no cache row
 // has nothing to route to yet (it can only get one by syncing on create, and
@@ -236,22 +236,22 @@ export function getCachedChamber(id: string): string | null {
 // attribution detail for sync bookkeeping, letting a chamber's own sync
 // delete-and-reinsert exactly the rows *it* discovered without touching a
 // connection the other side discovered independently), but this collapses
-// both directions into one deduped entry per "other" exhibit, isManual true
+// both directions into one deduped entry per "other" record, isManual true
 // if either side's row is manual.
-export async function getConnections(rawId: string): Promise<ExhibitRefEntry[]> {
+export async function getConnections(rawId: string): Promise<RecordRefEntry[]> {
   const id = canonicalId(rawId);
   const asOther = db.select().from(exhibitRefs).where(eq(exhibitRefs.targetId, id)).all();
   const asOwner = db.select().from(exhibitRefs).where(eq(exhibitRefs.sourceId, id)).all();
 
   const byOtherId = new Map<string, { chamber: string | null; isManual: boolean }>();
   for (const row of asOther) {
-    // This exhibit is row's target -> the other side is row.sourceId, whose
+    // This record is row's target -> the other side is row.sourceId, whose
     // chamber is always known (sourceChamber is recorded on every row).
     const existing = byOtherId.get(row.sourceId);
     byOtherId.set(row.sourceId, { chamber: row.sourceChamber, isManual: (existing?.isManual ?? false) || row.isManual });
   }
   for (const row of asOwner) {
-    // This exhibit is row's owner -> the other side is row.targetId, whose
+    // This record is row's owner -> the other side is row.targetId, whose
     // chamber was never recorded on the row itself (only exhibit_cache might
     // know it) - same limitation the old frontlinks read had.
     const existing = byOtherId.get(row.targetId);
@@ -259,7 +259,7 @@ export async function getConnections(rawId: string): Promise<ExhibitRefEntry[]> 
   }
 
   // One batched lookup up front, reused below both to resolve a
-  // chamber === null entry and as resolveExhibits' own cache check - it
+  // chamber === null entry and as resolveRecords' own cache check - it
   // would otherwise re-query the exact same ids a second time immediately
   // after this function does.
   const otherIds = Array.from(byOtherId.keys());
@@ -287,14 +287,14 @@ export async function getConnections(rawId: string): Promise<ExhibitRefEntry[]> 
     isManualByOtherId.set(otherId, entry.isManual);
   }
 
-  const resolved = await resolveExhibits(toResolve, cachedById);
-  // resolveExhibits preserves input order, so `toResolve` and `resolved`
+  const resolved = await resolveRecords(toResolve, cachedById);
+  // resolveRecords preserves input order, so `toResolve` and `resolved`
   // line up index-for-index.
   return resolved.map((r, i) => ({ ...r, isManual: isManualByOtherId.get(toResolve[i]!.id) ?? false }));
 }
 
-// Which side owns a manual connection between two exhibit ids, so a DELETE
-// from either exhibit's Connections panel removes the right underlying row
+// Which side owns a manual connection between two record ids, so a DELETE
+// from either record's Connections panel removes the right underlying row
 // regardless of which side it was originally added from - a manual
 // connection has no canonical owner from the UI's perspective, only from
 // storage's (see exhibit_refs's own schema comment).
@@ -316,8 +316,8 @@ export function getManualConnectionOwner(aId: string, bId: string): { ownerId: s
   return { ownerId: row.sourceId, chamber: row.sourceChamber };
 }
 
-// Builds a ready-to-paste `[[exhibit:e:id|Name]]` chip for a record's raw id.
-export async function getExhibitChip(
+// Builds a ready-to-paste `[[record:e:id|Name]]` chip for a record's raw id.
+export async function getRecordChip(
   chamber: string,
   rawId: string
 ): Promise<
@@ -331,7 +331,7 @@ export async function getExhibitChip(
   return { ...hit, chamber, token: buildChipToken({ chamber, id: hit.id, name: hit.name }) };
 }
 
-// Adds a manual Connection from `id` to `targetExhibitId`, callable from both an HTTP route and an MCP tool.
+// Adds a manual Connection from `id` to `targetRecordId`, callable from both an HTTP route and an MCP tool.
 export async function addManualConnection(
   rawId: string,
   rawTargetId: string,
@@ -339,7 +339,7 @@ export async function addManualConnection(
 ): Promise<{ refs: string[] } | { error: "not_found" }> {
   const id = canonicalId(rawId);
   const targetAlias = canonicalIds([rawTargetId]).get(rawTargetId);
-  const targetExhibitId = targetAlias?.id ?? rawTargetId;
+  const targetRecordId = targetAlias?.id ?? rawTargetId;
   const targetChamber = targetAlias?.namespace ?? rawTargetChamber;
   const chamber = getCachedChamber(id);
   if (!chamber) return { error: "not_found" };
@@ -350,26 +350,26 @@ export async function addManualConnection(
   // shows up in the panel, since getConnections silently skips an uncached,
   // chamber-unknown target.
   if (targetChamber) {
-    await resolveOneLive(targetExhibitId, targetChamber);
+    await resolveOneLive(targetRecordId, targetChamber);
   }
 
   const local = getLocalSource(chamber);
   if (!local) return { error: "not_found" };
-  const refs = local.addManualRef(id, targetExhibitId);
+  const refs = local.addManualRef(id, targetRecordId);
   return refs ? { refs } : { error: "not_found" };
 }
 
-// Removes a manual Connection between `id` and `otherExhibitId`, regardless
+// Removes a manual Connection between `id` and `otherRecordId`, regardless
 // of which side the underlying row is stored on (see getManualConnectionOwner).
 export async function removeManualConnection(
   rawId: string,
   rawOtherId: string
 ): Promise<{ refs: string[] } | { error: "not_found" }> {
   const id = canonicalId(rawId);
-  const otherExhibitId = canonicalId(rawOtherId);
-  const owner = getManualConnectionOwner(id, otherExhibitId);
+  const otherRecordId = canonicalId(rawOtherId);
+  const owner = getManualConnectionOwner(id, otherRecordId);
   if (!owner) return { error: "not_found" };
-  const otherId = owner.ownerId === id ? otherExhibitId : id;
+  const otherId = owner.ownerId === id ? otherRecordId : id;
   const local = getLocalSource(owner.chamber);
   if (!local) return { error: "not_found" };
   const refs = local.removeManualRef(owner.ownerId, otherId);

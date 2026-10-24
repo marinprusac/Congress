@@ -4,7 +4,7 @@ import { migrationsDir } from "@congress/test-support";
 import { db, runMigrations } from "../db/client.js";
 import { exhibitCache, exhibitRefs } from "../db/schema.js";
 import { onEventPublished, type PublishedEvent } from "../events.js";
-import { runExhibitsMigrations } from "./db/client.js";
+import { runRecordsMigrations } from "./db/client.js";
 import { publish } from "./store.js";
 import {
   addManualRef,
@@ -24,7 +24,7 @@ const stop = onEventPublished((e) => events.push(e));
 
 beforeAll(() => {
   runMigrations(migrationsDir("congress"));
-  runExhibitsMigrations();
+  runRecordsMigrations();
   for (const slug of ["person", "shelf"]) {
     publish({
       actor: "test",
@@ -64,7 +64,7 @@ const refsFrom = (id: string) =>
     .sort();
 
 describe("records", () => {
-  it("creates with defaults, caches the exhibit and publishes an event", () => {
+  it("creates with defaults, caches the record and publishes an event", () => {
     const rec = createRecord("book", { title: "Dune" }, { actor: "me" });
     expect(rec).toMatchObject({ type: "book", typeVersion: 1, values: { title: "Dune", notes: "", read: false, author: null, shelves: [] } });
     expect(rec.id).toMatch(/^[0-9a-z]{26}$/);
@@ -102,7 +102,7 @@ describe("records", () => {
     const [a, b] = [createRecord("shelf", { name: "A" }).id, createRecord("shelf", { name: "B" }).id].sort();
     const rec = createRecord("book", {
       title: "Middlemarch",
-      notes: "see [[exhibit:tasks:task-3|Read it]]",
+      notes: "see [[record:tasks:task-3|Read it]]",
       author: person,
       shelves: [b, a],
     });

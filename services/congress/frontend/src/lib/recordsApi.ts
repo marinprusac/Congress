@@ -1,6 +1,6 @@
-import type { CapitolExhibitSearchResult, ExhibitSearchResult, FileRef, RecordDto, RecordValue, RelatedGroup, TypeOverview, TypeSummary, TypeVersion } from "@congress/shared-types";
+import { withTitlePrefix, type CapitolRecordSearchResult, type RecordSearchResult, type FileRef, type RecordDto, type RecordValue, type RelatedGroup, type TypeOverview, type TypeSummary, type TypeVersion } from "@congress/shared-types";
 
-// Runtime exhibit types and their records (server: src/typeEngine/routes.ts).
+// Runtime record types and their records (server: src/typeEngine/routes.ts).
 
 export const TYPES_KEY = ["congress", "types"] as const;
 
@@ -48,7 +48,7 @@ export async function fetchRelated(id: string): Promise<RelatedGroup[]> {
 }
 
 // One type's records matching q (recent ones when q is empty).
-export async function searchRecords(type: string, q: string): Promise<ExhibitSearchResult[]> {
+export async function searchRecords(type: string, q: string): Promise<RecordSearchResult[]> {
   return check(await fetch(`/congress/records/search?type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}`));
 }
 
@@ -122,8 +122,8 @@ export async function fetchLive<T>(id: string): Promise<T | null> {
   return (await check<{ content: T | null }>(await fetch(`/congress/records/${encodeURIComponent(id)}/live`))).content;
 }
 
-export async function quickCreateRecord(type: TypeSummary, title: string): Promise<CapitolExhibitSearchResult> {
+export async function quickCreateRecord(type: TypeSummary, title: string): Promise<CapitolRecordSearchResult> {
   const titleField = type.definition.fields.find((f) => f.id === type.definition.titleField);
   const created = await createRecord(type.definition.slug, titleField ? { [titleField.slug]: title } : {});
-  return { id: created.id, chamber: "e", type: created.type, name: title, url: `/${created.id}` };
+  return { id: created.id, chamber: "e", type: created.type, name: withTitlePrefix(type.definition.label, title) || title, url: `/${created.id}` };
 }

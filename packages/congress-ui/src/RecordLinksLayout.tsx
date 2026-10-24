@@ -1,28 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { ExhibitRefEntry, CapitolExhibitSearchResult } from "@congress/shared-types";
-import { ExhibitChip } from "./ExhibitChip.js";
-import { useExhibitConnections } from "./useExhibitConnections.js";
-import { useExhibitSearch } from "./useExhibitSearch.js";
+import type { RecordRefEntry, CapitolRecordSearchResult } from "@congress/shared-types";
+import { RecordChip } from "./RecordChip.js";
+import { useRecordConnections } from "./useRecordConnections.js";
+import { useRecordSearch } from "./useRecordSearch.js";
 import { useKeyboardInset } from "./useKeyboardInset.js";
-import { addExhibitConnection, removeExhibitConnection } from "./exhibitRefs.js";
+import { addRecordConnection, removeRecordConnection } from "./recordRefs.js";
 
 interface AddReferenceControlProps {
-  exhibitId: string | null;
+  recordId: string | null;
   existingIds: Set<string>;
-  onAdd: (result: CapitolExhibitSearchResult) => Promise<void>;
-  onCreate?: (title: string) => Promise<CapitolExhibitSearchResult>;
+  onAdd: (result: CapitolRecordSearchResult) => Promise<void>;
+  onCreate?: (title: string) => Promise<CapitolRecordSearchResult>;
   renderIcon?: (chamber: string, type?: string) => ReactNode;
 }
 
 // The "+" trigger in a links panel header - an explicit way to attach a
-// reference to (or from) another Exhibit without writing a "[[" token in
-// body text, for Exhibits that either have no natural text area or where a
+// reference to (or from) another Record without writing a "[[" token in
+// body text, for Records that either have no natural text area or where a
 // reference doesn't belong inline. Deliberately a separate, simpler control
-// from useExhibitPicker/ExhibitPickerDropdown (no textarea, no caret math)
+// from useRecordPicker/RecordPickerDropdown (no textarea, no caret math)
 // even though the search/create/keyboard-nav shape mirrors it closely.
-function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIcon }: AddReferenceControlProps) {
+function AddReferenceControl({ recordId, existingIds, onAdd, onCreate, renderIcon }: AddReferenceControlProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -31,8 +31,8 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
   const inputRef = useRef<HTMLInputElement | null>(null);
   const keyboardInset = useKeyboardInset();
 
-  const { results: rawResults, loading } = useExhibitSearch(query, open);
-  const results = rawResults.filter((r) => r.id !== exhibitId && !existingIds.has(r.id));
+  const { results: rawResults, loading } = useRecordSearch(query, open);
+  const results = rawResults.filter((r) => r.id !== recordId && !existingIds.has(r.id));
   const trimmedQuery = query.trim();
   const showCreate =
     Boolean(onCreate) && trimmedQuery.length > 0 && !results.some((r) => r.name.toLowerCase() === trimmedQuery.toLowerCase());
@@ -54,9 +54,9 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
   }
 
   // Kept open on failure (e.g. the target Chamber hasn't adopted
-  // "/api/exhibits/:id/refs" yet) so the error message has somewhere to
+  // "/api/records/:id/refs" yet) so the error message has somewhere to
   // render and the query isn't lost.
-  function select(result: CapitolExhibitSearchResult) {
+  function select(result: CapitolRecordSearchResult) {
     setBusy(true);
     setError(null);
     onAdd(result)
@@ -79,7 +79,7 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
     return (
       <button
         type="button"
-        className="exhibit-ref-add-trigger tap-target"
+        className="record-ref-add-trigger tap-target"
         onClick={openPicker}
         aria-label="Add reference"
         title="Add reference"
@@ -92,17 +92,17 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
   const total = results.length + (showCreate ? 1 : 0);
   // The popover (input + dropdown together) is positioned as one unit,
   // independent of the header row's flex layout - a links panel is only
-  // 12rem wide on desktop (see .exhibit-links-panel-front/-back) and a
+  // 12rem wide on desktop (see .record-links-panel-front/-back) and a
   // narrow stacked half-column on mobile, either of which would otherwise
   // squeeze a flex sibling <input> down to a sliver instead of giving it
   // room to be usable. Same fixed-above-keyboard treatment as
-  // ExhibitPickerDropdown on mobile.
+  // RecordPickerDropdown on mobile.
   const popoverStyle: Record<string, string> = {};
   if (keyboardInset > 0) popoverStyle.bottom = `calc(0.5rem + ${keyboardInset}px)`;
 
   return (
-    <div className="exhibit-ref-add">
-      <div className="exhibit-ref-add-popover docked-sheet" style={Object.keys(popoverStyle).length > 0 ? popoverStyle : undefined}>
+    <div className="record-ref-add">
+      <div className="record-ref-add-popover docked-sheet" style={Object.keys(popoverStyle).length > 0 ? popoverStyle : undefined}>
         <input
           ref={inputRef}
           type="search"
@@ -136,27 +136,27 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
           }}
           placeholder="Search to reference —"
           aria-label="Search to reference"
-          className="exhibit-ref-add-input"
+          className="record-ref-add-input"
         />
-        <div className="exhibit-ref-add-dropdown" role="listbox">
-          {loading && results.length === 0 && <div className="exhibit-picker-empty">Searching —</div>}
+        <div className="record-ref-add-dropdown" role="listbox">
+          {loading && results.length === 0 && <div className="record-picker-empty">Searching —</div>}
           {!loading && results.length === 0 && !showCreate && (
-            <div className="exhibit-picker-empty">{trimmedQuery ? "No matches" : "— Type to search —"}</div>
+            <div className="record-picker-empty">{trimmedQuery ? "No matches" : "— Type to search —"}</div>
           )}
           {results.map((result, index) => (
             <div
               key={`${result.chamber}:${result.id}`}
               role="option"
               aria-selected={index === activeIndex}
-              className={index === activeIndex ? "exhibit-picker-option active" : "exhibit-picker-option"}
+              className={index === activeIndex ? "record-picker-option active" : "record-picker-option"}
               onMouseEnter={() => setActiveIndex(index)}
               onMouseDown={(e) => {
                 e.preventDefault();
                 select(result);
               }}
             >
-              {renderIcon && <span className="exhibit-picker-icon">{renderIcon(result.chamber, result.type)}</span>}
-              <span className="exhibit-picker-name">{result.name}</span>
+              {renderIcon && <span className="record-picker-icon">{renderIcon(result.chamber, result.type)}</span>}
+              <span className="record-picker-name">{result.name}</span>
             </div>
           ))}
           {showCreate && (
@@ -165,8 +165,8 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
               aria-selected={activeIndex === results.length}
               className={
                 activeIndex === results.length
-                  ? "exhibit-picker-option exhibit-picker-create active"
-                  : "exhibit-picker-option exhibit-picker-create"
+                  ? "record-picker-option record-picker-create active"
+                  : "record-picker-option record-picker-create"
               }
               onMouseEnter={() => setActiveIndex(results.length)}
               onMouseDown={(e) => {
@@ -174,10 +174,10 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
                 createNew();
               }}
             >
-              <span className="exhibit-picker-name">{busy ? "Working —" : `+ Create "${trimmedQuery}"`}</span>
+              <span className="record-picker-name">{busy ? "Working —" : `+ Create "${trimmedQuery}"`}</span>
             </div>
           )}
-          {error && <div className="exhibit-picker-error">{error}</div>}
+          {error && <div className="record-picker-error">{error}</div>}
         </div>
       </div>
     </div>
@@ -186,12 +186,12 @@ function AddReferenceControl({ exhibitId, existingIds, onAdd, onCreate, renderIc
 
 interface LinksPanelProps {
   title: string;
-  results: ExhibitRefEntry[];
+  results: RecordRefEntry[];
   renderIcon?: (chamber: string, type?: string) => ReactNode;
-  onNavigate?: (result: Extract<ExhibitRefEntry, { url: string }>) => void;
+  onNavigate?: (result: Extract<RecordRefEntry, { url: string }>) => void;
   className: string;
   addControl?: ReactNode;
-  onRemove?: (entry: ExhibitRefEntry) => void;
+  onRemove?: (entry: RecordRefEntry) => void;
 }
 
 function LinksPanel({ title, results, renderIcon, onNavigate, className, addControl, onRemove }: LinksPanelProps) {
@@ -204,16 +204,16 @@ function LinksPanel({ title, results, renderIcon, onNavigate, className, addCont
         <ul className="space-y-2">
           {results.map((r) => (
             <li key={`${r.chamber}:${r.id}`} className="flex items-center gap-1">
-              <ExhibitChip
+              <RecordChip
                 result={r}
                 renderIcon={renderIcon}
                 onNavigate={onNavigate}
-                className="exhibit-chip min-w-0 flex-1 font-mono text-sm"
+                className="record-chip min-w-0 flex-1 font-mono text-sm"
               />
               {r.isManual && onRemove && (
                 <button
                   type="button"
-                  className="exhibit-ref-remove tap-target"
+                  className="record-ref-remove tap-target"
                   onClick={() => onRemove(r)}
                   aria-label="Remove reference"
                   title="Remove reference"
@@ -230,51 +230,51 @@ function LinksPanel({ title, results, renderIcon, onNavigate, className, addCont
   );
 }
 
-interface ExhibitLinksLayoutProps {
-  // `null` = this Exhibit hasn't been created yet (a "New X" page rendering
+interface RecordLinksLayoutProps {
+  // `null` = this Record hasn't been created yet (a "New X" page rendering
   // the same layout as editing an existing one, before the first save) -
   // Connections are staged in `draftConnections` instead of coming from
   // Capitol's exhibit_refs graph. See `draftConnections`/
   // `onDraftConnectionsChange` below and `flushDraftConnections` in
   // exhibitRefs.ts, which applies them for real once a create mutation
-  // returns the exhibit's real id.
-  exhibitId: string | null;
+  // returns the record's real id.
+  recordId: string | null;
   renderIcon?: (chamber: string, type?: string) => ReactNode;
-  onNavigate?: (result: Extract<ExhibitRefEntry, { url: string }>) => void;
+  onNavigate?: (result: Extract<RecordRefEntry, { url: string }>) => void;
   children: ReactNode;
   // The page's own action bar (Edit/Delete/Share/...) - kept separate from
   // `children` rather than just the last thing rendered in them, so it can
   // sit *after* the reference panels instead of before them (see
-  // .exhibit-links-layout's grid-template-areas: content, then references,
+  // .record-links-layout's grid-template-areas: content, then references,
   // then actions last - nobody scans past the actions of a note they
   // haven't finished reading the references of yet).
   actions?: ReactNode;
   className?: string;
   // Turns on the "+"/"×" controls on the Connections panel - adding a
-  // connection writes an outgoing ref from this Exhibit (via Capitol's
+  // connection writes an outgoing ref from this Record (via Capitol's
   // proxy, see exhibitRefs.ts). Omit to keep the panel read-only (the
   // previous behavior).
   editable?: boolean;
-  // Only a Chamber whose own Exhibits can be quick-created (Notes, today)
+  // Only a Chamber whose own Records can be quick-created (Notes, today)
   // passes this - shows "+ Create <query>" in the add popover.
-  onCreateReference?: (title: string) => Promise<CapitolExhibitSearchResult>;
-  // Required together, only while `exhibitId` is null - the connections
-  // picked so far on a not-yet-created Exhibit, held in the caller's own
+  onCreateReference?: (title: string) => Promise<CapitolRecordSearchResult>;
+  // Required together, only while `recordId` is null - the connections
+  // picked so far on a not-yet-created Record, held in the caller's own
   // state (not this component's) so its create mutation can read them back
   // and flush them for real via flushDraftConnections once it has a real id.
-  draftConnections?: CapitolExhibitSearchResult[];
-  onDraftConnectionsChange?: (next: CapitolExhibitSearchResult[]) => void;
+  draftConnections?: CapitolRecordSearchResult[];
+  onDraftConnectionsChange?: (next: CapitolRecordSearchResult[]) => void;
   // Connections the page already shows elsewhere (e.g. relation fields).
   hideIds?: ReadonlySet<string>;
 }
 
 // Flanks its children with a single panel backed by Capitol's exhibit_refs
-// graph - every Exhibit connected to this one, undirected: no
+// graph - every Record connected to this one, undirected: no
 // differentiation of whether this one or the other one established the
 // connection. On desktop, at the side of the content; on mobile, stacked
-// below it (see .exhibit-links-layout in styles.css).
-export function ExhibitLinksLayout({
-  exhibitId,
+// below it (see .record-links-layout in styles.css).
+export function RecordLinksLayout({
+  recordId,
   renderIcon,
   onNavigate,
   children,
@@ -285,58 +285,58 @@ export function ExhibitLinksLayout({
   draftConnections,
   onDraftConnectionsChange,
   hideIds,
-}: ExhibitLinksLayoutProps) {
+}: RecordLinksLayoutProps) {
   const queryClient = useQueryClient();
-  const persistedConnections = useExhibitConnections(exhibitId);
-  const all: ExhibitRefEntry[] =
-    exhibitId === null
+  const persistedConnections = useRecordConnections(recordId);
+  const all: RecordRefEntry[] =
+    recordId === null
       ? (draftConnections ?? []).map((r) => ({ id: r.id, chamber: r.chamber, name: r.name, url: r.url, isManual: true }))
       : persistedConnections;
   const connections = hideIds?.size ? all.filter((r) => !hideIds.has(r.id)) : all;
 
   function refresh() {
-    queryClient.invalidateQueries({ queryKey: ["exhibit-connections", exhibitId] });
+    queryClient.invalidateQueries({ queryKey: ["record-connections", recordId] });
   }
 
   // The picked result's chamber is passed through so Capitol can eagerly
   // cache it if it's never been created/edited within Congress before (e.g.
-  // a pre-existing Google Calendar event) - see addExhibitConnection's own
-  // comment. When `exhibitId` is still null, nothing is written yet - just
+  // a pre-existing Google Calendar event) - see addRecordConnection's own
+  // comment. When `recordId` is still null, nothing is written yet - just
   // staged in the caller's own state, same shape flushDraftConnections
   // expects once a create mutation hands it a real id.
-  async function addConnection(result: CapitolExhibitSearchResult) {
-    if (exhibitId === null) {
+  async function addConnection(result: CapitolRecordSearchResult) {
+    if (recordId === null) {
       const staged = draftConnections ?? [];
       if (!staged.some((r) => r.id === result.id)) onDraftConnectionsChange?.([...staged, result]);
       return;
     }
-    await addExhibitConnection(exhibitId, result.id, result.chamber);
+    await addRecordConnection(recordId, result.id, result.chamber);
     refresh();
   }
-  async function removeConnection(entry: ExhibitRefEntry) {
-    if (exhibitId === null) {
+  async function removeConnection(entry: RecordRefEntry) {
+    if (recordId === null) {
       onDraftConnectionsChange?.((draftConnections ?? []).filter((r) => r.id !== entry.id));
       return;
     }
-    await removeExhibitConnection(exhibitId, entry.id);
+    await removeRecordConnection(recordId, entry.id);
     refresh();
   }
 
   return (
-    <div className={["exhibit-links-layout", className].filter(Boolean).join(" ")}>
-      <div className="exhibit-links-main">{children}</div>
-      <div className="exhibit-links-divider" aria-hidden="true" />
+    <div className={["record-links-layout", className].filter(Boolean).join(" ")}>
+      <div className="record-links-main">{children}</div>
+      <div className="record-links-divider" aria-hidden="true" />
       <LinksPanel
         title="Connections"
         results={connections}
         renderIcon={renderIcon}
         onNavigate={onNavigate}
-        className="exhibit-links-panel-connections"
+        className="record-links-panel-connections"
         onRemove={editable ? removeConnection : undefined}
         addControl={
           editable && (
             <AddReferenceControl
-              exhibitId={exhibitId}
+              recordId={recordId}
               existingIds={new Set(all.map((r) => r.id))}
               onAdd={addConnection}
               onCreate={onCreateReference}
@@ -345,7 +345,7 @@ export function ExhibitLinksLayout({
           )
         }
       />
-      {actions && <div className="exhibit-links-actions">{actions}</div>}
+      {actions && <div className="record-links-actions">{actions}</div>}
     </div>
   );
 }

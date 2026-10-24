@@ -302,5 +302,5 @@ and references. Check Chats -> Memory afterwards. Then, on the server:
 
 Keep `services/chamber-deputy/data/` until the import has been checked; the
 rest of that directory (`.env`, `node_modules`) can go right away. Migration
-`0029` removes Deputy's registry row, cached exhibits and event settings.
+`0029` removes Deputy's registry row, cached records and event settings.
 The import has run; its code is removed.

@@ -1,6 +1,6 @@
-// Relevance tiers for exhibit search, shared by every source so their results merge into one ranked list.
+// Relevance tiers for record search, shared by every source so their results merge into one ranked list.
 
-export interface ExhibitMatchField {
+export interface RecordMatchField {
   text: string;
   // true for a title-equivalent field (eligible for the top four tiers:
   // exact/prefix/word-boundary/substring); false for a body-equivalent
@@ -13,7 +13,7 @@ export interface ExhibitMatchField {
 // - only relative order matters, and every caller (the table-backed search()
 // below, calendar's hand-rolled search) uses this same function, so tiers
 // compare correctly across Chambers once Congress merges their results.
-export const EXHIBIT_MATCH_WEIGHT = {
+export const RECORD_MATCH_WEIGHT = {
   titleExact: 6,
   titlePrefix: 5,
   titleWordBoundary: 4,
@@ -31,23 +31,23 @@ function escapeRegExp(value: string): string {
 // tasks/deputy/fitness (via search() below) and calendar (hand-rolled, no
 // local table to speak of) agree on what "a better match" means without
 // duplicating the tier logic per Chamber.
-export function scoreExhibitMatch(query: string, fields: ExhibitMatchField[]): number {
+export function scoreRecordMatch(query: string, fields: RecordMatchField[]): number {
   const q = query.trim().toLowerCase();
-  if (!q) return EXHIBIT_MATCH_WEIGHT.none;
+  if (!q) return RECORD_MATCH_WEIGHT.none;
   const wordBoundaryRe = new RegExp(`\\b${escapeRegExp(q)}\\b`, "i");
 
-  let best: number = EXHIBIT_MATCH_WEIGHT.none;
+  let best: number = RECORD_MATCH_WEIGHT.none;
   for (const field of fields) {
     const text = field.text.toLowerCase();
     if (!text) continue;
     if (field.isPrimary) {
-      if (text === q) return EXHIBIT_MATCH_WEIGHT.titleExact; // can't beat this
-      if (text.startsWith(q)) best = Math.max(best, EXHIBIT_MATCH_WEIGHT.titlePrefix);
-      else if (wordBoundaryRe.test(field.text)) best = Math.max(best, EXHIBIT_MATCH_WEIGHT.titleWordBoundary);
-      else if (text.includes(q)) best = Math.max(best, EXHIBIT_MATCH_WEIGHT.titleSubstring);
+      if (text === q) return RECORD_MATCH_WEIGHT.titleExact; // can't beat this
+      if (text.startsWith(q)) best = Math.max(best, RECORD_MATCH_WEIGHT.titlePrefix);
+      else if (wordBoundaryRe.test(field.text)) best = Math.max(best, RECORD_MATCH_WEIGHT.titleWordBoundary);
+      else if (text.includes(q)) best = Math.max(best, RECORD_MATCH_WEIGHT.titleSubstring);
     } else {
-      if (wordBoundaryRe.test(field.text)) best = Math.max(best, EXHIBIT_MATCH_WEIGHT.bodyWordBoundary);
-      else if (text.includes(q)) best = Math.max(best, EXHIBIT_MATCH_WEIGHT.bodySubstring);
+      if (wordBoundaryRe.test(field.text)) best = Math.max(best, RECORD_MATCH_WEIGHT.bodyWordBoundary);
+      else if (text.includes(q)) best = Math.max(best, RECORD_MATCH_WEIGHT.bodySubstring);
     }
   }
   return best;

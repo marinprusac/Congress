@@ -1,6 +1,6 @@
 import { and, asc, eq, lte } from "drizzle-orm";
 import type { Binding, FieldDefinition, RecordDto } from "@congress/shared-types";
-import { exhibitsDb, exhibitsSqlite } from "../db/client.js";
+import { recordsDb, recordsSqlite } from "../db/client.js";
 import { bindingOutbox, bindingShadows } from "../db/schema.js";
 import { listTypes, onTypesChanged, type StoredType } from "../store.js";
 import { quoteIdent } from "../ddl.js";
@@ -62,13 +62,13 @@ const syncFields = (t: StoredType, b: Binding) =>
 // --- shadows
 
 function getShadow(recordId: string): Record<string, SourceValue> | null {
-  const row = exhibitsDb.select().from(bindingShadows).where(eq(bindingShadows.recordId, recordId)).get();
+  const row = recordsDb.select().from(bindingShadows).where(eq(bindingShadows.recordId, recordId)).get();
   return row ? (JSON.parse(row.valuesJson) as Record<string, SourceValue>) : null;
 }
 
 function setShadow(recordId: string, bindingId: string, values: Record<string, SourceValue>): void {
   const valuesJson = JSON.stringify(values);
-  exhibitsDb
+  recordsDb
     .insert(bindingShadows)
     .values({ recordId, bindingId, valuesJson, updatedAt: new Date() })
     .onConflictDoUpdate({ target: bindingShadows.recordId, set: { bindingId, valuesJson, updatedAt: new Date() } })
@@ -76,19 +76,19 @@ function setShadow(recordId: string, bindingId: string, values: Record<string, S
 }
 
 function forget(recordId: string): void {
-  exhibitsDb.delete(bindingShadows).where(eq(bindingShadows.recordId, recordId)).run();
-  exhibitsDb.delete(bindingOutbox).where(eq(bindingOutbox.recordId, recordId)).run();
+  recordsDb.delete(bindingShadows).where(eq(bindingShadows.recordId, recordId)).run();
+  recordsDb.delete(bindingOutbox).where(eq(bindingOutbox.recordId, recordId)).run();
 }
 
 function outboxOf(recordId: string): OutboxRow | undefined {
-  return exhibitsDb.select().from(bindingOutbox).where(eq(bindingOutbox.recordId, recordId)).get();
+  return recordsDb.select().from(bindingOutbox).where(eq(bindingOutbox.recordId, recordId)).get();
 }
 
 // --- pull
 
 function pendingDelete(bindingId: string, key: string): boolean {
   return Boolean(
-    exhibitsDb
+    recordsDb
       .select({ id: bindingOutbox.recordId })
       .from(bindingOutbox)
       .where(and(eq(bindingOutbox.bindingId, bindingId), eq(bindingOutbox.sourceKey, key)))
@@ -143,11 +143,11 @@ export function pullRecord(t: StoredType, b: Binding, src: SourceRecord, opts: {
 
 // The source won these fields: stop pushing the local values.
 function dropPending(recordId: string, slugs: string[]): void {
-  const row = exhibitsDb.select().from(bindingOutbox).where(eq(bindingOutbox.recordId, recordId)).get();
+  const row = recordsDb.select().from(bindingOutbox).where(eq(bindingOutbox.recordId, recordId)).get();
   if (!row || row.op !== "update" || row.failed) return;
   const left = (JSON.parse(row.fieldsJson) as string[]).filter((s) => !slugs.includes(s));
-  if (left.length === 0) exhibitsDb.delete(bindingOutbox).where(eq(bindingOutbox.recordId, recordId)).run();
-  else exhibitsDb.update(bindingOutbox).set({ fieldsJson: JSON.stringify(left) }).where(eq(bindingOutbox.recordId, recordId)).run();
+  if (left.length === 0) recordsDb.delete(bindingOutbox).where(eq(bindingOutbox.recordId, recordId)).run();
+  else recordsDb.update(bindingOutbox).set({ fieldsJson: JSON.stringify(left) }).where(eq(bindingOutbox.recordId, recordId)).run();
 }
 
 function applyChange(change: SourceChange): void {
@@ -163,7 +163,7 @@ function applyChange(change: SourceChange): void {
 }
 
 function boundCount(t: StoredType, b: Binding): number {
-  const row = exhibitsSqlite
+  const row = recordsSqlite
     .prepare(`SELECT count(*) AS n FROM ${quoteIdent(t.definition.tableName)} WHERE "source_binding" = ?`)
     .get(b.id) as { n: number };
   return Number(row.n);
@@ -253,16 +253,16 @@ function guard(t: StoredType, row: Row, op: "update" | "delete", changed: string
 // --- outbox
 
 function enqueue(recordId: string, bindingId: string, op: OutboxRow["op"], fields: string[], sourceKey: string | null = null): void {
-  const existing = exhibitsDb.select().from(bindingOutbox).where(eq(bindingOutbox.recordId, recordId)).get();
+  const existing = recordsDb.select().from(bindingOutbox).where(eq(bindingOutbox.recordId, recordId)).get();
   // Edits pile onto a pending update or create; anything else replaces it.
   if (existing && !existing.failed && op === "update" && (existing.op === "update" || existing.op === "create" || existing.op === "move")) {
     const merged = [...new Set([...(JSON.parse(existing.fieldsJson) as string[]), ...fields])];
     // A fresh edit is worth trying now, even mid-backoff.
-    exhibitsDb.update(bindingOutbox).set({ fieldsJson: JSON.stringify(merged), nextAt: new Date() }).where(eq(bindingOutbox.recordId, recordId)).run();
+    recordsDb.update(bindingOutbox).set({ fieldsJson: JSON.stringify(merged), nextAt: new Date() }).where(eq(bindingOutbox.recordId, recordId)).run();
   } else {
     const now = new Date();
     const row = { bindingId, op, sourceKey, fieldsJson: JSON.stringify(fields), attempts: 0, nextAt: now, lastError: null, failed: false, createdAt: now };
-    exhibitsDb.insert(bindingOutbox).values({ recordId, ...row }).onConflictDoUpdate({ target: bindingOutbox.recordId, set: row }).run();
+    recordsDb.insert(bindingOutbox).values({ recordId, ...row }).onConflictDoUpdate({ target: bindingOutbox.recordId, set: row }).run();
   }
   kick();
 }
@@ -283,7 +283,7 @@ function onWrite(t: StoredType, id: string, deleted: RecordDto | undefined, info
     return;
   }
   if (info.fromSource || t.definition.bindings.length === 0) return;
-  const row = exhibitsSqlite.prepare(`SELECT * FROM ${quoteIdent(t.definition.tableName)} WHERE "id" = ?`).get(id) as Row | undefined;
+  const row = recordsSqlite.prepare(`SELECT * FROM ${quoteIdent(t.definition.tableName)} WHERE "id" = ?`).get(id) as Row | undefined;
   if (!row) return;
   const rec = getRecord(id)!;
   const b = boundOf(t, row);
@@ -303,9 +303,9 @@ function onWrite(t: StoredType, id: string, deleted: RecordDto | undefined, info
     if (rec.values[target.slug] === "") {
       // Back to local: unlink now so the next pull can't recreate it, then delete at the source.
       setRecordSource(t, id, null);
-      exhibitsDb.delete(bindingShadows).where(eq(bindingShadows.recordId, id)).run();
+      recordsDb.delete(bindingShadows).where(eq(bindingShadows.recordId, id)).run();
       if (b.delete === "push") enqueue(id, b.id, "delete", [], key);
-      else exhibitsDb.delete(bindingOutbox).where(eq(bindingOutbox.recordId, id)).run();
+      else recordsDb.delete(bindingOutbox).where(eq(bindingOutbox.recordId, id)).run();
     } else enqueue(id, b.id, "move", [], key);
     return;
   }
@@ -328,10 +328,10 @@ function settle(row: OutboxRow, ops: OutboxRow["op"][] = [row.op]): void {
   const pushed = JSON.parse(row.fieldsJson) as string[];
   const left = (JSON.parse(now.fieldsJson) as string[]).filter((s) => !pushed.includes(s));
   if (left.length === 0) {
-    exhibitsDb.delete(bindingOutbox).where(eq(bindingOutbox.recordId, row.recordId)).run();
+    recordsDb.delete(bindingOutbox).where(eq(bindingOutbox.recordId, row.recordId)).run();
     return;
   }
-  exhibitsDb
+  recordsDb
     .update(bindingOutbox)
     .set({ op: "update", fieldsJson: JSON.stringify(left), sourceKey: null, attempts: 0, nextAt: new Date(), lastError: null })
     .where(eq(bindingOutbox.recordId, row.recordId))
@@ -340,7 +340,7 @@ function settle(row: OutboxRow, ops: OutboxRow["op"][] = [row.op]): void {
 
 async function pushOne(row: OutboxRow): Promise<void> {
   const bound = bindingById(row.bindingId);
-  if (!bound) return void exhibitsDb.delete(bindingOutbox).where(eq(bindingOutbox.recordId, row.recordId)).run();
+  if (!bound) return void recordsDb.delete(bindingOutbox).where(eq(bindingOutbox.recordId, row.recordId)).run();
   const { t, b } = bound;
   const running = runningConnector(b.connector);
   if (!running?.connector.push) throw new Error(`${b.label} isn't running`);
@@ -368,13 +368,13 @@ async function pushOne(row: OutboxRow): Promise<void> {
     () => push.create(ctx, b.kind, values),
     (src) => {
       setRecordSource(t, rec.id, { binding: b.id, key: src.key });
-      exhibitsDb.delete(bindingShadows).where(eq(bindingShadows.recordId, rec.id)).run();
+      recordsDb.delete(bindingShadows).where(eq(bindingShadows.recordId, rec.id)).run();
       pullRecord(t, b, src);
     }
   );
   if (row.op === "move" && row.sourceKey) {
     // Created: from here on only the old copy's delete is left (retried alone).
-    exhibitsDb.update(bindingOutbox).set({ op: "delete" }).where(eq(bindingOutbox.recordId, row.recordId)).run();
+    recordsDb.update(bindingOutbox).set({ op: "delete" }).where(eq(bindingOutbox.recordId, row.recordId)).run();
     await push.delete(ctx, b.kind, row.sourceKey);
     return settle(row, ["delete"]);
   }
@@ -384,13 +384,13 @@ async function pushOne(row: OutboxRow): Promise<void> {
 function fail(row: OutboxRow, err: unknown): void {
   const message = (err as Error).message;
   if (err instanceof ConnectorRefusedError) {
-    exhibitsDb.update(bindingOutbox).set({ failed: true, lastError: message }).where(eq(bindingOutbox.recordId, row.recordId)).run();
+    recordsDb.update(bindingOutbox).set({ failed: true, lastError: message }).where(eq(bindingOutbox.recordId, row.recordId)).run();
     revert(row);
     return;
   }
   const attempts = row.attempts + 1;
   const delay = Math.min(RETRY_BASE_MS * 2 ** (attempts - 1), RETRY_MAX_MS);
-  exhibitsDb
+  recordsDb
     .update(bindingOutbox)
     .set({ attempts, lastError: message, nextAt: new Date(Date.now() + delay) })
     .where(eq(bindingOutbox.recordId, row.recordId))
@@ -426,7 +426,7 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 let started = false;
 
 function dueRows(): OutboxRow[] {
-  return exhibitsDb
+  return recordsDb
     .select()
     .from(bindingOutbox)
     .where(and(eq(bindingOutbox.failed, false), lte(bindingOutbox.nextAt, new Date())))
@@ -463,7 +463,7 @@ function arm(): void {
   if (timer) clearTimeout(timer);
   timer = undefined;
   if (!started) return;
-  const next = exhibitsDb.select({ at: bindingOutbox.nextAt }).from(bindingOutbox).where(eq(bindingOutbox.failed, false)).orderBy(asc(bindingOutbox.nextAt)).get();
+  const next = recordsDb.select({ at: bindingOutbox.nextAt }).from(bindingOutbox).where(eq(bindingOutbox.failed, false)).orderBy(asc(bindingOutbox.nextAt)).get();
   if (!next) return;
   timer = setTimeout(() => void flushOutbox(), Math.max(0, next.at.getTime() - Date.now()));
   timer.unref?.();

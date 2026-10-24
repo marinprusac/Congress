@@ -58,7 +58,7 @@ export const gmailConnector = defineConnector({
         account: { type: "string" },
         messageId: { type: "string" },
         threadId: { type: "string" },
-        exhibitId: { type: "string" },
+        recordId: { type: "string" },
         from: { type: "string" },
         fromEmail: { type: "string" },
         subject: { type: "string" },

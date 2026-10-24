@@ -14,7 +14,7 @@ list of operation batches (`create_type`, `add_field`, `set_title_field`,
 boot, like migrations. A later batch is how you change a premade type (the
 Mail, Chat and Place premades each end with an "unhide" batch).
 
-You get for free: `/e/<id>` pages, Search, `[[exhibit:e:<id>|Title]]` chips,
+You get for free: `/e/<id>` pages, Search, `[[record:e:<id>|Title]]` chips,
 relations, feed rules, time triggers, events (`<prefix>.created|updated|deleted`)
 and MCP tools (`list_/get_/create_/update_/delete_/search_<type>`).
 

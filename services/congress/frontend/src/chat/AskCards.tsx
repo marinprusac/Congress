@@ -122,7 +122,7 @@ function QuestionAsk({ message }: { message: AiMessage }) {
           {fields.map((f) => (
             <div key={f.key}>
               <dt>{f.label}</dt>
-              <dd>{f.type === "exhibit" && typeof answer[f.key] === "string" ? <ChatMarkdown text={String(answer[f.key])} {...nav} /> : answerLine(f, answer[f.key])}</dd>
+              <dd>{(f.type === "record" || f.type === "exhibit") && typeof answer[f.key] === "string" ? <ChatMarkdown text={String(answer[f.key])} {...nav} /> : answerLine(f, answer[f.key])}</dd>
             </div>
           ))}
         </dl>

@@ -2,8 +2,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { migrationsDir } from "@congress/test-support";
 import { runMigrations } from "../db/client.js";
 import { onEventPublished, type PublishedEvent } from "../events.js";
-import { exhibitsDb } from "./db/client.js";
-import { runExhibitsMigrations } from "./db/client.js";
+import { recordsDb } from "./db/client.js";
+import { runRecordsMigrations } from "./db/client.js";
 import { recordTriggerState } from "./db/schema.js";
 import { getTypeBySlug, publish } from "./store.js";
 import { createRecord, deleteRecord, getRecord, updateRecord } from "./records.js";
@@ -24,7 +24,7 @@ const seen = () => events.map((e) => `${e.type}:${(e.payload as { title: string 
 beforeAll(async () => {
   vi.useFakeTimers({ now: START, toFake: ["Date", "setTimeout", "clearTimeout"] });
   runMigrations(migrationsDir("congress"));
-  runExhibitsMigrations();
+  runRecordsMigrations();
   publish({
     actor: "test",
     ops: [
@@ -122,12 +122,12 @@ describe("time-trigger ladders", () => {
   it("clears on delete, keeping the title", () => {
     deleteRecord(old);
     expect(seen()).toEqual(["chore.deleted:Taxes", "chore.cleared:Taxes"]);
-    expect(exhibitsDb.select().from(recordTriggerState).all().map((r) => r.recordId)).not.toContain(old);
+    expect(recordsDb.select().from(recordTriggerState).all().map((r) => r.recordId)).not.toContain(old);
   });
 
   it("doesn't refire a state carried over by an import", () => {
     const imported = createRecord("chore", { title: "Imported", due: "2026-09-01" }, { silent: true }).id;
-    exhibitsDb
+    recordsDb
       .insert(recordTriggerState)
       .values({ recordId: imported, typeId: getTypeBySlug("chore")!.id, ladder: "fld_due", state: "overdue", firedAt: new Date() })
       .run();

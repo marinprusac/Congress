@@ -14,7 +14,7 @@ const CHAMBER_COLORS: Readonly<Record<string, SourceColor>> = {
 let typeColors: ReadonlyMap<string, string> = new Map();
 const listeners = new Set<() => void>();
 
-export function setExhibitTypeColors(next: ReadonlyMap<string, string | undefined>): void {
+export function setRecordTypeColors(next: ReadonlyMap<string, string | undefined>): void {
   const map = new Map<string, string>();
   for (const [slug, color] of next) if (color) map.set(slug, color);
   typeColors = map;

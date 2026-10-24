@@ -10,7 +10,7 @@ export function formatDuration(ms: number): string {
 }
 
 // A note/description body flattened for a feed item's inline preview:
-// "[[exhibit:notes:note-4|Trip plan]]" chips become their label,
+// "[[record:notes:note-4|Trip plan]]" chips become their label,
 // markdown markers (headings, emphasis, list bullets, quotes, code ticks)
 // and extra whitespace go, and it's cut at a word boundary. Returns
 // undefined for an empty body so the preview simply omits it.

@@ -27,8 +27,8 @@ const tempDir = mkdtempSync(join(tmpdir(), "congress-test-"));
 // A path, not a directory that exists - createDb mkdir -p's the parent
 // itself, and better-sqlite3 creates the file.
 process.env.DB_PATH = join(tempDir, "test.sqlite3");
-process.env.EXHIBITS_DB_PATH = join(tempDir, "exhibits.sqlite3");
-process.env.EXHIBIT_FILES_DIR = join(tempDir, "exhibit-files");
+process.env.RECORDS_DB_PATH = join(tempDir, "records.sqlite3");
+process.env.RECORD_FILES_DIR = join(tempDir, "record-files");
 process.env.CONNECTORS_DATA_DIR = join(tempDir, "connectors");
 process.env.OWNER_TIMEZONE = "Europe/Zagreb";
 process.env.NODE_ENV = "test";

@@ -6,7 +6,7 @@ import { pipeline } from "node:stream/promises";
 import { and, eq, inArray, isNotNull, isNull, lt } from "drizzle-orm";
 import type { FileRef } from "@congress/shared-types";
 import { env } from "../env.js";
-import { exhibitsDb, exhibitsSqlite } from "./db/client.js";
+import { recordsDb, recordsSqlite } from "./db/client.js";
 import { files } from "./db/schema.js";
 import { listTypes } from "./store.js";
 import { quoteIdent } from "./ddl.js";
@@ -26,7 +26,7 @@ export class FileTooLargeError extends Error {
 }
 
 export function filesDir(): string {
-  return resolve(env.EXHIBIT_FILES_DIR);
+  return resolve(env.RECORD_FILES_DIR);
 }
 
 export function filePath(id: string): string {
@@ -50,7 +50,7 @@ function toRef(row: typeof files.$inferSelect): FileRef {
 
 function insertRow(id: string, sha256: string, name: string, mime: string, size: number, now: Date): FileRef {
   // Unattached until a record write claims it.
-  exhibitsDb.insert(files).values({ id, sha256, name, mime, size, createdAt: now, orphanedAt: now }).run();
+  recordsDb.insert(files).values({ id, sha256, name, mime, size, createdAt: now, orphanedAt: now }).run();
   return { id, name, mime, size };
 }
 
@@ -97,11 +97,11 @@ export function storeFromPath(src: string, meta: { name: string; mime?: string }
 export function fileRefs(ids: string[]): Map<string, FileRef> {
   const unique = [...new Set(ids.filter(Boolean))];
   if (unique.length === 0) return new Map();
-  return new Map(exhibitsDb.select().from(files).where(inArray(files.id, unique)).all().map((r) => [r.id, toRef(r)]));
+  return new Map(recordsDb.select().from(files).where(inArray(files.id, unique)).all().map((r) => [r.id, toRef(r)]));
 }
 
 export function getFile(id: string): (FileRef & { sha256: string }) | null {
-  const row = exhibitsDb.select().from(files).where(eq(files.id, id)).get();
+  const row = recordsDb.select().from(files).where(eq(files.id, id)).get();
   return row ? { ...toRef(row), sha256: row.sha256 } : null;
 }
 
@@ -110,7 +110,7 @@ export function isReferenced(id: string): boolean {
   for (const t of listTypes({ includeHidden: true })) {
     for (const f of t.definition.fields) {
       if (f.kind !== "file") continue;
-      const hit = exhibitsSqlite.prepare(`SELECT 1 FROM ${quoteIdent(t.definition.tableName)} WHERE ${quoteIdent(f.column)} = ? LIMIT 1`).get(id);
+      const hit = recordsSqlite.prepare(`SELECT 1 FROM ${quoteIdent(t.definition.tableName)} WHERE ${quoteIdent(f.column)} = ? LIMIT 1`).get(id);
       if (hit) return true;
     }
   }
@@ -119,21 +119,21 @@ export function isReferenced(id: string): boolean {
 
 export function attachFiles(ids: string[]): void {
   const unique = [...new Set(ids.filter(Boolean))];
-  if (unique.length) exhibitsDb.update(files).set({ orphanedAt: null }).where(inArray(files.id, unique)).run();
+  if (unique.length) recordsDb.update(files).set({ orphanedAt: null }).where(inArray(files.id, unique)).run();
 }
 
 // Called after a write moved records off these files.
 export function releaseFiles(ids: string[], now = new Date()): void {
   const loose = [...new Set(ids.filter(Boolean))].filter((id) => !isReferenced(id));
   if (loose.length) {
-    exhibitsDb.update(files).set({ orphanedAt: now }).where(and(inArray(files.id, loose), isNull(files.orphanedAt))).run();
+    recordsDb.update(files).set({ orphanedAt: now }).where(and(inArray(files.id, loose), isNull(files.orphanedAt))).run();
   }
 }
 
 // Nightly: deletes files orphaned longer than the grace period.
 export function collectOrphans(now = new Date(), graceDays = ORPHAN_GRACE_DAYS): number {
   const cutoff = new Date(now.getTime() - graceDays * DAY);
-  const stale = exhibitsDb.select().from(files).where(and(isNotNull(files.orphanedAt), lt(files.orphanedAt, cutoff))).all();
+  const stale = recordsDb.select().from(files).where(and(isNotNull(files.orphanedAt), lt(files.orphanedAt, cutoff))).all();
   let removed = 0;
   for (const row of stale) {
     if (isReferenced(row.id)) {
@@ -141,7 +141,7 @@ export function collectOrphans(now = new Date(), graceDays = ORPHAN_GRACE_DAYS):
       continue;
     }
     rmSync(filePath(row.id), { force: true });
-    exhibitsDb.delete(files).where(eq(files.id, row.id)).run();
+    recordsDb.delete(files).where(eq(files.id, row.id)).run();
     removed++;
   }
   return removed;

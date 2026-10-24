@@ -14,7 +14,7 @@ export function useBackNavigation(): () => void {
 
 // Rendered at the index route of a Chamber with no screen of its own at its
 // root (Notes, Tasks, Documents, ...): there's no list page to land on any
-// more - its exhibits live in the home feed and Search - so "/<chamber>"
+// more - its records live in the home feed and Search - so "/<chamber>"
 // steps straight back to wherever the owner was.
 export function ChamberIndexRedirect() {
   const nav = useStackNav();

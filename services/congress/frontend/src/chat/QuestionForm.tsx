@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { answerSchemaFor, type AskAnswerValue, type AskField } from "@congress/shared-types";
-import { ExhibitInlineField, getExhibitIcon, showToast } from "@congress/congress-ui";
+import { RecordInlineField, getRecordIcon, showToast } from "@congress/congress-ui";
 import { AskAnswerError, aiAsksQueryKey, aiThreadQueryKey, answerAsk } from "@/lib/aiApi";
 
 type Values = Record<string, AskAnswerValue | undefined>;
@@ -9,7 +9,7 @@ type Values = Record<string, AskAnswerValue | undefined>;
 export function initialValues(fields: AskField[]): Values {
   const values: Values = {};
   for (const f of fields) {
-    if (f.type === "exhibit") values[f.key] = "";
+    if (f.type === "record" || f.type === "exhibit") values[f.key] = "";
     else if (f.type === "multichoice") values[f.key] = f.default ?? [];
     else values[f.key] = f.default ?? (f.type === "boolean" ? undefined : "");
   }
@@ -21,7 +21,7 @@ function validate(fields: AskField[], values: Values): Record<string, string> {
   const cleaned: Record<string, unknown> = {};
   for (const f of fields) {
     const v = values[f.key];
-    cleaned[f.key] = f.type === "number" && typeof v === "string" ? (v.trim() === "" ? null : Number(v)) : f.type === "exhibit" && typeof v === "string" ? v.trim() : v;
+    cleaned[f.key] = f.type === "number" && typeof v === "string" ? (v.trim() === "" ? null : Number(v)) : (f.type === "record" || f.type === "exhibit") && typeof v === "string" ? v.trim() : v;
   }
   const result = answerSchemaFor(fields).safeParse(cleaned);
   if (result.success) return {};
@@ -118,15 +118,16 @@ function FieldInput({ field, value, onChange, disabled }: { field: AskField; val
       return <input id={id} className="ask-input" type="date" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} disabled={disabled} />;
     case "datetime":
       return <input id={id} className="ask-input" type="datetime-local" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} disabled={disabled} />;
+    case "record":
     case "exhibit":
       return (
-        <ExhibitInlineField
+        <RecordInlineField
           value={String(value ?? "")}
           onChange={(v) => onChange(v)}
           readOnly={disabled}
           placeholder="Type @ to pick"
-          className="ask-input ask-exhibit"
-          renderIcon={getExhibitIcon}
+          className="ask-input ask-record"
+          renderIcon={getRecordIcon}
         />
       );
   }

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import type { CapitolExhibitResolveResult, FieldDefinition, FileRef, KeyKind, RecordValue } from "@congress/shared-types";
+import type { CapitolRecordResolveResult, FieldDefinition, FileRef, KeyKind, RecordValue } from "@congress/shared-types";
 import {
-  ExhibitChip,
-  ExhibitFieldEditor,
+  RecordChip,
+  RecordFieldEditor,
   FormLabel,
-  getExhibitIcon,
+  getRecordIcon,
   showToast,
-  useResolvedExhibits,
+  useResolvedRecords,
 } from "@congress/congress-ui";
 import { useQuery } from "@tanstack/react-query";
 import { fetchTypes, fileUrl, quickCreateRecord, searchRecords, TYPES_KEY, uploadFile } from "@/lib/recordsApi";
@@ -20,7 +20,7 @@ export interface FieldProps {
   field: FieldDefinition;
   value: RecordValue;
   onChange: (value: RecordValue) => void;
-  onNavigate: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
+  onNavigate: (result: Extract<CapitolRecordResolveResult, { url: string }>) => void;
 }
 
 export function FieldControl({ field, value, onChange, onNavigate }: FieldProps) {
@@ -30,12 +30,12 @@ export function FieldControl({ field, value, onChange, onNavigate }: FieldProps)
       return <input className="field-plain w-full font-mono text-base" value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />;
     case "richtext":
       return (
-        <ExhibitFieldEditor
+        <RecordFieldEditor
           value={String(value ?? "")}
           onChange={onChange}
           minRows={1}
           className="w-full bg-parchment p-2 font-body text-base text-ink focus-within:outline-none"
-          renderIcon={getExhibitIcon}
+          renderIcon={getRecordIcon}
           onNavigate={onNavigate}
         />
       );
@@ -147,13 +147,13 @@ export function ReadonlyValue({ field, value, onNavigate }: { field: FieldDefini
   if (field.kind === "relation" && onNavigate) return <ReadonlyRelation value={value} onNavigate={onNavigate} />;
   if (field.kind === "richtext" && typeof value === "string" && value) {
     return (
-      <ExhibitFieldEditor
+      <RecordFieldEditor
         value={value}
         onChange={() => {}}
         readOnly
         minRows={1}
         className="w-full font-body text-base text-slate"
-        renderIcon={getExhibitIcon}
+        renderIcon={getRecordIcon}
         onNavigate={onNavigate}
       />
     );
@@ -179,13 +179,13 @@ export function ReadonlyValue({ field, value, onNavigate }: { field: FieldDefini
 
 function ReadonlyRelation({ value, onNavigate }: { value: RecordValue | undefined; onNavigate: FieldProps["onNavigate"] }) {
   const ids = Array.isArray(value) ? value : typeof value === "string" && value ? [value] : [];
-  const { resultsByToken } = useResolvedExhibits(ids.map((id) => `exhibit:e:${id}`));
+  const { resultsByToken } = useResolvedRecords(ids.map((id) => `record:e:${id}`));
   if (ids.length === 0) return <p className="font-mono text-base text-slate">—</p>;
   return (
     <div className="flex flex-wrap items-center gap-2">
       {ids.map((id) => {
-        const hit = resultsByToken.get(`exhibit:e:${id}`);
-        return hit ? <ExhibitChip key={id} result={hit} renderIcon={getExhibitIcon} onNavigate={onNavigate} /> : <span key={id} className="font-mono text-xs text-dust">…</span>;
+        const hit = resultsByToken.get(`record:e:${id}`);
+        return hit ? <RecordChip key={id} result={hit} renderIcon={getRecordIcon} onNavigate={onNavigate} /> : <span key={id} className="font-mono text-xs text-dust">…</span>;
       })}
     </div>
   );
@@ -284,7 +284,7 @@ function KeyListControl({ kind, value, onChange }: { kind: KeyKind; value: strin
 
 function RelationControl({ field, value, onChange, onNavigate }: FieldProps) {
   const ids = Array.isArray(value) ? value : typeof value === "string" && value ? [value] : [];
-  const { resultsByToken } = useResolvedExhibits(ids.map((id) => `exhibit:e:${id}`));
+  const { resultsByToken } = useResolvedRecords(ids.map((id) => `record:e:${id}`));
   const { data: types } = useQuery({ queryKey: TYPES_KEY, queryFn: fetchTypes });
   const target = types?.find((t) => t.definition.slug === field.options.target);
   const [query, setQuery] = useState("");
@@ -324,10 +324,10 @@ function RelationControl({ field, value, onChange, onNavigate }: FieldProps) {
       {ids.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {ids.map((id) => {
-            const hit = resultsByToken.get(`exhibit:e:${id}`);
+            const hit = resultsByToken.get(`record:e:${id}`);
             return (
               <span key={id} className="inline-flex min-w-0 items-center gap-1">
-                {hit ? <ExhibitChip result={hit} renderIcon={getExhibitIcon} onNavigate={onNavigate} /> : <span className="font-mono text-xs text-dust">…</span>}
+                {hit ? <RecordChip result={hit} renderIcon={getRecordIcon} onNavigate={onNavigate} /> : <span className="font-mono text-xs text-dust">…</span>}
                 <button type="button" aria-label="Remove" className="tap-target font-mono text-xs text-dust" onClick={() => set(ids.filter((x) => x !== id))}>
                   ×
                 </button>

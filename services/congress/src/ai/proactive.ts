@@ -94,12 +94,12 @@ export async function buildDigest(since: number, zone: string): Promise<{ text: 
   const asks = (await listAsksForAi()).asks.filter((a) => a.state === "open" || a.state === "scheduled");
   const feed = await getFeed().catch(() => []);
   const upcoming = feed
-    .filter((f) => f.kind === "exhibit")
+    .filter((f) => f.kind === "record")
     .slice(0, 10)
     .map((f) => {
-      const p = f.kind === "exhibit" ? f.preview : undefined;
+      const p = f.kind === "record" ? f.preview : undefined;
       const when = p?.time?.start ? ` (${localTime(new Date(p.time.start), zone)})` : "";
-      return `- ${f.chamber}: ${p?.title ?? (f.kind === "exhibit" ? f.name : "")}${when}${f.reason ? ` - ${f.reason}` : ""}`;
+      return `- ${f.chamber}: ${p?.title ?? (f.kind === "record" ? f.name : "")}${when}${f.reason ? ` - ${f.reason}` : ""}`;
     });
   const sections = [
     `### Events since the last look (${events.length})`,

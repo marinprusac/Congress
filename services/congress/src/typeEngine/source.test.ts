@@ -1,21 +1,21 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { migrationsDir } from "@congress/test-support";
 import { runMigrations } from "../db/client.js";
-import { registerLocalSource } from "../exhibitSources.js";
+import { registerLocalSource } from "../recordSources.js";
 import {
   addManualConnection,
   getConnections,
-  getExhibitChip,
+  getRecordChip,
   removeManualConnection,
-  resolveExhibits,
-  searchExhibits,
-} from "../exhibits.js";
+  resolveRecords,
+  searchRecords,
+} from "../records.js";
 import { getFeed } from "../feed.js";
 import { syncEventCatalog } from "../eventCatalogSync.js";
 import { getEventSettingsByType, updateEventSettings } from "../eventSettings.js";
 import { listNotifications } from "../notifications.js";
 import { handleReceivedEvent } from "../eventReceive.js";
-import { runExhibitsMigrations } from "./db/client.js";
+import { runRecordsMigrations } from "./db/client.js";
 import { getTypeBySlug, publish } from "./store.js";
 import { createRecord, deleteRecord } from "./records.js";
 import { typeEngineSource } from "./source.js";
@@ -25,7 +25,7 @@ let draft: string;
 
 beforeAll(async () => {
   runMigrations(migrationsDir("congress"));
-  runExhibitsMigrations();
+  runRecordsMigrations();
   registerLocalSource(typeEngineSource);
   publish({
     actor: "test",
@@ -54,7 +54,7 @@ beforeAll(async () => {
 
 describe("the e namespace", () => {
   it("ranks search results by score and skips hidden types", async () => {
-    const results = await searchExhibits("desert");
+    const results = await searchRecords("desert");
     expect(results.map((r) => `${r.chamber}:${r.name}`)).toEqual(["e:Desert Solitaire", "e:Dune"]);
     expect(results[0]).toMatchObject({ type: "book", url: `/${draft}` });
   });
@@ -62,7 +62,7 @@ describe("the e namespace", () => {
   it("resolves e ids in-process, including deleted ones", async () => {
     const gone = createRecord("book", { title: "Temp" }).id;
     deleteRecord(gone);
-    const results = await resolveExhibits([
+    const results = await resolveRecords([
       { id: dune, chamber: "e" },
       { id: gone, chamber: "e" },
       { id: "nope", chamber: "gone-chamber" },
@@ -75,8 +75,8 @@ describe("the e namespace", () => {
   });
 
   it("builds chips", async () => {
-    expect(await getExhibitChip("e", dune)).toMatchObject({ name: "Dune", token: `[[exhibit:e:${dune}|Dune]]` });
-    expect(await getExhibitChip("e", "nope")).toEqual({ error: "not_found" });
+    expect(await getRecordChip("e", dune)).toMatchObject({ name: "Dune", token: `[[record:e:${dune}|Dune]]` });
+    expect(await getRecordChip("e", "nope")).toEqual({ error: "not_found" });
   });
 
   it("adds and removes manual connections owned by a record", async () => {
@@ -89,7 +89,7 @@ describe("the e namespace", () => {
 
   it("puts rule candidates in the feed", async () => {
     const feed = await getFeed();
-    expect(feed.map((i) => (i.kind === "exhibit" ? `${i.chamber}:${i.name}` : i.viewId))).toEqual(["e:Desert Solitaire"]);
+    expect(feed.map((i) => (i.kind === "record" ? `${i.chamber}:${i.name}` : i.viewId))).toEqual(["e:Desert Solitaire"]);
   });
 
   it("adds catalog entries for visible types only", async () => {

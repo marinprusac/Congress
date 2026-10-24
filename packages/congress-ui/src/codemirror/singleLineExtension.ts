@@ -17,8 +17,8 @@ export function createSingleLineExtension(onEnter: () => void): Extension[] {
       return hasNewline ? [] : tr;
     }),
     // Placed ahead of @codemirror/commands' defaultKeymap in the extensions
-    // array (see useExhibitEditorCore) so this wins at the same precedence
-    // level; the exhibit-picker's own Enter binding is Prec.highest and so
+    // array (see useRecordEditorCore) so this wins at the same precedence
+    // level; the record-picker's own Enter binding is Prec.highest and so
     // still takes priority over this while the picker is open.
     keymap.of([{ key: "Enter", run: () => { onEnter(); return true; } }]),
   ];

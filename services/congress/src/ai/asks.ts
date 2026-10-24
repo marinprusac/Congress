@@ -303,7 +303,7 @@ async function executeProposal(messageId: number, payload: AskProposalPayload, t
     trigger: "decision",
     summaryText: `Approved: ${payload.title}`,
     buildBody: async () =>
-      `## The owner approved your proposal "${payload.title}"\nCongress executed the calls exactly as proposed:\n${lines.join("\n")}\n\n${failed ? "Something failed - explain briefly and suggest a fix (a new proposal if it needs approval again)." : "Confirm briefly what changed. To mention something that was created, get its chip with get_exhibit_chip (the chamber plus the id in the result) - never write a token yourself."}`,
+      `## The owner approved your proposal "${payload.title}"\nCongress executed the calls exactly as proposed:\n${lines.join("\n")}\n\n${failed ? "Something failed - explain briefly and suggest a fix (a new proposal if it needs approval again)." : "Confirm briefly what changed. To mention something that was created, get its chip with get_record_chip (the chamber plus the id in the result) - never write a token yourself."}`,
   });
 }
 

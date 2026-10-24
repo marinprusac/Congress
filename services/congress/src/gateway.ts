@@ -6,7 +6,7 @@ import type { Context } from "hono";
 // the build). Public: an icon carries nothing sensitive. Any miss is a 404
 // and the caller falls back to a generic mark.
 const icon = (name: string) => fileURLToPath(new URL(`../frontend/public/icons/${name}.svg`, import.meta.url));
-// Runtime exhibit types share one mark ("e"); the views that replaced Chambers keep their names, so pins keep theirs.
+// Runtime record types share one mark ("e"); the views that replaced Chambers keep their names, so pins keep theirs.
 const CORE_ICONS: Record<string, string> = {
   e: icon("record"),
   types: icon("record"),

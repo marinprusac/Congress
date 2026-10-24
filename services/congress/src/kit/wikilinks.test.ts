@@ -1,44 +1,44 @@
 import { describe, expect, it } from "vitest";
-import { extractExhibitTokensWithLabels, extractOutgoingExhibitRefs } from "./wikilinks.js";
+import { extractRecordTokensWithLabels, extractOutgoingRecordRefs } from "./wikilinks.js";
 
 // Every Chamber that stores body text runs this over it on save and hands
 // the result to Congress's exhibit_refs graph, so a miss here silently
 // drops a Connection and a false positive creates one to nothing.
-describe("extractOutgoingExhibitRefs", () => {
-  it("returns bare exhibit ids, not the full token", () => {
-    expect(extractOutgoingExhibitRefs("see [[exhibit:notes:note-3]]")).toEqual(["note-3"]);
+describe("extractOutgoingRecordRefs", () => {
+  it("returns bare record ids, not the full token", () => {
+    expect(extractOutgoingRecordRefs("see [[record:notes:note-3]]")).toEqual(["note-3"]);
   });
 
   it("reads the target, not the alias", () => {
-    expect(extractOutgoingExhibitRefs("see [[exhibit:notes:note-3|Some other title]]")).toEqual(["note-3"]);
+    expect(extractOutgoingRecordRefs("see [[record:notes:note-3|Some other title]]")).toEqual(["note-3"]);
   });
 
-  it("deduplicates repeated references to the same exhibit", () => {
-    const body = "[[exhibit:notes:note-3|first]] and later [[exhibit:notes:note-3|again]]";
-    expect(extractOutgoingExhibitRefs(body)).toEqual(["note-3"]);
+  it("deduplicates repeated references to the same record", () => {
+    const body = "[[record:notes:note-3|first]] and later [[record:notes:note-3|again]]";
+    expect(extractOutgoingRecordRefs(body)).toEqual(["note-3"]);
   });
 
   it("collects references across multiple lines and chambers", () => {
-    const body = ["intro [[exhibit:notes:note-1]]", "", "- [[exhibit:tasks:task-9|Do the thing]]", "[[exhibit:map:place-4]]"].join(
+    const body = ["intro [[record:notes:note-1]]", "", "- [[record:tasks:task-9|Do the thing]]", "[[record:map:place-4]]"].join(
       "\n"
     );
-    expect(extractOutgoingExhibitRefs(body)).toEqual(["note-1", "task-9", "place-4"]);
+    expect(extractOutgoingRecordRefs(body)).toEqual(["note-1", "task-9", "place-4"]);
   });
 
-  it("ignores plain wikilinks that are not exhibit tokens", () => {
-    // Notes bodies predate the exhibit token migration and may still contain
+  it("ignores plain wikilinks that are not record tokens", () => {
+    // Notes bodies predate the record token migration and may still contain
     // bare [[Some Title]] links; those are not references to anything
     // addressable and must not reach the refs graph.
-    expect(extractOutgoingExhibitRefs("[[Some Title]] and [[another/one]]")).toEqual([]);
+    expect(extractOutgoingRecordRefs("[[Some Title]] and [[another/one]]")).toEqual([]);
   });
 
   it("tolerates surrounding whitespace inside the brackets", () => {
-    expect(extractOutgoingExhibitRefs("[[  exhibit:notes:note-5  |  Label ]]")).toEqual(["note-5"]);
+    expect(extractOutgoingRecordRefs("[[  record:notes:note-5  |  Label ]]")).toEqual(["note-5"]);
   });
 
   it("returns an empty array for text with no links at all", () => {
-    expect(extractOutgoingExhibitRefs("just some prose")).toEqual([]);
-    expect(extractOutgoingExhibitRefs("")).toEqual([]);
+    expect(extractOutgoingRecordRefs("just some prose")).toEqual([]);
+    expect(extractOutgoingRecordRefs("")).toEqual([]);
   });
 });
 
@@ -46,39 +46,39 @@ describe("extractOutgoingExhibitRefs", () => {
 // both the token (to resolve a live label) and the embedded alias (the
 // fallback when resolution fails) for every reference in a rich value.
 describe("escaped pipes in Markdown tables", () => {
-  it("reads [[exhibit:x:y\\|Label]] as the clean token", () => {
-    expect(extractExhibitTokensWithLabels("| [[exhibit:notes:note-3\\|Standup]] |")).toEqual([
-      { chamber: "notes", id: "note-3", token: "exhibit:notes:note-3", label: "Standup" },
+  it("reads [[record:x:y\\|Label]] as the clean token", () => {
+    expect(extractRecordTokensWithLabels("| [[record:notes:note-3\\|Standup]] |")).toEqual([
+      { chamber: "notes", id: "note-3", token: "record:notes:note-3", label: "Standup" },
     ]);
-    expect(extractOutgoingExhibitRefs("| [[exhibit:notes:note-3\\|Standup]] |")).toEqual(["note-3"]);
+    expect(extractOutgoingRecordRefs("| [[record:notes:note-3\\|Standup]] |")).toEqual(["note-3"]);
   });
 });
 
-describe("extractExhibitTokensWithLabels", () => {
+describe("extractRecordTokensWithLabels", () => {
   it("returns the full token, chamber, id, and alias", () => {
-    expect(extractExhibitTokensWithLabels("see [[exhibit:map:place-4|Grandma's House]]")).toEqual([
-      { token: "exhibit:map:place-4", chamber: "map", id: "place-4", label: "Grandma's House" },
+    expect(extractRecordTokensWithLabels("see [[record:map:place-4|Grandma's House]]")).toEqual([
+      { token: "record:map:place-4", chamber: "map", id: "place-4", label: "Grandma's House" },
     ]);
   });
 
   it("falls back to the bare id as the label when no alias is given", () => {
-    expect(extractExhibitTokensWithLabels("[[exhibit:map:place-4]]")).toEqual([
-      { token: "exhibit:map:place-4", chamber: "map", id: "place-4", label: "place-4" },
+    expect(extractRecordTokensWithLabels("[[record:map:place-4]]")).toEqual([
+      { token: "record:map:place-4", chamber: "map", id: "place-4", label: "place-4" },
     ]);
   });
 
   it("deduplicates by token, keeping the first alias seen", () => {
-    const text = "[[exhibit:map:place-4|First]] later [[exhibit:map:place-4|Second]]";
-    expect(extractExhibitTokensWithLabels(text)).toEqual([
-      { token: "exhibit:map:place-4", chamber: "map", id: "place-4", label: "First" },
+    const text = "[[record:map:place-4|First]] later [[record:map:place-4|Second]]";
+    expect(extractRecordTokensWithLabels(text)).toEqual([
+      { token: "record:map:place-4", chamber: "map", id: "place-4", label: "First" },
     ]);
   });
 
-  it("ignores plain wikilinks that are not exhibit tokens", () => {
-    expect(extractExhibitTokensWithLabels("[[Some Title]]")).toEqual([]);
+  it("ignores plain wikilinks that are not record tokens", () => {
+    expect(extractRecordTokensWithLabels("[[Some Title]]")).toEqual([]);
   });
 
   it("returns an empty array for text with no links at all", () => {
-    expect(extractExhibitTokensWithLabels("just some prose")).toEqual([]);
+    expect(extractRecordTokensWithLabels("just some prose")).toEqual([]);
   });
 });

@@ -1,5 +1,5 @@
 // Icons a type can use: lucide icon names (kebab-case). The frontend maps each to its component.
-export const EXHIBIT_ICONS = [
+export const RECORD_ICONS = [
   "file", "file-text", "sticky-note", "notebook", "book", "book-open", "bookmark", "bookmark-check", "tag", "folder",
   "archive", "inbox", "mail", "message-square", "message-circle", "phone", "user", "users", "contact", "building",
   "home", "calendar", "calendar-days", "clock", "alarm-clock", "timer", "hourglass", "square-check", "list-checks", "list-todo",
@@ -16,10 +16,10 @@ export const EXHIBIT_ICONS = [
   "chart-bar", "chart-pie", "scale", "hash", "at-sign", "circle-dot", "sparkles", "wand-sparkles", "repeat", "history",
   "text", "languages", "flask-conical", "microscope", "calculator",
 ] as const;
-export type ExhibitIconName = (typeof EXHIBIT_ICONS)[number];
+export type RecordIconName = (typeof RECORD_ICONS)[number];
 
 // Names stored before icons were lucide names.
-const LEGACY_ICONS: Record<string, ExhibitIconName> = {
+const LEGACY_ICONS: Record<string, RecordIconName> = {
   note: "sticky-note",
   task: "square-check",
   document: "file-text",
@@ -31,11 +31,11 @@ const LEGACY_ICONS: Record<string, ExhibitIconName> = {
   chat: "message-square",
 };
 
-const KNOWN = new Set<string>(EXHIBIT_ICONS);
+const KNOWN = new Set<string>(RECORD_ICONS);
 
 // Any stored icon string to a displayable icon name; unknown values become "file".
-export function normalizeExhibitIcon(icon: string | null | undefined): ExhibitIconName {
+export function normalizeRecordIcon(icon: string | null | undefined): RecordIconName {
   if (!icon) return "file";
-  if (KNOWN.has(icon)) return icon as ExhibitIconName;
+  if (KNOWN.has(icon)) return icon as RecordIconName;
   return LEGACY_ICONS[icon] ?? "file";
 }

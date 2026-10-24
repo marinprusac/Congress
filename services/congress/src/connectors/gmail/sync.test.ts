@@ -47,7 +47,7 @@ describe("gmail sync", () => {
     grow("m4", ["SENT"]);
     await syncAll(ctx);
     expect(state.published.map((p) => p.payload.messageId)).toEqual(["m3"]);
-    expect(state.published[0]).toMatchObject({ type: "mail.received", payload: { exhibitId: "rec1", url: "/e/rec1", from: "Jane Doe" } });
+    expect(state.published[0]).toMatchObject({ type: "mail.received", payload: { recordId: "rec1", url: "/e/rec1", from: "Jane Doe" } });
   });
 
   it("skips label changes on threads it doesn't keep, and drops a trashed thread", async () => {

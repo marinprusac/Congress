@@ -1,12 +1,12 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { runExhibitsMigrations } from "./db/client.js";
+import { runRecordsMigrations } from "./db/client.js";
 import { getTypeByPremadeKey, publish } from "./store.js";
 import { installPremades, type Premade } from "./premade/index.js";
 import { NOTE } from "./premade/note.js";
 import { PERSON } from "./premade/person.js";
 import { CHAT } from "./premade/chat.js";
 
-beforeAll(() => runExhibitsMigrations());
+beforeAll(() => runRecordsMigrations());
 
 describe("installPremades", () => {
   it("installs Note (visible after the cutover batch), once", () => {

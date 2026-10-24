@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Operation } from "@congress/shared-types";
-import { runExhibitsMigrations } from "./db/client.js";
+import { runRecordsMigrations } from "./db/client.js";
 import { DraftError, discardDraft, draftHash, getDraft, previewDraft, publishDraft, setDraftOps, startDraft } from "./drafts.js";
 import { getTypeBySlug, publish, PublishError } from "./store.js";
 import { installPremades } from "./premade/index.js";
@@ -13,7 +13,7 @@ const newBook: Operation[] = [
 ];
 
 beforeAll(() => {
-  runExhibitsMigrations();
+  runRecordsMigrations();
   installPremades([NOTE]);
 });
 

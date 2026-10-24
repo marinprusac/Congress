@@ -46,17 +46,17 @@ describe("migrations", () => {
 });
 
 describe("type engine migrations", () => {
-  it("apply cleanly to an empty exhibits database, twice", async () => {
-    const path = join(dir, "exhibits.sqlite3");
-    process.env.EXHIBITS_DB_PATH = path;
+  it("apply cleanly to an empty records database, twice", async () => {
+    const path = join(dir, "records.sqlite3");
+    process.env.RECORDS_DB_PATH = path;
     vi.resetModules();
-    const { runExhibitsMigrations, closeExhibitsDb } = await import("../services/congress/src/typeEngine/db/client.js");
+    const { runRecordsMigrations, closeRecordsDb } = await import("../services/congress/src/typeEngine/db/client.js");
     try {
-      runExhibitsMigrations();
-      runExhibitsMigrations();
+      runRecordsMigrations();
+      runRecordsMigrations();
       expect(statSync(path).size).toBeGreaterThan(0);
     } finally {
-      closeExhibitsDb();
+      closeRecordsDb();
     }
   });
 });

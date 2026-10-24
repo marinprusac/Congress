@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer, primaryKey, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 
-// The type engine's own tables in exhibits.sqlite3. Type tables (x_*, j_*)
+// The type engine's own tables in records.sqlite3. Type tables (x_*, j_*)
 // live in the same file but are created at runtime, never by drizzle.
 
 export const types = sqliteTable("types", {
@@ -49,13 +49,13 @@ export const recordRefs = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     recordId: text("record_id").notNull(),
-    targetExhibitId: text("target_exhibit_id").notNull(),
+    targetRecordId: text("target_exhibit_id").notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   },
-  (t) => [uniqueIndex("record_refs_pair_idx").on(t.recordId, t.targetExhibitId)]
+  (t) => [uniqueIndex("record_refs_pair_idx").on(t.recordId, t.targetRecordId)]
 );
 
-// Old Chamber exhibit ids (notes/note-42) mapped to the records that replaced them.
+// Old Chamber record ids (notes/note-42) mapped to the records that replaced them.
 export const legacyAliases = sqliteTable(
   "legacy_aliases",
   {
@@ -72,7 +72,7 @@ export const imports = sqliteTable("imports", {
   statsJson: text("stats_json").notNull(),
 });
 
-// Uploaded bytes for `file` fields, stored at EXHIBIT_FILES_DIR/<id>. Files are
+// Uploaded bytes for `file` fields, stored at RECORD_FILES_DIR/<id>. Files are
 // immutable; one no record uses is orphaned and deleted after a grace period.
 export const files = sqliteTable(
   "files",

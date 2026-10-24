@@ -1,6 +1,6 @@
 import type { FeedCandidate, FeedItem, FeedPreview, ManifestView } from "@congress/shared-types";
-import { resolveExhibits } from "./exhibits.js";
-import { listLocalSources } from "./exhibitSources.js";
+import { resolveRecords } from "./records.js";
+import { listLocalSources } from "./recordSources.js";
 import { listConnectors } from "./connectors/runtime.js";
 
 // The home "For You" feed. Every source (record types, connectors) supplies
@@ -22,7 +22,7 @@ export interface ChamberCandidates {
 
 type Unresolved =
   | Extract<FeedItem, { kind: "view" }>
-  | { kind: "exhibit"; chamber: string; exhibitId: string; score: number; reason?: string; preview?: FeedPreview };
+  | { kind: "record"; chamber: string; recordId: string; score: number; reason?: string; preview?: FeedPreview };
 
 // Pure: merges every Chamber's candidates into one list sorted by score
 // (ties keep registration order). Only views with a feed card take part -
@@ -30,10 +30,10 @@ type Unresolved =
 // link (those are reached through Search and the pinned row). Carded views
 // a Chamber didn't score get DEFAULT_VIEW_SCORE; candidates naming a view
 // the Chamber never declared (or one without a card) are dropped; an
-// exhibit named twice keeps its best-scored candidate.
+// record named twice keeps its best-scored candidate.
 export function rankFeed(perChamber: ChamberCandidates[]): Unresolved[] {
   const items: Unresolved[] = [];
-  const seenExhibits = new Map<string, Unresolved & { kind: "exhibit" }>();
+  const seenRecords = new Map<string, Unresolved & { kind: "record" }>();
 
   for (const { chamber, candidates } of perChamber) {
     const cardViews = chamber.views.filter((v) => v.card === true);
@@ -46,19 +46,19 @@ export function rankFeed(perChamber: ChamberCandidates[]): Unresolved[] {
         const prev = scoredViews.get(candidate.viewId);
         if (!prev || candidate.score > prev.score) scoredViews.set(candidate.viewId, { score: candidate.score, reason: candidate.reason });
       } else {
-        const prev = seenExhibits.get(candidate.exhibitId);
+        const prev = seenRecords.get(candidate.recordId);
         if (prev && prev.score >= candidate.score) continue;
         const item = {
-          kind: "exhibit" as const,
+          kind: "record" as const,
           chamber: chamber.name,
-          exhibitId: candidate.exhibitId,
+          recordId: candidate.recordId,
           score: candidate.score,
           reason: candidate.reason,
           preview: candidate.preview,
         };
         if (prev) items.splice(items.indexOf(prev), 1, item);
         else items.push(item);
-        seenExhibits.set(candidate.exhibitId, item);
+        seenRecords.set(candidate.recordId, item);
       }
     }
 
@@ -98,8 +98,8 @@ export async function getFeed(): Promise<FeedItem[]> {
   }
   const ranked = rankFeed(perChamber);
 
-  const exhibitRefs = ranked.flatMap((item) => (item.kind === "exhibit" ? [{ id: item.exhibitId, chamber: item.chamber }] : []));
-  const resolved = new Map((await resolveExhibits(exhibitRefs)).map((r) => [r.id, r]));
+  const refs = ranked.flatMap((item) => (item.kind === "record" ? [{ id: item.recordId, chamber: item.chamber }] : []));
+  const resolved = new Map((await resolveRecords(refs)).map((r) => [r.id, r]));
 
   const items: FeedItem[] = [];
   for (const item of ranked) {
@@ -107,8 +107,8 @@ export async function getFeed(): Promise<FeedItem[]> {
       items.push(item);
       continue;
     }
-    const hit = resolved.get(item.exhibitId);
-    // Deleted or currently unresolvable exhibits just drop out of the feed.
+    const hit = resolved.get(item.recordId);
+    // Deleted or currently unresolvable records just drop out of the feed.
     if (!hit || "deleted" in hit || "unavailable" in hit) continue;
     items.push({ ...item, name: hit.name, url: hit.url, type: hit.type });
   }

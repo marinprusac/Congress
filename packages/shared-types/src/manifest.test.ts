@@ -15,7 +15,7 @@ describe("manifestSchema views/exhibitTypes", () => {
     expect(parsed.exhibitTypes).toEqual([]);
   });
 
-  it("accepts a full-screen view, a card-only view, and creatable exhibit types", () => {
+  it("accepts a full-screen view, a card-only view, and creatable record types", () => {
     const parsed = manifestSchema.parse({
       ...base,
       views: [{ id: "agenda", label: "Agenda", fullPath: "/" }, { id: "snapshot", label: "Snapshot", card: true }],

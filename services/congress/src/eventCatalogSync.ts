@@ -3,7 +3,7 @@ import { CONGRESS_SYNTHETIC_EVENTS } from "@congress/shared-types";
 import { db } from "./db/client.js";
 import { eventSettings } from "./db/schema.js";
 import { typeEventCatalog } from "./typeEngine/source.js";
-import { getLocalSource } from "./exhibitSources.js";
+import { getLocalSource } from "./recordSources.js";
 import { listConnectors } from "./connectors/runtime.js";
 
 // Keeps Congress's known event-type catalog current with its own live

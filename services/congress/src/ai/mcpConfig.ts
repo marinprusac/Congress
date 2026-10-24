@@ -3,11 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ACTOR_HEADER } from "@congress/shared-types";
 import { env } from "../env.js";
-import { getLocalSource } from "../exhibitSources.js";
+import { getLocalSource } from "../recordSources.js";
 import { RUN_ID_HEADER, THREAD_ID_HEADER, type RunContextInfo } from "./runContext.js";
 
 // One `type: "http"` MCP server entry per active, MCP-capable Chamber, plus
-// Congress's own /mcp (exhibit search/resolve/chips/Connections, logs) -
+// Congress's own /mcp (record search/resolve/chips/Connections, logs) -
 // Congress is the registry owner, not a registrant, so it never appears in
 // its own registry and has to be added explicitly. The file is handed to
 // `claude --strict-mcp-config`, so these are the only MCP servers a run

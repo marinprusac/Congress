@@ -18,7 +18,7 @@ export interface CalendarItem {
   tentative: boolean;
 }
 
-// "[[exhibit:e:01..|Room 4]]" -> "Room 4".
+// "[[record:e:01..|Room 4]]" -> "Room 4".
 const plain = (text: string) => text.replace(/\[\[[^\]|]+\|([^\]]+)\]\]/g, "$1").replace(/\[\[([^\]|]+)\]\]/g, "$1");
 
 // Hidden events stay out; an event with no end lasts an hour.

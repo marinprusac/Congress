@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { migrationsDir } from "@congress/test-support";
 import { runMigrations } from "../../db/client.js";
 import { onEventPublished, type PublishedEvent } from "../../events.js";
-import { runExhibitsMigrations } from "../db/client.js";
+import { runRecordsMigrations } from "../db/client.js";
 import { getTypeBySlug, publish, PublishError } from "../store.js";
 import { createRecord, deleteRecord, getRecord, listRecords, RecordLockedError, updateRecord } from "../records.js";
 import { ConnectorRefusedError, defineConnector, type SourceRecord, type SourceValue } from "../../connectors/contract.js";
@@ -104,7 +104,7 @@ const byKey = (key: string) => all().find((r) => r.provenance?.key === key)!;
 
 beforeAll(async () => {
   runMigrations(migrationsDir("congress"));
-  runExhibitsMigrations();
+  runRecordsMigrations();
   seed("s1", { title: "Standup" });
   seed("s2", { title: "Their party" }, { editable: false, canRsvp: true });
   startBindings();
@@ -210,14 +210,14 @@ describe("pushing", () => {
 
   it("keeps rich chips while the source text still reads the same", async () => {
     const id = byKey("s1").id;
-    updateRecord(id, { notes: "With [[exhibit:e:01aaaaaaaaaaaaaaaaaaaaaaaa|Ana]]" }, { actor: "me" });
+    updateRecord(id, { notes: "With [[record:e:01aaaaaaaaaaaaaaaaaaaaaaaa|Ana]]" }, { actor: "me" });
     // Force the due retry of the earlier failed edit too.
     await vi.waitFor(async () => {
       await flushOutbox();
       expect(store.get("s1")!.values.notes).toBe("With Ana");
     });
     emit("s1");
-    expect(getRecord(id)!.values.notes).toBe("With [[exhibit:e:01aaaaaaaaaaaaaaaaaaaaaaaa|Ana]]");
+    expect(getRecord(id)!.values.notes).toBe("With [[record:e:01aaaaaaaaaaaaaaaaaaaaaaaa|Ana]]");
     store.get("s1")!.values.notes = "Rewritten in the source";
     emit("s1");
     expect(getRecord(id)!.values.notes).toBe("Rewritten in the source");

@@ -28,7 +28,7 @@ export function registerMemoryTools(server: McpServer) {
         nextCheckAt: iso.optional().describe("First check (ISO with offset). Omit it when a recurrence is set - the first slot is computed for you."),
         recurrence: recurrenceSchema.optional().describe("Checks repeat on this schedule in the owner's time zone."),
         watchEvents: z.array(watchEventSchema).max(20).optional().describe('Event types that matter, e.g. {"type":"tasks.overdue","immediate":true}.'),
-        refs: z.array(z.string()).max(20).optional().describe("Related exhibit tokens."),
+        refs: z.array(z.string()).max(20).optional().describe("Related record tokens."),
       },
     },
     async ({ title, body, nextCheckAt, recurrence, watchEvents, refs }) => {

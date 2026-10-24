@@ -3,7 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { migrationsDir } from "@congress/test-support";
 import { runMigrations } from "../../db/client.js";
 import { onEventPublished, type PublishedEvent } from "../../events.js";
-import { runExhibitsMigrations } from "../db/client.js";
+import { runRecordsMigrations } from "../db/client.js";
 import { getTypeBySlug, publish } from "../store.js";
 import { createRecord, listRecords, RecordLockedError } from "../records.js";
 import { registerTypeTools } from "../mcpTools.js";
@@ -49,7 +49,7 @@ const threads = () => listRecords("thread", { limit: 50 });
 
 beforeAll(async () => {
   runMigrations(migrationsDir("congress"));
-  runExhibitsMigrations();
+  runRecordsMigrations();
   startBindings();
   await startConnectors([fakeMail]);
   publish({

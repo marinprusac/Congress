@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { FieldDefinition, TypeOverview } from "@congress/shared-types";
-import { ExhibitTypeIcon, sourceColorStyle, useSourceColor } from "@congress/congress-ui";
+import { RecordTypeIcon, sourceColorStyle, useSourceColor } from "@congress/congress-ui";
 import { fetchTypeOverviews, fetchTypeVersions } from "@/lib/recordsApi";
 
 // Read-only: types change only through the AI's builder mode.
@@ -53,7 +53,7 @@ function TypeRow({ type }: { type: TypeOverview }) {
     <li className="border-t border-dust py-3">
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-baseline justify-between gap-3 text-left">
         <span className="flex min-w-0 items-baseline gap-3">
-          <ExhibitTypeIcon name={def.icon} className="h-5 w-5 shrink-0 translate-y-0.5 text-dust" />
+          <RecordTypeIcon name={def.icon} className="h-5 w-5 shrink-0 translate-y-0.5 text-dust" />
           <span
             aria-label={`Colour: ${color}`}
             className="inline-block h-3.5 w-3.5 shrink-0 translate-y-1 border-2 border-ink"
@@ -103,7 +103,7 @@ export function TypesSettingsTab() {
 
   return (
     <div>
-      <h3 className="font-display text-xl text-ink">Exhibit types</h3>
+      <h3 className="font-display text-xl text-ink">Record types</h3>
       <p className="mb-3 font-mono text-xs text-dust">
         To add or change a type, ask the AI in a chat. It asks for builder mode first, and every change needs your approval.
       </p>

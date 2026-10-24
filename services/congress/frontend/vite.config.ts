@@ -78,7 +78,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // Congress's own API (settings/records/exhibits/notifications/...).
+      // Congress's own API (settings/records/records/notifications/...).
       "/congress": PROXY_TARGET,
       // Session auth (LoginGate) - server.ts mounts these at top-level
       // "/auth", not under "/congress/*", so they need their own rule here.

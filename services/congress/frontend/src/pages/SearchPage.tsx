@@ -3,11 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ChamberHeader,
   ChamberMark,
-  ExhibitTypeIcon,
+  RecordTypeIcon,
   resolveChamberPath,
   StackLink,
   useAppliedTheme,
-  useExhibitSearch,
+  useRecordSearch,
   useStackNav,
 } from "@congress/congress-ui";
 import { viewHref } from "@/components/ViewSlot";
@@ -26,7 +26,7 @@ export function SearchPage() {
   const [params, setParams] = useSearchParams();
   const query = params.get("q") ?? "";
   const setQuery = (next: string) => setParams(next ? { q: next } : {}, { replace: true });
-  const { results, loading } = useExhibitSearch(query, true);
+  const { results, loading } = useRecordSearch(query, true);
   const { data: types } = useQuery({ queryKey: TYPES_KEY, queryFn: fetchTypes });
   const typeLabels = new Map((types ?? []).map((t) => [t.definition.slug, t.definition.label]));
 
@@ -67,7 +67,7 @@ export function SearchPage() {
           </>
         )}
 
-        <h2 className="search-section-title">{needle ? "Exhibits" : "Recent"}</h2>
+        <h2 className="search-section-title">{needle ? "Records" : "Recent"}</h2>
         {loading && results.length === 0 && <p className="font-mono text-xs text-dust">Searching —</p>}
         {!loading && results.length === 0 && <p className="font-mono text-xs text-dust">{needle ? "No matches" : "— Nothing yet —"}</p>}
         {results.map((result) => (
@@ -77,7 +77,7 @@ export function SearchPage() {
             className="search-row"
             onClick={() => nav.push(resolveChamberPath(result.url, result.chamber))}
           >
-            {result.chamber === "e" ? <ExhibitTypeIcon type={result.type} /> : <ChamberMark name={result.chamber} />}
+            {result.chamber === "e" ? <RecordTypeIcon type={result.type} /> : <ChamberMark name={result.chamber} />}
             <span className="search-row-name">{result.name}</span>
             <span className="search-row-meta">{result.chamber === "e" ? (typeLabels.get(result.type) ?? result.type) : (displayNames.get(result.chamber) ?? result.chamber)}</span>
           </button>

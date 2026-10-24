@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-interface ExhibitActionBarProps {
+interface RecordActionBarProps {
   children: ReactNode;
   className?: string;
 }
@@ -12,6 +12,6 @@ interface ExhibitActionBarProps {
 // caller passes: each Chamber's exact set of controls differs (Pin vs.
 // Complete/Reopen, Delete living on a separate edit page for Calendar) too
 // much to force through one rigid prop contract.
-export function ExhibitActionBar({ children, className }: ExhibitActionBarProps) {
-  return <div className={["exhibit-action-bar", className].filter(Boolean).join(" ")}>{children}</div>;
+export function RecordActionBar({ children, className }: RecordActionBarProps) {
+  return <div className={["record-action-bar", className].filter(Boolean).join(" ")}>{children}</div>;
 }

@@ -2,6 +2,7 @@ import { ConnectorRefusedError, type ConnectorContext, type SourceRecord, type S
 import { API, listCalendars } from "./calendars.js";
 import { getEventRow, parseEventKey, removeEvent, toSourceRecord, writeEvent } from "./cache.js";
 import { RESPONSES, rawFacts, type RawGoogleEvent } from "./facts.js";
+import { stripTitlePrefix } from "@congress/shared-types";
 import { dayOf, ownerZone } from "../../typeEngine/zone.js";
 
 // Writes to Google, then through to the cache; bindings call these.
@@ -17,7 +18,7 @@ function eventUrl(calendarId: string, eventId?: string): string {
 // Times are instants; an all-day one names its day in the owner's zone.
 export function toGoogleBody(values: Record<string, SourceValue>, zone = ownerZone()): Record<string, unknown> {
   const body: Record<string, unknown> = {};
-  if ("title" in values) body.summary = str(values.title) ?? "";
+  if ("title" in values) body.summary = stripTitlePrefix("Event", str(values.title) ?? "");
   if ("description" in values) body.description = str(values.description) ?? "";
   if ("location" in values) body.location = str(values.location) ?? "";
   const timeZone = str(values.timeZone) ?? zone;

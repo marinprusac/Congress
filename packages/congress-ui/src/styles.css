@@ -1,6 +1,6 @@
 /* Shared across every Congress frontend (Capitol + all Chambers) - theme
    tokens, base reset, and every component style this package's React
-   components rely on (exhibit chips, the [[ picker, sharing badges/forms,
+   components rely on (record chips, the [[ picker, sharing badges/forms,
    the Chamber shell). A consuming app's own index.css should only need
    `@import "@congress/congress-ui/styles.css";` - there are no remaining
    per-Chamber exceptions. */
@@ -139,7 +139,7 @@ html[data-theme="dark"] {
     color: var(--color-ink);
     font-family: var(--font-body);
     /* Default for all body text (note/task/document/event descriptions,
-       exhibit chip labels, ...): a long unbroken string like a URL with no
+       record chip labels, ...): a long unbroken string like a URL with no
        spaces wraps instead of pushing the layout wider than the viewport. */
     overflow-wrap: break-word;
     /* Never side-scrollable; `clip` keeps position: sticky working. */

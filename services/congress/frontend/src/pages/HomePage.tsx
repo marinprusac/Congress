@@ -56,7 +56,7 @@ function PinnedViews() {
 
 // A record: a kicker (its type, in the type's colour, and why it is here),
 // then its own information inline. The whole card opens the record.
-function ExhibitCard({ item, lead, typeLabel }: { item: Extract<FeedItem, { kind: "exhibit" }>; lead: boolean; typeLabel?: string }) {
+function RecordCard({ item, lead, typeLabel }: { item: Extract<FeedItem, { kind: "record" }>; lead: boolean; typeLabel?: string }) {
   const nav = useStackNav();
   const color = useSourceColor(item.chamber, item.type);
   const preview = item.preview;
@@ -68,15 +68,15 @@ function ExhibitCard({ item, lead, typeLabel }: { item: Extract<FeedItem, { kind
   const href = resolveChamberPath(item.url, item.chamber);
   return (
     <section className={lead ? "feed-card feed-card--lead" : "feed-card"} style={sourceColorStyle(color)}>
-      <button type="button" className="feed-exhibit" onPointerDown={() => void preloadRoute(href)} onClick={() => nav.push(href)}>
+      <button type="button" className="feed-record" onPointerDown={() => void preloadRoute(href)} onClick={() => nav.push(href)}>
         <span className="feed-kicker">
           <span className="feed-kicker-label">{typeLabel ?? item.type ?? item.chamber}</span>
           {reason && <span className="feed-kicker-reason">{reason}</span>}
         </span>
-        <span className="feed-exhibit-name">{preview?.title ?? item.name}</span>
-        {time && <span className="feed-exhibit-time">{time}</span>}
-        {preview?.fields && preview.fields.length > 0 && <span className="feed-exhibit-fields">{preview.fields.join(" · ")}</span>}
-        {preview?.body && <span className="feed-exhibit-body">{preview.body}</span>}
+        <span className="feed-record-name">{preview?.title ?? item.name}</span>
+        {time && <span className="feed-record-time">{time}</span>}
+        {preview?.fields && preview.fields.length > 0 && <span className="feed-record-fields">{preview.fields.join(" · ")}</span>}
+        {preview?.body && <span className="feed-record-body">{preview.body}</span>}
       </button>
     </section>
   );
@@ -88,11 +88,11 @@ function FeedEntry({ item, lead, typeLabel }: { item: FeedItem; lead: boolean; t
     if (!core?.view.Card) return null;
     return <ViewSlot source={core.source} view={core.view} Card={core.view.Card} reason={item.reason} />;
   }
-  return <ExhibitCard item={item} lead={lead} typeLabel={typeLabel} />;
+  return <RecordCard item={item} lead={lead} typeLabel={typeLabel} />;
 }
 
 function feedKey(item: FeedItem): string {
-  return item.kind === "view" ? `v:${item.chamber}:${item.viewId}` : `e:${item.exhibitId}`;
+  return item.kind === "view" ? `v:${item.chamber}:${item.viewId}` : `e:${item.recordId}`;
 }
 
 // Card-shaped placeholders while the feed loads.
@@ -110,7 +110,7 @@ function FeedSkeleton() {
   );
 }
 
-// Congress's home: a "For You" feed. The owner's pinned views, then every active Chamber's views and exhibits ranked by how
+// Congress's home: a "For You" feed. The owner's pinned views, then every active Chamber's views and records ranked by how
 // much they matter right now (GET /congress/feed - the ranking itself lives
 // server-side, see services/congress/src/feed.ts).
 export function HomePage() {
@@ -157,7 +157,7 @@ export function HomePage() {
                 data-flip-key={key}
                 className={`feed-slot feed-slot--${slot}${introIndex === undefined ? "" : " motion-rise"}`}
                 style={introIndex === undefined ? undefined : ({ "--stagger": `${staggerDelayMs(introIndex)}ms` } as CSSProperties)}>
-                <FeedEntry item={item} lead={slot === "lead"} typeLabel={item.kind === "exhibit" && item.type ? typeLabels.get(item.type) : undefined} />
+                <FeedEntry item={item} lead={slot === "lead"} typeLabel={item.kind === "record" && item.type ? typeLabels.get(item.type) : undefined} />
               </div>
             );
           })}

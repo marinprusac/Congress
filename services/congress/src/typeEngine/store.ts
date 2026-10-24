@@ -4,7 +4,7 @@ import type { Operation, TypeDefinition, TypeSummary, TypeVersion } from "@congr
 import { count } from "drizzle-orm";
 import { typeDefinitionSchema } from "@congress/shared-types";
 import { env } from "../env.js";
-import { exhibitsDb, exhibitsSqlite } from "./db/client.js";
+import { recordsDb, recordsSqlite } from "./db/client.js";
 import { records, types, typeVersions } from "./db/schema.js";
 import { applyOperations, OperationError, rollbackDefinition } from "./operations.js";
 import { planMigration, type MigrationPlan } from "./planner.js";
@@ -58,7 +58,7 @@ export function onTypesChanged(fn: () => void): () => void {
 function ensureLoaded(): void {
   if (loaded) return;
   cache.clear();
-  for (const row of exhibitsDb.select().from(types).all()) cache.set(row.id, toStored(row));
+  for (const row of recordsDb.select().from(types).all()) cache.set(row.id, toStored(row));
   loaded = true;
 }
 
@@ -175,7 +175,7 @@ function prepareRollback(typeId: string, toVersion: number): { current: StoredTy
   ensureLoaded();
   const current = cache.get(typeId);
   if (!current) throw new PublishError([`no type ${typeId}`]);
-  const row = exhibitsDb.select().from(typeVersions).where(eq(typeVersions.typeId, typeId)).all().find((v) => v.version === toVersion);
+  const row = recordsDb.select().from(typeVersions).where(eq(typeVersions.typeId, typeId)).all().find((v) => v.version === toVersion);
   if (!row || toVersion >= current.version) throw new PublishError([`no earlier version ${toVersion}`]);
   const target = typeDefinitionSchema.parse(JSON.parse(row.definitionJson));
   const def = rollbackDefinition(current.definition, target);
@@ -213,7 +213,7 @@ function runPreflight(plan: MigrationPlan): { warnings: PreflightCount[]; blocke
   const warnings: PreflightCount[] = [];
   const blockers: PreflightCount[] = [];
   for (const check of plan.preflight) {
-    const n = Number((exhibitsSqlite.prepare(check.sql).get() as { n: number }).n);
+    const n = Number((recordsSqlite.prepare(check.sql).get() as { n: number }).n);
     if (n > 0) (check.block ? blockers : warnings).push({ label: check.label, count: n });
   }
   return { warnings, blockers };
@@ -244,7 +244,7 @@ function preview(prep: () => { current: StoredType | undefined; def: TypeDefinit
 }
 
 export function listVersions(typeId: string): TypeVersion[] {
-  const rows = exhibitsDb
+  const rows = recordsDb
     .select({ version: typeVersions.version, actor: typeVersions.actor, createdAt: typeVersions.createdAt, definitionJson: typeVersions.definitionJson })
     .from(typeVersions)
     .where(eq(typeVersions.typeId, typeId))
@@ -261,7 +261,7 @@ export function listVersions(typeId: string): TypeVersion[] {
 }
 
 export function recordCount(typeId: string): number {
-  return exhibitsDb.select({ n: count() }).from(records).where(eq(records.typeId, typeId)).get()?.n ?? 0;
+  return recordsDb.select({ n: count() }).from(records).where(eq(records.typeId, typeId)).get()?.n ?? 0;
 }
 
 function commit(
@@ -274,7 +274,7 @@ function commit(
   const plan = planMigration(current?.definition ?? null, def);
   if (plan.rebuild) {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    snapshot(exhibitsSqlite, join(backupDir(env.EXHIBITS_DB_PATH), `exhibits-prepublish-${def.slug}-${stamp}.sqlite3`));
+    snapshot(recordsSqlite, join(backupDir(env.RECORDS_DB_PATH), `records-prepublish-${def.slug}-${stamp}.sqlite3`));
   }
 
   const now = new Date();
@@ -282,11 +282,11 @@ function commit(
   const version = (current?.version ?? 0) + 1;
   const warnings: string[] = [];
 
-  exhibitsSqlite.transaction(() => {
+  recordsSqlite.transaction(() => {
     const counts = runPreflight(plan);
     if (counts.blockers.length) throw new PublishError(counts.blockers.map((b) => `${b.label} (${b.count})`));
     warnings.push(...counts.warnings.map((w) => `${w.label} (${w.count})`));
-    for (const step of plan.steps) exhibitsSqlite.exec(step);
+    for (const step of plan.steps) recordsSqlite.exec(step);
     if (current && keySignature(current.definition) !== keySignature(def)) {
       const clashes = keyClashes(def);
       if (clashes.length) throw new PublishError(clashes.map((c) => `${c.label} (${c.count})`));
@@ -295,7 +295,7 @@ function commit(
 
     const definitionJson = JSON.stringify(def);
     if (current) {
-      exhibitsDb
+      recordsDb
         .update(types)
         .set({
           slug: def.slug,
@@ -307,7 +307,7 @@ function commit(
         .where(eq(types.id, id))
         .run();
     } else {
-      exhibitsDb
+      recordsDb
         .insert(types)
         .values({
           id,
@@ -323,7 +323,7 @@ function commit(
         })
         .run();
     }
-    exhibitsDb
+    recordsDb
       .insert(typeVersions)
       .values({
         typeId: id,
@@ -337,7 +337,7 @@ function commit(
       .run();
   })();
 
-  const row = exhibitsDb.select().from(types).where(eq(types.id, id)).get()!;
+  const row = recordsDb.select().from(types).where(eq(types.id, id)).get()!;
   const stored = toStored(row);
   cache.set(id, stored);
   for (const fn of listeners) fn();
@@ -345,7 +345,7 @@ function commit(
 }
 
 export function markForked(typeId: string): void {
-  exhibitsDb.update(types).set({ forked: true }).where(eq(types.id, typeId)).run();
+  recordsDb.update(types).set({ forked: true }).where(eq(types.id, typeId)).run();
   const t = cache.get(typeId);
   if (t) t.forked = true;
 }

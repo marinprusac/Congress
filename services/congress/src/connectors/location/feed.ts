@@ -18,8 +18,8 @@ export function mapFeed(today: Visit[]): { source: string; views: ManifestView[]
   const here: FeedCandidate[] = current
     ? [
         {
-          kind: "exhibit",
-          exhibitId: current.placeId!,
+          kind: "record",
+          recordId: current.placeId!,
           score: 45,
           reason: "You're here",
           preview: { title: current.placeName ?? undefined, time: { label: "Since", start: current.arrivedAt } },

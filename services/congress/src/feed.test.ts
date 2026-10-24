@@ -7,11 +7,11 @@ const entry = (name: string, views: ManifestView[]) => ({ name, views });
 describe("rankFeed", () => {
   it("sorts every Chamber's candidates together by score", () => {
     const ranked = rankFeed([
-      { chamber: entry("map", [{ id: "today", label: "Today", card: true }]), candidates: [{ kind: "exhibit", exhibitId: "task-1", score: 90, reason: "Overdue" }] },
+      { chamber: entry("map", [{ id: "today", label: "Today", card: true }]), candidates: [{ kind: "record", recordId: "task-1", score: 90, reason: "Overdue" }] },
       { chamber: entry("fitness", [{ id: "health", label: "Health", fullPath: "/metrics", card: true }]), candidates: [{ kind: "view", viewId: "health", score: 95, reason: "New reading" }] },
     ]);
 
-    expect(ranked.map((i) => (i.kind === "view" ? `${i.chamber}:${i.viewId}` : i.exhibitId))).toEqual(["fitness:health", "task-1", "map:today"]);
+    expect(ranked.map((i) => (i.kind === "view" ? `${i.chamber}:${i.viewId}` : i.recordId))).toEqual(["fitness:health", "task-1", "map:today"]);
     expect(ranked[0]).toMatchObject({ label: "Health", fullPath: "/metrics", reason: "New reading" });
   });
 
@@ -27,10 +27,10 @@ describe("rankFeed", () => {
     expect(ranked).toEqual([]);
   });
 
-  it("carries an exhibit's inline preview through", () => {
+  it("carries a record's inline preview through", () => {
     const preview = { time: { label: "Due", start: "2026-09-27T15:00:00.000Z" }, body: "Invoice #42 for September" };
-    const ranked = rankFeed([{ chamber: entry("tasks", []), candidates: [{ kind: "exhibit", exhibitId: "task-1", score: 80, preview }] }]);
-    expect(ranked[0]).toMatchObject({ exhibitId: "task-1", preview });
+    const ranked = rankFeed([{ chamber: entry("tasks", []), candidates: [{ kind: "record", recordId: "task-1", score: 80, preview }] }]);
+    expect(ranked[0]).toMatchObject({ recordId: "task-1", preview });
   });
 
   it("drops a candidate naming a view the Chamber never declared", () => {
@@ -38,16 +38,16 @@ describe("rankFeed", () => {
     expect(ranked).toEqual([]);
   });
 
-  it("keeps an exhibit named twice once, at its best score", () => {
+  it("keeps a record named twice once, at its best score", () => {
     const ranked = rankFeed([
       {
         chamber: entry("tasks", []),
         candidates: [
-          { kind: "exhibit", exhibitId: "task-1", score: 40, reason: "Due tomorrow" },
-          { kind: "exhibit", exhibitId: "task-1", score: 80, reason: "Due in 1h" },
+          { kind: "record", recordId: "task-1", score: 40, reason: "Due tomorrow" },
+          { kind: "record", recordId: "task-1", score: 80, reason: "Due in 1h" },
         ],
       },
     ]);
-    expect(ranked).toEqual([{ kind: "exhibit", chamber: "tasks", exhibitId: "task-1", score: 80, reason: "Due in 1h" }]);
+    expect(ranked).toEqual([{ kind: "record", chamber: "tasks", recordId: "task-1", score: 80, reason: "Due in 1h" }]);
   });
 });

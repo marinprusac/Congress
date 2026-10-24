@@ -2,14 +2,14 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { AutoCreate } from "@congress/shared-types";
 import { migrationsDir } from "@congress/test-support";
 import { runMigrations } from "../db/client.js";
-import { runExhibitsMigrations } from "./db/client.js";
+import { runRecordsMigrations } from "./db/client.js";
 import { getTypeBySlug, publish } from "./store.js";
 import { getRecord, RecordValidationError, updateRecord } from "./records.js";
 import { lookupOrCreate, type Evidence } from "./lookups.js";
 
 beforeAll(() => {
   runMigrations(migrationsDir("congress"));
-  runExhibitsMigrations();
+  runRecordsMigrations();
   publish({
     actor: "test",
     ops: [

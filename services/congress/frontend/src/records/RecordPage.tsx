@@ -4,12 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChamberHeader,
   ConfirmSheet,
-  ExhibitActionBar,
-  ExhibitFieldEditor,
-  ExhibitLinksLayout,
+  RecordActionBar,
+  RecordFieldEditor,
+  RecordLinksLayout,
   flushDraftConnections,
-  getExhibitIcon,
-  navigateToExhibit,
+  getRecordIcon,
+  navigateToRecord,
   resolveEditorIdentity,
   showToast,
   useAppliedTheme,
@@ -19,7 +19,7 @@ import {
   useSelfNavigateGuard,
   useStackNav,
 } from "@congress/congress-ui";
-import type { CapitolExhibitResolveResult, CapitolExhibitSearchResult, FieldDefinition, RecordValue, TypeDefinition } from "@congress/shared-types";
+import { stripTitlePrefix, type CapitolRecordResolveResult, type CapitolRecordSearchResult, type FieldDefinition, type RecordValue, type TypeDefinition } from "@congress/shared-types";
 import { LIVE_RENDERERS } from "@/connectors/live";
 import { MapPointControl, type MapPoint } from "./MapPointControl";
 import {
@@ -44,7 +44,7 @@ import { DEFAULT_MINUTES, plusMinutes } from "./timeRange";
 import { RelatedSection } from "./RelatedSection";
 import { titleFromFilename } from "./format";
 
-// One page for every runtime exhibit type: /e/:id and /e/new/:type. A new
+// One page for every runtime record type: /e/:id and /e/new/:type. A new
 // record is created on the title's blur, then autosaves a diff of changed
 // fields, the same flow Notes' editor used.
 
@@ -97,7 +97,7 @@ export function RecordPage() {
 
   const [recordId, setRecordId] = useState<string | null>(idParam ?? null);
   const [values, setValues] = useState<Values>({});
-  const [draftConnections, setDraftConnections] = useState<CapitolExhibitSearchResult[]>([]);
+  const [draftConnections, setDraftConnections] = useState<CapitolRecordSearchResult[]>([]);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   // Stops the query and autosave from touching a record that's gone.
   const [deleted, setDeleted] = useState(false);
@@ -172,7 +172,7 @@ export function RecordPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [titleField?.slug, startField?.slug]);
 
-  const onNavigate = (r: Extract<CapitolExhibitResolveResult, { url: string }>) => navigateToExhibit(r, navigate);
+  const onNavigate = (r: Extract<CapitolRecordResolveResult, { url: string }>) => navigateToRecord(r, navigate);
 
   const createMutation = useMutation({
     mutationFn: async (draft: Values) => {
@@ -343,16 +343,19 @@ export function RecordPage() {
             )}
             {titleField && !locked.has(titleField.slug) && (
               <div className="mb-6 border-b-2 border-ink pb-4">
-                <input
-                  ref={titleRef}
-                  readOnly={locked.has(titleField.slug)}
-                  autoFocus={isDraft}
-                  value={String(current[titleField.slug] ?? "")}
-                  onChange={(e) => set(titleField.slug, e.target.value)}
-                  onBlur={() => draftCreate.attempt()}
-                  placeholder={isDraft ? titleField.label : "Untitled"}
-                  className="w-full font-display text-3xl font-black tracking-tight text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
-                />
+                {/* The type's label is part of every title; the server adds it on save. */}
+                <label className="flex flex-wrap items-baseline font-display text-3xl font-black tracking-tight">
+                  <span className="shrink-0 whitespace-pre text-ink/30">{def.label}: </span>
+                  <input
+                    ref={titleRef}
+                    autoFocus={isDraft}
+                    value={stripTitlePrefix(def.label, String(current[titleField.slug] ?? ""))}
+                    onChange={(e) => set(titleField.slug, e.target.value)}
+                    onBlur={() => draftCreate.attempt()}
+                    placeholder={isDraft ? titleField.label : "Untitled"}
+                    className="min-w-0 flex-1 basis-40 text-ink placeholder:text-dust focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+                  />
+                </label>
               </div>
             )}
 
@@ -426,17 +429,17 @@ export function RecordPage() {
 
             {related.length > 0 && <RelatedSection groups={related} onNavigate={onNavigate} />}
 
-            <ExhibitLinksLayout
-              exhibitId={recordId}
+            <RecordLinksLayout
+              recordId={recordId}
               hideIds={shownLinks}
-              renderIcon={getExhibitIcon}
+              renderIcon={getRecordIcon}
               onNavigate={onNavigate}
               editable
               onCreateReference={type && creatable ? (title) => quickCreateRecord(type, title) : undefined}
               draftConnections={draftConnections}
               onDraftConnectionsChange={setDraftConnections}
               actions={
-                <ExhibitActionBar>
+                <RecordActionBar>
                   {isDraft ? (
                     <button onClick={() => nav.pop()} className="btn">
                       Cancel
@@ -468,7 +471,7 @@ export function RecordPage() {
                       )}
                     </>
                   )}
-                </ExhibitActionBar>
+                </RecordActionBar>
               }
             >
               {Live && binding && recordId ? (
@@ -476,20 +479,20 @@ export function RecordPage() {
               ) : bodyField && locked.has(bodyField.slug) ? (
                 <ReadonlyValue field={bodyField} value={current[bodyField.slug]} onNavigate={onNavigate} />
               ) : bodyField ? (
-                <ExhibitFieldEditor
+                <RecordFieldEditor
                   value={String(current[bodyField.slug] ?? "")}
                   onChange={(v) => set(bodyField.slug, v)}
                   minRows={3}
-                  placeholder="Start writing. Type @ to reference a note, event, or other Exhibit."
+                  placeholder="Start writing. Type @ to reference a note, event, or other Record."
                   className="w-full bg-parchment p-3 font-body text-base text-ink focus-within:outline-none"
-                  renderIcon={getExhibitIcon}
+                  renderIcon={getRecordIcon}
                   onNavigate={onNavigate}
                   onCreate={type ? (title) => quickCreateRecord(type, title) : undefined}
                 />
               ) : (
                 <span />
               )}
-            </ExhibitLinksLayout>
+            </RecordLinksLayout>
 
             {!isDraft && (
               <ConfirmSheet

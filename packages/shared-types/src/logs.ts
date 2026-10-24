@@ -15,7 +15,7 @@ export const eventSettingsSummarySchema = z.object({
   // inputs' field picker - null when the publisher declared no fields.
   payloadFields: z.record(z.string(), manifestEventFieldSchema).nullable(),
   historyRetentionMs: z.number().int().positive().nullable(),
-  // The slug of the exhibit type that owns this event: its notification
+  // The slug of the record type that owns this event: its notification
   // setting lives in that type's definition and is read-only here.
   managedByType: z.string().nullable(),
   notify: z.boolean(),

@@ -1,34 +1,34 @@
-import type { ExhibitResolveResult, ExhibitSearchResult, FeedCandidate } from "@congress/shared-types";
+import type { RecordResolveResult, RecordSearchResult, FeedCandidate } from "@congress/shared-types";
 
-// An exhibit namespace served in-process by Congress itself (the type
+// A record namespace served in-process by Congress itself (the type
 // engine's "e"), next to the Chambers reached over chamberFetch.
 
-export interface LocalExhibitSource {
+export interface LocalRecordSource {
   namespace: string;
-  search(query: string): ExhibitSearchResult[];
-  resolve(ids: string[]): ExhibitResolveResult[];
+  search(query: string): RecordSearchResult[];
+  resolve(ids: string[]): RecordResolveResult[];
   typeOf(id: string): string | null;
   chip(id: string): { id: string; name: string; url: string } | null;
-  addManualRef(id: string, targetExhibitId: string): string[] | null;
-  removeManualRef(id: string, targetExhibitId: string): string[] | null;
+  addManualRef(id: string, targetRecordId: string): string[] | null;
+  removeManualRef(id: string, targetRecordId: string): string[] | null;
   feedCandidates(now: Date): FeedCandidate[];
-  // Old exhibit ids this namespace replaced (e.g. notes' note-42): legacy id
+  // Old record ids this namespace replaced (e.g. notes' note-42): legacy id
   // -> id here, and the reverse.
   canonicalize?(ids: string[]): Map<string, string>;
   legacyIdsOf?(id: string): string[];
 }
 
-const sources = new Map<string, LocalExhibitSource>();
+const sources = new Map<string, LocalRecordSource>();
 
-export function registerLocalSource(source: LocalExhibitSource): void {
+export function registerLocalSource(source: LocalRecordSource): void {
   sources.set(source.namespace, source);
 }
 
-export function getLocalSource(namespace: string): LocalExhibitSource | undefined {
+export function getLocalSource(namespace: string): LocalRecordSource | undefined {
   return sources.get(namespace);
 }
 
-export function listLocalSources(): LocalExhibitSource[] {
+export function listLocalSources(): LocalRecordSource[] {
   return [...sources.values()];
 }
 

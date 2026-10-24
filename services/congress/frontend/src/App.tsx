@@ -74,7 +74,7 @@ export function App() {
         </Route>
         <Route path="/whatsapp/settings" element={<Navigate to="/settings?from=accounts" replace />} />
         <Route path="/whatsapp/*" element={<Navigate to="/whatsapp" replace />} />
-        {/* Every runtime exhibit type's records (typeEngine). */}
+        {/* Every runtime record type's records (typeEngine). */}
         <Route path="/e/new/:type" element={<RecordPage />} />
         <Route path="/e/:id" element={<RecordPage />} />
         {/* Retired Chambers' old URLs, now premade types. */}

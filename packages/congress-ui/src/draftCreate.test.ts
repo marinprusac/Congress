@@ -12,7 +12,7 @@ describe("shouldFireDraftCreate", () => {
 
   it("never fires again once already fired, even if canCreate is still true", () => {
     // Guards the double-create case: two blur events in the same tick (or a
-    // blur followed by the unmount flush) must not both create an exhibit.
+    // blur followed by the unmount flush) must not both create a record.
     expect(shouldFireDraftCreate("fired", true)).toBe(false);
   });
 });

@@ -9,7 +9,7 @@ export function toolLabel(toolName: string): { chamber: string | null; label: st
   if (builtin) return { chamber: null, label: builtin };
   const match = /^mcp__([^_]+(?:_[^_]+)*?)__(.+)$/.exec(toolName);
   const chamber = match?.[1] ?? null;
-  const action = (match?.[2] ?? toolName).replace(/[_.-]+/g, " ").trim();
+  const action = (match?.[2] ?? toolName).replace(/[_.-]+/g, " ").replace(/record/g, "record").trim();
   return { chamber, label: action.charAt(0).toUpperCase() + action.slice(1) };
 }
 

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { migrationsDir } from "@congress/test-support";
 import { runMigrations } from "../db/client.js";
-import { exhibitsSqlite, runExhibitsMigrations } from "./db/client.js";
+import { recordsSqlite, runRecordsMigrations } from "./db/client.js";
 import { DraftError, draftHash, previewDraft, publishDraft, setDraftOps, startDraft } from "./drafts.js";
 import { createRecord, getRecord, updateRecord } from "./records.js";
 import { getTypeBySlug, publish } from "./store.js";
@@ -10,7 +10,7 @@ import { NOTE } from "./premade/note.js";
 
 beforeAll(() => {
   runMigrations(migrationsDir("congress"));
-  runExhibitsMigrations();
+  runRecordsMigrations();
   installPremades([NOTE]);
   publish({
     actor: "test",
@@ -32,7 +32,7 @@ beforeAll(() => {
   });
 });
 
-const tableExists = (name: string) => !!exhibitsSqlite.prepare("select 1 from sqlite_master where name = ?").get(name);
+const tableExists = (name: string) => !!recordsSqlite.prepare("select 1 from sqlite_master where name = ?").get(name);
 
 function deleteDraft(slug: string, threadId: number) {
   const d = startDraft({ threadId, slug });

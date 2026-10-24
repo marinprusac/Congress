@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { EXHIBIT_ICONS } from "./exhibitIcons.js";
+import { RECORD_ICONS } from "./recordIcons.js";
 import { SOURCE_COLORS } from "./sourceColors.js";
 
-// Runtime exhibit types: a definition is data (never code), rendered by
+// Runtime record types: a definition is data (never code), rendered by
 // Congress's generic record UI and backed by a real SQLite table.
 
 export const SLUG_PATTERN = /^[a-z][a-z0-9_]{0,40}$/;
@@ -186,7 +186,7 @@ export const operationSchema = z.discriminatedUnion("op", [
     slug: slugSchema,
     label: z.string().min(1).max(60),
     pluralLabel: z.string().min(1).max(60).optional(),
-    icon: z.enum(EXHIBIT_ICONS).optional(),
+    icon: z.enum(RECORD_ICONS).optional(),
     color: z.enum(SOURCE_COLORS).optional(),
   }),
   z.object({
@@ -194,7 +194,7 @@ export const operationSchema = z.discriminatedUnion("op", [
     slug: slugSchema.optional(),
     label: z.string().min(1).max(60).optional(),
     pluralLabel: z.string().min(1).max(60).optional(),
-    icon: z.enum(EXHIBIT_ICONS).optional(),
+    icon: z.enum(RECORD_ICONS).optional(),
     color: z.enum(SOURCE_COLORS).optional(),
     eventPrefix: slugSchema.optional(),
     hidden: z.boolean().optional(),

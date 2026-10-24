@@ -3,7 +3,7 @@ import { migrationsDir } from "@congress/test-support";
 import { runMigrations } from "../../db/client.js";
 import { onEventPublished, type PublishedEvent } from "../../events.js";
 import { startTypeEngine } from "../index.js";
-import { exhibitsSqlite } from "../db/client.js";
+import { recordsSqlite } from "../db/client.js";
 import { getTypeBySlug } from "../store.js";
 import { createRecord, listRecords, RecordLockedError, titleOf, updateRecord } from "../records.js";
 import { feedCandidatesFor } from "../feedRules.js";
@@ -55,8 +55,8 @@ describe("the Email premade bound to Gmail", () => {
   it("keeps mail out of the feed", () => {
     const t = getTypeBySlug("email")!;
     const def = t.definition;
-    const rows = (sql: string, params: Stored[]) => exhibitsSqlite.prepare(sql).all(...params) as Record<string, Stored>[];
-    const ids = feedCandidatesFor(def, new Date(), rows, (r) => titleOf(def, r)).map((c) => (c.kind === "exhibit" ? c.exhibitId : ""));
+    const rows = (sql: string, params: Stored[]) => recordsSqlite.prepare(sql).all(...params) as Record<string, Stored>[];
+    const ids = feedCandidatesFor(def, new Date(), rows, (r) => titleOf(def, r)).map((c) => (c.kind === "record" ? c.recordId : ""));
     expect(ids).toEqual([]);
   });
 

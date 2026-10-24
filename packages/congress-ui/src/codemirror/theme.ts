@@ -7,7 +7,7 @@ import type { Extension } from "@codemirror/state";
 // shared.css) rather than hardcoded colors, so dark mode (useAppliedTheme)
 // keeps working here with zero extra wiring - those tokens already flip
 // per-theme wherever they're defined.
-export const exhibitEditorTheme = EditorView.theme({
+export const recordEditorTheme = EditorView.theme({
   "&": {
     color: "var(--color-ink)",
     backgroundColor: "transparent",

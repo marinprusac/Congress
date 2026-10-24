@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import type { CapitolExhibitResolveResult, CapitolExhibitSearchResult } from "@congress/shared-types";
-import { useExhibitEditorCore } from "./codemirror/useExhibitEditorCore.js";
-import { ExhibitPickerDropdown } from "./ExhibitPickerDropdown.js";
+import type { CapitolRecordResolveResult, CapitolRecordSearchResult } from "@congress/shared-types";
+import { useRecordEditorCore } from "./codemirror/useRecordEditorCore.js";
+import { RecordPickerDropdown } from "./RecordPickerDropdown.js";
 
-interface ExhibitInlineFieldProps {
+interface RecordInlineFieldProps {
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
@@ -11,33 +11,33 @@ interface ExhibitInlineFieldProps {
   className: string;
   wrapperClassName?: string;
   renderIcon: (chamber: string, type?: string) => ReactNode;
-  onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
-  onCreate?: (title: string) => Promise<CapitolExhibitSearchResult>;
+  onNavigate?: (result: Extract<CapitolRecordResolveResult, { url: string }>) => void;
+  onCreate?: (title: string) => Promise<CapitolRecordSearchResult>;
   autoFocus?: boolean;
   // Called on Enter instead of inserting a line break (this field never
   // holds more than one line) - e.g. submitting the surrounding form.
   onEnter?: () => void;
 }
 
-// Single-line counterpart to <ExhibitFieldEditor>: exhibit chips plus inline
+// Single-line counterpart to <RecordFieldEditor>: record chips plus inline
 // emphasis (bold/italic/links) only, no block-level Markdown (headers,
 // lists) - for fields like Calendar's location, replacing a bespoke
-// <input type="text"> with one that can hold and live-preview an exhibit
+// <input type="text"> with one that can hold and live-preview a record
 // reference too.
-export function ExhibitInlineField({
+export function RecordInlineField({
   value,
   onChange,
   readOnly = false,
   placeholder,
   className,
-  wrapperClassName = "exhibit-field",
+  wrapperClassName = "record-field",
   renderIcon,
   onNavigate,
   onCreate,
   autoFocus,
   onEnter,
-}: ExhibitInlineFieldProps) {
-  const { containerRef, picker } = useExhibitEditorCore({
+}: RecordInlineFieldProps) {
+  const { containerRef, picker } = useRecordEditorCore({
     value,
     onChange,
     readOnly,
@@ -53,7 +53,7 @@ export function ExhibitInlineField({
   return (
     <div className={wrapperClassName}>
       <div ref={containerRef} className={className} />
-      {!readOnly && <ExhibitPickerDropdown picker={picker} renderIcon={renderIcon} className="exhibit-picker-dropdown" />}
+      {!readOnly && <RecordPickerDropdown picker={picker} renderIcon={renderIcon} className="record-picker-dropdown" />}
     </div>
   );
 }

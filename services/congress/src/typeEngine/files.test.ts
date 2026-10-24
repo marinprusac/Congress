@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
 import { migrationsDir } from "@congress/test-support";
 import { runMigrations } from "../db/client.js";
-import { exhibitsDb, runExhibitsMigrations } from "./db/client.js";
+import { recordsDb, runRecordsMigrations } from "./db/client.js";
 import { files } from "./db/schema.js";
 import { publish } from "./store.js";
 import { createRecord, deleteRecord, RecordValidationError, updateRecord } from "./records.js";
@@ -17,11 +17,11 @@ const body = (text: string) =>
       c.close();
     },
   });
-const orphanedAt = (id: string) => exhibitsDb.select().from(files).where(eq(files.id, id)).get()?.orphanedAt ?? null;
+const orphanedAt = (id: string) => recordsDb.select().from(files).where(eq(files.id, id)).get()?.orphanedAt ?? null;
 
 beforeAll(() => {
   runMigrations(migrationsDir("congress"));
-  runExhibitsMigrations();
+  runRecordsMigrations();
   publish({
     actor: "test",
     ops: [
@@ -38,7 +38,7 @@ describe("file storage", () => {
     const ref = await storeUpload(body("hello"), { name: "a/b.txt", mime: "text/plain; charset=utf-8" });
     expect(ref).toMatchObject({ name: "a_b.txt", mime: "text/plain", size: 5 });
     expect(existsSync(filePath(ref.id))).toBe(true);
-    expect(exhibitsDb.select().from(files).where(eq(files.id, ref.id)).get()?.sha256).toBe(
+    expect(recordsDb.select().from(files).where(eq(files.id, ref.id)).get()?.sha256).toBe(
       "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
     );
     expect(cleanMime("<script>")).toBe("application/octet-stream");

@@ -83,9 +83,9 @@ describe("the types MCP server", () => {
 
   it("creates, updates, finds and deletes records with chip tokens", async () => {
     const created = await call("create_novel", { title: "Dune" });
-    expect(created).toMatchObject({ type: "novel", values: { title: "Dune", read: false }, token: `[[exhibit:e:${created.id}|Dune]]` });
-    expect(await call("update_novel", { id: created.id, read: true })).toMatchObject({ values: { title: "Dune", read: true } });
-    expect(await call("search_novels", { query: "dun" })).toEqual([expect.objectContaining({ id: created.id, name: "Dune" })]);
+    expect(created).toMatchObject({ type: "novel", values: { title: "Novel: Dune", read: false }, token: `[[record:e:${created.id}|Novel: Dune]]` });
+    expect(await call("update_novel", { id: created.id, read: true })).toMatchObject({ values: { title: "Novel: Dune", read: true } });
+    expect(await call("search_novels", { query: "dun" })).toEqual([expect.objectContaining({ id: created.id, name: "Novel: Dune" })]);
     expect(await call("get_novel", { id: created.id })).toMatchObject({ id: created.id });
     expect(await call("delete_novel", { id: created.id })).toEqual({ ok: true, id: created.id });
     expect(await call("get_novel", { id: created.id })).toMatchObject({ error: "not_found" });
@@ -113,7 +113,7 @@ describe("the types MCP server", () => {
     const ana = await call("find_or_create_person", { email: "ana@example.com" });
     const meeting = await call("create_meeting", { title: "Standup", people: [ana.id] });
     expect(await call("get_person", { id: ana.id })).toMatchObject({
-      linkedFrom: [{ from: "Meetings · People", total: 1, records: [{ id: meeting.id, token: `[[exhibit:e:${meeting.id}|Standup]]` }] }],
+      linkedFrom: [{ from: "Meetings · People", total: 1, records: [{ id: meeting.id, token: `[[record:e:${meeting.id}|Meeting: Standup]]` }] }],
     });
     expect(await call("create_meeting", { title: "Bad", people: ["nope"] })).toMatchObject({ error: "invalid" });
   });

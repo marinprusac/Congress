@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { AiMessage, AiRunKind, AiThread, CreateAiThreadRequest } from "@congress/shared-types";
 import { enqueue, JobCancelledError, PRIORITY } from "./jobQueue.js";
 import { runAi, type RunOutcome } from "./engine.js";
-import { chatPromptBody, type ReferencedExhibit } from "./prompt.js";
+import { chatPromptBody, type ReferencedRecord } from "./prompt.js";
 import { notifyThreadUpdated } from "./runStream.js";
 import { markInterruptedRuns } from "./runs.js";
 import {
@@ -17,19 +17,19 @@ import {
   updateThreadRow,
 } from "./threads.js";
 import { publishEvent } from "../events.js";
-import { getCachedChamber, resolveExhibits } from "../exhibits.js";
-import { extractExhibitTokensWithLabels, WIKILINK_PATTERN } from "../kit/wikilinks.js";
-import { buildExhibitToken, parseExhibitToken } from "@congress/shared-types";
+import { getCachedChamber, resolveRecords } from "../records.js";
+import { extractRecordTokensWithLabels, WIKILINK_PATTERN } from "../kit/wikilinks.js";
+import { buildRecordToken, parseRecordToken } from "@congress/shared-types";
 
 export class ThreadNotFoundError extends Error {}
 export class ThreadBusyError extends Error {}
 
-// Resolves the exhibit tokens in an owner message so the AI knows what they
+// Resolves the record tokens in an owner message so the AI knows what they
 // point at without a lookup of its own.
-export async function resolveReferencedExhibits(text: string): Promise<ReferencedExhibit[]> {
-  const tokens = extractExhibitTokensWithLabels(text).slice(0, 20);
+export async function resolveReferencedRecords(text: string): Promise<ReferencedRecord[]> {
+  const tokens = extractRecordTokensWithLabels(text).slice(0, 20);
   if (tokens.length === 0) return [];
-  const results = await resolveExhibits(tokens.map((t) => ({ id: t.id, chamber: t.chamber }))).catch(() => null);
+  const results = await resolveRecords(tokens.map((t) => ({ id: t.id, chamber: t.chamber }))).catch(() => null);
   return tokens.map((t, i) => {
     const r = results?.[i];
     if (r && "name" in r) return { token: t.token, label: t.label, name: r.name, url: r.url, state: "ok" as const };
@@ -40,9 +40,9 @@ export async function resolveReferencedExhibits(text: string): Promise<Reference
 // A token the AI made up (never known to Congress, and its Chamber says it
 // doesn't exist) becomes its plain label rather than a "deleted" chip.
 export async function repairInventedTokens(text: string): Promise<string> {
-  const tokens = extractExhibitTokensWithLabels(text).slice(0, 40);
+  const tokens = extractRecordTokensWithLabels(text).slice(0, 40);
   if (tokens.length === 0) return text;
-  const results = await resolveExhibits(tokens.map((t) => ({ id: t.id, chamber: t.chamber }))).catch(() => null);
+  const results = await resolveRecords(tokens.map((t) => ({ id: t.id, chamber: t.chamber }))).catch(() => null);
   if (!results) return text;
   const invented = new Set(
     tokens.filter((t, i) => {
@@ -52,8 +52,8 @@ export async function repairInventedTokens(text: string): Promise<string> {
   );
   if (invented.size === 0) return text;
   return text.replace(WIKILINK_PATTERN, (full, rawTarget: string, rawAlias?: string) => {
-    const parsed = parseExhibitToken(rawTarget.trim().replace(/\\$/, ""));
-    if (!parsed || !invented.has(buildExhibitToken(parsed))) return full;
+    const parsed = parseRecordToken(rawTarget.trim().replace(/\\$/, ""));
+    if (!parsed || !invented.has(buildRecordToken(parsed))) return full;
     return rawAlias?.trim() || parsed.id;
   });
 }
@@ -87,7 +87,7 @@ export function threadContext(threadId: number, beforeMessageId: number, fresh: 
 }
 
 export async function ownerMessageBody(text: string, context: string | null = null): Promise<string> {
-  const body = chatPromptBody(text, await resolveReferencedExhibits(text));
+  const body = chatPromptBody(text, await resolveReferencedRecords(text));
   return context ? `${context}\n\n${body}` : body;
 }
 
@@ -143,7 +143,7 @@ export function retryLast(threadId: number): { runId: string } {
 
 export interface ThreadRunInput {
   kind: AiRunKind;
-  // Built when the run starts (it may resolve exhibits over the network).
+  // Built when the run starts (it may resolve records over the network).
   // `fresh`: no CLI session to resume, so include the thread's history.
   buildBody: (fresh: boolean) => Promise<string>;
   // What the owner said, for the congress.ai_chat_run event.

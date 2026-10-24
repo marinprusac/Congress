@@ -22,7 +22,7 @@ import {
   updateRecord,
 } from "./records.js";
 import { bindingTargets, liveDetail, materialize, runBindingAction, searchSource, withBinding } from "./bindings/runtime.js";
-import { canCreate } from "./records.js";
+import { canCreate, withTypedTitle } from "./records.js";
 import { getConnector, listConnectors } from "../connectors/runtime.js";
 import { runningConnector } from "../connectors/registry.js";
 import { typeEngineSource } from "./source.js";
@@ -52,7 +52,7 @@ function describeFields(def: TypeDefinition): string {
                 : f.kind === "file"
                   ? " (write the id upload_file returns)"
                   : f.kind === "richtext"
-                    ? " (markdown; may contain [[exhibit:chamber:id|Name]] tokens)"
+                    ? " (markdown; may contain [[record:chamber:id|Name]] tokens)"
                     : f.options.key
                       ? ` (${f.options.key === "email" ? "emails" : "phone numbers"}, one per line; a lookup key)`
                       : "";
@@ -87,7 +87,7 @@ export function registerTypeTools(server: McpServer): void {
     "list_types",
     {
       title: "List Types",
-      description: "Every kind of exhibit Congress stores itself (notes, ...) with its fields. Each has its own list/search/get/create/update/delete tools here.",
+      description: "Every kind of record Congress stores itself (notes, ...) with its fields. Each has its own list/search/get/create/update/delete tools here.",
       inputSchema: {},
     },
     async () => mcpTextResult(types.map((t) => ({ slug: t.definition.slug, label: t.definition.label, fields: describeFields(t.definition) })))
@@ -98,7 +98,7 @@ export function registerTypeTools(server: McpServer): void {
     const slug = def.slug;
     const label = def.label.toLowerCase();
     const fields = describeFields(def);
-    const refHint = "Records are exhibits: reference one elsewhere with its `token`; use Congress's own tools for Connections.";
+    const refHint = "Reference a record elsewhere with its `token`; use Congress's own tools for Connections.";
 
     const range = rangeFields(def);
     const when = range ? `${range.start.label.toLowerCase()}` : "date";
@@ -227,7 +227,7 @@ export function registerTypeTools(server: McpServer): void {
         description: `Create a ${label}. Fields: ${fields}. ${refHint}`,
         inputSchema: recordInputSchema(def, "create").shape,
       },
-      (values) => guarded(() => withChip(t, createRecord(slug, values, { actor: "congress" })))
+      (values) => guarded(() => withChip(t, createRecord(slug, withTypedTitle(def, values), { actor: "congress" })))
     );
 
     server.registerTool(
@@ -240,7 +240,7 @@ export function registerTypeTools(server: McpServer): void {
       ({ id, ...values }) =>
         guarded(() => {
           if (typeOfRecord(id)?.definition.slug !== slug) throw new RecordNotFoundError(`no ${label} ${id}`);
-          return withChip(t, updateRecord(id, values, { actor: "congress" }));
+          return withChip(t, updateRecord(id, withTypedTitle(def, values), { actor: "congress" }));
         })
     );
 

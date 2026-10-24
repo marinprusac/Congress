@@ -18,7 +18,7 @@ export function createDb<TSchema extends Record<string, unknown>>(dbPath: string
   // across a process crash, only at risk from an OS-level power loss, which
   // this single-user VPS setup doesn't defend against further anyway. This
   // is the dominant cost of any single-row-at-a-time write loop (see
-  // syncExhibit) until those get batched into real transactions.
+  // syncRecord) until those get batched into real transactions.
   sqlite.pragma("synchronous = NORMAL");
   // ~16MB page cache (negative = KiB) instead of better-sqlite3's ~2MB
   // default - cheap given these are all small single-user databases, and it

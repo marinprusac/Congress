@@ -1,6 +1,6 @@
 import { WIKILINK_PATTERN } from "../../kit/wikilinks.js";
 import type { Binding, FactCondition, FieldDefinition, FieldKind, RecordValue, TypeDefinition } from "@congress/shared-types";
-import { parseExhibitToken } from "@congress/shared-types";
+import { parseRecordToken } from "@congress/shared-types";
 import type { SourceKind, SourceValue } from "../../connectors/contract.js";
 
 // Pure: how a binding's source values map onto a type's fields and back.
@@ -61,10 +61,10 @@ export function factHolds(c: FactCondition, facts: Record<string, SourceValue>):
   return c.equals === undefined ? Boolean(v) : v === c.equals;
 }
 
-// "[[exhibit:e:01..|Ana]] lunch" -> "Ana lunch": what a plain-text source sees.
+// "[[record:e:01..|Ana]] lunch" -> "Ana lunch": what a plain-text source sees.
 export function projectRich(rich: string): string {
   return rich.replace(WIKILINK_PATTERN, (match, rawTarget: string, rawAlias?: string) => {
-    const parsed = parseExhibitToken(rawTarget?.trim() ?? "");
+    const parsed = parseRecordToken(rawTarget?.trim() ?? "");
     if (!parsed) return match;
     return rawAlias?.trim() || parsed.id;
   });

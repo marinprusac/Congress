@@ -31,6 +31,8 @@ export const askFieldSchema = z.discriminatedUnion("type", [
   z.object({ ...fieldBase, type: z.literal("multichoice"), options: z.array(optionSchema).min(2).max(12), default: z.array(z.string()).optional() }),
   z.object({ ...fieldBase, type: z.literal("date"), default: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }),
   z.object({ ...fieldBase, type: z.literal("datetime"), default: z.string().optional() }),
+  z.object({ ...fieldBase, type: z.literal("record") }),
+  // Asks stored before the rename.
   z.object({ ...fieldBase, type: z.literal("exhibit") }),
 ]);
 export type AskField = z.infer<typeof askFieldSchema>;
@@ -92,8 +94,9 @@ export function answerSchemaFor(fields: AskField[]) {
       case "datetime":
         s = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/, "expected a date and time");
         break;
+      case "record":
       case "exhibit":
-        s = z.string().regex(/^\[\[exhibit:[^\]]+\]\]$/, "expected an exhibit");
+        s = z.string().regex(/^\[\[(?:record|exhibit):[^\]]+\]\]$/, "expected a record");
         break;
     }
     // An empty string/list counts as "not answered".
@@ -106,7 +109,7 @@ export function answerSchemaFor(fields: AskField[]) {
 
 export const askMessagePayloadSchema = z.object({
   title: z.string().max(120).nullable(),
-  // Exhibit tokens shown as chips under the message.
+  // Record tokens shown as chips under the message.
   links: z.array(z.string()).max(12).default([]),
 });
 export type AskMessagePayload = z.infer<typeof askMessagePayloadSchema>;

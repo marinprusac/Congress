@@ -121,7 +121,7 @@ describe("mapping values", () => {
     expect(toTargetValue(null, f("title"))).toBe("");
     expect(toTargetValue("maybe", f("response"))).toBeNull();
     expect(toTargetValue("declined", f("response"))).toBe("declined");
-    expect(toSourceValue("[[exhibit:e:01abc|Ana]] and [[exhibit:e:01def]]", f("notes"))).toBe("Ana and 01def");
+    expect(toSourceValue("[[record:e:01abc|Ana]] and [[record:e:01def]]", f("notes"))).toBe("Ana and 01def");
     expect(projectRich("plain")).toBe("plain");
   });
 

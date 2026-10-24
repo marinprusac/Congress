@@ -119,11 +119,11 @@
   resize: vertical;
 }
 
-.ask-exhibit .cm-editor,
-.ask-exhibit .cm-content {
+.ask-record .cm-editor,
+.ask-record .cm-content {
   font-size: 16px;
 }
-.ask-exhibit .cm-editor.cm-focused {
+.ask-record .cm-editor.cm-focused {
   outline: none;
 }
 

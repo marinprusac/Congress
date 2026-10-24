@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Congress's home "For You" feed. Each Chamber answers GET /api/feed
 // (chamber-kit's mountFeedRoute) with candidates it thinks matter *right
-// now* - its own views and exhibits, each scored 0-100 with a short
+// now* - its own views and records, each scored 0-100 with a short
 // human-readable reason ("Starts in 25 min", "Overdue"). The domain
 // knowledge of what's urgent stays in the Chamber; Congress only merges and
 // ranks (services/congress/src/feed.ts), which is the one place a smarter
@@ -15,7 +15,7 @@ export const feedScoreSchema = z.number().min(0).max(100);
 // rendered generically by Congress. `time` stays machine-readable (ISO) so
 // the browser formats it in the owner's own time zone, never the server's.
 export const feedPreviewSchema = z.object({
-  // Overrides the resolved exhibit name when the Chamber has a better one.
+  // Overrides the resolved record name when the Chamber has a better one.
   title: z.string().max(200).optional(),
   time: z
     .object({
@@ -36,8 +36,8 @@ export type FeedPreview = z.infer<typeof feedPreviewSchema>;
 export const feedCandidateSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("view"), viewId: z.string().min(1), score: feedScoreSchema, reason: z.string().optional() }),
   z.object({
-    kind: z.literal("exhibit"),
-    exhibitId: z.string().min(1),
+    kind: z.literal("record"),
+    recordId: z.string().min(1),
     score: feedScoreSchema,
     reason: z.string().optional(),
     preview: feedPreviewSchema.optional(),
@@ -47,8 +47,8 @@ export type FeedCandidate = z.infer<typeof feedCandidateSchema>;
 
 
 // What GET /congress/feed returns: candidates from every active Chamber,
-// merged and ranked, with exhibits resolved to a name/url (a candidate whose
-// exhibit no longer resolves is dropped). Only views with a feed card
+// merged and ranked, with records resolved to a name/url (a candidate whose
+// record no longer resolves is dropped). Only views with a feed card
 // appear - a view with nothing to show inline is reached through Search and
 // the pinned row instead.
 export const feedItemSchema = z.discriminatedUnion("kind", [
@@ -62,9 +62,9 @@ export const feedItemSchema = z.discriminatedUnion("kind", [
     reason: z.string().optional(),
   }),
   z.object({
-    kind: z.literal("exhibit"),
+    kind: z.literal("record"),
     chamber: z.string(),
-    exhibitId: z.string(),
+    recordId: z.string(),
     name: z.string(),
     url: z.string(),
     // Record type slug (namespace "e"); picks the icon.

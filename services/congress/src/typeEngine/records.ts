@@ -1,7 +1,7 @@
 import { and, eq, inArray, or } from "drizzle-orm";
-import type { FieldDefinition, RecordDto, RecordValue, RelatedGroup, TypeAction, TypeDefinition } from "@congress/shared-types";
-import { extractOutgoingExhibitRefs } from "../kit/wikilinks.js";
-import { exhibitsDb, exhibitsSqlite } from "./db/client.js";
+import { withTitlePrefix, type FieldDefinition, type RecordDto, type RecordValue, type RelatedGroup, type TypeAction, type TypeDefinition } from "@congress/shared-types";
+import { extractOutgoingRecordRefs } from "../kit/wikilinks.js";
+import { recordsDb, recordsSqlite } from "./db/client.js";
 import { records, recordRefs, bindingOutbox, bindingShadows, legacyAliases } from "./db/schema.js";
 import { getType, getTypeBySlug, listTypes, type StoredType } from "./store.js";
 import { activeFields } from "./operations.js";
@@ -10,11 +10,11 @@ import { decodeValue, defaultValue, encodeValue, recordInputSchema } from "./cod
 import { attachFiles, fileRefs, releaseFiles } from "./files.js";
 import { ulid } from "./ulid.js";
 import { deleteKeys, hasKeys, KeyConflictError, writeKeys } from "./keys.js";
-import { syncExhibit } from "../exhibits.js";
+import { syncRecord } from "../records.js";
 import { publishEvent } from "../events.js";
 import type { Stored } from "./casts.js";
 
-// Generic CRUD over type tables. Every write re-syncs the exhibit cache and
+// Generic CRUD over type tables. Every write re-syncs the record cache and
 // publishes <eventPrefix>.created|updated|deleted (plus toggle events).
 
 export const NAMESPACE = "e";
@@ -101,18 +101,26 @@ export function titleOf(def: TypeDefinition, row: Row): string {
   return title || `Untitled ${def.label.toLowerCase()}`;
 }
 
+// Owner and AI writes only; sources keep their own titles.
+export function withTypedTitle(def: TypeDefinition, values: unknown): unknown {
+  const f = def.fields.find((x) => x.id === def.titleField);
+  const v = values as Record<string, unknown> | null;
+  if (!f || !v || typeof v[f.slug] !== "string") return values;
+  return { ...v, [f.slug]: withTitlePrefix(def.label, v[f.slug] as string) };
+}
+
 export function typeOfRecord(id: string): StoredType | undefined {
-  const row = exhibitsDb.select().from(records).where(eq(records.id, id)).get();
+  const row = recordsDb.select().from(records).where(eq(records.id, id)).get();
   return row ? getType(row.typeId) : undefined;
 }
 
 export function readRow(def: TypeDefinition, id: string): Row | undefined {
-  return exhibitsSqlite.prepare(`SELECT * FROM ${quoteIdent(def.tableName)} WHERE "id" = ?`).get(id) as Row | undefined;
+  return recordsSqlite.prepare(`SELECT * FROM ${quoteIdent(def.tableName)} WHERE "id" = ?`).get(id) as Row | undefined;
 }
 
 function joinValues(f: FieldDefinition, id: string): string[] {
   return (
-    exhibitsSqlite.prepare(`SELECT "to_id" FROM ${quoteIdent(f.column)} WHERE "from_id" = ? ORDER BY "position"`).all(id) as {
+    recordsSqlite.prepare(`SELECT "to_id" FROM ${quoteIdent(f.column)} WHERE "from_id" = ? ORDER BY "position"`).all(id) as {
       to_id: string;
     }[]
   ).map((r) => r.to_id);
@@ -192,7 +200,7 @@ export function listRecords(typeSlug: string, opts: ListOptions = {}): RecordDto
     where.push(`${s} IS NOT NULL`);
     order = `${s} ASC`;
   }
-  const rows = exhibitsSqlite
+  const rows = recordsSqlite
     .prepare(`SELECT * FROM ${quoteIdent(t.definition.tableName)} ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY ${order} LIMIT ? OFFSET ?`)
     .all(...params, limit, Math.max(opts.offset ?? 0, 0)) as Row[];
   return rows.map((r) => toDto(t, r));
@@ -224,7 +232,7 @@ function checkRelations(def: TypeDefinition, input: Record<string, RecordValue>)
     const target = getTypeBySlug(f.options.target ?? "");
     const found = target
       ? new Set(
-          exhibitsDb
+          recordsDb
             .select({ id: records.id })
             .from(records)
             .where(and(eq(records.typeId, target.id), inArray(records.id, ids)))
@@ -250,14 +258,14 @@ function unlinkEverywhere(id: string, slug: string): { t: StoredType; id: string
   const changed = new Map<string, StoredType>();
   for (const { t, f } of fieldsTargeting(slug)) {
     if (isJoinField(f)) {
-      const from = exhibitsSqlite.prepare(`SELECT "from_id" FROM ${quoteIdent(f.column)} WHERE "to_id" = ?`).all(id) as { from_id: string }[];
-      exhibitsSqlite.prepare(`DELETE FROM ${quoteIdent(f.column)} WHERE "to_id" = ?`).run(id);
+      const from = recordsSqlite.prepare(`SELECT "from_id" FROM ${quoteIdent(f.column)} WHERE "to_id" = ?`).all(id) as { from_id: string }[];
+      recordsSqlite.prepare(`DELETE FROM ${quoteIdent(f.column)} WHERE "to_id" = ?`).run(id);
       for (const r of from) changed.set(r.from_id, t);
     } else {
       const table = quoteIdent(t.definition.tableName);
       const col = quoteIdent(f.column);
-      const rows = exhibitsSqlite.prepare(`SELECT "id" FROM ${table} WHERE ${col} = ?`).all(id) as { id: string }[];
-      exhibitsSqlite.prepare(`UPDATE ${table} SET ${col} = NULL WHERE ${col} = ?`).run(id);
+      const rows = recordsSqlite.prepare(`SELECT "id" FROM ${table} WHERE ${col} = ?`).all(id) as { id: string }[];
+      recordsSqlite.prepare(`UPDATE ${table} SET ${col} = NULL WHERE ${col} = ?`).run(id);
       for (const r of rows) changed.set(r.id, t);
     }
   }
@@ -279,9 +287,9 @@ export function relatedRecords(id: string): RelatedGroup[] | null {
     const [where, from] = isJoinField(f)
       ? [`"id" IN (SELECT "from_id" FROM ${quoteIdent(f.column)} WHERE "to_id" = ?)`, id]
       : [`${quoteIdent(f.column)} = ?`, id];
-    const total = Number((exhibitsSqlite.prepare(`SELECT count(*) AS n FROM ${table} WHERE ${where}`).get(from) as { n: number }).n);
+    const total = Number((recordsSqlite.prepare(`SELECT count(*) AS n FROM ${table} WHERE ${where}`).get(from) as { n: number }).n);
     if (total === 0) continue;
-    const rows = exhibitsSqlite.prepare(`SELECT * FROM ${table} WHERE ${where} ORDER BY "updated_at" DESC, "id" DESC LIMIT ?`).all(from, RELATED_LIMIT) as Row[];
+    const rows = recordsSqlite.prepare(`SELECT * FROM ${table} WHERE ${where} ORDER BY "updated_at" DESC, "id" DESC LIMIT ?`).all(from, RELATED_LIMIT) as Row[];
     groups.push({
       type: def.slug,
       typeLabel: def.pluralLabel,
@@ -306,8 +314,8 @@ function rethrowConflict(def: TypeDefinition, err: unknown): never {
 }
 
 function writeJoin(f: FieldDefinition, id: string, ids: string[]): void {
-  exhibitsSqlite.prepare(`DELETE FROM ${quoteIdent(f.column)} WHERE "from_id" = ?`).run(id);
-  const insert = exhibitsSqlite.prepare(`INSERT OR IGNORE INTO ${quoteIdent(f.column)} ("from_id", "to_id", "position") VALUES (?, ?, ?)`);
+  recordsSqlite.prepare(`DELETE FROM ${quoteIdent(f.column)} WHERE "from_id" = ?`).run(id);
+  const insert = recordsSqlite.prepare(`INSERT OR IGNORE INTO ${quoteIdent(f.column)} ("from_id", "to_id", "position") VALUES (?, ?, ?)`);
   ids.forEach((to, i) => insert.run(id, to, i));
 }
 
@@ -380,9 +388,9 @@ export function createRecord(typeSlug: string, values: unknown, opts: CreateOpti
   }
 
   try {
-    exhibitsSqlite.transaction(() => {
-      exhibitsDb.insert(records).values({ id, typeId: t.id, createdAt: at }).run();
-      exhibitsSqlite
+    recordsSqlite.transaction(() => {
+      recordsDb.insert(records).values({ id, typeId: t.id, createdAt: at }).run();
+      recordsSqlite
         .prepare(`INSERT INTO ${quoteIdent(def.tableName)} (${cols.map(quoteIdent).join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`)
         .run(...params);
       for (const f of fields) if (isJoinField(f)) writeJoin(f, id, (input[f.slug] as string[] | undefined) ?? []);
@@ -395,7 +403,7 @@ export function createRecord(typeSlug: string, values: unknown, opts: CreateOpti
 
   const dto = getRecord(id)!;
   if (!opts.silent) {
-    syncRecordExhibit(t, id);
+    syncRecordRecord(t, id);
     if (!opts.quiet) emit(t, "created", dto, opts.actor);
     notifyWrite(t, id, undefined, { op: "create", changed: Object.keys(input), actor: opts.actor, fromSource: opts.fromSource, quiet: opts.quiet });
   }
@@ -428,8 +436,8 @@ export function updateRecord(id: string, patch: unknown, opts: UpdateOptions = {
   }
 
   try {
-    exhibitsSqlite.transaction(() => {
-      const res = exhibitsSqlite.prepare(`UPDATE ${quoteIdent(def.tableName)} SET ${sets.join(", ")} WHERE "id" = ?`).run(...params, id);
+    recordsSqlite.transaction(() => {
+      const res = recordsSqlite.prepare(`UPDATE ${quoteIdent(def.tableName)} SET ${sets.join(", ")} WHERE "id" = ?`).run(...params, id);
       if (res.changes === 0) throw new RecordNotFoundError(`no record ${id}`);
       for (const f of fields) if (isJoinField(f)) writeJoin(f, id, input[f.slug] as string[]);
       if (fields.some((f) => f.options.key)) writeKeys(t.id, def, id, readRow(def, id)!);
@@ -443,7 +451,7 @@ export function updateRecord(id: string, patch: unknown, opts: UpdateOptions = {
   releaseFiles(fileIdsIn(def, before).filter((f) => !kept.has(f)));
 
   const dto = toDto(t, after);
-  syncRecordExhibit(t, id);
+  syncRecordRecord(t, id);
   if (!opts.quiet) {
     emit(t, "updated", dto, opts.actor, fields.map((f) => f.slug));
     for (const { action, on } of flipped) {
@@ -463,19 +471,19 @@ export function deleteRecord(id: string, opts: { actor?: string; fromSource?: bo
   if (row && !opts.fromSource) for (const g of guards) g(t, row, "delete", []);
   const dto = row ? toDto(t, row) : null;
   let unlinked: { t: StoredType; id: string }[] = [];
-  exhibitsSqlite.transaction(() => {
+  recordsSqlite.transaction(() => {
     unlinked = unlinkEverywhere(id, def.slug);
-    exhibitsSqlite.prepare(`DELETE FROM ${quoteIdent(def.tableName)} WHERE "id" = ?`).run(id);
-    for (const f of def.fields) if (isJoinField(f)) exhibitsSqlite.prepare(`DELETE FROM ${quoteIdent(f.column)} WHERE "from_id" = ?`).run(id);
-    exhibitsDb.delete(recordRefs).where(eq(recordRefs.recordId, id)).run();
+    recordsSqlite.prepare(`DELETE FROM ${quoteIdent(def.tableName)} WHERE "id" = ?`).run(id);
+    for (const f of def.fields) if (isJoinField(f)) recordsSqlite.prepare(`DELETE FROM ${quoteIdent(f.column)} WHERE "from_id" = ?`).run(id);
+    recordsDb.delete(recordRefs).where(eq(recordRefs.recordId, id)).run();
     deleteKeys(id);
-    exhibitsDb.delete(records).where(eq(records.id, id)).run();
+    recordsDb.delete(records).where(eq(records.id, id)).run();
   })();
   if (row) releaseFiles(fileIdsIn(def, row));
-  syncExhibit({ chamber: NAMESPACE, id, type: def.slug, name: "", url: "", deleted: true, outgoingRefs: [] });
+  syncRecord({ chamber: NAMESPACE, id, type: def.slug, name: "", url: "", deleted: true, outgoingRefs: [] });
   // A cleanup, not an edit: re-sync the records that lost a link, without events.
   for (const u of unlinked) {
-    syncRecordExhibit(u.t, u.id);
+    syncRecordRecord(u.t, u.id);
     notifyWrite(u.t, u.id, undefined, { op: "cleanup", changed: [] });
   }
   if (dto) {
@@ -497,10 +505,10 @@ export function purgeRecords(t: StoredType): { ids: string[]; unlinked: { t: Sto
     const row = readRow(def, id);
     if (row) fileIds.push(...fileIdsIn(def, row));
     for (const u of unlinkEverywhere(id, def.slug)) if (!gone.has(u.id)) unlinked.set(u.id, u);
-    exhibitsDb.delete(recordRefs).where(or(eq(recordRefs.recordId, id), eq(recordRefs.targetExhibitId, id))).run();
-    exhibitsDb.delete(bindingShadows).where(eq(bindingShadows.recordId, id)).run();
-    exhibitsDb.delete(bindingOutbox).where(eq(bindingOutbox.recordId, id)).run();
-    exhibitsDb.delete(legacyAliases).where(eq(legacyAliases.recordId, id)).run();
+    recordsDb.delete(recordRefs).where(or(eq(recordRefs.recordId, id), eq(recordRefs.targetRecordId, id))).run();
+    recordsDb.delete(bindingShadows).where(eq(bindingShadows.recordId, id)).run();
+    recordsDb.delete(bindingOutbox).where(eq(bindingOutbox.recordId, id)).run();
+    recordsDb.delete(legacyAliases).where(eq(legacyAliases.recordId, id)).run();
     deleteKeys(id);
   }
   return { ids, unlinked: [...unlinked.values()], fileIds };
@@ -508,21 +516,21 @@ export function purgeRecords(t: StoredType): { ids: string[]; unlinked: { t: Sto
 
 // Bindings: the record mirroring a source record, and (re)linking one.
 export function findBySource(t: StoredType, binding: string, key: string): string | undefined {
-  const row = exhibitsSqlite
+  const row = recordsSqlite
     .prepare(`SELECT "id" FROM ${quoteIdent(t.definition.tableName)} WHERE "source_binding" = ? AND "source_key" = ?`)
     .get(binding, key) as { id: string } | undefined;
   return row?.id;
 }
 
 export function setRecordSource(t: StoredType, id: string, source: { binding: string; key: string } | null): void {
-  exhibitsSqlite
+  recordsSqlite
     .prepare(`UPDATE ${quoteIdent(t.definition.tableName)} SET "source_binding" = ?, "source_key" = ? WHERE "id" = ?`)
     .run(source?.binding ?? null, source?.key ?? null, id);
 }
 
 export function manualRefs(id: string): string[] {
-  return exhibitsDb
-    .select({ target: recordRefs.targetExhibitId })
+  return recordsDb
+    .select({ target: recordRefs.targetRecordId })
     .from(recordRefs)
     .where(eq(recordRefs.recordId, id))
     .all()
@@ -532,16 +540,16 @@ export function manualRefs(id: string): string[] {
 export function addManualRef(id: string, target: string): string[] | null {
   const t = typeOfRecord(id);
   if (!t || target === id) return null;
-  exhibitsDb.insert(recordRefs).values({ recordId: id, targetExhibitId: target, createdAt: new Date() }).onConflictDoNothing().run();
-  syncRecordExhibit(t, id);
+  recordsDb.insert(recordRefs).values({ recordId: id, targetRecordId: target, createdAt: new Date() }).onConflictDoNothing().run();
+  syncRecordRecord(t, id);
   return manualRefs(id);
 }
 
 export function removeManualRef(id: string, target: string): string[] | null {
   const t = typeOfRecord(id);
   if (!t) return null;
-  exhibitsDb.delete(recordRefs).where(and(eq(recordRefs.recordId, id), eq(recordRefs.targetExhibitId, target))).run();
-  syncRecordExhibit(t, id);
+  recordsDb.delete(recordRefs).where(and(eq(recordRefs.recordId, id), eq(recordRefs.targetRecordId, target))).run();
+  syncRecordRecord(t, id);
   return manualRefs(id);
 }
 
@@ -549,7 +557,7 @@ export function removeManualRef(id: string, target: string): string[] | null {
 export function outgoingRefs(t: StoredType, id: string, row: Row): string[] {
   const refs = new Set<string>();
   for (const f of activeFields(t.definition)) {
-    if (f.kind === "richtext") for (const r of extractOutgoingExhibitRefs(String(row[f.column] ?? ""))) refs.add(r);
+    if (f.kind === "richtext") for (const r of extractOutgoingRecordRefs(String(row[f.column] ?? ""))) refs.add(r);
     else if (isJoinField(f)) for (const r of joinValues(f, id)) refs.add(r);
     else if (f.kind === "relation" && row[f.column]) refs.add(String(row[f.column]));
   }
@@ -558,10 +566,10 @@ export function outgoingRefs(t: StoredType, id: string, row: Row): string[] {
   return [...refs];
 }
 
-export function syncRecordExhibit(t: StoredType, id: string): void {
+export function syncRecordRecord(t: StoredType, id: string): void {
   const row = readRow(t.definition, id);
   if (!row) return;
-  syncExhibit({
+  syncRecord({
     chamber: NAMESPACE,
     id,
     type: t.definition.slug,
@@ -593,10 +601,10 @@ function emit(t: StoredType, verb: string, dto: RecordDto, actor?: string, chang
 }
 
 export function idsOfType(typeId: string): string[] {
-  return exhibitsDb.select({ id: records.id }).from(records).where(eq(records.typeId, typeId)).all().map((r) => r.id);
+  return recordsDb.select({ id: records.id }).from(records).where(eq(records.typeId, typeId)).all().map((r) => r.id);
 }
 
 export function existingRecordIds(ids: string[]): Set<string> {
   if (ids.length === 0) return new Set();
-  return new Set(exhibitsDb.select({ id: records.id }).from(records).where(inArray(records.id, ids)).all().map((r) => r.id));
+  return new Set(recordsDb.select({ id: records.id }).from(records).where(inArray(records.id, ids)).all().map((r) => r.id));
 }

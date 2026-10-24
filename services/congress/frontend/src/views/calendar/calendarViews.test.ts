@@ -161,7 +161,7 @@ describe("toCalendarItems", () => {
   it("maps Event records, leaving hidden ones out", () => {
     const items = toCalendarItems(
       [
-        record({ title: "Review", start: "2030-01-07T09:00:00.000Z", end: "2030-01-07T10:00:00.000Z", all_day: false, calendar: "1:me", response: "needsAction", location: "Room [[exhibit:e:01ab|4]]" }),
+        record({ title: "Review", start: "2030-01-07T09:00:00.000Z", end: "2030-01-07T10:00:00.000Z", all_day: false, calendar: "1:me", response: "needsAction", location: "Room [[record:e:01ab|4]]" }),
         record({ title: "Secret", start: "2030-01-07T09:00:00.000Z", hidden: true }, "r2"),
         record({ title: "", start: "2030-01-07T11:00:00.000Z", end: null, response: "accepted" }, "r3"),
       ],

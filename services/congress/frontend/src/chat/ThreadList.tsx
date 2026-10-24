@@ -8,7 +8,7 @@ import { listStamp } from "./chatFormat";
 import { useThreads } from "./useChatData";
 
 function stripTokens(text: string): string {
-  return text.replace(/\[\[exhibit:[^\]|]+\|([^\]]+)\]\]/g, "$1").replace(/\[\[exhibit:[^\]]+\]\]/g, "");
+  return text.replace(/\[\[(?:record|exhibit):[^\]|]+\|([^\]]+)\]\]/g, "$1").replace(/\[\[(?:record|exhibit):[^\]]+\]\]/g, "");
 }
 
 function ThreadRow({ thread }: { thread: AiThread }) {

@@ -71,7 +71,7 @@ function publishReceived(ctx: ConnectorContext, account: Account, raw: RawThread
       messageId: m.id,
       threadId: raw.id,
       // The record's id and page once bound; else the Mail Chamber's (aliases, redirects).
-      exhibitId: recordId ?? `thread-${account.id}:${raw.id}`,
+      recordId: recordId ?? `thread-${account.id}:${raw.id}`,
       from: displayFrom(from),
       fromEmail: from.email ?? "",
       subject: headerValue(m.payload?.headers, "Subject")?.trim() || "(no subject)",

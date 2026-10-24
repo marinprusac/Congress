@@ -174,8 +174,8 @@ export function feedCandidatesFor(
     );
     for (const row of rows) {
       out.push({
-        kind: "exhibit",
-        exhibitId: String(row.id),
+        kind: "record",
+        recordId: String(row.id),
         score: Math.max(0, Math.min(100, compiled.score(row))),
         ...(rule.reason ? { reason: rule.reason } : {}),
         preview: previewFor(def, rule, row, titleOf(row)),

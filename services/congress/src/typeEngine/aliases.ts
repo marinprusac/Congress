@@ -1,12 +1,12 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { exhibitsDb } from "./db/client.js";
+import { recordsDb } from "./db/client.js";
 import { legacyAliases } from "./db/schema.js";
 
-// Old Chamber exhibit ids keep working after an import: resolve and sync
+// Old Chamber record ids keep working after an import: resolve and sync
 // consult these instead of other Chambers' text ever being rewritten.
 
 export function resolveLegacyAlias(chamber: string, id: string): string | null {
-  const row = exhibitsDb
+  const row = recordsDb
     .select()
     .from(legacyAliases)
     .where(and(eq(legacyAliases.legacyChamber, chamber), eq(legacyAliases.legacyId, id)))
@@ -14,11 +14,11 @@ export function resolveLegacyAlias(chamber: string, id: string): string | null {
   return row?.recordId ?? null;
 }
 
-// Legacy exhibit ids (any chamber) -> record id, for ids that have one.
+// Legacy record ids (any chamber) -> record id, for ids that have one.
 export function aliasesForIds(ids: string[]): Map<string, string> {
   if (ids.length === 0) return new Map();
   return new Map(
-    exhibitsDb
+    recordsDb
       .select()
       .from(legacyAliases)
       .where(inArray(legacyAliases.legacyId, ids))
@@ -28,7 +28,7 @@ export function aliasesForIds(ids: string[]): Map<string, string> {
 }
 
 export function legacyIdsFor(recordId: string): string[] {
-  return exhibitsDb
+  return recordsDb
     .select({ id: legacyAliases.legacyId })
     .from(legacyAliases)
     .where(eq(legacyAliases.recordId, recordId))
@@ -37,5 +37,5 @@ export function legacyIdsFor(recordId: string): string[] {
 }
 
 export function addLegacyAlias(chamber: string, legacyId: string, recordId: string): void {
-  exhibitsDb.insert(legacyAliases).values({ legacyChamber: chamber, legacyId, recordId }).onConflictDoNothing().run();
+  recordsDb.insert(legacyAliases).values({ legacyChamber: chamber, legacyId, recordId }).onConflictDoNothing().run();
 }

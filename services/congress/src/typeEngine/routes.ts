@@ -13,6 +13,8 @@ import {
   RecordNotFoundError,
   RecordValidationError,
   updateRecord,
+  typeOfRecord,
+  withTypedTitle,
 } from "./records.js";
 import { bindingTargets, liveDetail, runBindingAction, withBinding } from "./bindings/runtime.js";
 import { ConnectorRefusedError } from "../connectors/contract.js";
@@ -126,7 +128,9 @@ typeRoutes.post("/records", requireSession, async (c) => {
   const body = (await c.req.json().catch(() => null)) as { type?: unknown; values?: unknown } | null;
   if (!body || typeof body.type !== "string") return c.json({ error: "invalid_request", message: "type is required" }, 400);
   try {
-    return c.json(withBinding(createRecord(body.type, body.values ?? {}, { actor: "me" })), 201);
+    const t = getTypeBySlug(body.type);
+    const values = t ? withTypedTitle(t.definition, body.values ?? {}) : body.values ?? {};
+    return c.json(withBinding(createRecord(body.type, values, { actor: "me" })), 201);
   } catch (err) {
     return fail(c, err);
   }
@@ -135,7 +139,10 @@ typeRoutes.post("/records", requireSession, async (c) => {
 typeRoutes.patch("/records/:id", requireSession, async (c) => {
   const body = (await c.req.json().catch(() => null)) as { values?: unknown } | null;
   try {
-    return c.json(withBinding(updateRecord(c.req.param("id"), body?.values ?? {}, { actor: "me" })));
+    const id = c.req.param("id");
+    const t = typeOfRecord(id);
+    const values = t ? withTypedTitle(t.definition, body?.values ?? {}) : body?.values ?? {};
+    return c.json(withBinding(updateRecord(id, values, { actor: "me" })));
   } catch (err) {
     return fail(c, err);
   }
@@ -195,7 +202,7 @@ typeRoutes.get("/files/:id", requireSession, async (c) => {
   return c.body(createStreamBody(createReadStream(filePath(file.id))));
 });
 
-typeRoutes.get("/exhibits/legacy/:chamber/:id", requireSession, (c) => {
+typeRoutes.get("/refs/legacy/:chamber/:id", requireSession, (c) => {
   const recordId = resolveLegacyAlias(c.req.param("chamber"), c.req.param("id"));
   return recordId ? c.json({ id: recordId, url: `/e/${recordId}` }) : c.json({ error: "not_found" }, 404);
 });

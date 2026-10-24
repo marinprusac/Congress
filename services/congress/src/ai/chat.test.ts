@@ -7,10 +7,10 @@ const runAi = vi.fn<(ctx: RunContext) => Promise<RunOutcome>>();
 vi.mock("./engine.js", () => ({ runAi: (ctx: RunContext) => runAi(ctx) }));
 const publishEvent = vi.fn();
 vi.mock("../events.js", () => ({ publishEvent: (...a: unknown[]) => publishEvent(...a) }));
-const resolveExhibits = vi.fn();
+const resolveRecords = vi.fn();
 const getCachedChamber = vi.fn((_id: string): string | null => null);
-vi.mock("../exhibits.js", () => ({
-  resolveExhibits: (...a: unknown[]) => resolveExhibits(...a),
+vi.mock("../records.js", () => ({
+  resolveRecords: (...a: unknown[]) => resolveRecords(...a),
   getCachedChamber: (id: string) => getCachedChamber(id),
 }));
 
@@ -60,7 +60,7 @@ beforeEach(() => {
   db.run(sql`delete from ai_threads`);
   runAi.mockReset();
   publishEvent.mockReset();
-  resolveExhibits.mockReset();
+  resolveRecords.mockReset();
 });
 
 describe("threaded chat", () => {
@@ -166,16 +166,16 @@ describe("threaded chat", () => {
     ]);
   });
 
-  it("resolves referenced exhibits into the prompt", async () => {
-    resolveExhibits.mockResolvedValue([{ id: "note-4", chamber: "notes", name: "Trip ideas", url: "/n/4" }]);
+  it("resolves referenced records into the prompt", async () => {
+    resolveRecords.mockResolvedValue([{ id: "note-4", chamber: "notes", name: "Trip ideas", url: "/n/4" }]);
     runAi.mockResolvedValue(outcome());
 
-    const { thread } = createThread({ text: "Summarise [[exhibit:notes:note-4|Trip]]" });
+    const { thread } = createThread({ text: "Summarise [[record:notes:note-4|Trip]]" });
     await settled(thread.id);
 
     const body = runAi.mock.calls[0]?.[0].body ?? "";
-    expect(body).toContain("## Exhibits referenced");
-    expect(body).toContain('exhibit:notes:note-4 - "Trip ideas" (/n/4)');
+    expect(body).toContain("## Records referenced");
+    expect(body).toContain('record:notes:note-4 - "Trip ideas" (/n/4)');
     expect(thread.title).toBe("Summarise Trip");
   });
 
@@ -238,27 +238,27 @@ describe("threaded chat", () => {
 
 describe("repairInventedTokens", () => {
   it("turns tokens nobody knows into plain labels, keeping real and deleted ones", async () => {
-    resolveExhibits.mockResolvedValue([
+    resolveRecords.mockResolvedValue([
       { id: "note-1", chamber: "notes", name: "Real", url: "/n/1" },
       { id: "Gym plan", chamber: "notes", deleted: true },
       { id: "note-9", chamber: "notes", deleted: true },
     ]);
     getCachedChamber.mockImplementation((id) => (id === "note-9" ? "notes" : null));
-    const text = "[[exhibit:notes:note-1|Real]], [[exhibit:notes:Gym plan|Gym plan]] and | [[exhibit:notes:note-9\\|Old]] |";
-    expect(await repairInventedTokens(text)).toBe("[[exhibit:notes:note-1|Real]], Gym plan and | [[exhibit:notes:note-9\\|Old]] |");
+    const text = "[[record:notes:note-1|Real]], [[record:notes:Gym plan|Gym plan]] and | [[record:notes:note-9\\|Old]] |";
+    expect(await repairInventedTokens(text)).toBe("[[record:notes:note-1|Real]], Gym plan and | [[record:notes:note-9\\|Old]] |");
   });
 });
 
 describe("titleFromText", () => {
-  it("uses exhibit labels and truncates on a word boundary", () => {
-    expect(titleFromText("Look at [[exhibit:notes:n-1|Groceries]] now")).toBe("Look at Groceries now");
+  it("uses record labels and truncates on a word boundary", () => {
+    expect(titleFromText("Look at [[record:notes:n-1|Groceries]] now")).toBe("Look at Groceries now");
     expect(titleFromText("word ".repeat(30))).toMatch(/^(word ){5,}.*…$/);
   });
 });
 
 describe("plainSnippet", () => {
   it("flattens Markdown and chips into one readable line", () => {
-    const table = "| Title | Summary |\n|-------|---------|\n| [[exhibit:notes:note-3\\|Standup]] | **Daily** notes |";
+    const table = "| Title | Summary |\n|-------|---------|\n| [[record:notes:note-3\\|Standup]] | **Daily** notes |";
     expect(plainSnippet(table)).toBe("Title Summary Standup Daily notes");
     expect(plainSnippet("## Plan\n- [Docs](https://x.y) and `code`")).toBe("Plan Docs and code");
   });

@@ -60,7 +60,7 @@ describe("public routes", () => {
 });
 
 describe("routes that went away with Chamber processes", () => {
-  it.each(["/congress/register", "/congress/deregister", "/congress/heartbeat", "/congress/exhibits/sync", "/congress/events/publish", "/congress/ai/run"])(
+  it.each(["/congress/register", "/congress/deregister", "/congress/heartbeat", "/congress/refs/sync", "/congress/events/publish", "/congress/ai/run"])(
     "no longer answers POST %s, even with the internal token",
     async (path) => {
       const res = await app.request(path, { method: "POST", headers: { ...internal, ...json }, body: "{}" }, bindings());
@@ -73,9 +73,9 @@ describe("session-only routes", () => {
   const cases: { method: string; path: string; body?: unknown }[] = [
     { method: "GET", path: "/congress/settings" },
     { method: "PUT", path: "/congress/settings", body: { darkMode: true } },
-    { method: "GET", path: "/congress/exhibits/search?q=x" },
-    { method: "POST", path: "/congress/exhibits/resolve", body: { refs: [] } },
-    { method: "GET", path: "/congress/exhibits/note-1/connections" },
+    { method: "GET", path: "/congress/refs/search?q=x" },
+    { method: "POST", path: "/congress/refs/resolve", body: { refs: [] } },
+    { method: "GET", path: "/congress/refs/note-1/connections" },
     // Core features folded in from the retired Capitol/Logs Chambers.
     { method: "GET", path: "/congress/event-settings" },
     { method: "GET", path: "/congress/history" },

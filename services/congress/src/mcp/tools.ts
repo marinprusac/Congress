@@ -5,68 +5,68 @@ import { buildChipToken } from "@congress/shared-types";
 import { registerAskTools } from "./askTools.js";
 import { registerMemoryTools } from "./memoryTools.js";
 import {
-  searchExhibits,
-  resolveExhibits,
-  getExhibitChip,
+  searchRecords,
+  resolveRecords,
+  getRecordChip,
   getConnections,
   addManualConnection,
   removeManualConnection,
-} from "../exhibits.js";
+} from "../records.js";
 import { listEventSettings, getEventSettingsByType, updateEventSettings } from "../eventSettings.js";
 import { listHistory } from "../eventHistory.js";
 import { listNotifications, dismissNotification } from "../notifications.js";
 
 export function registerTools(server: McpServer) {
   server.registerTool(
-    "search_exhibits",
+    "search_records",
     {
-      title: "Search Exhibits",
+      title: "Search Records",
       description:
-        "Search for Exhibits (notes, calendar events, and other referenceable objects) across every active Chamber. Each result's `token` is the exact chip to paste into a reply.",
+        "Search for Records (notes, calendar events, and other referenceable objects) across every active Chamber. Each result's `token` is the exact chip to paste into a reply.",
       inputSchema: { query: z.string().min(1) },
     },
     async ({ query }) => {
-      const results = await searchExhibits(query);
+      const results = await searchRecords(query);
       return mcpTextResult(results.map((r) => ({ ...r, token: buildChipToken({ chamber: r.chamber, id: r.id, name: r.name }) })));
     }
   );
 
   server.registerTool(
-    "resolve_exhibits",
+    "resolve_records",
     {
-      title: "Resolve Exhibits",
+      title: "Resolve Records",
       description:
-        "Batch-resolve a list of Exhibit references (id + owning chamber) into their current name/url, or a deleted/unavailable status.",
+        "Batch-resolve a list of Record references (id + owning chamber) into their current name/url, or a deleted/unavailable status.",
       inputSchema: {
         refs: z.array(z.object({ id: z.string().min(1), chamber: z.string().min(1) })),
       },
     },
     async ({ refs }) => {
-      const results = await resolveExhibits(refs);
+      const results = await resolveRecords(refs);
       return mcpTextResult(results.map((r) => ("name" in r ? { ...r, token: buildChipToken({ chamber: r.chamber, id: r.id, name: r.name }) } : r)));
     }
   );
 
   server.registerTool(
-    "get_exhibit_chip",
+    "get_record_chip",
     {
-      title: "Get Exhibit Chip",
+      title: "Get Record Chip",
       description:
-        "Build a ready-to-paste [[exhibit:chamber:id|Name]] chip token for an object you just created or fetched via that Chamber's own domain tools (e.g. create_task's or get_task's returned numeric id). Input is the Chamber's own RAW id (e.g. the task's plain numeric id, not \"task-7\") - this tool encodes it into the correct Exhibit id and resolves it for you.",
+        "Build a ready-to-paste [[record:chamber:id|Name]] chip token for an object you just created or fetched via that Chamber's own domain tools (e.g. create_task's or get_task's returned numeric id). Input is the Chamber's own RAW id (e.g. the task's plain numeric id, not \"task-7\") - this tool encodes it into the correct Record id and resolves it for you.",
       inputSchema: { chamber: z.string().min(1), id: z.string().min(1) },
     },
     async ({ chamber, id }) => {
-      const result = await getExhibitChip(chamber, id);
+      const result = await getRecordChip(chamber, id);
       return mcpTextResult(result);
     }
   );
 
   server.registerTool(
-    "get_exhibit_connections",
+    "get_record_connections",
     {
-      title: "Get Exhibit Connections",
+      title: "Get Record Connections",
       description:
-        "List every other Exhibit connected to the given Exhibit (full id, e.g. \"task-7\"), whether the connection came from a [[wikilink]] in body text or was added manually - each resolved to its current name/url, or a deleted/unavailable status.",
+        "List every other Record connected to the given Record (full id, e.g. \"task-7\"), whether the connection came from a [[wikilink]] in body text or was added manually - each resolved to its current name/url, or a deleted/unavailable status.",
       inputSchema: { id: z.string().min(1) },
     },
     async ({ id }) => {
@@ -76,33 +76,33 @@ export function registerTools(server: McpServer) {
   );
 
   server.registerTool(
-    "create_exhibit_connection",
+    "create_record_connection",
     {
-      title: "Create Exhibit Connection",
+      title: "Create Record Connection",
       description:
-        "Add a manual Connection between two Exhibits (full ids, e.g. \"task-7\" and \"note-12\") - shows up in both Exhibits' Connections without editing either body's text. Pass targetChamber when known (e.g. it came from search_exhibits) so the target gets cached immediately even if it's never been created/edited within Congress.",
+        "Add a manual Connection between two Records (full ids, e.g. \"task-7\" and \"note-12\") - shows up in both Records' Connections without editing either body's text. Pass targetChamber when known (e.g. it came from search_records) so the target gets cached immediately even if it's never been created/edited within Congress.",
       inputSchema: {
         id: z.string().min(1),
-        targetExhibitId: z.string().min(1),
+        targetRecordId: z.string().min(1),
         targetChamber: z.string().optional(),
       },
     },
-    async ({ id, targetExhibitId, targetChamber }) => {
-      const result = await addManualConnection(id, targetExhibitId, targetChamber);
+    async ({ id, targetRecordId, targetChamber }) => {
+      const result = await addManualConnection(id, targetRecordId, targetChamber);
       return mcpTextResult(result);
     }
   );
 
   server.registerTool(
-    "delete_exhibit_connection",
+    "delete_record_connection",
     {
-      title: "Delete Exhibit Connection",
+      title: "Delete Record Connection",
       description:
-        "Remove a manual Connection between two Exhibits (full ids). Only removes connections added manually - one derived from body text (a [[wikilink]] token) can only be removed by editing that text.",
-      inputSchema: { id: z.string().min(1), otherExhibitId: z.string().min(1) },
+        "Remove a manual Connection between two Records (full ids). Only removes connections added manually - one derived from body text (a [[wikilink]] token) can only be removed by editing that text.",
+      inputSchema: { id: z.string().min(1), otherRecordId: z.string().min(1) },
     },
-    async ({ id, otherExhibitId }) => {
-      const result = await removeManualConnection(id, otherExhibitId);
+    async ({ id, otherRecordId }) => {
+      const result = await removeManualConnection(id, otherRecordId);
       return mcpTextResult(result);
     }
   );
@@ -137,7 +137,7 @@ export function registerTools(server: McpServer) {
     {
       title: "Update Event Settings",
       description:
-        "Update an event type's settings - its history retention and whether to push a templated notification. Every event is always recorded to history. Events of exhibit types are the exception for notifications: those are set in the type's definition (builder mode, set_event_notifications) and ignored here. There is no create/delete: every known event type already has a row.",
+        "Update an event type's settings - its history retention and whether to push a templated notification. Every event is always recorded to history. Events of record types are the exception for notifications: those are set in the type's definition (builder mode, set_event_notifications) and ignored here. There is no create/delete: every known event type already has a row.",
       inputSchema: {
         eventType: z.string().min(1),
         historyRetentionMs: z.number().int().positive().nullable().optional(),

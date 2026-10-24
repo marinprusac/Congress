@@ -13,7 +13,7 @@ interface UseDraftCreateOptions<T> {
 
 // Fires `onCreate` at most once, on demand (call the returned `attempt` -
 // typically from a title/name field's `onBlur`) instead of on a content
-// debounce, so creating an Exhibit doesn't fire mid-keystroke. A flush on
+// debounce, so creating a Record doesn't fire mid-keystroke. A flush on
 // unmount is the net for a draft abandoned before that field ever blurs
 // (e.g. the back button while it's still focused).
 export function useDraftCreate<T>({ value, canCreate, onCreate }: UseDraftCreateOptions<T>): {

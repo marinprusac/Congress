@@ -1,19 +1,19 @@
 import type { CSSProperties, ReactNode } from "react";
-import type { CapitolExhibitSearchResult } from "@congress/shared-types";
+import type { CapitolRecordSearchResult } from "@congress/shared-types";
 import { useKeyboardInset } from "./useKeyboardInset.js";
 
 // The display/selection contract this dropdown renders off of - owned here
 // rather than by whatever produces it, since this component is the one
 // actual reader of every field. The CM6-based editors (see
-// codemirror/useExhibitEditorCore.ts) are the only current producer.
-export interface ExhibitPickerState {
+// codemirror/useRecordEditorCore.ts) are the only current producer.
+export interface RecordPickerState {
   open: boolean;
   query: string;
-  results: CapitolExhibitSearchResult[];
+  results: CapitolRecordSearchResult[];
   loading: boolean;
   activeIndex: number;
   setActiveIndex: (index: number) => void;
-  select: (result: CapitolExhibitSearchResult) => void;
+  select: (result: CapitolRecordSearchResult) => void;
   showCreate: boolean;
   creating: boolean;
   createError: string | null;
@@ -24,8 +24,8 @@ export interface ExhibitPickerState {
   caretPosition: { top: number; bottom: number; left: number } | null;
 }
 
-interface ExhibitPickerDropdownProps {
-  picker: ExhibitPickerState;
+interface RecordPickerDropdownProps {
+  picker: RecordPickerState;
   renderIcon: (chamber: string, type?: string) => ReactNode;
   className?: string;
 }
@@ -74,7 +74,7 @@ function placePicker(
 // Positioned by placePicker as a caret-anchored overlay (position: fixed
 // applies its own top/bottom/left/width/maxHeight inline, per-render) - the
 // editor keeps focus throughout, so keyboard nav (handled in
-// useExhibitEditorCore) and click selection both work regardless of where
+// useRecordEditorCore) and click selection both work regardless of where
 // this renders.
 //
 // Always renders its container, toggling only the `hidden` attribute -
@@ -82,7 +82,7 @@ function placePicker(
 // make mobile browsers reset the textarea's caret to the end of the value
 // (and occasionally drop the next keystroke), since it's a layout mutation
 // happening right as the focused element changes.
-export function ExhibitPickerDropdown({ picker, renderIcon, className }: ExhibitPickerDropdownProps) {
+export function RecordPickerDropdown({ picker, renderIcon, className }: RecordPickerDropdownProps) {
   const keyboardInset = useKeyboardInset();
   const style = picker.caretPosition ? placePicker(picker.caretPosition, keyboardInset) : undefined;
 
@@ -94,19 +94,19 @@ export function ExhibitPickerDropdown({ picker, renderIcon, className }: Exhibit
       style={style}
     >
       {picker.loading && picker.results.length === 0 && (
-        <div className="exhibit-picker-empty">Searching —</div>
+        <div className="record-picker-empty">Searching —</div>
       )}
       {!picker.loading && picker.results.length === 0 && !picker.showCreate && (
-        <div className="exhibit-picker-empty">
+        <div className="record-picker-empty">
           {picker.query.trim() ? "No matches" : "— Nothing to reference yet —"}
         </div>
       )}
-      {picker.results.map((result: CapitolExhibitSearchResult, index: number) => (
+      {picker.results.map((result: CapitolRecordSearchResult, index: number) => (
         <div
           key={`${result.chamber}:${result.id}`}
           role="option"
           aria-selected={index === picker.activeIndex}
-          className={index === picker.activeIndex ? "exhibit-picker-option active" : "exhibit-picker-option"}
+          className={index === picker.activeIndex ? "record-picker-option active" : "record-picker-option"}
           onMouseEnter={() => picker.setActiveIndex(index)}
           // mousedown, not click - fires before the textarea's blur handler
           // would otherwise close the picker first.
@@ -115,8 +115,8 @@ export function ExhibitPickerDropdown({ picker, renderIcon, className }: Exhibit
             picker.select(result);
           }}
         >
-          <span className="exhibit-picker-icon">{renderIcon(result.chamber, result.type)}</span>
-          <span className="exhibit-picker-name">{result.name}</span>
+          <span className="record-picker-icon">{renderIcon(result.chamber, result.type)}</span>
+          <span className="record-picker-name">{result.name}</span>
         </div>
       ))}
       {picker.showCreate && (
@@ -125,8 +125,8 @@ export function ExhibitPickerDropdown({ picker, renderIcon, className }: Exhibit
           aria-selected={picker.activeIndex === picker.results.length}
           className={
             picker.activeIndex === picker.results.length
-              ? "exhibit-picker-option exhibit-picker-create active"
-              : "exhibit-picker-option exhibit-picker-create"
+              ? "record-picker-option record-picker-create active"
+              : "record-picker-option record-picker-create"
           }
           onMouseEnter={() => picker.setActiveIndex(picker.results.length)}
           onMouseDown={(e) => {
@@ -134,12 +134,12 @@ export function ExhibitPickerDropdown({ picker, renderIcon, className }: Exhibit
             picker.createNew();
           }}
         >
-          <span className="exhibit-picker-name">
+          <span className="record-picker-name">
             {picker.creating ? "Creating —" : `+ Create "${picker.query.trim()}"`}
           </span>
         </div>
       )}
-      {picker.createError && <div className="exhibit-picker-error">{picker.createError}</div>}
+      {picker.createError && <div className="record-picker-error">{picker.createError}</div>}
     </div>
   );
 }

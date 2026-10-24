@@ -2,13 +2,13 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import type { MigrationPlan } from "./planner.js";
 import { env } from "../env.js";
-import { syncExhibit } from "../exhibits.js";
-import { exhibitsDb, exhibitsSqlite } from "./db/client.js";
+import { syncRecord } from "../records.js";
+import { recordsDb, recordsSqlite } from "./db/client.js";
 import { imports, records, recordTriggerState, types, typeDrafts, typeVersions } from "./db/schema.js";
 import { backupDir, snapshot } from "./backups.js";
 import { isJoinField, quoteIdent } from "./ddl.js";
 import { releaseFiles } from "./files.js";
-import { NAMESPACE, notifyWrite, purgeRecords, syncRecordExhibit } from "./records.js";
+import { NAMESPACE, notifyWrite, purgeRecords, syncRecordRecord } from "./records.js";
 import { forgetType, getType, listTypes, PublishError, recordCount, type PublishPreview, type PublishResult } from "./store.js";
 
 // Deleting a type: its records, table and versions are removed for good (a
@@ -51,21 +51,21 @@ export function deleteType(typeId: string, actor: string): PublishResult {
 
   const def = t.definition;
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  snapshot(exhibitsSqlite, join(backupDir(env.EXHIBITS_DB_PATH), `exhibits-predelete-${def.slug}-${stamp}.sqlite3`));
+  snapshot(recordsSqlite, join(backupDir(env.RECORDS_DB_PATH), `records-predelete-${def.slug}-${stamp}.sqlite3`));
 
   let purged!: ReturnType<typeof purgeRecords>;
-  exhibitsSqlite.transaction(() => {
+  recordsSqlite.transaction(() => {
     purged = purgeRecords(t);
-    for (const f of def.fields) if (isJoinField(f)) exhibitsSqlite.exec(`DROP TABLE IF EXISTS ${quoteIdent(f.column)}`);
-    exhibitsSqlite.exec(`DROP TABLE IF EXISTS ${quoteIdent(def.tableName)}`);
-    exhibitsDb.delete(recordTriggerState).where(eq(recordTriggerState.typeId, typeId)).run();
-    exhibitsDb.delete(typeVersions).where(eq(typeVersions.typeId, typeId)).run();
-    exhibitsDb.update(typeDrafts).set({ state: "discarded" }).where(eq(typeDrafts.typeId, typeId)).run();
-    exhibitsDb.delete(records).where(eq(records.typeId, typeId)).run();
-    exhibitsDb.delete(types).where(eq(types.id, typeId)).run();
+    for (const f of def.fields) if (isJoinField(f)) recordsSqlite.exec(`DROP TABLE IF EXISTS ${quoteIdent(f.column)}`);
+    recordsSqlite.exec(`DROP TABLE IF EXISTS ${quoteIdent(def.tableName)}`);
+    recordsDb.delete(recordTriggerState).where(eq(recordTriggerState.typeId, typeId)).run();
+    recordsDb.delete(typeVersions).where(eq(typeVersions.typeId, typeId)).run();
+    recordsDb.update(typeDrafts).set({ state: "discarded" }).where(eq(typeDrafts.typeId, typeId)).run();
+    recordsDb.delete(records).where(eq(records.typeId, typeId)).run();
+    recordsDb.delete(types).where(eq(types.id, typeId)).run();
     // Premade types install again at boot unless they're marked deleted.
     if (t.premadeKey) {
-      exhibitsDb
+      recordsDb
         .insert(imports)
         .values({ key: `premade-deleted:${t.premadeKey}`, ranAt: new Date(), statsJson: JSON.stringify({ actor }) })
         .onConflictDoNothing()
@@ -75,9 +75,9 @@ export function deleteType(typeId: string, actor: string): PublishResult {
 
   releaseFiles(purged.fileIds);
   forgetType(typeId);
-  for (const id of purged.ids) syncExhibit({ chamber: NAMESPACE, id, type: def.slug, name: "", url: "", deleted: true, outgoingRefs: [] });
+  for (const id of purged.ids) syncRecord({ chamber: NAMESPACE, id, type: def.slug, name: "", url: "", deleted: true, outgoingRefs: [] });
   for (const u of purged.unlinked) {
-    syncRecordExhibit(u.t, u.id);
+    syncRecordRecord(u.t, u.id);
     notifyWrite(u.t, u.id, undefined, { op: "cleanup", changed: [] });
   }
 

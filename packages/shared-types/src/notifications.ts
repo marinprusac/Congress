@@ -12,8 +12,8 @@ export const notificationPushRequestSchema = z.object({
   title: z.string().min(1),
   body: z.string().optional(),
   // Path relative to the owning Chamber's own root (e.g. "/t/42"), same
-  // convention as an Exhibit's own `url` - the notification center
-  // resolves it through resolveChamberPath/navigateToExhibit rather than
+  // convention as a Record's own `url` - the notification center
+  // resolves it through resolveChamberPath/navigateToRecord rather than
   // storing a chamber-prefixed path itself.
   chamberUrl: z.string().optional(),
 });

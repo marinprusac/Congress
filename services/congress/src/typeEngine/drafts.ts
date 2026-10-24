@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { operationSchema, type Operation } from "@congress/shared-types";
-import { exhibitsDb } from "./db/client.js";
+import { recordsDb } from "./db/client.js";
 import { typeDrafts } from "./db/schema.js";
 import {
   getType,
@@ -61,7 +61,7 @@ function toDraft(row: DraftRow): Draft {
 }
 
 function row(id: string): DraftRow {
-  const r = exhibitsDb.select().from(typeDrafts).where(eq(typeDrafts.id, id)).get();
+  const r = recordsDb.select().from(typeDrafts).where(eq(typeDrafts.id, id)).get();
   if (!r) throw new DraftError(`no draft ${id}`);
   return r;
 }
@@ -74,7 +74,7 @@ export function listDrafts(opts: { threadId?: number; openOnly?: boolean } = {})
   const conds = [];
   if (opts.threadId !== undefined) conds.push(eq(typeDrafts.threadId, opts.threadId));
   if (opts.openOnly) conds.push(eq(typeDrafts.state, "open"));
-  return exhibitsDb
+  return recordsDb
     .select()
     .from(typeDrafts)
     .where(conds.length ? and(...conds) : undefined)
@@ -101,7 +101,7 @@ export function startDraft(input: { threadId: number; slug?: string; rollbackTo?
 
   const now = new Date();
   const id = `drf_${ulid()}`;
-  exhibitsDb
+  recordsDb
     .insert(typeDrafts)
     .values({
       id,
@@ -135,13 +135,13 @@ export function setDraftOps(id: string, ops: unknown[], mode: "append" | "replac
   const next = mode === "append" ? [...(JSON.parse(r.opsJson) as Operation[]), ...parsed] : parsed;
   if (next.some((o) => o.op === "delete_type") && next.length > 1) throw new DraftError("delete_type must be the draft's only op");
   if (next.length > 100) throw new DraftError("a draft holds at most 100 ops");
-  exhibitsDb.update(typeDrafts).set({ opsJson: JSON.stringify(next), problemsJson: null, updatedAt: new Date() }).where(eq(typeDrafts.id, id)).run();
+  recordsDb.update(typeDrafts).set({ opsJson: JSON.stringify(next), problemsJson: null, updatedAt: new Date() }).where(eq(typeDrafts.id, id)).run();
   return getDraft(id);
 }
 
 export function discardDraft(id: string): Draft {
   openRow(id);
-  exhibitsDb.update(typeDrafts).set({ state: "discarded", updatedAt: new Date() }).where(eq(typeDrafts.id, id)).run();
+  recordsDb.update(typeDrafts).set({ state: "discarded", updatedAt: new Date() }).where(eq(typeDrafts.id, id)).run();
   return getDraft(id);
 }
 
@@ -181,13 +181,13 @@ export function publishDraft(id: string, actor: string, expectedHash?: string): 
         : publish({ typeId: draft.typeId ?? undefined, ops: draft.ops, actor });
   } catch (err) {
     if (err instanceof PublishError) {
-      exhibitsDb.update(typeDrafts).set({ problemsJson: JSON.stringify(err.problems), updatedAt: new Date() }).where(eq(typeDrafts.id, id)).run();
+      recordsDb.update(typeDrafts).set({ problemsJson: JSON.stringify(err.problems), updatedAt: new Date() }).where(eq(typeDrafts.id, id)).run();
     }
     throw err;
   }
   // An owner-approved change to a premade type means its later batches no longer apply.
   if (result.type.origin === "premade" && !result.type.forked) markForked(result.type.id);
-  exhibitsDb
+  recordsDb
     .update(typeDrafts)
     .set({ state: "published", typeId: result.type.id, publishedVersion: result.type.version, problemsJson: null, updatedAt: new Date() })
     .where(eq(typeDrafts.id, id))

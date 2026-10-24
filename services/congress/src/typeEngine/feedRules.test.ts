@@ -41,7 +41,7 @@ describe("feedCandidatesFor", () => {
   it("compiles overdue/within_next with extra conditions and previews", () => {
     const sqlite = seed();
     const candidates = feedCandidatesFor(def, now, (sql, params) => sqlite.prepare(sql).all(...params) as never, (r) => String(r.title));
-    const byId = Object.fromEntries(candidates.map((c) => [c.kind === "exhibit" ? c.exhibitId : "", c]));
+    const byId = Object.fromEntries(candidates.map((c) => [c.kind === "record" ? c.recordId : "", c]));
     expect(Object.keys(byId).sort()).toEqual(["edge", "late", "soon"]);
     expect(byId.late).toMatchObject({
       score: 90,
@@ -57,9 +57,9 @@ describe("feedCandidatesFor", () => {
     const local = feedCandidatesFor(def, now, (sql, params) => sqlite.prepare(sql).all(...params) as never, (r) => String(r.title));
     const ranked = rankFeed([
       { chamber: { name: "e", views: [] }, candidates: local },
-      { chamber: { name: "mail", views: [] }, candidates: [{ kind: "exhibit", exhibitId: "thread-1", score: 95 }] },
+      { chamber: { name: "mail", views: [] }, candidates: [{ kind: "record", recordId: "thread-1", score: 95 }] },
     ]);
-    expect(ranked.map((r) => (r.kind === "exhibit" ? `${r.chamber}:${r.exhibitId}` : ""))).toEqual(["mail:thread-1", "e:late", "e:soon", "e:edge"]);
+    expect(ranked.map((r) => (r.kind === "record" ? `${r.chamber}:${r.recordId}` : ""))).toEqual(["mail:thread-1", "e:late", "e:soon", "e:edge"]);
   });
 });
 
@@ -95,7 +95,7 @@ describe("feed rules on date fields", () => {
   const ids = (cs: ReturnType<typeof candidatesAt>, reason?: string) =>
     cs
       .filter((c) => (reason ? c.reason === reason : !c.reason))
-      .map((c) => (c.kind === "exhibit" ? c.exhibitId : ""))
+      .map((c) => (c.kind === "record" ? c.recordId : ""))
       .sort();
 
   it("counts a day as due until it ends in the owner's zone", () => {
@@ -130,7 +130,7 @@ describe("within_last", () => {
     insert.run("old", "Old", now.getTime() - 30 * HOUR);
     insert.run("future", "Future", now.getTime() + HOUR);
     const candidates = feedCandidatesFor(mail, now, (sql, params) => sqlite.prepare(sql).all(...params) as never, (r) => String(r.subject));
-    const scores = Object.fromEntries(candidates.map((c) => [c.kind === "exhibit" ? c.exhibitId : "", c.score]));
+    const scores = Object.fromEntries(candidates.map((c) => [c.kind === "record" ? c.recordId : "", c.score]));
     expect(Object.keys(scores).sort()).toEqual(["fresh", "stale"]);
     expect(scores.fresh!).toBeGreaterThan(scores.stale!);
     expect(scores.fresh!).toBeLessThanOrEqual(60);

@@ -1,8 +1,8 @@
 import { eq, inArray } from "drizzle-orm";
-import type { ExhibitResolveResult, ExhibitSearchResult, FeedCandidate, ManifestEvent } from "@congress/shared-types";
-import { scoreExhibitMatch } from "../kit/exhibitScore.js";
-import type { LocalExhibitSource } from "../exhibitSources.js";
-import { exhibitsDb, exhibitsSqlite } from "./db/client.js";
+import type { RecordResolveResult, RecordSearchResult, FeedCandidate, ManifestEvent } from "@congress/shared-types";
+import { scoreRecordMatch } from "../kit/recordScore.js";
+import type { LocalRecordSource } from "../recordSources.js";
+import { recordsDb, recordsSqlite } from "./db/client.js";
 import { records } from "./db/schema.js";
 import { getType, listTypes } from "./store.js";
 import { activeFields } from "./operations.js";
@@ -12,27 +12,27 @@ import { feedCandidatesFor } from "./feedRules.js";
 import { aliasesForIds, legacyIdsFor } from "./aliases.js";
 import type { Stored } from "./casts.js";
 
-// The "e" exhibit namespace: every type's records, in-process.
+// The "e" record namespace: every type's records, in-process.
 
 const SEARCH_CANDIDATES = 200;
 const RECENT_LIMIT = 10;
 
 type Row = Record<string, Stored>;
 
-export function searchType(t: ReturnType<typeof listTypes>[number], query: string): ExhibitSearchResult[] {
+export function searchType(t: ReturnType<typeof listTypes>[number], query: string): RecordSearchResult[] {
   const def = t.definition;
   const table = quoteIdent(def.tableName);
   const title = def.fields.find((f) => f.id === def.titleField);
   const q = query.trim();
   if (!q) {
-    const rows = exhibitsSqlite.prepare(`SELECT * FROM ${table} ORDER BY "updated_at" DESC LIMIT ?`).all(RECENT_LIMIT) as Row[];
+    const rows = recordsSqlite.prepare(`SELECT * FROM ${table} ORDER BY "updated_at" DESC LIMIT ?`).all(RECENT_LIMIT) as Row[];
     return rows.map((r) => ({ id: String(r.id), type: def.slug, name: titleOf(def, r), url: recordUrl(String(r.id)) }));
   }
   const searchable = activeFields(def).filter((f) => f.id === def.titleField || f.options.searchable);
   if (searchable.length === 0) return [];
   const where = searchable.map((f) => `${quoteIdent(f.column)} LIKE ? ESCAPE '\\'`).join(" OR ");
   const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-  const rows = exhibitsSqlite
+  const rows = recordsSqlite
     .prepare(`SELECT * FROM ${table} WHERE ${where} ORDER BY "updated_at" DESC LIMIT ?`)
     .all(...searchable.map(() => pattern), SEARCH_CANDIDATES) as Row[];
   return rows
@@ -41,7 +41,7 @@ export function searchType(t: ReturnType<typeof listTypes>[number], query: strin
       type: def.slug,
       name: titleOf(def, r),
       url: recordUrl(String(r.id)),
-      score: scoreExhibitMatch(
+      score: scoreRecordMatch(
         q,
         searchable.map((f) => ({ text: String(r[f.column] ?? ""), isPrimary: f.id === title?.id }))
       ),
@@ -49,7 +49,7 @@ export function searchType(t: ReturnType<typeof listTypes>[number], query: strin
     .filter((r) => r.score > 0);
 }
 
-export const typeEngineSource: LocalExhibitSource = {
+export const typeEngineSource: LocalRecordSource = {
   namespace: NAMESPACE,
 
   search(query) {
@@ -59,9 +59,9 @@ export const typeEngineSource: LocalExhibitSource = {
 
   resolve(ids) {
     const owners = new Map(
-      ids.length ? exhibitsDb.select().from(records).where(inArray(records.id, ids)).all().map((r) => [r.id, r.typeId]) : []
+      ids.length ? recordsDb.select().from(records).where(inArray(records.id, ids)).all().map((r) => [r.id, r.typeId]) : []
     );
-    return ids.map((id): ExhibitResolveResult => {
+    return ids.map((id): RecordResolveResult => {
       const t = owners.has(id) ? getType(owners.get(id)!) : undefined;
       const row = t && readRow(t.definition, id);
       if (!t || !row) return { id, deleted: true };
@@ -70,7 +70,7 @@ export const typeEngineSource: LocalExhibitSource = {
   },
 
   typeOf(id) {
-    const row = exhibitsDb.select().from(records).where(eq(records.id, id)).get();
+    const row = recordsDb.select().from(records).where(eq(records.id, id)).get();
     return row ? (getType(row.typeId)?.definition.slug ?? null) : null;
   },
 
@@ -90,7 +90,7 @@ export const typeEngineSource: LocalExhibitSource = {
       feedCandidatesFor(
         t.definition,
         now,
-        (sql, params) => exhibitsSqlite.prepare(sql).all(...params) as Row[],
+        (sql, params) => recordsSqlite.prepare(sql).all(...params) as Row[],
         (row) => titleOf(t.definition, row)
       )
     );

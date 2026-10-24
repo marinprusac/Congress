@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import type { FieldDefinition, RecordDto, TimeTrigger, TypeDefinition } from "@congress/shared-types";
-import { exhibitsDb, exhibitsSqlite } from "./db/client.js";
+import { recordsDb, recordsSqlite } from "./db/client.js";
 import { imports, recordTriggerState } from "./db/schema.js";
 import { listTypes, onTypesChanged, type StoredType } from "./store.js";
 import { quoteIdent } from "./ddl.js";
@@ -57,7 +57,7 @@ function ladderRows(def: TypeDefinition, trigger: TimeTrigger, extra: string, ex
   }
   const col = quoteIdent(f.column);
   const where = [`${col} IS NOT NULL`, ...(f.kind === "date" ? [`${col} <> ''`] : []), ...conds.clauses, ...(extra ? [extra] : [])];
-  return exhibitsSqlite
+  return recordsSqlite
     .prepare(`SELECT * FROM ${quoteIdent(def.tableName)} WHERE ${where.join(" AND ")} ${tail}`)
     .all(...conds.params, ...extraParams) as Row[];
 }
@@ -91,7 +91,7 @@ function storedStates(typeId: string, ladder: string, recordId?: string): Map<st
   const where = recordId
     ? and(eq(recordTriggerState.ladder, ladder), eq(recordTriggerState.recordId, recordId))
     : and(eq(recordTriggerState.typeId, typeId), eq(recordTriggerState.ladder, ladder));
-  return new Map(exhibitsDb.select().from(recordTriggerState).where(where).all().map((r) => [r.recordId, r.state]));
+  return new Map(recordsDb.select().from(recordTriggerState).where(where).all().map((r) => [r.recordId, r.state]));
 }
 
 // `staleAt`: a "before" step's notification is moot once its moment arrives;
@@ -111,14 +111,14 @@ function transition(t: StoredType, trigger: TimeTrigger, id: string, title: stri
   // The ladder moved on or cleared: the previous step's notification is stale.
   if (prev !== undefined && cur?.event !== prev) dismissStep(t, prev, id);
   if (cur && cur.event !== prev) {
-    exhibitsDb
+    recordsDb
       .insert(recordTriggerState)
       .values({ recordId: id, typeId: t.id, ladder: trigger.field, state: cur.event, firedAt: new Date(now) })
       .onConflictDoUpdate({ target: [recordTriggerState.recordId, recordTriggerState.ladder], set: { state: cur.event, firedAt: new Date(now) } })
       .run();
     if (!silent) publish(t, cur.event, id, title, cur.offsetMinutes < 0 ? instant : null);
   } else if (!cur && prev !== undefined) {
-    exhibitsDb.delete(recordTriggerState).where(and(eq(recordTriggerState.recordId, id), eq(recordTriggerState.ladder, trigger.field))).run();
+    recordsDb.delete(recordTriggerState).where(and(eq(recordTriggerState.recordId, id), eq(recordTriggerState.ladder, trigger.field))).run();
     if (trigger.clearEvent && !silent) publish(t, trigger.clearEvent.event, id, title);
   }
 }
@@ -128,13 +128,13 @@ function transition(t: StoredType, trigger: TimeTrigger, id: string, title: stri
 const ladderKey = (t: StoredType, trigger: TimeTrigger) => `ladder:${t.id}:${trigger.field}`;
 
 function markLadderKnown(t: StoredType, trigger: TimeTrigger): void {
-  exhibitsDb.insert(imports).values({ key: ladderKey(t, trigger), ranAt: new Date(), statsJson: "{}" }).onConflictDoNothing().run();
+  recordsDb.insert(imports).values({ key: ladderKey(t, trigger), ranAt: new Date(), statsJson: "{}" }).onConflictDoNothing().run();
 }
 
 function ladderKnown(t: StoredType, trigger: TimeTrigger): boolean {
-  if (exhibitsDb.select().from(imports).where(eq(imports.key, ladderKey(t, trigger))).get()) return true;
+  if (recordsDb.select().from(imports).where(eq(imports.key, ladderKey(t, trigger))).get()) return true;
   // A ladder that fired before this marker existed counts as known.
-  const fired = exhibitsDb
+  const fired = recordsDb
     .select()
     .from(recordTriggerState)
     .where(and(eq(recordTriggerState.typeId, t.id), eq(recordTriggerState.ladder, trigger.field)))
@@ -153,7 +153,7 @@ export function evaluateRecord(t: StoredType, id: string, deleted?: RecordDto, n
     const row = deleted ? undefined : ladderRows(def, trigger, `"id" = ?`, [id])[0];
     const cur = currentStep(def, trigger, row, now, zone);
     if (!cur && prev === undefined) continue;
-    const titleRow = row ?? (deleted ? undefined : (exhibitsSqlite.prepare(`SELECT * FROM ${quoteIdent(def.tableName)} WHERE "id" = ?`).get(id) as Row | undefined));
+    const titleRow = row ?? (deleted ? undefined : (recordsSqlite.prepare(`SELECT * FROM ${quoteIdent(def.tableName)} WHERE "id" = ?`).get(id) as Row | undefined));
     const title = deleted ? titleFromDto(def, deleted) : titleRow ? titleOf(def, titleRow) : "";
     transition(t, trigger, id, title, cur, prev, now, quiet || staleStep(def, trigger, row, cur, now, zone), rowInstant(def, trigger, row, zone));
   }
@@ -193,7 +193,7 @@ export function evaluateAll(now = Date.now()): void {
       // Stored states whose record no longer qualifies fall out of the ladder.
       for (const [id, prev] of stored) {
         if (seen.has(id)) continue;
-        const row = exhibitsSqlite.prepare(`SELECT * FROM ${quoteIdent(def.tableName)} WHERE "id" = ?`).get(id) as Row | undefined;
+        const row = recordsSqlite.prepare(`SELECT * FROM ${quoteIdent(def.tableName)} WHERE "id" = ?`).get(id) as Row | undefined;
         transition(t, trigger, id, row ? titleOf(def, row) : "", null, prev, now);
       }
     }

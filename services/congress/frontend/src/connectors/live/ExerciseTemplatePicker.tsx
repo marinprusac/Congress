@@ -4,7 +4,7 @@ import type { ExerciseTemplate } from "@/lib/fitnessApi";
 import { searchExerciseTemplates } from "@/lib/fitnessApi";
 
 // Purpose-specific to this Chamber's routine editor - no existing congress-ui
-// combobox fits (ExhibitPickerDropdown is tightly coupled to CM6's caret
+// combobox fits (RecordPickerDropdown is tightly coupled to CM6's caret
 // positioning, PayloadFieldPicker inserts a token into a text field rather
 // than picking a value), so this is a small new one. Reuses the .field-picker
 // trigger+popover CSS idiom (mobile-fixed / desktop-anchored) already

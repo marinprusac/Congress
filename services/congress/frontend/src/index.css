@@ -271,14 +271,14 @@
 }
 
 @media (hover: hover) {
-  .feed-card:has(> .feed-exhibit:hover),
+  .feed-card:has(> .feed-record:hover),
   .feed-card--figure:hover {
     translate: -2px -2px;
     box-shadow: 6px 6px 0 var(--color-ink);
   }
 }
 
-.feed-card:has(> .feed-exhibit:active) {
+.feed-card:has(> .feed-record:active) {
   translate: 4px 4px;
   box-shadow: none;
 }
@@ -351,7 +351,7 @@
 
 /* A single record: its own information inline (time, facts, an excerpt),
    the whole card tappable. */
-.feed-exhibit {
+.feed-record {
   display: flex;
   width: 100%;
   flex-direction: column;
@@ -387,14 +387,14 @@
   color: var(--color-ink);
 }
 
-.feed-exhibit-time,
-.feed-exhibit-fields {
+.feed-record-time,
+.feed-record-fields {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--color-slate);
 }
 
-.feed-exhibit-body {
+.feed-record-body {
   font-size: 0.9rem;
   line-height: 1.4;
   color: var(--color-ink);
@@ -405,7 +405,7 @@
 }
 
 /* The full title, wrapping if it must - context goes on the lines below. */
-.feed-exhibit-name {
+.feed-record-name {
   min-width: 0;
   overflow-wrap: anywhere;
   font-family: var(--font-display);
@@ -416,11 +416,11 @@
 }
 
 /* The lead story: the first ranked record, set as a headline. */
-.feed-card--lead .feed-exhibit {
+.feed-card--lead .feed-record {
   gap: 0.4rem;
 }
 
-.feed-card--lead .feed-exhibit-name {
+.feed-card--lead .feed-record-name {
   margin-top: 0.15rem;
   font-size: 1.8rem;
   font-weight: 900;
@@ -428,7 +428,7 @@
   letter-spacing: -0.02em;
 }
 
-.feed-card--lead .feed-exhibit-time {
+.feed-card--lead .feed-record-time {
   margin-top: 0.15rem;
   padding-top: 0.4rem;
   border-top: 1px solid var(--color-ink);
@@ -748,7 +748,7 @@
 }
 
 /* Tappable rows: a tint. Feed cards press onto their shadow (see .feed-card). */
-.feed-exhibit:active,
+.feed-record:active,
 .search-row:active,
 .create-sheet-option:active {
   scale: none;

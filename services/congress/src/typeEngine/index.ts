@@ -1,11 +1,11 @@
-import { registerLocalSource } from "../exhibitSources.js";
-import { runExhibitsMigrations } from "./db/client.js";
+import { registerLocalSource } from "../recordSources.js";
+import { runRecordsMigrations } from "./db/client.js";
 import { installPremades } from "./premade/index.js";
 import { typeEngineSource } from "./source.js";
 
-// Boot: meta migrations, premade types, and the "e" exhibit namespace.
+// Boot: meta migrations, premade types, and the "e" record namespace.
 export function startTypeEngine(): void {
-  runExhibitsMigrations();
+  runRecordsMigrations();
   installPremades();
   registerLocalSource(typeEngineSource);
 }

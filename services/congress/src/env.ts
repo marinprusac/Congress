@@ -1,8 +1,17 @@
 import { loadEnv } from "./kit/env.js";
 import { z } from "zod";
+import { existsSync } from "node:fs";
 
 // Congress's own env. Each Chamber's config comes from its own .env instead
 // (see chambers/loader.ts).
+// Names and paths from before records were called records: a deployment that
+// still sets them, or still has the old database file, keeps working.
+process.env.RECORDS_DB_PATH ??= process.env.EXHIBITS_DB_PATH;
+process.env.RECORD_FILES_DIR ??= process.env.EXHIBIT_FILES_DIR;
+if (!process.env.RECORDS_DB_PATH && !existsSync("./data/records.sqlite3") && existsSync("./data/exhibits.sqlite3")) {
+  process.env.RECORDS_DB_PATH = "./data/exhibits.sqlite3";
+}
+
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default("127.0.0.1"),
@@ -12,10 +21,10 @@ const envSchema = z.object({
     .length(64, "CONGRESS_MASTER_PASSWORD_HASH must be a 64-char sha256 hex digest"),
   SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 characters"),
   DB_PATH: z.string().default("./data/capitol.sqlite3"),
-  // Runtime exhibit types: definitions plus one real table per type.
-  EXHIBITS_DB_PATH: z.string().default("./data/exhibits.sqlite3"),
+  // Runtime record types: definitions plus one real table per type.
+  RECORDS_DB_PATH: z.string().default("./data/records.sqlite3"),
   // Files of `file` fields, one per upload, named by file id.
-  EXHIBIT_FILES_DIR: z.string().default("./data/files"),
+  RECORD_FILES_DIR: z.string().default("./data/files"),
   // Each connector's own cache DB (connectors/<name>).
   CONNECTORS_DATA_DIR: z.string().default("./data/connectors"),
   MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(25 * 1024 * 1024),

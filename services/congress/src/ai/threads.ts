@@ -17,7 +17,7 @@ function visibleNow(now = new Date()) {
 }
 
 export function titleFromText(text: string): string {
-  const flat = text.replace(/\[\[exhibit:[^\]|]+\|([^\]]+)\]\]/g, "$1").replace(/\s+/g, " ").trim();
+  const flat = text.replace(/\[\[(?:record|exhibit):[^\]|]+\|([^\]]+)\]\]/g, "$1").replace(/\s+/g, " ").trim();
   if (flat.length <= 60) return flat || DEFAULT_THREAD_TITLE;
   const cut = flat.slice(0, 60);
   const space = cut.lastIndexOf(" ");
@@ -28,8 +28,8 @@ export function titleFromText(text: string): string {
 // labels and Markdown syntax (tables, emphasis, links, headings) is dropped.
 export function plainSnippet(text: string): string {
   return text
-    .replace(/\[\[exhibit:[^\]|]+?\\?\|([^\]]+)\]\]/g, "$1")
-    .replace(/\[\[exhibit:[^\]]+\]\]/g, "")
+    .replace(/\[\[(?:record|exhibit):[^\]|]+?\\?\|([^\]]+)\]\]/g, "$1")
+    .replace(/\[\[(?:record|exhibit):[^\]]+\]\]/g, "")
     .replace(/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/gm, "")
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, "")

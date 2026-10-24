@@ -2,7 +2,7 @@ export type EditorIdentityAction = "keep" | "reset";
 
 // A create/edit page that stays mounted across the create -> persisted
 // transition (see useDraftCreate) also stays mounted across a navigation
-// from one persisted id straight to a different one (e.g. an Exhibit chip
+// from one persisted id straight to a different one (e.g. a Record chip
 // pointing at a sibling note/task/directive) - same component type at the
 // same route position, so React doesn't remount and re-run initializer
 // state on its own. This tells the two apart: `idParam` matching

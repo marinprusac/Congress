@@ -1,8 +1,8 @@
 import { EditorView, Decoration, WidgetType, type DecorationSet } from "@codemirror/view";
 import { EditorState, StateField, type Extension, type Range } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
-import { splitExhibitText } from "../textSegments.js";
-import type { ExhibitEditorRuntimeRef } from "./runtime.js";
+import { splitRecordText } from "../textSegments.js";
+import type { RecordEditorRuntimeRef } from "./runtime.js";
 
 export type TableAlign = "left" | "center" | "right" | null;
 export interface ParsedTable {
@@ -124,7 +124,7 @@ class TableWidget extends WidgetType {
   constructor(
     private readonly source: string,
     private readonly table: ParsedTable,
-    private readonly runtime: ExhibitEditorRuntimeRef,
+    private readonly runtime: RecordEditorRuntimeRef,
     private readonly from: number,
     private readonly to: number
   ) {
@@ -147,14 +147,14 @@ class TableWidget extends WidgetType {
 
   private show(cell: HTMLElement, raw: string): void {
     cell.replaceChildren();
-    for (const seg of splitExhibitText(raw)) {
+    for (const seg of splitRecordText(raw)) {
       if (seg.type === "text") {
         renderInline(cell, seg.value);
         continue;
       }
       const result = this.runtime.current.resultsByToken.get(seg.token);
       const chip = document.createElement("span");
-      chip.className = "exhibit-chip";
+      chip.className = "record-chip";
       chip.textContent = result && "name" in result && result.name ? result.name : seg.label;
       cell.append(chip);
     }
@@ -247,7 +247,7 @@ class TableWidget extends WidgetType {
   }
 }
 
-function buildTables(state: EditorState, runtime: ExhibitEditorRuntimeRef): DecorationSet {
+function buildTables(state: EditorState, runtime: RecordEditorRuntimeRef): DecorationSet {
   const sel = state.selection.main;
   const doc = state.doc;
   const lines = Array.from({ length: doc.lines }, (_, i) => doc.line(i + 1).text);
@@ -275,7 +275,7 @@ function buildTables(state: EditorState, runtime: ExhibitEditorRuntimeRef): Deco
 }
 
 // Block replace decorations must come from a state field, not a ViewPlugin.
-export function createTableExtension(runtime: ExhibitEditorRuntimeRef): Extension {
+export function createTableExtension(runtime: RecordEditorRuntimeRef): Extension {
   return StateField.define<DecorationSet>({
     create: (state) => buildTables(state, runtime),
     update(value, tr) {

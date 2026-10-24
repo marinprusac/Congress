@@ -7,7 +7,7 @@ const fields: AskFieldInput[] = [
   { key: "hours", label: "Hours", type: "number", min: 0, max: 24 },
   { key: "done", label: "Done?", type: "boolean", required: true },
   { key: "tags", label: "Tags", type: "multichoice", options: [{ value: "a", label: "A" }, { value: "b", label: "B" }] },
-  { key: "note", label: "Note", type: "exhibit" },
+  { key: "note", label: "Note", type: "record" },
 ];
 
 describe("askFieldsSchema", () => {
@@ -26,9 +26,9 @@ describe("answerSchemaFor", () => {
   const schema = answerSchemaFor(askFieldsSchema.parse(fields));
 
   it("accepts valid answers and nulls out empty optional ones", () => {
-    const r = schema.safeParse({ when: "2026-09-28", mood: "", hours: 3, done: false, tags: [], note: "[[exhibit:notes:note-1|X]]" });
+    const r = schema.safeParse({ when: "2026-09-28", mood: "", hours: 3, done: false, tags: [], note: "[[record:notes:note-1|X]]" });
     expect(r.success).toBe(true);
-    expect(r.data).toEqual({ when: "2026-09-28", mood: null, hours: 3, done: false, tags: null, note: "[[exhibit:notes:note-1|X]]" });
+    expect(r.data).toEqual({ when: "2026-09-28", mood: null, hours: 3, done: false, tags: null, note: "[[record:notes:note-1|X]]" });
   });
 
   it("rejects missing required, out-of-range, unknown option and unknown keys", () => {

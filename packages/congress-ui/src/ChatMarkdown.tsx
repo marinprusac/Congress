@@ -1,33 +1,33 @@
 import { memo, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { CapitolExhibitResolveResult } from "@congress/shared-types";
-import { ExhibitChip } from "./ExhibitChip.js";
-import { getExhibitIcon } from "./ExhibitTypeIcon.js";
-import { useResolvedExhibits } from "./useResolvedExhibits.js";
-import { EXHIBIT_HREF_PREFIX, exhibitTokensToLinks, trimPartialToken } from "./chatMarkdownText.js";
+import type { CapitolRecordResolveResult } from "@congress/shared-types";
+import { RecordChip } from "./RecordChip.js";
+import { getRecordIcon } from "./RecordTypeIcon.js";
+import { useResolvedRecords } from "./useResolvedRecords.js";
+import { isRecordHref, recordTokensToLinks, trimPartialToken } from "./chatMarkdownText.js";
 
-type ResolvedExhibit = Extract<CapitolExhibitResolveResult, { url: string }>;
+type ResolvedRecord = Extract<CapitolRecordResolveResult, { url: string }>;
 
 interface ChatMarkdownProps {
   text: string;
   streaming?: boolean;
-  onNavigateExhibit?: (result: ResolvedExhibit) => void;
+  onNavigateRecord?: (result: ResolvedRecord) => void;
   // Same-origin paths ("/notes/n/3") navigate in-app instead of reloading.
   onNavigatePath?: (path: string) => void;
   className?: string;
 }
 
-function ChatExhibitChip({ token, label, onNavigate }: { token: string; label: string; onNavigate?: (r: ResolvedExhibit) => void }) {
-  const { resultsByToken } = useResolvedExhibits([token]);
+function ChatRecordChip({ token, label, onNavigate }: { token: string; label: string; onNavigate?: (r: ResolvedRecord) => void }) {
+  const { resultsByToken } = useResolvedRecords([token]);
   const result = resultsByToken.get(token);
-  if (!result) return <span className="exhibit-chip chat-exhibit-chip" data-exhibit-state="loading">{label}</span>;
+  if (!result) return <span className="record-chip chat-record-chip" data-record-state="loading">{label}</span>;
   return (
-    <ExhibitChip
+    <RecordChip
       result={result}
       fallbackLabel={label}
-      className="exhibit-chip chat-exhibit-chip"
-      renderIcon={getExhibitIcon}
+      className="record-chip chat-record-chip"
+      renderIcon={getRecordIcon}
       onNavigate={onNavigate}
     />
   );
@@ -57,17 +57,17 @@ function CodeBlock({ children }: { children?: ReactNode }) {
 }
 
 function urlTransform(url: string): string {
-  return url.startsWith(EXHIBIT_HREF_PREFIX) ? url : defaultUrlTransform(url);
+  return isRecordHref(url) ? url : defaultUrlTransform(url);
 }
 
-// Chat replies: GitHub-flavored Markdown with exhibit tokens as live chips.
-export const ChatMarkdown = memo(function ChatMarkdown({ text, streaming, onNavigateExhibit, onNavigatePath, className }: ChatMarkdownProps) {
-  const source = exhibitTokensToLinks(streaming ? trimPartialToken(text) : text);
+// Chat replies: GitHub-flavored Markdown with record tokens as live chips.
+export const ChatMarkdown = memo(function ChatMarkdown({ text, streaming, onNavigateRecord, onNavigatePath, className }: ChatMarkdownProps) {
+  const source = recordTokensToLinks(streaming ? trimPartialToken(text) : text);
   const components: Components = {
     a({ href, children }) {
-      if (href?.startsWith(EXHIBIT_HREF_PREFIX)) {
+      if (href && isRecordHref(href)) {
         const label = typeof children === "string" ? children : Array.isArray(children) ? children.join("") : String(children ?? "");
-        return <ChatExhibitChip token={decodeURIComponent(href)} label={label} onNavigate={onNavigateExhibit} />;
+        return <ChatRecordChip token={decodeURIComponent(href)} label={label} onNavigate={onNavigateRecord} />;
       }
       const internal = href?.startsWith("/") && !href.startsWith("//");
       return (

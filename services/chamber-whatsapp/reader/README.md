@@ -40,7 +40,7 @@ socket isn't reachable by the other services on this VPS.
 - Congress's AI can read (never send) through the Chamber's MCP tools:
   `get_status`, `list_chats`, `find_chats`, `read_chat`, `search_messages`,
   `list_unread`, and `mark_read` (local only).
-  No exhibits or feed items, so WhatsApp isn't in Congress Search or the home feed.
+  No records or feed items, so WhatsApp isn't in Congress Search or the home feed.
 - Permanent rule: nothing is ever sent or uploaded to WhatsApp (messages,
   reactions, media, photos, status, receipts beyond the automatic ones,
   account or app-state changes), from the UI or the AI.

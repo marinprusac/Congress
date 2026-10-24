@@ -1,22 +1,22 @@
-export { buildExhibitToken, parseExhibitToken, EXHIBIT_TOKEN_PREFIX } from "./token.js";
-export type { ExhibitToken } from "./token.js";
-export { useExhibitSearch } from "./useExhibitSearch.js";
-export { ExhibitPickerDropdown } from "./ExhibitPickerDropdown.js";
-export { ExhibitChip } from "./ExhibitChip.js";
-export { extractExhibitTokens, splitExhibitText } from "./textSegments.js";
-export type { ExhibitTextSegment } from "./textSegments.js";
-export { ExhibitFieldEditor } from "./ExhibitFieldEditor.js";
-export { ExhibitInlineField } from "./ExhibitInlineField.js";
-export { useResolvedExhibits } from "./useResolvedExhibits.js";
+export { buildRecordToken, parseRecordToken, RECORD_TOKEN_PREFIX } from "./token.js";
+export type { RecordToken } from "./token.js";
+export { useRecordSearch } from "./useRecordSearch.js";
+export { RecordPickerDropdown } from "./RecordPickerDropdown.js";
+export { RecordChip } from "./RecordChip.js";
+export { extractRecordTokens, splitRecordText } from "./textSegments.js";
+export type { RecordTextSegment } from "./textSegments.js";
+export { RecordFieldEditor } from "./RecordFieldEditor.js";
+export { RecordInlineField } from "./RecordInlineField.js";
+export { useResolvedRecords } from "./useResolvedRecords.js";
 export { stripFrontmatter } from "./frontmatter.js";
-export { navigateToExhibit } from "./navigateToExhibit.js";
+export { navigateToRecord } from "./navigateToRecord.js";
 export { resolveChamberPath } from "./ShellHostContext.js";
 export { ChamberLayout } from "./ChamberLayout.js";
 export { ChamberHeader } from "./ChamberHeader.js";
-export { useExhibitConnections } from "./useExhibitConnections.js";
-export { addExhibitConnection, removeExhibitConnection, flushDraftConnections } from "./exhibitRefs.js";
-export { ExhibitLinksLayout } from "./ExhibitLinksLayout.js";
-export { ExhibitActionBar } from "./ExhibitActionBar.js";
+export { useRecordConnections } from "./useRecordConnections.js";
+export { addRecordConnection, removeRecordConnection, flushDraftConnections } from "./recordRefs.js";
+export { RecordLinksLayout } from "./RecordLinksLayout.js";
+export { RecordActionBar } from "./RecordActionBar.js";
 export {
   useAppliedTheme,
   useCapitolSettings,
@@ -25,8 +25,8 @@ export {
 } from "./useAppliedTheme.js";
 export { useBackNavigation, ChamberIndexRedirect } from "./chamberNav.js";
 export { ChamberMark, CapitolMark, getChamberIcon } from "./ChamberMarks.js";
-export { ExhibitTypeIcon, getExhibitIcon, setExhibitTypeIcons } from "./ExhibitTypeIcon.js";
-export { pickSourceColor, setExhibitTypeColors, sourceColorStyle, useSourceColor } from "./sourceColor.js";
+export { RecordTypeIcon, getRecordIcon, setRecordTypeIcons } from "./RecordTypeIcon.js";
+export { pickSourceColor, setRecordTypeColors, sourceColorStyle, useSourceColor } from "./sourceColor.js";
 export { ViewCard } from "./ViewCard.js";
 export { useAiRunStream, fetchAiSettings, aiSettingsQueryKey, type AiRunStreamState, type AiToolCall } from "./useAiRunStream.js";
 export {

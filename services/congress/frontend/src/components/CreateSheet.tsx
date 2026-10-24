@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExhibitTypeIcon, sourceColorStyle, usePresence, useSourceColor, useStackNav } from "@congress/congress-ui";
+import { RecordTypeIcon, sourceColorStyle, usePresence, useSourceColor, useStackNav } from "@congress/congress-ui";
 import { canCreate, CUSTOM_NEW, fetchTypes } from "@/lib/recordsApi";
 import { TYPES_KEY } from "@/records/RecordPage";
 
@@ -10,7 +10,7 @@ function CreateOption({ type, icon, label, onPick }: { type: string; icon: strin
   return (
     <button type="button" className="create-sheet-option" onClick={onPick}>
       <span className="create-sheet-mark" style={sourceColorStyle(color)} aria-hidden="true" />
-      <ExhibitTypeIcon name={icon} />
+      <RecordTypeIcon name={icon} />
       {label}
     </button>
   );

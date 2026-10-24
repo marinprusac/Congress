@@ -147,10 +147,10 @@ import {
   ZapIcon,
   type LucideIcon,
 } from "lucide-react";
-import { normalizeExhibitIcon, type ExhibitIconName } from "@congress/shared-types";
+import { normalizeRecordIcon, type RecordIconName } from "@congress/shared-types";
 import { getChamberIcon } from "./ChamberMarks.js";
 
-const ICONS: Record<ExhibitIconName, LucideIcon> = {
+const ICONS: Record<RecordIconName, LucideIcon> = {
   "file": FileIcon,
   "file-text": FileTextIcon,
   "sticky-note": StickyNoteIcon,
@@ -302,12 +302,12 @@ const ICONS: Record<ExhibitIconName, LucideIcon> = {
 let typeIcons: ReadonlyMap<string, string> = new Map();
 const listeners = new Set<() => void>();
 
-export function setExhibitTypeIcons(next: ReadonlyMap<string, string>): void {
+export function setRecordTypeIcons(next: ReadonlyMap<string, string>): void {
   typeIcons = next;
   for (const l of listeners) l();
 }
 
-function useTypeIcon(type: string | undefined): ExhibitIconName | null {
+function useTypeIcon(type: string | undefined): RecordIconName | null {
   const stored = useSyncExternalStore(
     (onChange) => {
       listeners.add(onChange);
@@ -315,10 +315,10 @@ function useTypeIcon(type: string | undefined): ExhibitIconName | null {
     },
     () => (type ? typeIcons.get(type) : undefined)
   );
-  return stored === undefined ? null : normalizeExhibitIcon(stored);
+  return stored === undefined ? null : normalizeRecordIcon(stored);
 }
 
-interface ExhibitTypeIconProps {
+interface RecordTypeIconProps {
   // An icon name directly (e.g. from a type definition) or a type slug.
   name?: string;
   type?: string;
@@ -326,14 +326,14 @@ interface ExhibitTypeIconProps {
 }
 
 // A type's lucide icon; "file" until the type list loads.
-export function ExhibitTypeIcon({ name, type, className }: ExhibitTypeIconProps): ReactElement {
+export function RecordTypeIcon({ name, type, className }: RecordTypeIconProps): ReactElement {
   const fromType = useTypeIcon(type);
-  const Icon = ICONS[name !== undefined ? normalizeExhibitIcon(name) : (fromType ?? "file")];
+  const Icon = ICONS[name !== undefined ? normalizeRecordIcon(name) : (fromType ?? "file")];
   return <Icon className={className ?? "h-4 w-4"} aria-hidden />;
 }
 
-// For `renderIcon` props: record exhibits (namespace "e") show their type's icon, others their source's mark.
-export function getExhibitIcon(chamber: string, type?: string): ReactElement {
-  if (chamber === "e" && type) return <ExhibitTypeIcon type={type} />;
+// For `renderIcon` props: record records (namespace "e") show their type's icon, others their source's mark.
+export function getRecordIcon(chamber: string, type?: string): ReactElement {
+  if (chamber === "e" && type) return <RecordTypeIcon type={type} />;
   return getChamberIcon(chamber);
 }

@@ -44,13 +44,13 @@ export function registerAskTools(server: McpServer) {
     {
       title: "Send Message",
       description:
-        "Tell the owner something without needing a reply - a heads-up, a finding, or (with deliverAt) a reminder delivered later. Lands in the current chat thread, or a new one when you're not in a chat. Markdown and exhibit tokens render.",
+        "Tell the owner something without needing a reply - a heads-up, a finding, or (with deliverAt) a reminder delivered later. Lands in the current chat thread, or a new one when you're not in a chat. Markdown and record tokens render.",
       inputSchema: {
         title: z.string().max(120).optional().describe("Short headline, shown on the Home card and notification."),
         body: z.string().min(1).max(4000),
         urgency,
         deliverAt: futureIso("Deliver later instead of now"),
-        links: z.array(z.string()).max(12).optional().describe("Exhibit tokens to show as chips under the message."),
+        links: z.array(z.string()).max(12).optional().describe("Record tokens to show as chips under the message."),
       },
     },
     ({ title, body, urgency, deliverAt, links }) =>
@@ -110,7 +110,7 @@ export function registerAskTools(server: McpServer) {
     {
       title: "Request Builder Mode",
       description:
-        "Ask the owner for builder mode, needed to create or change exhibit types (their fields, feed rules, time triggers) or roll one back. You can't change types without it. The owner grants it for a while in this thread; the builder tools then appear in the follow-up run, and every publish still needs their approval.",
+        "Ask the owner for builder mode, needed to create or change record types (their fields, feed rules, time triggers) or roll one back. You can't change types without it. The owner grants it for a while in this thread; the builder tools then appear in the follow-up run, and every publish still needs their approval.",
       inputSchema: {
         title: z.string().min(1).max(120).describe('Short headline, e.g. "Add a Book type".'),
         reason: z.string().min(1).max(2000).describe("To the owner, in Markdown: what you want to build or change and why."),

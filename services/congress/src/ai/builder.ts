@@ -90,7 +90,7 @@ export function decideBuilderRequest(messageId: number, approve: boolean, opts: 
       trigger: "decision",
       summaryText: "Declined builder mode",
       buildBody: async () =>
-        `## The owner declined builder mode ("${payload.title}")\n${opts.note ? `Their note: ${opts.note}\n` : ""}Don't change any exhibit type. Acknowledge briefly.`,
+        `## The owner declined builder mode ("${payload.title}")\n${opts.note ? `Their note: ${opts.note}\n` : ""}Don't change any record type. Acknowledge briefly.`,
     });
     return updated ?? message;
   }

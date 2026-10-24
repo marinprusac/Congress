@@ -651,7 +651,7 @@ html:has(.chat-page) body {
   font-size: 1.02rem;
 }
 
-.chat-md a:not(.exhibit-chip) {
+.chat-md a:not(.record-chip) {
   color: var(--color-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -757,7 +757,7 @@ html:has(.chat-page) body {
 
 /* Same breathing room the editor's chip widget has, so a chip reads the
    same in the composer and in the sent message. */
-.chat-exhibit-chip {
+.chat-record-chip {
   vertical-align: baseline;
   margin: 0 0.2em;
 }

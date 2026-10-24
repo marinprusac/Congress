@@ -3,31 +3,31 @@ import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { EditorView, keymap, placeholder as placeholderExtension } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
-import type { CapitolExhibitResolveResult, CapitolExhibitSearchResult } from "@congress/shared-types";
-import { useExhibitSearch } from "../useExhibitSearch.js";
-import { extractExhibitTokens } from "../textSegments.js";
-import { useResolvedExhibits } from "../useResolvedExhibits.js";
-import type { ExhibitPickerState } from "../ExhibitPickerDropdown.js";
-import { buildChipInsertion } from "../exhibitTrigger.js";
-import { createExhibitChipExtensions, refreshExhibitChips } from "./exhibitChipDecorations.js";
-import { createExhibitTriggerExtension, type ExhibitPickerController } from "./exhibitTriggerExtension.js";
-import type { ExhibitEditorRuntimeRef } from "./runtime.js";
-import { exhibitEditorTheme, markdownHighlightStyle } from "./theme.js";
+import type { CapitolRecordResolveResult, CapitolRecordSearchResult } from "@congress/shared-types";
+import { useRecordSearch } from "../useRecordSearch.js";
+import { extractRecordTokens } from "../textSegments.js";
+import { useResolvedRecords } from "../useResolvedRecords.js";
+import type { RecordPickerState } from "../RecordPickerDropdown.js";
+import { buildChipInsertion } from "../recordTrigger.js";
+import { createRecordChipExtensions, refreshRecordChips } from "./recordChipDecorations.js";
+import { createRecordTriggerExtension, type RecordPickerController } from "./recordTriggerExtension.js";
+import type { RecordEditorRuntimeRef } from "./runtime.js";
+import { recordEditorTheme, markdownHighlightStyle } from "./theme.js";
 import { createLivePreviewExtension } from "./livePreviewExtension.js";
 import { createLinkClickExtension } from "./linkClickExtension.js";
 import { Autolink } from "@lezer/markdown";
 import { createTableExtension } from "./tableExtension.js";
 import { createSingleLineExtension } from "./singleLineExtension.js";
 
-export interface UseExhibitEditorCoreOptions {
+export interface UseRecordEditorCoreOptions {
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
   placeholder?: string;
   mode: "multiline" | "inline";
   renderIcon: (chamber: string, type?: string) => ReactNode;
-  onNavigate?: (result: Extract<CapitolExhibitResolveResult, { url: string }>) => void;
-  onCreate?: (title: string) => Promise<CapitolExhibitSearchResult>;
+  onNavigate?: (result: Extract<CapitolRecordResolveResult, { url: string }>) => void;
+  onCreate?: (title: string) => Promise<CapitolRecordSearchResult>;
   onEnter?: () => void;
   // Multiline only: runs on Enter first; return true to consume it (send).
   onSubmitKey?: () => boolean;
@@ -40,16 +40,16 @@ interface TriggerState {
   cursor: number;
 }
 
-// Shared core behind <ExhibitFieldEditor> (multiline) and <ExhibitInlineField>
+// Shared core behind <RecordFieldEditor> (multiline) and <RecordInlineField>
 // (single-line) - owns the CM6 EditorView lifecycle, the "@" picker's
-// search/keyboard-nav state, and resolving exhibit tokens for the chip
+// search/keyboard-nav state, and resolving record tokens for the chip
 // decorations. Returns a plain DOM ref to mount CM6 into and a picker object
-// satisfying ExhibitPickerDropdown.tsx's own ExhibitPickerState contract, so
-// the existing, already mobile-verified <ExhibitPickerDropdown> keeps
+// satisfying RecordPickerDropdown.tsx's own RecordPickerState contract, so
+// the existing, already mobile-verified <RecordPickerDropdown> keeps
 // working completely unmodified.
-export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
+export function useRecordEditorCore(options: UseRecordEditorCoreOptions): {
   containerRef: (el: HTMLDivElement | null) => void;
-  picker: ExhibitPickerState;
+  picker: RecordPickerState;
 } {
   const { value, onChange, readOnly = false, placeholder, mode, renderIcon, onNavigate, onCreate, onEnter, onSubmitKey, autoFocus } = options;
 
@@ -79,12 +79,12 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const { results, loading } = useExhibitSearch(trigger?.query ?? "", trigger !== null && !readOnly);
+  const { results, loading } = useRecordSearch(trigger?.query ?? "", trigger !== null && !readOnly);
 
   // The "@" anchor's own position only *changes* (a real DOM layout read,
   // via CM6's own coordsAtPos) when triggerStart itself changes - a new
   // trigger opening, or the caret jumping to a different existing one -
-  // mirroring the old useExhibitPicker's identical optimization; a re-
+  // mirroring the old useRecordPicker's identical optimization; a re-
   // measure on plain scroll/resize below is cheap in comparison and keeps
   // the dropdown honest about where the caret currently sits on screen
   // while it stays open through either. This must run outside CM6's own
@@ -92,7 +92,7 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
   // detection ViewPlugin) - CM6 throws if layout is read synchronously from
   // inside a ViewPlugin's update(). Client/viewport coordinates (exactly
   // what coordsAtPos already returns - CM6 doesn't offset these to the
-  // editor's own DOM node), not editor-relative ones: ExhibitPickerDropdown
+  // editor's own DOM node), not editor-relative ones: RecordPickerDropdown
   // positions itself with `position: fixed` against these directly, so it
   // can float freely above or below the caret's own line and clamp itself
   // against the real screen edges/keyboard, the same as any other viewport-
@@ -135,7 +135,7 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
     Boolean(onCreate) && trimmedQuery.length > 0 && !results.some((r) => r.name.toLowerCase() === trimmedQuery.toLowerCase());
 
   // Read by the CM6 keymap (built once at mount) through a stable
-  // controller object - see exhibitTriggerExtension.ts's own comment on why
+  // controller object - see recordTriggerExtension.ts's own comment on why
   // extensions can't just close over React state directly.
   const triggerRef = useRef(trigger);
   triggerRef.current = trigger;
@@ -151,7 +151,7 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
     setCreateError(null);
   }, [trigger?.query]);
 
-  const select = useCallback((result: CapitolExhibitSearchResult) => {
+  const select = useCallback((result: CapitolRecordSearchResult) => {
     const current = triggerRef.current;
     const view = viewRef.current;
     if (!current || !view) return;
@@ -187,7 +187,7 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
   const createNewRef = useRef(createNew);
   createNewRef.current = createNew;
 
-  const controllerRef = useRef<ExhibitPickerController>({
+  const controllerRef = useRef<RecordPickerController>({
     isOpen: () => false,
     onEscape: () => {},
     onArrowDown: () => {},
@@ -217,18 +217,18 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
     }
   };
 
-  // Chip rendering data - same shape/resolution mechanism ExhibitAnnotatedText
-  // and ExhibitMarkdown already use.
-  const tokens = extractExhibitTokens(value);
-  const { resultsByToken } = useResolvedExhibits(tokens);
-  const runtimeRef = useRef<ExhibitEditorRuntimeRef>({ current: { renderIcon, onNavigate, resultsByToken } });
+  // Chip rendering data - same shape/resolution mechanism RecordAnnotatedText
+  // and RecordMarkdown already use.
+  const tokens = extractRecordTokens(value);
+  const { resultsByToken } = useResolvedRecords(tokens);
+  const runtimeRef = useRef<RecordEditorRuntimeRef>({ current: { renderIcon, onNavigate, resultsByToken } });
   runtimeRef.current.current.renderIcon = renderIcon;
   runtimeRef.current.current.onNavigate = onNavigate;
   runtimeRef.current.current.resultsByToken = resultsByToken;
 
   useEffect(() => {
     if (tokens.length === 0) return;
-    viewRef.current?.dispatch({ effects: refreshExhibitChips.of(null) });
+    viewRef.current?.dispatch({ effects: refreshRecordChips.of(null) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resultsByToken]);
 
@@ -247,10 +247,10 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
         createLivePreviewExtension(mode),
         createLinkClickExtension(),
         ...(mode === "multiline" ? [createTableExtension(runtimeRef.current)] : []),
-        exhibitEditorTheme,
+        recordEditorTheme,
         EditorView.lineWrapping,
-        ...createExhibitChipExtensions(runtimeRef.current),
-        ...createExhibitTriggerExtension({
+        ...createRecordChipExtensions(runtimeRef.current),
+        ...createRecordTriggerExtension({
           enabled: !readOnly,
           onTriggerChange: (report) => setTrigger(report),
           controller: controllerRef.current,
@@ -263,7 +263,7 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
       ];
       if (mode === "inline") extensions.push(...createSingleLineExtension(() => onEnterRef.current?.()));
       else extensions.push(keymap.of([{ key: "Enter", run: () => onSubmitKeyRef.current?.() ?? false }]));
-      // defaultKeymap/historyKeymap last, so the exhibit picker (Prec.highest)
+      // defaultKeymap/historyKeymap last, so the record picker (Prec.highest)
       // and single-line Enter binding both take priority over their defaults
       // at the same precedence level.
       extensions.push(keymap.of([...defaultKeymap, ...historyKeymap]));
@@ -275,7 +275,7 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
       if (autoFocus) view.focus();
 
       // The wrapper div (`el`) can be visually taller than CM6's own content
-      // (see `minRows` on <ExhibitFieldEditor>, e.g. a 20-row-tall empty
+      // (see `minRows` on <RecordFieldEditor>, e.g. a 20-row-tall empty
       // note) - CM6 itself only ever sizes to its actual content height, so
       // without this, clicking in that extra empty space below a short
       // body's last line would miss the editable surface entirely instead
@@ -329,7 +329,7 @@ export function useExhibitEditorCore(options: UseExhibitEditorCoreOptions): {
     });
   }, [placeholder]);
 
-  const picker: ExhibitPickerState = {
+  const picker: RecordPickerState = {
     open: trigger !== null,
     query: trigger?.query ?? "",
     results,

@@ -4,7 +4,7 @@ import { dayLabel, durationLabel, layoutMarkers, listStamp, stringifyToolValue, 
 describe("toolLabel", () => {
   it("splits MCP tool names into chamber and a readable action", () => {
     expect(toolLabel("mcp__notes__create_note")).toEqual({ chamber: "notes", label: "Create note" });
-    expect(toolLabel("mcp__congress__search_exhibits")).toEqual({ chamber: "congress", label: "Search exhibits" });
+    expect(toolLabel("mcp__congress__search_records")).toEqual({ chamber: "congress", label: "Search records" });
     expect(toolLabel("weird")).toEqual({ chamber: null, label: "Weird" });
     expect(toolLabel("ToolSearch")).toEqual({ chamber: null, label: "Load tools" });
   });

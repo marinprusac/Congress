@@ -50,7 +50,7 @@ function DefaultChamberMark(props: IconProps) {
 //
 // Module-scoped cache + pub/sub, read through useSyncExternalStore: a
 // given Chamber's icon is fetched at most once per page load, and every
-// consumer (nav picker, exhibit chips, homepage tiles, ...) re-renders
+// consumer (nav picker, record chips, homepage tiles, ...) re-renders
 // together the moment it resolves, however many of them are mounted.
 type IconCacheEntry = string | null; // null = unavailable (offline / no icon shipped / fetch failed)
 
@@ -139,7 +139,7 @@ export function ChamberMark({ name, ...props }: IconProps & { name: string }): R
 
 // Same rendering as ChamberMark - kept as a second export because callers
 // pass it around as a `renderIcon: (chamber: string) => ReactNode` prop
-// (ExhibitChip, ExhibitTextarea's "[[" picker, ...), which reads more
+// (RecordChip, RecordTextarea's "[[" picker, ...), which reads more
 // naturally as a function than as `<ChamberMark name={chamber} />` inline.
 export function getChamberIcon(chamber: string, props?: IconProps): ReactElement {
   return <FetchedMark chamber={chamber} {...props} />;

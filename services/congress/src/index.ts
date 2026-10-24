@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { env } from "./env.js";
 import { app } from "./server.js";
 import { runMigrations, closeDb, sqlite } from "./db/client.js";
-import { closeExhibitsDb, exhibitsSqlite } from "./typeEngine/db/client.js";
+import { closeRecordsDb, recordsSqlite } from "./typeEngine/db/client.js";
 import { startTypeEngine } from "./typeEngine/index.js";
 import { startBackups, stopBackups } from "./typeEngine/backups.js";
 import { collectOrphans } from "./typeEngine/files.js";
@@ -34,7 +34,7 @@ const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (
 startEventCatalogSync();
 startBackups(
   [
-    { name: "exhibits", sqlite: exhibitsSqlite, dbPath: env.EXHIBITS_DB_PATH },
+    { name: "records", sqlite: recordsSqlite, dbPath: env.RECORDS_DB_PATH },
     { name: "congress", sqlite, dbPath: env.DB_PATH },
   ],
   () => collectOrphans()
@@ -62,7 +62,7 @@ async function shutdown() {
   await stopConnectors();
   server.close(() => {
     closeDb();
-    closeExhibitsDb();
+    closeRecordsDb();
     process.exit(0);
   });
 }

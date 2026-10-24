@@ -1,7 +1,7 @@
 import { sqliteTable, text, integer, real, index, uniqueIndex, primaryKey } from "drizzle-orm/sqlite-core";
 
-// Disposable, rebuildable resolution cache - a Chamber pushes here on Exhibit
-// create/update/delete (POST /congress/exhibits/sync). Missing/stale rows
+// Disposable, rebuildable resolution cache - a Chamber pushes here on Record
+// create/update/delete (POST /congress/records/sync). Missing/stale rows
 // always fall back to a live call to the owning Chamber, never treated as
 // authoritative on their own.
 export const exhibitCache = sqliteTable("exhibit_cache", {
@@ -14,7 +14,7 @@ export const exhibitCache = sqliteTable("exhibit_cache", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
 
-// Backs the undirected "Connections" between two Exhibits - whenever either
+// Backs the undirected "Connections" between two Records - whenever either
 // side references the other (body text or a manual add), the two are
 // connected, with no differentiation of which side established it. Storage
 // is still one directed row per discovery (sourceId "owns" the row) because
@@ -22,8 +22,8 @@ export const exhibitCache = sqliteTable("exhibit_cache", {
 // connections *it* discovered (its own outgoingRefs) without disturbing one
 // the other side discovered independently - but this is purely a
 // sync-bookkeeping detail. Nothing reads sourceId/targetId as a meaningful
-// direction: getConnections (exhibits.ts) collapses both directions into one
-// deduped entry per exhibit, and a manual connection is removable from
+// direction: getConnections (records.ts) collapses both directions into one
+// deduped entry per record, and a manual connection is removable from
 // either side regardless of which one happens to own the row (see
 // getManualConnectionOwner). sourceChamber is stored alongside sourceId so a
 // connections lookup doesn't need a second query against exhibitCache just

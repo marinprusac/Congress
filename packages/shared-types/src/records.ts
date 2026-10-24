@@ -1,35 +1,35 @@
 import { z } from "zod";
 
-// Base shape returned by a Chamber's own GET /exhibits/search.
-export const exhibitSearchResultSchema = z.object({
+// Base shape returned by a Chamber's own GET /records/search.
+export const recordSearchResultSchema = z.object({
   id: z.string(),
   type: z.string(),
   name: z.string(),
   url: z.string(),
   // Present only for a non-empty query - a Chamber's own relevance score
-  // (see chamber-kit's scoreExhibitMatch), used by Congress to merge
+  // (see chamber-kit's scoreRecordMatch), used by Congress to merge
   // multiple Chambers' results into one relevance-sorted list. Absent for
   // an empty ("browse recent") query, where no ranking applies.
   score: z.number().optional(),
 });
-export type ExhibitSearchResult = z.infer<typeof exhibitSearchResultSchema>;
+export type RecordSearchResult = z.infer<typeof recordSearchResultSchema>;
 
-// Request/response for a Chamber's own POST /exhibits/resolve - ids are
+// Request/response for a Chamber's own POST /records/resolve - ids are
 // assumed to already be owned by that Chamber (the caller groups by chamber
 // before calling).
-export const exhibitResolveRequestSchema = z.object({
+export const recordResolveRequestSchema = z.object({
   ids: z.array(z.string()),
 });
-export type ExhibitResolveRequest = z.infer<typeof exhibitResolveRequestSchema>;
+export type RecordResolveRequest = z.infer<typeof recordResolveRequestSchema>;
 
-export const exhibitResolveResultSchema = z.union([
+export const recordResolveResultSchema = z.union([
   z.object({ id: z.string(), name: z.string(), url: z.string() }),
   z.object({ id: z.string(), deleted: z.literal(true) }),
 ]);
-export type ExhibitResolveResult = z.infer<typeof exhibitResolveResultSchema>;
+export type RecordResolveResult = z.infer<typeof recordResolveResultSchema>;
 
-// Pushed by a Chamber to Capitol on Exhibit create/update/delete.
-export const exhibitSyncRequestSchema = z.object({
+// Pushed by a Chamber to Capitol on Record create/update/delete.
+export const recordSyncRequestSchema = z.object({
   chamber: z.string().min(1),
   id: z.string().min(1),
   type: z.string().min(1),
@@ -44,59 +44,59 @@ export const exhibitSyncRequestSchema = z.object({
   // owning Chamber.
   manualRefs: z.array(z.string()).optional(),
 });
-export type ExhibitSyncRequest = z.infer<typeof exhibitSyncRequestSchema>;
+export type RecordSyncRequest = z.infer<typeof recordSyncRequestSchema>;
 
 // Capitol's cross-chamber search aggregation attaches `chamber` at merge time.
-export const capitolExhibitSearchResultSchema = exhibitSearchResultSchema.extend({
+export const capitolRecordSearchResultSchema = recordSearchResultSchema.extend({
   chamber: z.string(),
 });
-export type CapitolExhibitSearchResult = z.infer<typeof capitolExhibitSearchResultSchema>;
+export type CapitolRecordSearchResult = z.infer<typeof capitolRecordSearchResultSchema>;
 
 // `deleted` = the owning Chamber confirmed this id no longer exists.
 // `unavailable` = the owning Chamber could not be reached at all - distinct
 // states per the spec, must render differently and `unavailable` should be
 // retried rather than treated as a confirmed deletion.
-export const capitolExhibitResolveResultSchema = z.union([
+export const capitolRecordResolveResultSchema = z.union([
   // `type` is the record type's slug (namespace "e"), which picks the icon.
   z.object({ id: z.string(), chamber: z.string(), name: z.string(), url: z.string(), type: z.string().optional() }),
   z.object({ id: z.string(), chamber: z.string(), deleted: z.literal(true) }),
   z.object({ id: z.string(), chamber: z.string(), unavailable: z.literal(true) }),
 ]);
-export type CapitolExhibitResolveResult = z.infer<typeof capitolExhibitResolveResultSchema>;
+export type CapitolRecordResolveResult = z.infer<typeof capitolRecordResolveResultSchema>;
 
-// One entry in an Exhibit's undirected Connections list, same three states
-// as capitolExhibitResolveResultSchema plus whether the connection is
+// One entry in a Record's undirected Connections list, same three states
+// as capitolRecordResolveResultSchema plus whether the connection is
 // removable from the Connections panel (added manually) or only ever
 // re-derivable by re-parsing body text. There is no direction here - a
-// connection between two Exhibits is a single fact, not "this one's
+// connection between two Records is a single fact, not "this one's
 // incoming" vs. "this one's outgoing".
-export const exhibitRefEntrySchema = z.union([
+export const recordRefEntrySchema = z.union([
   z.object({ id: z.string(), chamber: z.string(), name: z.string(), url: z.string(), type: z.string().optional(), isManual: z.boolean() }),
   z.object({ id: z.string(), chamber: z.string(), deleted: z.literal(true), isManual: z.boolean() }),
   z.object({ id: z.string(), chamber: z.string(), unavailable: z.literal(true), isManual: z.boolean() }),
 ]);
-export type ExhibitRefEntry = z.infer<typeof exhibitRefEntrySchema>;
+export type RecordRefEntry = z.infer<typeof recordRefEntrySchema>;
 
-// A source Exhibit's explicit connections, added from a side panel rather
+// A source Record's explicit connections, added from a side panel rather
 // than embedded in body text (e.g. "[[" wikilinks) - merged with any
 // text-derived refs by the owning Chamber before it pushes outgoingRefs to
 // Capitol, so they show up in the same undirected Connections graph.
-// Mounted generically at "/api/exhibits/:id/refs" by every Chamber that
+// Mounted generically at "/api/records/:id/refs" by every Chamber that
 // opts in (see chamber-kit's mountManualRefsRoutes) - which is what lets
 // Capitol proxy an add/remove to whichever Chamber actually owns the
-// relevant id (see POST/DELETE /congress/exhibits/:id/connections in
+// relevant id (see POST/DELETE /congress/refs/:id/connections in
 // services/congress/src/server.ts).
 export const manualRefRequestSchema = z.object({
-  targetExhibitId: z.string().min(1),
+  targetRecordId: z.string().min(1),
   // Optional hint the frontend already has whenever the target came from a
-  // search result (CapitolExhibitSearchResult always carries `chamber`) -
+  // search result (CapitolRecordSearchResult always carries `chamber`) -
   // lets Capitol's proxy eagerly resolveOneLive() the target so it gets an
-  // exhibit_cache row immediately. Without this, an exhibit that's never
+  // exhibit_cache row immediately. Without this, a record that's never
   // been created/edited within Congress (a pre-existing Google Calendar
   // event is the common case) has no cache row yet, and getConnections
   // silently skips any connection whose other side isn't cached - it would
   // save successfully but never appear in the panel. A Chamber's own
-  // "/api/exhibits/:id/refs" ignores this field; it's read only by
+  // "/api/records/:id/refs" ignores this field; it's read only by
   // Capitol's proxy.
   targetChamber: z.string().optional(),
 });

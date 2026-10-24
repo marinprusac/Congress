@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { Operation } from "@congress/shared-types";
 import { migrationsDir } from "@congress/test-support";
 import { runMigrations } from "../db/client.js";
-import { exhibitsSqlite, runExhibitsMigrations } from "./db/client.js";
+import { recordsSqlite, runRecordsMigrations } from "./db/client.js";
 import { getTypeBySlug, previewPublish, publish, PublishError } from "./store.js";
 import { createRecord, deleteRecord, RecordConflictError, RecordValidationError, updateRecord } from "./records.js";
 import { findByKey } from "./keys.js";
@@ -17,11 +17,11 @@ const contact: Operation[] = [
 ];
 
 const typeId = () => getTypeBySlug("contact")!.id;
-const keyRows = () => exhibitsSqlite.prepare("SELECT kind, value FROM record_keys ORDER BY kind, value").all();
+const keyRows = () => recordsSqlite.prepare("SELECT kind, value FROM record_keys ORDER BY kind, value").all();
 
 beforeAll(() => {
   runMigrations(migrationsDir("congress"));
-  runExhibitsMigrations();
+  runRecordsMigrations();
   publish({ actor: "test", ops: contact });
 });
 

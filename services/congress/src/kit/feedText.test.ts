@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { closeness, formatDuration, plainTextPreview } from "./feedText.js";
 
 describe("plainTextPreview", () => {
-  it("turns exhibit chips into their labels and drops markdown markers", () => {
-    expect(plainTextPreview("# Plan\n- pack for [[exhibit:notes:note-4|Trip plan]]\n- **book** the `taxi`")).toBe("Plan pack for Trip plan book the taxi");
+  it("turns record chips into their labels and drops markdown markers", () => {
+    expect(plainTextPreview("# Plan\n- pack for [[record:notes:note-4|Trip plan]]\n- **book** the `taxi`")).toBe("Plan pack for Trip plan book the taxi");
   });
 
   it("returns nothing for an empty or whitespace-only body", () => {

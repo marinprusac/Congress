@@ -8,7 +8,7 @@ export type FeedSlot = "lead" | "view" | "item";
 export function feedSlots(items: readonly FeedItem[]): FeedSlot[] {
   let lead = -1;
   items.forEach((item, i) => {
-    if (lead === -1 && item.kind === "exhibit" && item.preview) lead = i;
+    if (lead === -1 && item.kind === "record" && item.preview) lead = i;
   });
   return items.map((item, i) => (i === lead ? "lead" : item.kind === "view" ? "view" : "item"));
 }

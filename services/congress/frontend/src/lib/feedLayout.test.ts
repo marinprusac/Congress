@@ -5,9 +5,9 @@ import { feedSlots } from "./feedLayout.js";
 const view = (id: string): FeedItem => ({ kind: "view", chamber: "map", viewId: id, label: id, score: 50 }) as FeedItem;
 const record = (id: string, withPreview = true): FeedItem =>
   ({
-    kind: "exhibit",
+    kind: "record",
     chamber: "e",
-    exhibitId: id,
+    recordId: id,
     name: id,
     url: `/${id}`,
     type: "task",

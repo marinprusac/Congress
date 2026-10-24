@@ -14,7 +14,7 @@ export interface NotifyConfig {
   dedupeKeyTemplate: string | null;
 }
 
-// An exhibit type's events are configured in its definition (eventNotifications);
+// A record type's events are configured in its definition (eventNotifications);
 // every other event type keeps its own columns here.
 export function resolveNotify(row: typeof eventSettings.$inferSelect): NotifyConfig {
   if (row.chamber === "types") {

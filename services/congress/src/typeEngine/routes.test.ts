@@ -92,8 +92,8 @@ describe("type routes", () => {
     expect(created.status).toBe(201);
     const { id } = (await created.json()) as { id: string };
 
-    const patched = await call(`/congress/records/${id}`, { method: "PATCH", body: JSON.stringify({ values: { body: "hi [[exhibit:e:x|X]]" } }) });
-    expect(await patched.json()).toMatchObject({ values: { title: "Hello", body: "hi [[exhibit:e:x|X]]", pinned: false } });
+    const patched = await call(`/congress/records/${id}`, { method: "PATCH", body: JSON.stringify({ values: { body: "hi [[record:e:x|X]]" } }) });
+    expect(await patched.json()).toMatchObject({ values: { title: "Note: Hello", body: "hi [[record:e:x|X]]", pinned: false } });
 
     expect(((await (await call("/congress/records?type=note")).json()) as unknown[]).length).toBe(1);
     expect((await call(`/congress/records/${id}`, { method: "DELETE" })).status).toBe(200);
@@ -128,7 +128,7 @@ describe("type routes", () => {
 
     const related = await (await call(`/congress/records/${note.id}/related`)).json();
     expect(related).toEqual([
-      { type: "trip", typeLabel: "Trips", field: "notes", fieldLabel: "Notes", total: 1, records: [{ id: trip.id, name: "Rome", url: `/${trip.id}` }] },
+      { type: "trip", typeLabel: "Trips", field: "notes", fieldLabel: "Notes", total: 1, records: [{ id: trip.id, name: "Trip: Rome", url: `/${trip.id}` }] },
     ]);
     expect((await call("/congress/records/missing/related")).status).toBe(404);
   });

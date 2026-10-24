@@ -22,7 +22,7 @@ export function LegacyRedirect({
 
   useEffect(() => {
     let cancelled = false;
-    void fetch(`/congress/exhibits/legacy/${chamber}/${idPrefix}${encodeURIComponent(id)}`)
+    void fetch(`/congress/refs/legacy/${chamber}/${idPrefix}${encodeURIComponent(id)}`)
       .then(async (res) => {
         if (cancelled) return;
         if (!res.ok) return setMissing(true);

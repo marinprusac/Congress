@@ -1,26 +1,26 @@
 import { sql } from "drizzle-orm";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { ExhibitResolveResult, ExhibitSearchResult } from "@congress/shared-types";
+import type { RecordResolveResult, RecordSearchResult } from "@congress/shared-types";
 import { migrationsDir } from "@congress/test-support";
 import { db, runMigrations } from "./db/client.js";
 import { exhibitCache, exhibitRefs } from "./db/schema.js";
-import { registerLocalSource, type LocalExhibitSource } from "./exhibitSources.js";
+import { registerLocalSource, type LocalRecordSource } from "./recordSources.js";
 import {
   getCachedChamber,
   getConnections,
-  getExhibitChip,
+  getRecordChip,
   getManualConnectionOwner,
-  resolveExhibits,
-  searchExhibits,
-  syncExhibit,
-} from "./exhibits.js";
+  resolveRecords,
+  searchRecords,
+  syncRecord,
+} from "./records.js";
 
-// An in-process exhibit source, registered the way the type engine registers its own.
-function makeSource(namespace: string, parts: Partial<LocalExhibitSource>): LocalExhibitSource {
-  const source: LocalExhibitSource = {
+// An in-process record source, registered the way the type engine registers its own.
+function makeSource(namespace: string, parts: Partial<LocalRecordSource>): LocalRecordSource {
+  const source: LocalRecordSource = {
     namespace,
     search: () => [],
-    resolve: (ids) => ids.map((id): ExhibitResolveResult => ({ id, name: `Live ${id}`, url: `/x/${id}` })),
+    resolve: (ids) => ids.map((id): RecordResolveResult => ({ id, name: `Live ${id}`, url: `/x/${id}` })),
     typeOf: () => null,
     chip: () => null,
     addManualRef: () => null,
@@ -32,7 +32,7 @@ function makeSource(namespace: string, parts: Partial<LocalExhibitSource>): Loca
   return source;
 }
 
-const result = (id: string, name: string, score?: number): ExhibitSearchResult => ({ id, type: "note", name, url: `/x/${id}`, score });
+const result = (id: string, name: string, score?: number): RecordSearchResult => ({ id, type: "note", name, url: `/x/${id}`, score });
 
 beforeAll(() => {
   runMigrations(migrationsDir("congress"));
@@ -59,12 +59,12 @@ beforeEach(() => {
 });
 
 function cached(id: string, chamber = "notes", name = id, deleted = false) {
-  syncExhibit({ chamber, id, type: "note", name, url: `/x/${id}`, deleted, outgoingRefs: [] });
+  syncRecord({ chamber, id, type: "note", name, url: `/x/${id}`, deleted, outgoingRefs: [] });
 }
 
-describe("syncExhibit", () => {
+describe("syncRecord", () => {
   it("inserts a cache row and its outgoing refs", () => {
-    syncExhibit({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-2"] });
+    syncRecord({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-2"] });
 
     expect(db.select().from(exhibitCache).all()).toEqual([expect.objectContaining({ id: "note-1", name: "One" })]);
     expect(db.select().from(exhibitRefs).all()).toEqual([
@@ -73,8 +73,8 @@ describe("syncExhibit", () => {
   });
 
   it("updates the cache row in place on a re-sync rather than inserting a second one", () => {
-    syncExhibit({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: [] });
-    syncExhibit({ chamber: "notes", id: "note-1", type: "note", name: "Renamed", url: "/n/1", outgoingRefs: [] });
+    syncRecord({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: [] });
+    syncRecord({ chamber: "notes", id: "note-1", type: "note", name: "Renamed", url: "/n/1", outgoingRefs: [] });
 
     const rows = db.select().from(exhibitCache).all();
     expect(rows).toHaveLength(1);
@@ -82,24 +82,24 @@ describe("syncExhibit", () => {
   });
 
   it("replaces the source's refs wholesale, so a removed link disappears", () => {
-    syncExhibit({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-2", "task-3"] });
-    syncExhibit({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-3"] });
+    syncRecord({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-2", "task-3"] });
+    syncRecord({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-3"] });
 
     expect(db.select().from(exhibitRefs).all().map((r) => r.targetId)).toEqual(["task-3"]);
   });
 
-  it("only deletes the syncing source's own rows, leaving another exhibit's refs intact", () => {
+  it("only deletes the syncing source's own rows, leaving another record's refs intact", () => {
     // Each side's sync owns exactly the rows it discovered; a Chamber
     // re-syncing must not wipe a connection the other side established.
-    syncExhibit({ chamber: "tasks", id: "task-9", type: "task", name: "Nine", url: "/t/9", outgoingRefs: ["note-1"] });
-    syncExhibit({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: [] });
+    syncRecord({ chamber: "tasks", id: "task-9", type: "task", name: "Nine", url: "/t/9", outgoingRefs: ["note-1"] });
+    syncRecord({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: [] });
 
     expect(db.select().from(exhibitRefs).all()).toHaveLength(1);
     expect(db.select().from(exhibitRefs).all()[0]?.sourceId).toBe("task-9");
   });
 
   it("flags exactly the refs named in manualRefs", () => {
-    syncExhibit({
+    syncRecord({
       chamber: "notes",
       id: "note-1",
       type: "note",
@@ -114,8 +114,8 @@ describe("syncExhibit", () => {
   });
 
   it("records a deletion as a tombstone rather than removing the row", () => {
-    syncExhibit({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: [] });
-    syncExhibit({ chamber: "notes", id: "note-1", type: "", name: "", url: "", deleted: true, outgoingRefs: [] });
+    syncRecord({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: [] });
+    syncRecord({ chamber: "notes", id: "note-1", type: "", name: "", url: "", deleted: true, outgoingRefs: [] });
 
     expect(db.select().from(exhibitCache).all()[0]?.deleted).toBe(true);
   });
@@ -132,30 +132,30 @@ describe("getCachedChamber", () => {
   });
 });
 
-describe("resolveExhibits", () => {
+describe("resolveRecords", () => {
   it("returns an empty array for no refs, without touching any source", async () => {
-    await expect(resolveExhibits([])).resolves.toEqual([]);
+    await expect(resolveRecords([])).resolves.toEqual([]);
   });
 
   it("answers entirely from the cache when every id is known", async () => {
     cached("note-1", "notes", "One");
     cached("task-2", "tasks", "Two");
 
-    await expect(resolveExhibits([{ id: "note-1", chamber: "notes" }, { id: "task-2", chamber: "tasks" }])).resolves.toEqual([
+    await expect(resolveRecords([{ id: "note-1", chamber: "notes" }, { id: "task-2", chamber: "tasks" }])).resolves.toEqual([
       { id: "note-1", chamber: "notes", name: "One", url: "/x/note-1", type: "note" },
       { id: "task-2", chamber: "tasks", name: "Two", url: "/x/task-2", type: "note" },
     ]);
   });
 
-  it("reports a tombstoned exhibit as deleted", async () => {
+  it("reports a tombstoned record as deleted", async () => {
     cached("note-1", "notes", "One", true);
-    await expect(resolveExhibits([{ id: "note-1", chamber: "notes" }])).resolves.toEqual([
+    await expect(resolveRecords([{ id: "note-1", chamber: "notes" }])).resolves.toEqual([
       { id: "note-1", chamber: "notes", deleted: true },
     ]);
   });
 
   it("resolves a cache miss live against the owning source and caches the answer", async () => {
-    const [result] = await resolveExhibits([{ id: "note-7", chamber: "notes" }]);
+    const [result] = await resolveRecords([{ id: "note-7", chamber: "notes" }]);
     expect(result).toEqual({ id: "note-7", chamber: "notes", name: "Live note-7", url: "/n/note-7" });
     expect(getCachedChamber("note-7")).toBe("notes");
   });
@@ -165,7 +165,7 @@ describe("resolveExhibits", () => {
     // index-for-index, so a reordering here mislabels connections.
     cached("note-1", "notes", "Cached one");
 
-    const results = await resolveExhibits([
+    const results = await resolveRecords([
       { id: "task-5", chamber: "tasks" },
       { id: "note-1", chamber: "notes" },
       { id: "note-8", chamber: "notes" },
@@ -175,10 +175,10 @@ describe("resolveExhibits", () => {
     expect(results[1]).toMatchObject({ name: "Cached one" });
   });
 
-  it("marks an exhibit unavailable when its namespace has no source, without failing the whole batch", async () => {
+  it("marks a record unavailable when its namespace has no source, without failing the whole batch", async () => {
     cached("note-1", "notes", "One");
 
-    const results = await resolveExhibits([
+    const results = await resolveRecords([
       { id: "note-1", chamber: "notes" },
       { id: "temp-1", chamber: "temp" },
     ]);
@@ -187,8 +187,8 @@ describe("resolveExhibits", () => {
     expect(results[1]).toEqual({ id: "temp-1", chamber: "temp", unavailable: true });
   });
 
-  it("tombstones an exhibit the owning source reports as deleted", async () => {
-    await expect(resolveExhibits([{ id: "note-gone", chamber: "notes" }])).resolves.toEqual([
+  it("tombstones a record the owning source reports as deleted", async () => {
+    await expect(resolveRecords([{ id: "note-gone", chamber: "notes" }])).resolves.toEqual([
       { id: "note-gone", chamber: "notes", deleted: true },
     ]);
     expect(db.select().from(exhibitCache).all()[0]).toMatchObject({ id: "note-gone", deleted: true });
@@ -196,13 +196,13 @@ describe("resolveExhibits", () => {
 });
 
 describe("getConnections", () => {
-  it("returns nothing for an exhibit with no refs on either side", async () => {
+  it("returns nothing for a record with no refs on either side", async () => {
     await expect(getConnections("note-1")).resolves.toEqual([]);
   });
 
-  it("finds a connection this exhibit established", async () => {
+  it("finds a connection this record established", async () => {
     cached("task-2", "tasks", "Two");
-    syncExhibit({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-2"] });
+    syncRecord({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-2"] });
 
     await expect(getConnections("note-1")).resolves.toEqual([
       { id: "task-2", chamber: "tasks", name: "Two", url: "/x/task-2", type: "note", isManual: false },
@@ -212,7 +212,7 @@ describe("getConnections", () => {
   it("finds a connection the other side established, with no direction visible to the caller", async () => {
     // Storage is directed for sync bookkeeping only - a Connection is
     // undirected as far as anyone reading it is concerned.
-    syncExhibit({ chamber: "tasks", id: "task-2", type: "task", name: "Two", url: "/t/2", outgoingRefs: ["note-1"] });
+    syncRecord({ chamber: "tasks", id: "task-2", type: "task", name: "Two", url: "/t/2", outgoingRefs: ["note-1"] });
 
     await expect(getConnections("note-1")).resolves.toEqual([
       { id: "task-2", chamber: "tasks", name: "Two", url: "/t/2", type: "task", isManual: false },
@@ -221,8 +221,8 @@ describe("getConnections", () => {
 
   it("collapses a mutual reference into a single entry", async () => {
     cached("task-2", "tasks", "Two");
-    syncExhibit({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-2"] });
-    syncExhibit({ chamber: "tasks", id: "task-2", type: "task", name: "Two", url: "/t/2", outgoingRefs: ["note-1"] });
+    syncRecord({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-2"] });
+    syncRecord({ chamber: "tasks", id: "task-2", type: "task", name: "Two", url: "/t/2", outgoingRefs: ["note-1"] });
 
     const connections = await getConnections("note-1");
     expect(connections).toHaveLength(1);
@@ -231,8 +231,8 @@ describe("getConnections", () => {
 
   it("treats a connection as manual if either side flagged it manual", async () => {
     cached("task-2", "tasks", "Two");
-    syncExhibit({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-2"] });
-    syncExhibit({
+    syncRecord({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-2"] });
+    syncRecord({
       chamber: "tasks",
       id: "task-2",
       type: "task",
@@ -247,15 +247,15 @@ describe("getConnections", () => {
 
   it("skips an outgoing target whose chamber is neither recorded nor cached", async () => {
     // The row records sourceChamber, not targetChamber - so an id this
-    // exhibit points at that has never synced has nothing to route a
+    // record points at that has never synced has nothing to route a
     // resolve through and is dropped rather than guessed at.
-    syncExhibit({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["mystery-9"] });
+    syncRecord({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["mystery-9"] });
     await expect(getConnections("note-1")).resolves.toEqual([]);
   });
 
   it("routes an outgoing target through its cached chamber when the row does not name one", async () => {
     cached("task-2", "tasks", "Two");
-    syncExhibit({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-2"] });
+    syncRecord({ chamber: "notes", id: "note-1", type: "note", name: "One", url: "/n/1", outgoingRefs: ["task-2"] });
     expect((await getConnections("note-1"))[0]?.chamber).toBe("tasks");
   });
 
@@ -263,7 +263,7 @@ describe("getConnections", () => {
     cached("task-2", "tasks", "Two");
     cached("doc-3", "documents", "Three");
     cached("task-4", "tasks", "Four");
-    syncExhibit({
+    syncRecord({
       chamber: "notes",
       id: "note-1",
       type: "note",
@@ -280,7 +280,7 @@ describe("getConnections", () => {
 
 describe("getManualConnectionOwner", () => {
   beforeEach(() => {
-    syncExhibit({
+    syncRecord({
       chamber: "notes",
       id: "note-1",
       type: "note",
@@ -300,7 +300,7 @@ describe("getManualConnectionOwner", () => {
   });
 
   it("returns null when the connection exists but was not manual", () => {
-    syncExhibit({ chamber: "notes", id: "note-5", type: "note", name: "Five", url: "/n/5", outgoingRefs: ["task-6"] });
+    syncRecord({ chamber: "notes", id: "note-5", type: "note", name: "Five", url: "/n/5", outgoingRefs: ["task-6"] });
     expect(getManualConnectionOwner("note-5", "task-6")).toBeNull();
   });
 
@@ -309,67 +309,67 @@ describe("getManualConnectionOwner", () => {
   });
 });
 
-describe("searchExhibits", () => {
+describe("searchRecords", () => {
   it("merges every source and tags each result with its owner", async () => {
-    const results = await searchExhibits("week");
+    const results = await searchRecords("week");
     expect(results).toContainEqual(expect.objectContaining({ id: "note-1", chamber: "notes" }));
     expect(results).toContainEqual(expect.objectContaining({ id: "task-1", chamber: "tasks" }));
   });
 
   it("passes the query through to each source", async () => {
-    const results = await searchExhibits("week");
+    const results = await searchRecords("week");
     expect(results.find((r) => r.chamber === "notes")?.name).toBe("Note for week");
   });
 
   it("drops a failing source's results instead of failing the whole search", async () => {
-    const results = await searchExhibits("week");
+    const results = await searchRecords("week");
     expect(results.some((r) => r.chamber === "broken")).toBe(false);
     expect(results.length).toBeGreaterThan(0);
   });
 
   it("ranks a higher-scoring result first regardless of registration order", async () => {
-    const ids = (await searchExhibits("query")).map((r) => r.id);
+    const ids = (await searchRecords("query")).map((r) => r.id);
     expect(ids.indexOf("high-1")).toBeLessThan(ids.indexOf("low-1"));
   });
 
   it("ranks a source that omits score entirely beneath any source with a positive score", async () => {
     // A missing score is 0, not "unranked and therefore first".
-    const ids = (await searchExhibits("query")).map((r) => r.id);
+    const ids = (await searchRecords("query")).map((r) => r.id);
     expect(ids.indexOf("high-1")).toBeLessThan(ids.indexOf("note-1"));
     expect(ids.indexOf("high-1")).toBeLessThan(ids.indexOf("task-1"));
   });
 
   it("leaves an empty query's results without a score", async () => {
-    const results = await searchExhibits("");
+    const results = await searchRecords("");
     expect(results.every((r) => r.score === undefined)).toBe(true);
   });
 });
 
-describe("getExhibitChip", () => {
+describe("getRecordChip", () => {
   it("builds a paste-ready chip token from a raw row id", async () => {
-    await expect(getExhibitChip("notes", "3")).resolves.toEqual({
+    await expect(getRecordChip("notes", "3")).resolves.toEqual({
       id: "note-3",
       chamber: "notes",
       name: "Note 3",
       url: "/n/3",
-      token: "[[exhibit:notes:note-3|Note 3]]",
+      token: "[[record:notes:note-3|Note 3]]",
     });
   });
 
   it("reports a namespace that has no source", async () => {
-    await expect(getExhibitChip("nosuch", "1")).resolves.toEqual({ error: "chamber_not_found" });
+    await expect(getRecordChip("nosuch", "1")).resolves.toEqual({ error: "chamber_not_found" });
   });
 
   it("reports a row the source does not have", async () => {
-    await expect(getExhibitChip("notes", "404")).resolves.toEqual({ error: "not_found" });
+    await expect(getRecordChip("notes", "404")).resolves.toEqual({ error: "not_found" });
   });
 });
 
 describe("live resolve re-sync", () => {
-  it("keeps an exhibit's manual connections manual", async () => {
-    syncExhibit({ chamber: "notes", id: "note-77", type: "note", name: "N", url: "/n/77", outgoingRefs: ["task-1", "task-2"], manualRefs: ["task-2"] });
+  it("keeps a record's manual connections manual", async () => {
+    syncRecord({ chamber: "notes", id: "note-77", type: "note", name: "N", url: "/n/77", outgoingRefs: ["task-1", "task-2"], manualRefs: ["task-2"] });
     db.delete(exhibitCache).where(sql`${exhibitCache.id} = 'note-77'`).run();
-    await resolveExhibits([{ id: "note-77", chamber: "notes" }]);
+    await resolveRecords([{ id: "note-77", chamber: "notes" }]);
     const rows = db.select().from(exhibitRefs).where(sql`${exhibitRefs.sourceId} = 'note-77'`).all();
     expect(rows.map((r) => [r.targetId, r.isManual]).sort()).toEqual([
       ["task-1", false],
