@@ -6,8 +6,11 @@ import { existsSync } from "node:fs";
 // (see chambers/loader.ts).
 // Names and paths from before records were called records: a deployment that
 // still sets them, or still has the old database file, keeps working.
-process.env.RECORDS_DB_PATH ??= process.env.EXHIBITS_DB_PATH;
-process.env.RECORD_FILES_DIR ??= process.env.EXHIBIT_FILES_DIR;
+// (Assigning undefined to process.env would store the string "undefined".)
+for (const [next, legacy] of [["RECORDS_DB_PATH", "EXHIBITS_DB_PATH"], ["RECORD_FILES_DIR", "EXHIBIT_FILES_DIR"]] as const) {
+  const old = process.env[legacy];
+  if (!process.env[next] && old) process.env[next] = old;
+}
 if (!process.env.RECORDS_DB_PATH && !existsSync("./data/records.sqlite3") && existsSync("./data/exhibits.sqlite3")) {
   process.env.RECORDS_DB_PATH = "./data/exhibits.sqlite3";
 }
