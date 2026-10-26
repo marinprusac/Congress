@@ -234,12 +234,16 @@ export function registerTypeTools(server: McpServer): void {
       `update_${slug}`,
       {
         title: `Update ${def.label}`,
-        description: `Change some fields of a ${label}; fields you leave out stay as they are. Fields: ${fields}.`,
+        description: `Change some fields of a ${label}; fields you leave out stay as they are. Pass the fields directly next to id (not nested under "values"). Fields: ${fields}.`,
         inputSchema: { id: z.string().min(1), ...recordInputSchema(def, "patch").shape },
       },
       ({ id, ...values }) =>
         guarded(() => {
           if (typeOfRecord(id)?.definition.slug !== slug) throw new RecordNotFoundError(`no ${label} ${id}`);
+          // An unknown wrapper such as {values: {...}} is stripped to nothing; say so instead of "succeeding".
+          if (Object.keys(values).length === 0) {
+            throw new RecordValidationError({ formErrors: ["no fields given: pass the fields at the top level next to id, not wrapped in `values`"], fieldErrors: {} });
+          }
           return withChip(t, updateRecord(id, withTypedTitle(def, values), { actor: "congress" }));
         })
     );

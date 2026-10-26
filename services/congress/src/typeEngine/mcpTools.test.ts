@@ -85,6 +85,9 @@ describe("the types MCP server", () => {
     const created = await call("create_novel", { title: "Dune" });
     expect(created).toMatchObject({ type: "novel", values: { title: "Novel: Dune", read: false }, token: `[[record:e:${created.id}|Novel: Dune]]` });
     expect(await call("update_novel", { id: created.id, read: true })).toMatchObject({ values: { title: "Novel: Dune", read: true } });
+    // Fields wrapped in `values` are dropped; that must read as an error, not a silent success.
+    expect(await call("update_novel", { id: created.id, values: { read: false } })).toMatchObject({ error: "invalid" });
+    expect(await call("get_novel", { id: created.id })).toMatchObject({ values: { read: true } });
     expect(await call("search_novels", { query: "dun" })).toEqual([expect.objectContaining({ id: created.id, name: "Novel: Dune" })]);
     expect(await call("get_novel", { id: created.id })).toMatchObject({ id: created.id });
     expect(await call("delete_novel", { id: created.id })).toEqual({ ok: true, id: created.id });
