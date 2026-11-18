@@ -197,6 +197,7 @@ export const aiSettingsSchema = z.object({
   // The AI linker: connects new records (and new WhatsApp contacts) to People and each other.
   linkerEnabled: z.boolean(),
   linkerIntervalMinutes: z.number().int().min(5).max(24 * 60),
+  classifierEnabled: z.boolean(),
 });
 export type AiSettings = z.infer<typeof aiSettingsSchema>;
 
@@ -239,7 +240,7 @@ export type AiRunResult = z.infer<typeof aiRunResultSchema>;
 
 // chat/answer: the owner's threads. remote: a Chamber's POST /run.
 // proactive/tracking/gate: runs Congress starts on its own.
-export type AiRunKind = "chat" | "answer" | "remote" | "proactive" | "tracking" | "gate" | "link";
+export type AiRunKind = "chat" | "answer" | "remote" | "proactive" | "tracking" | "gate" | "link" | "classify";
 
 // Server-sent on GET /congress/ai/runs/stream. The job queue is
 // concurrency-1, so there is at most one active run at a time.

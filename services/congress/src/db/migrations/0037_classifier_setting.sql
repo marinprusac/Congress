@@ -1,0 +1,1 @@
+ALTER TABLE `ai_settings` ADD `classifier_enabled` integer DEFAULT true NOT NULL;

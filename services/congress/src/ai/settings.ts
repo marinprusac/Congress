@@ -22,6 +22,7 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
   lightModel: "claude-haiku-5-5",
   linkerEnabled: true,
   linkerIntervalMinutes: 15,
+  classifierEnabled: true,
 };
 
 export const { getSettings: getAiSettings, updateSettings: updateAiSettings } = createSingleRowSettings<
@@ -49,6 +50,7 @@ export const { getSettings: getAiSettings, updateSettings: updateAiSettings } = 
     lightModel: row.lightModel,
     linkerEnabled: row.linkerEnabled,
     linkerIntervalMinutes: row.linkerIntervalMinutes,
+    classifierEnabled: row.classifierEnabled,
   }),
   defaults: DEFAULT_AI_SETTINGS,
 });

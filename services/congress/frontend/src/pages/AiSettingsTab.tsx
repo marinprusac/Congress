@@ -53,6 +53,7 @@ export function AiSettingsTab() {
         lightModel: s.lightModel,
         linkerEnabled: s.linkerEnabled,
         linkerIntervalMinutes: s.linkerIntervalMinutes,
+        classifierEnabled: s.classifierEnabled,
       };
       setDraft(loaded);
       markSaved(loaded);
@@ -283,6 +284,15 @@ export function AiSettingsTab() {
             />
           </div>
         </div>
+
+        <h3 className="mb-3 font-mono text-xs uppercase tracking-widest text-dust">Places</h3>
+        <label className="mb-6 flex items-start gap-3">
+          <input type="checkbox" className="mt-1" checked={draft.classifierEnabled ?? true} onChange={(e) => setDraft((d) => ({ ...d, classifierEnabled: e.target.checked }))} />
+          <span>
+            <span className="block text-ink">Let the AI sort out places you stopped at</span>
+            <span className="block font-mono text-xs text-dust">Stops at unrecognized spots are matched to your Places, labelled or made into a new Place by the AI; when it's unsure, it asks you (with a map). Uses the cheap model and the proactive budget.</span>
+          </span>
+        </label>
 
         {mutation.isError && <p className="mb-4 font-mono text-sm text-alert">{(mutation.error as Error).message}</p>}
 

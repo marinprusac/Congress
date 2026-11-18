@@ -1118,3 +1118,15 @@ html:has(.chat-page) body {
   padding-top: 0.45rem;
   border-top: 1px solid var(--color-ink);
 }
+
+.chat-map {
+  margin: 0.45em 0;
+  overflow: hidden;
+  border: var(--border-heavy);
+}
+
+.chat-map-loading {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  color: var(--color-dust, #888);
+}

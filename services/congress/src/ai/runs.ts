@@ -54,7 +54,7 @@ export function setRunVerdict(id: string, verdict: unknown): void {
 }
 
 // Runs Congress starts on its own, with their own daily budget.
-export const AUTONOMOUS_KINDS = ["proactive", "tracking", "gate", "link"] as const;
+export const AUTONOMOUS_KINDS = ["proactive", "tracking", "gate", "link", "classify"] as const;
 
 export function spendSince(kinds: readonly string[], since: Date): number {
   const row = db

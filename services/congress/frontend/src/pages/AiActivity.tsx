@@ -14,6 +14,7 @@ const KIND_LABEL: Record<string, string> = {
   tracking: "Check",
   gate: "Look",
   link: "Linking",
+  classify: "Places",
 };
 
 function verdictLine(run: AiRunDetail): string | null {

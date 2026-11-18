@@ -1,4 +1,4 @@
-import { memo, useRef, useState, type ReactNode } from "react";
+import { isValidElement, memo, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { CapitolRecordResolveResult } from "@congress/shared-types";
@@ -16,6 +16,8 @@ interface ChatMarkdownProps {
   // Same-origin paths ("/notes/n/3") navigate in-app instead of reloading.
   onNavigatePath?: (path: string) => void;
   className?: string;
+  // Draws a fenced code block of this language as something else (a map); null keeps it as code.
+  renderCode?: (lang: string, code: string, streaming: boolean) => ReactNode | null;
 }
 
 function ChatRecordChip({ token, label, onNavigate }: { token: string; label: string; onNavigate?: (r: ResolvedRecord) => void }) {
@@ -61,7 +63,7 @@ function urlTransform(url: string): string {
 }
 
 // Chat replies: GitHub-flavored Markdown with record tokens as live chips.
-export const ChatMarkdown = memo(function ChatMarkdown({ text, streaming, onNavigateRecord, onNavigatePath, className }: ChatMarkdownProps) {
+export const ChatMarkdown = memo(function ChatMarkdown({ text, streaming, onNavigateRecord, onNavigatePath, className, renderCode }: ChatMarkdownProps) {
   const source = recordTokensToLinks(streaming ? trimPartialToken(text) : text);
   const components: Components = {
     a({ href, children }) {
@@ -86,6 +88,11 @@ export const ChatMarkdown = memo(function ChatMarkdown({ text, streaming, onNavi
       );
     },
     pre({ children }) {
+      if (renderCode && isValidElement<{ className?: string; children?: ReactNode }>(children)) {
+        const lang = /language-([\w-]+)/.exec(children.props.className ?? "")?.[1];
+        const node = lang ? renderCode(lang, String(children.props.children ?? "").replace(/\n$/, ""), Boolean(streaming)) : null;
+        if (node) return <>{node}</>;
+      }
       return <CodeBlock>{children}</CodeBlock>;
     },
     table({ children }) {

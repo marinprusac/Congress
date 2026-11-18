@@ -260,6 +260,13 @@
       "when": 1795017638713,
       "tag": "0036_magical_squirrel_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1795027747465,
+      "tag": "0037_classifier_setting",
+      "breakpoints": true
     }
   ]
 }

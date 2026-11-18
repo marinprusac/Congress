@@ -223,6 +223,7 @@ export const aiSettings = sqliteTable("ai_settings", {
   lightModel: text("light_model").notNull().default("claude-haiku-5-5"),
   linkerEnabled: integer("linker_enabled", { mode: "boolean" }).notNull().default(true),
   linkerIntervalMinutes: integer("linker_interval_minutes").notNull().default(15),
+  classifierEnabled: integer("classifier_enabled", { mode: "boolean" }).notNull().default(true),
 });
 
 // One conversation. sessionId is the `claude` CLI session every run in it

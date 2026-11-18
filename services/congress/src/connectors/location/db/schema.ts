@@ -47,6 +47,14 @@ export const visits = sqliteTable(
   (t) => [index("visits_arrived_at_idx").on(t.arrivedAt), index("visits_status_idx").on(t.status)]
 );
 
+// Stops the AI has looked at (classified or asked about), keyed by arrival time:
+// a history rebuild recreates visits with new ids but the same arrival, so a
+// stop is never reviewed (or asked about) twice.
+export const visitReviews = sqliteTable("visit_reviews", {
+  arrivedAt: integer("arrived_at", { mode: "timestamp_ms" }).primaryKey(),
+  reviewedAt: integer("reviewed_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 export const trips = sqliteTable(
   "trips",
   {
