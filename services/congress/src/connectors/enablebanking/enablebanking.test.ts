@@ -14,7 +14,7 @@ vi.mock("./client.js", async (importOriginal) => ({
 
 import { createSession, describeError, fetchBalances, fetchTransactions, listBanks, signJwt, startAuth } from "./client.js";
 import { bankDb, runBankMigrations } from "./db/client.js";
-import { addPendingAuth, getBankSettings, listAccounts, listConnections, saveConnection, takePendingAuth, updateBankSettings, getTransactionRow, transactionRecord } from "./cache.js";
+import { markTransfers, addPendingAuth, getBankSettings, listAccounts, listConnections, saveConnection, takePendingAuth, updateBankSettings, getTransactionRow, transactionRecord, upsertTransaction } from "./cache.js";
 import { normalizeTransaction, normalizeTransactions } from "./normalize.js";
 import { syncBanks } from "./sync.js";
 import { bankHooks, bankPanelRoutes } from "./routes.js";
@@ -105,6 +105,84 @@ describe("normalize", () => {
     expect(a!.key).toMatch(/^a:h[0-9a-f]{20}$/);
     expect(b!.key).toBe(`${a!.key}#2`);
     expect(normalizeTransactions("a", [coffee])[0]!.key).toBe(a!.key);
+  });
+});
+
+describe("normalize: bank quirks and detail", () => {
+  const entry = (text: string, extra: Record<string, unknown> = {}) => ({ entry_reference: "r", transaction_amount: { currency: "EUR", amount: "100.00" }, credit_debit_indicator: "CRDT", booking_date: "2026-11-15", remittance_information: [text], ...extra });
+
+  it("reads Zagrebačka's card purchases and fees (reported as credits) as money out, and leaves real credits alone", () => {
+    expect(normalizeTransaction("a", entry("Kupovina Revolut**7915* Dublin IE"), { country: "HR" })!.amount).toBe(-100);
+    expect(normalizeTransaction("a", entry("Naknada za obradu prekogran. priljeva"), { country: "HR" })!.amount).toBe(-100);
+    expect(normalizeTransaction("a", entry("HR99 M-ZABA UPLATA PATRIK Renta"), { country: "HR" })!.amount).toBe(100);
+    expect(normalizeTransaction("a", entry("Priljev iz inozemstva IGEM LUND"), { country: "HR" })!.amount).toBe(100);
+  });
+
+  it("applies that only to Croatian banks", () => {
+    expect(normalizeTransaction("a", entry("Kupovina something"), { country: "SE" })!.amount).toBe(100);
+    expect(normalizeTransaction("a", entry("Kupovina something"))!.amount).toBe(100);
+  });
+
+  it("falls back to the amount's sign when a bank sends no indicator", () => {
+    expect(normalizeTransaction("a", entry("x", { credit_debit_indicator: undefined, transaction_amount: { currency: "SEK", amount: "-42.5" } }))!.amount).toBe(-42.5);
+  });
+
+  it("keeps the merchant category, the bank's code and the other party's IBAN", () => {
+    const t = normalizeTransaction("a", entry("x", { credit_debit_indicator: "DBIT", merchant_category_code: "5411", bank_transaction_code: { description: "Card payment" }, creditor_account: { iban: "LT1" }, debtor_account: { iban: "SE9" } }))!;
+    expect(t).toMatchObject({ mcc: "5411", bankCode: "Card payment", counterpartyIban: "LT1" });
+  });
+});
+
+describe("own-account transfers", () => {
+  function twoAccounts() {
+    saveConnection({ sessionId: "z", bank: "Zagrebačka banka", country: "HR", validUntil: "2027-02-01T00:00:00Z", accounts: [{ uid: "z1", name: "", iban: "HR1", currency: "EUR" }] });
+    saveConnection({ sessionId: "r", bank: "Revolut", country: "LT", validUntil: "2027-02-01T00:00:00Z", accounts: [{ uid: "r1", name: "", iban: "LT1", currency: "EUR" }] });
+  }
+  const set = (a: string, key: string, amount: number, date: string, over: Record<string, unknown> = {}) =>
+    upsertTransaction(a, { key, bookingDate: date, amount, currency: "EUR", counterparty: "", description: "", mcc: null, bankCode: null, counterpartyIban: null, ...over });
+  const marks = () => Object.fromEntries(["z1:o", "r1:i", "z1:o2", "r1:i2", "r1:x"].map((k) => [k, getTransactionRow(k)?.transfer ?? null]));
+
+  it("pairs an outgoing entry with an equal incoming one on another account within 3 days, both ways marked", () => {
+    twoAccounts();
+    set("z1", "z1:o", -100, "2026-11-15");
+    set("r1", "r1:i", 100, "2026-11-17");
+    expect(markTransfers().sort()).toEqual(["r1:i", "z1:o"]);
+    expect(marks()).toMatchObject({ "z1:o": "own", "r1:i": "own" });
+  });
+
+  it("leaves alone entries too far apart, of different size, or on the same account", () => {
+    twoAccounts();
+    set("z1", "z1:o", -100, "2026-11-10");
+    set("r1", "r1:i", 100, "2026-11-15");
+    set("r1", "r1:x", -100, "2026-11-10");
+    set("z1", "z1:o2", -50, "2026-11-10");
+    set("r1", "r1:i2", 100.5, "2026-11-10");
+    expect(markTransfers()).toEqual([]);
+  });
+
+  it("uses each incoming entry once: two outgoing, one incoming makes one transfer", () => {
+    twoAccounts();
+    set("z1", "z1:o", -100, "2026-11-15");
+    set("z1", "z1:o2", -100, "2026-11-15");
+    set("r1", "r1:i", 100, "2026-11-15");
+    expect(markTransfers()).toHaveLength(2);
+    expect(Object.values(marks()).filter((v) => v === "own")).toHaveLength(2);
+  });
+
+  it("recognises a move by the other party's IBAN being one of the owner's accounts, even with no twin", () => {
+    twoAccounts();
+    set("z1", "z1:o", -80, "2026-11-15", { counterpartyIban: "LT1" });
+    set("z1", "z1:o2", -80, "2026-11-15", { counterpartyIban: "SE_UNKNOWN" });
+    set("z1", "z1:self", -5, "2026-11-15", { counterpartyIban: "HR1" });
+    expect(markTransfers()).toEqual(["z1:o"]);
+  });
+
+  it("is stable: a second pass changes nothing", () => {
+    twoAccounts();
+    set("z1", "z1:o", -100, "2026-11-15");
+    set("r1", "r1:i", 100, "2026-11-15");
+    markTransfers();
+    expect(markTransfers()).toEqual([]);
   });
 });
 
@@ -353,6 +431,31 @@ describe("tools", () => {
   it("gives records the same account label, not a bare name", async () => {
     await threeAccounts();
     expect(enableBankingConnector.read.get("transaction", "sp-1:a")?.values.account).toBe("Sparbanken Skåne · SEK · …7374");
+  });
+
+  it("separates income sources from spending, and keeps topping-up Revolut out of both", async () => {
+    saveConnection({ sessionId: "z", bank: "Zagrebačka banka", country: "HR", validUntil: "2027-02-01T00:00:00Z", accounts: [{ uid: "z1", name: "", iban: "HR1", currency: "EUR" }] });
+    saveConnection({ sessionId: "r", bank: "Revolut", country: "LT", validUntil: "2027-02-01T00:00:00Z", accounts: [{ uid: "r1", name: "", iban: "LT1", currency: "EUR" }] });
+    const e = (id: string, amount: string, ind: string, date: string, text: string, who?: object) => ({ entry_reference: id, transaction_amount: { currency: "EUR", amount }, credit_debit_indicator: ind, booking_date: date, remittance_information: [text], ...who });
+    vi.mocked(fetchTransactions).mockImplementation(async (_c, uid) =>
+      uid === "z1"
+        ? [e("z-rent", "850", "CRDT", "2026-10-12", "UPLATA Rent", { debtor: { name: "Zrinka" } }), e("z-top", "100", "CRDT", "2026-11-13", "Kupovina Revolut**7915* Dublin IE")]
+        : [e("r-top", "100", "CRDT", "2026-11-13", "Top-up"), e("r-shop", "30", "DBIT", "2026-11-14", "x", { creditor: { name: "Konzum" } })]
+    );
+    await syncBanks(ctx, NOW);
+    const out = await tools()("banks_spending", { from: "2026-10-01", to: "2026-11-30" });
+    expect(out.totalsPerCurrency).toEqual([{ currency: "EUR", in: 850, out: 30 }]);
+    expect(out.byMonth).toEqual([{ month: "2026-10", currency: "EUR", in: 850, out: 0 }, { month: "2026-11", currency: "EUR", in: 0, out: 30 }]);
+    expect(out.accounts.find((a: { accountId: string }) => a.accountId === "z1")).toMatchObject({ in: 850, out: 0, topIncome: [{ counterparty: "Zrinka", amount: 850 }] });
+    expect(out.accounts.find((a: { accountId: string }) => a.accountId === "r1")).toMatchObject({ topSpending: [{ counterparty: "Konzum", amount: 30 }] });
+    expect(out.transfersExcluded).toEqual([{ currency: "EUR", entries: 2, movedOut: 100 }]);
+
+    const naive = await tools()("banks_spending", { from: "2026-10-01", to: "2026-11-30", includeTransfers: true });
+    expect(naive.totalsPerCurrency).toEqual([{ currency: "EUR", in: 950, out: 130 }]);
+
+    const list = await tools()("banks_list_transactions", { direction: "out", includeTransfers: false });
+    expect(list.map((t: { counterparty: string }) => t.counterparty)).toEqual(["Konzum"]);
+    expect((await tools()("banks_list_transactions", {})).filter((t: { transfer: boolean }) => t.transfer)).toHaveLength(2);
   });
 
   it("doesn't read balances for an expired consent", async () => {

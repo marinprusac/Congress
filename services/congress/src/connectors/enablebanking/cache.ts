@@ -98,13 +98,75 @@ export function matchAccounts(ref: string, all = listAccountInfos()): AccountInf
 
 export const getTransactionRow = (key: string): TxRow | undefined => db.select().from(transactions).where(eq(transactions.key, key)).get();
 
-// Returns whether it was new or changed.
+// Returns whether it was new or changed. A row's `transfer` mark is kept (it's decided afterwards, see markTransfers).
 export function upsertTransaction(accountUid: string, t: BankTransaction): boolean {
   const before = getTransactionRow(t.key);
-  if (before && before.bookingDate === t.bookingDate && before.amount === t.amount && before.currency === t.currency && before.counterparty === t.counterparty && before.description === t.description) return false;
-  const row = { key: t.key, accountUid, bookingDate: t.bookingDate, amount: t.amount, currency: t.currency, counterparty: t.counterparty, description: t.description, updatedAt: new Date() };
+  if (
+    before &&
+    before.bookingDate === t.bookingDate &&
+    before.amount === t.amount &&
+    before.currency === t.currency &&
+    before.counterparty === t.counterparty &&
+    before.description === t.description &&
+    before.mcc === t.mcc &&
+    before.bankCode === t.bankCode &&
+    before.counterpartyIban === t.counterpartyIban
+  )
+    return false;
+  const row = {
+    key: t.key,
+    accountUid,
+    bookingDate: t.bookingDate,
+    amount: t.amount,
+    currency: t.currency,
+    counterparty: t.counterparty,
+    description: t.description,
+    mcc: t.mcc,
+    bankCode: t.bankCode,
+    counterpartyIban: t.counterpartyIban,
+    updatedAt: new Date(),
+  };
   db.insert(transactions).values(row).onConflictDoUpdate({ target: transactions.key, set: row }).run();
   return true;
+}
+
+// --- moves between the owner's own accounts
+
+const PAIR_DAYS = 3;
+const DAY_MS = 86_400_000;
+
+// Marks entries that are the owner moving money between their own accounts, so they count as neither
+// income nor spending (a top-up would otherwise be spending on one account and income on the other, and
+// the same money would count again when it's spent). Two signals: the other party's IBAN is one of the
+// owner's own accounts, or an entry has an equal and opposite twin on another account within 3 days.
+// Returns the keys whose mark changed.
+export function markTransfers(): string[] {
+  const own = new Set(listAccounts().map((a) => a.iban).filter((i): i is string => Boolean(i)));
+  const ibanOf = new Map(listAccounts().map((a) => [a.uid, a.iban]));
+  const unmarked = db.select().from(transactions).where(eq(transactions.transfer, "")).all();
+  const marked = new Set<string>();
+  for (const t of unmarked) {
+    if (t.counterpartyIban && own.has(t.counterpartyIban) && t.counterpartyIban !== ibanOf.get(t.accountUid)) marked.add(t.key);
+  }
+  // Twins: each outgoing entry takes the nearest-dated unclaimed incoming one of the same size and currency elsewhere.
+  const incoming = unmarked.filter((t) => t.amount > 0 && !marked.has(t.key));
+  const claimed = new Set<string>();
+  for (const out of unmarked.filter((t) => t.amount < 0 && !marked.has(t.key)).sort((a, b) => a.bookingDate.localeCompare(b.bookingDate))) {
+    let best: TxRow | undefined;
+    let bestGap = Infinity;
+    for (const inc of incoming) {
+      if (claimed.has(inc.key) || inc.accountUid === out.accountUid || inc.currency !== out.currency || inc.amount !== -out.amount) continue;
+      const gap = Math.abs(Date.parse(inc.bookingDate) - Date.parse(out.bookingDate)) / DAY_MS;
+      if (gap <= PAIR_DAYS && gap < bestGap) (best = inc), (bestGap = gap);
+    }
+    if (best) {
+      claimed.add(best.key);
+      marked.add(out.key);
+      marked.add(best.key);
+    }
+  }
+  for (const key of marked) db.update(transactions).set({ transfer: "own", updatedAt: new Date() }).where(eq(transactions.key, key)).run();
+  return [...marked];
 }
 
 export function listTransactionRows(opts: { from?: string; to?: string; accountUids?: string[] } = {}): TxRow[] {
@@ -127,6 +189,9 @@ export function transactionRecord(row: TxRow): SourceRecord {
       counterparty: row.counterparty,
       description: row.description,
       account: accountText,
+      transfer: row.transfer === "own",
+      mcc: row.mcc ?? "",
+      bankCode: row.bankCode ?? ""
     },
     facts: {},
     updatedAt: row.updatedAt.toISOString(),

@@ -15,6 +15,13 @@
       "when": 1795032201280,
       "tag": "0001_fresh_malice",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1795037406334,
+      "tag": "0002_lovely_diamondback",
+      "breakpoints": true
     }
   ]
 }

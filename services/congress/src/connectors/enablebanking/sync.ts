@@ -1,6 +1,6 @@
 import type { ConnectorContext, SyncResult } from "../contract.js";
 import { fetchTransactions } from "./client.js";
-import { credentials, getBankSettings, isExpired, listAccounts, listConnections, markFetched, setSyncedThrough, updateBankSettings, updateConnection, upsertTransaction } from "./cache.js";
+import { credentials, getBankSettings, isExpired, listAccounts, listConnections, markFetched, markTransfers, setSyncedThrough, updateBankSettings, updateConnection, upsertTransaction } from "./cache.js";
 import { normalizeTransactions } from "./normalize.js";
 
 // A first pull reaches back this far (banks cap what they serve; 90 days is the usual SCA window).
@@ -25,6 +25,8 @@ export function syncBanks(ctx: ConnectorContext, now = Date.now()): Promise<Sync
     if (!creds) return { changed: 0, error: null };
     const errors: string[] = [];
     let changed = 0;
+    // Keys pulled quietly this run (a backfill): their transfer mark is quiet too.
+    const quietKeys = new Set<string>();
     for (const conn of listConnections()) {
       if (conn.status !== "active") continue;
       if (isExpired(conn, now)) {
@@ -43,9 +45,10 @@ export function syncBanks(ctx: ConnectorContext, now = Date.now()): Promise<Sync
           const from = first ? day(now - FIRST_DAYS * DAY) : day(Date.parse(acc.syncedThrough!) - OVERLAP_DAYS * DAY);
           const quiet = first;
           let latest = acc.syncedThrough;
-          for (const t of normalizeTransactions(acc.uid, await fetchTransactions(creds, acc.uid, from))) {
+          for (const t of normalizeTransactions(acc.uid, await fetchTransactions(creds, acc.uid, from), { country: conn.country })) {
             if (!latest || t.bookingDate > latest) latest = t.bookingDate;
             if (upsertTransaction(acc.uid, t)) {
+              if (quiet) quietKeys.add(t.key);
               ctx.emitChange("transaction", t.key, false, quiet);
               changed++;
             }
@@ -55,6 +58,11 @@ export function syncBanks(ctx: ConnectorContext, now = Date.now()): Promise<Sync
           errors.push(`${conn.bank} ${acc.name || acc.iban || acc.uid}: ${(err as Error).message}`);
         }
       }
+    }
+    // After every account: a transfer's two sides can come from different accounts in the same run.
+    for (const key of markTransfers()) {
+      ctx.emitChange("transaction", key, false, quietKeys.has(key));
+      changed++;
     }
     const settings = getBankSettings();
     if (errors.length === 0) {

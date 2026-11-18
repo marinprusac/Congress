@@ -54,6 +54,13 @@ export const transactions = sqliteTable(
     currency: text("currency").notNull(),
     counterparty: text("counterparty").notNull().default(""),
     description: text("description").notNull().default(""),
+    // Merchant category code and the bank's own transaction-code text, when it sends them.
+    mcc: text("mcc"),
+    bankCode: text("bank_code"),
+    // IBAN of the other party, when given: how a move between the owner's own accounts is recognised.
+    counterpartyIban: text("counterparty_iban"),
+    // "own" = a move between the owner's own accounts (not income or spending).
+    transfer: text("transfer").notNull().default(""),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
   (t) => [index("transactions_by_date").on(t.bookingDate)]
