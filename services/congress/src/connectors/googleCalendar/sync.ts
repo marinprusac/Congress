@@ -2,9 +2,8 @@ import { GoogleAccountNeedsReconnectError, GoogleScopeMissingError } from "../..
 import type { ConnectorContext, SyncResult } from "../contract.js";
 import { GoogleApiError } from "../googleApi.js";
 import { accountRows, API, ensureSeeded, recordAccountSync, selectedCalendars, setSyncToken, type CalendarRow } from "./calendars.js";
-import { eventKey, eventsOfCalendar, forgetAccount, linkAttendee, normalizeEmail, pendingAttendees, removeEvent, writeEvent } from "./cache.js";
+import { eventKey, eventsOfCalendar, forgetAccount, normalizeEmail, removeEvent, writeEvent } from "./cache.js";
 import { timeMs, type RawGoogleEvent } from "./facts.js";
-import { guestsToLink } from "./people.js";
 
 const WINDOW_DAYS = 180;
 const DAY_MS = 86_400_000;
@@ -85,21 +84,6 @@ export async function syncCalendar(ctx: ConnectorContext, cal: CalendarRow, now 
   return changed;
 }
 
-// Links unlinked guests to existing People. Runs every sync, so a Person
-// added later picks up their past and future events.
-export function linkPeople(ctx: ConnectorContext, ownEmails: Set<string>): number {
-  let linked = 0;
-  const memo = new Map<string, string | null>();
-  for (const g of guestsToLink(pendingAttendees(), ownEmails)) {
-    if (!memo.has(g.email)) memo.set(g.email, ctx.people.find(g.email));
-    const personId = memo.get(g.email)!;
-    if (!personId) continue;
-    linkAttendee(g.eventKey, g.email, personId);
-    linked++;
-  }
-  return linked;
-}
-
 export function friendlyError(err: unknown, label: string): string {
   if (err instanceof GoogleAccountNeedsReconnectError) return `${label} needs reconnecting`;
   if (err instanceof GoogleScopeMissingError) return `${label} hasn't granted calendar access`;
@@ -147,6 +131,5 @@ export async function syncAll(ctx: ConnectorContext): Promise<SyncResult> {
     recordAccountSync(account.id, errors.join("; ") || null);
     failures.push(...errors);
   }
-  linkPeople(ctx, ownEmails);
   return { changed, error: failures.join("; ") || null };
 }

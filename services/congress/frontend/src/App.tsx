@@ -19,8 +19,6 @@ import { HealthPage } from "@/views/health/HealthViews";
 import { NewRoutinePage } from "@/views/fitness/NewRoutinePage";
 import { MapPage } from "@/views/map/MapPage";
 import { PendingVisitsPage } from "@/views/map/PendingVisitsPage";
-import { ChatPage } from "@/views/whatsapp/ChatPage";
-import { ChatsPage } from "@/views/whatsapp/ChatsPage";
 
 // The shell's top-level paths (keep the service worker's denylist in sw.ts in step).
 export function App() {
@@ -67,13 +65,9 @@ export function App() {
         <Route path="/map/places/new" element={<Navigate to="/e/new/place" replace />} />
         <Route path="/map/settings" element={<Navigate to="/settings?from=accounts" replace />} />
         <Route path="/map/*" element={<Navigate to="/map" replace />} />
-        {/* WhatsApp: the chat list and a chat's messages (whatsapp connector; read-only). */}
-        <Route element={<ChamberLayout title="WhatsApp" ownChamber="whatsapp" />}>
-          <Route path="/whatsapp" element={<ChatsPage />} />
-          <Route path="/whatsapp/c/:jid" element={<ChatPage />} />
-        </Route>
-        <Route path="/whatsapp/settings" element={<Navigate to="/settings?from=accounts" replace />} />
-        <Route path="/whatsapp/*" element={<Navigate to="/whatsapp" replace />} />
+        {/* WhatsApp chats aren't read in Congress any more (the AI reads them). */}
+        <Route path="/whatsapp" element={<Navigate to="/" replace />} />
+        <Route path="/whatsapp/*" element={<Navigate to="/" replace />} />
         {/* Every runtime record type's records (typeEngine). */}
         <Route path="/e/new/:type" element={<RecordPage />} />
         <Route path="/e/:id" element={<RecordPage />} />

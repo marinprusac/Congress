@@ -16,6 +16,7 @@ import { startAskTimer, stopAskTimer } from "./ai/asks.js";
 import { startTrackingScheduler, stopTrackingScheduler } from "./ai/tracking.js";
 import { listTracking } from "./ai/memory.js";
 import { startProactive, stopProactive } from "./ai/proactive.js";
+import { startLinker, stopLinker } from "./ai/linker.js";
 import { startConnectors, stopConnectors } from "./connectors/registry.js";
 import { startBindings, stopBindings } from "./typeEngine/bindings/runtime.js";
 import { CONNECTORS } from "./connectors/list.js";
@@ -46,6 +47,7 @@ startAiRetentionSweep();
 startAskTimer();
 startTrackingScheduler(() => listTracking(["active"]));
 startProactive();
+startLinker();
 
 async function shutdown() {
   console.log("Shutting down Congress...");
@@ -58,6 +60,7 @@ async function shutdown() {
   stopAskTimer();
   stopTrackingScheduler();
   stopProactive();
+  stopLinker();
   stopBindings();
   await stopConnectors();
   server.close(() => {

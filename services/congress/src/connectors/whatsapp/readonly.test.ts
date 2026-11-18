@@ -1,7 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ConnectorRefusedError, type ConnectorContext } from "../contract.js";
 import { whatsappConnector } from "./index.js";
 
 // Nothing may ever be sent or uploaded to WhatsApp (a permanent owner rule).
@@ -23,12 +22,7 @@ describe("the WhatsApp connector stays read-only", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("refuses every push but a local mark-read", async () => {
-    const ctx = {} as ConnectorContext;
-    const push = whatsappConnector.push!;
-    await expect(push.create(ctx, "chat", {})).rejects.toThrow(ConnectorRefusedError);
-    await expect(push.update(ctx, "chat", "x@s.whatsapp.net", { name: "x" })).rejects.toThrow(ConnectorRefusedError);
-    await expect(push.delete(ctx, "chat", "x@s.whatsapp.net")).rejects.toThrow(ConnectorRefusedError);
-    await expect(push.act(ctx, "chat", "x@s.whatsapp.net", "send", {})).rejects.toThrow(ConnectorRefusedError);
+  it("has no push at all: chats aren't records", () => {
+    expect(whatsappConnector.push).toBeUndefined();
   });
 });

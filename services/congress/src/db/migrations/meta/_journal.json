@@ -253,6 +253,13 @@
       "when": 1791730109677,
       "tag": "0035_notification_expiry",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1795017638713,
+      "tag": "0036_magical_squirrel_girl",
+      "breakpoints": true
     }
   ]
 }

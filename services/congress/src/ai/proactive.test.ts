@@ -91,10 +91,18 @@ describe("gate", () => {
 
     expect(runAi).toHaveBeenCalledTimes(2);
     const proactive = runAi.mock.calls[1]![0];
-    expect(proactive).toMatchObject({ kind: "proactive", trigger: "gate" });
+    expect(proactive).toMatchObject({ kind: "proactive", trigger: "gate", model: "claude-haiku-5-5" });
     expect(proactive.body).toContain("Car registration due soon");
     expect(proactive.body).toContain("Deadline in 3 days");
     expect(meterState().cooldownUntil).toBeGreaterThan(Date.now());
+  });
+
+  it("hands deep work to the main model", async () => {
+    runAi.mockResolvedValueOnce(outcome(JSON.stringify({ act: true, depth: "deep", reason: "Plan the trip" }))).mockResolvedValueOnce(outcome("ok"));
+    for (let i = 0; i < 7; i++) observeEvent(ev("tasks.created"), T0 + i);
+    await flush();
+    expect(runAi).toHaveBeenCalledTimes(2);
+    expect(runAi.mock.calls[1]![0].model).toBeUndefined();
   });
 
   it("treats unusable gate output as a no", () => {

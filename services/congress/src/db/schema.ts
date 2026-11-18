@@ -218,7 +218,11 @@ export const aiSettings = sqliteTable("ai_settings", {
   proactiveBudgetUsd: real("proactive_budget_usd").notNull().default(2),
   gateModel: text("gate_model").notNull().default("claude-haiku-4-5-20251001"),
   gateSensitivity: text("gate_sensitivity", { enum: ["low", "normal", "high"] }).notNull().default("normal"),
-  heartbeatHours: real("heartbeat_hours").notNull().default(4),
+  heartbeatHours: real("heartbeat_hours").notNull().default(1),
+  // The cheap model for linking and light proactive runs.
+  lightModel: text("light_model").notNull().default("claude-haiku-5-5"),
+  linkerEnabled: integer("linker_enabled", { mode: "boolean" }).notNull().default(true),
+  linkerIntervalMinutes: integer("linker_interval_minutes").notNull().default(15),
 });
 
 // One conversation. sessionId is the `claude` CLI session every run in it
@@ -351,6 +355,15 @@ export const aiEventBuffer = sqliteTable(
   },
   (table) => [index("ai_event_buffer_occurred_at_idx").on(table.occurredAt)]
 );
+
+// Work for the AI linker (ai/linker.ts): records written since its last pass
+// ("e:<id>") and new direct WhatsApp contacts ("wa:<jid>").
+export const aiLinkQueue = sqliteTable("ai_link_queue", {
+  key: text("key").primaryKey(),
+  label: text("label").notNull().default(""),
+  queuedAt: integer("queued_at", { mode: "timestamp_ms" }).notNull(),
+  attempts: integer("attempts").notNull().default(0),
+});
 
 // Plain facts about the owner, carried into every run's prompt.
 export const aiFacts = sqliteTable("ai_facts", {

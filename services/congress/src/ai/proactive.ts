@@ -26,6 +26,8 @@ export const gateVerdictSchema = z.object({
   act: z.boolean(),
   focus: z.string().max(300).default(""),
   urgency: z.enum(["quiet", "push"]).default("quiet"),
+  // light: the cheap model handles it; deep: the main model.
+  depth: z.enum(["light", "deep"]).default("light"),
   reason: z.string().max(500).default(""),
 });
 export type GateVerdict = z.infer<typeof gateVerdictSchema>;
@@ -36,6 +38,11 @@ export const GATE_JSON_SCHEMA = {
     act: { type: "boolean", description: "true only if something specific deserves the assistant's attention now" },
     focus: { type: "string", description: "What to look at, if act" },
     urgency: { type: "string", enum: ["quiet", "push"] },
+    depth: {
+      type: "string",
+      enum: ["light", "deep"],
+      description: "light: a quick look, a reminder, a simple check (cheap model). deep: needs judgement across several sources, careful writing, or preparing changes",
+    },
     reason: { type: "string", description: "One sentence: why (or why not)" },
   },
   required: ["act", "reason"],
@@ -50,7 +57,7 @@ export function parseVerdict(response: string | null): GateVerdict {
   } catch {
     // fall through
   }
-  return { act: false, focus: "", urgency: "quiet", reason: "No usable verdict." };
+  return { act: false, focus: "", urgency: "quiet", depth: "light", reason: "No usable verdict." };
 }
 
 // ---- Event buffer ----
@@ -116,7 +123,7 @@ export async function buildDigest(since: number, zone: string): Promise<{ text: 
 
 export function gatePromptBody(digest: string): string {
   return `## Gate: should the assistant act on its own right now?
-You decide whether Congress's assistant should take a proactive look now - to tell the owner something, ask them something, or prepare a change for approval. Most of the time the answer is no: say act=true only for something specific and timely that the owner would genuinely want (a deadline getting close, something that changed and matters, a follow-up that's due), never for routine noise, and never for something already waiting on the owner.
+You decide whether Congress's assistant should take a proactive look now - to tell the owner something, ask them something, tidy or organise their records, or prepare a change for approval. Say act=true for something specific and timely the owner would genuinely want (a deadline getting close, something that changed and matters, a follow-up that's due, records worth organising), never for routine noise, and never for something already waiting on the owner. Pick depth "light" unless the work clearly needs the stronger model.
 
 ${digest}
 
@@ -196,10 +203,10 @@ export async function maybeGate(now = Date.now()): Promise<GateVerdict | null> {
         runAi({ kind: "gate", body: gatePromptBody(digest.text), actor: "congress", runId: gateRunId, trigger: "meter", model: settings.gateModel, jsonSchema: GATE_JSON_SCHEMA, signal }),
       { entry: { runId: gateRunId, kind: "gate", threadId: null, meta: {} }, priority: PRIORITY.gate }
     );
-    const verdict = result.refused ? { act: false, focus: "", urgency: "quiet" as const, reason: result.errorMessage ?? "Refused." } : parseVerdict(result.response);
+    const verdict = result.refused ? { act: false, focus: "", urgency: "quiet" as const, depth: "light" as const, reason: result.errorMessage ?? "Refused." } : parseVerdict(result.response);
     setRunVerdict(gateRunId, { ...verdict, events: digest.eventCount });
     meter = afterGate(meter, Date.now(), verdict.act);
-    if (verdict.act) startProactiveRun(verdict, digest.text, gateRunId);
+    if (verdict.act) startProactiveRun(verdict, digest.text, gateRunId, verdict.depth === "light" ? settings.lightModel : undefined);
     return verdict;
   } catch (err) {
     if (!(err instanceof JobCancelledError)) console.warn("Gate failed:", err);
@@ -210,7 +217,7 @@ export async function maybeGate(now = Date.now()): Promise<GateVerdict | null> {
   }
 }
 
-function startProactiveRun(verdict: GateVerdict, digest: string, gateRunId: string): void {
+function startProactiveRun(verdict: GateVerdict, digest: string, gateRunId: string, model?: string): void {
   const runId = randomUUID();
   void enqueue(
     (signal) =>
@@ -221,6 +228,7 @@ function startProactiveRun(verdict: GateVerdict, digest: string, gateRunId: stri
         runId,
         trigger: "gate",
         signal,
+        model,
         meta: { gateRunId },
       }),
     { entry: { runId, kind: "proactive", threadId: null, meta: { gateRunId } }, priority: PRIORITY.proactive }

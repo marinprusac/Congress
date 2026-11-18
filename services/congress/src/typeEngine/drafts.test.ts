@@ -84,11 +84,11 @@ describe("drafts", () => {
     expect(() => startDraft({ threadId: 6, slug: "book", rollbackTo: back.version })).toThrow(/no earlier version/);
   });
 
-  it("marks a premade type forked when a draft changes it", () => {
+  it("changes a built-in type like any other", () => {
     const draft = startDraft({ threadId: 7, slug: "note" });
     setDraftOps(draft.id, [{ op: "add_field", slug: "mood", label: "Mood", kind: "text" }], "append");
     const { type } = publishDraft(draft.id, "ai-builder");
-    expect(type.forked).toBe(true);
-    expect(getTypeBySlug("note")?.forked).toBe(true);
+    expect(type.definition.fields.map((f) => f.slug)).toContain("mood");
+    expect(getTypeBySlug("note")?.forked).toBe(false);
   });
 });

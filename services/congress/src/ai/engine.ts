@@ -326,11 +326,11 @@ export async function runAi(ctx: RunContext): Promise<RunOutcome> {
     return refuse("Daily budget cap reached; AI has been paused.");
   }
 
-  const grant = ctx.jsonSchema ? null : activeGrant(threadId);
+  const builder = !ctx.jsonSchema;
   const internet = ctx.jsonSchema ? null : activeGrant(threadId, "internet");
-  const memory = ctx.jsonSchema ? undefined : [memoryPromptSection(settings.timeZone), grant && builderPromptSection(grant.expiresAt), internet && internetPromptSection(internet.expiresAt)].filter(Boolean).join("\n\n");
+  const memory = ctx.jsonSchema ? undefined : [memoryPromptSection(settings.timeZone), builder && builderPromptSection(), internet && internetPromptSection(internet.expiresAt)].filter(Boolean).join("\n\n");
   const prompt = buildPrompt(settings, ctx.body, new Date(), memory);
-  const mcpConfig = await writeMcpConfigFile(ctx.actor, { runId, threadId }, { empty: Boolean(ctx.jsonSchema), builder: Boolean(grant), internet: Boolean(internet) });
+  const mcpConfig = await writeMcpConfigFile(ctx.actor, { runId, threadId }, { empty: Boolean(ctx.jsonSchema), builder, internet: Boolean(internet) });
   insertRunRow({ id: runId, ...base, status: "running" });
   startRun(runId, ctx.kind, ctx.meta ?? {}, threadId);
 

@@ -50,6 +50,9 @@ export function AiSettingsTab() {
         gateModel: s.gateModel,
         gateSensitivity: s.gateSensitivity,
         heartbeatHours: s.heartbeatHours,
+        lightModel: s.lightModel,
+        linkerEnabled: s.linkerEnabled,
+        linkerIntervalMinutes: s.linkerIntervalMinutes,
       };
       setDraft(loaded);
       markSaved(loaded);
@@ -228,9 +231,9 @@ export function AiSettingsTab() {
             <FormLabel>Look anyway every (hours)</FormLabel>
             <input
               type="number"
-              min={0.5}
+              min={0.25}
               max={48}
-              step={0.5}
+              step={0.25}
               value={draft.heartbeatHours ?? ""}
               onChange={(e) => setDraft((d) => ({ ...d, heartbeatHours: Number(e.target.value) }))}
               className={inputClass}
@@ -251,6 +254,33 @@ export function AiSettingsTab() {
           <div>
             <FormLabel>Model for deciding whether to look</FormLabel>
             <input value={draft.gateModel ?? ""} onChange={(e) => setDraft((d) => ({ ...d, gateModel: e.target.value }))} className={inputClass} />
+          </div>
+          <div>
+            <FormLabel>Cheap model (linking, light looks)</FormLabel>
+            <input value={draft.lightModel ?? ""} onChange={(e) => setDraft((d) => ({ ...d, lightModel: e.target.value }))} className={inputClass} />
+          </div>
+        </div>
+
+        <h3 className="mb-3 font-mono text-xs uppercase tracking-widest text-dust">Connections</h3>
+        <label className="mb-4 flex items-start gap-3">
+          <input type="checkbox" className="mt-1" checked={draft.linkerEnabled ?? true} onChange={(e) => setDraft((d) => ({ ...d, linkerEnabled: e.target.checked }))} />
+          <span>
+            <span className="block text-ink">Let the AI connect new records</span>
+            <span className="block font-mono text-xs text-dust">New mail, events and your edits get linked to People and to each other, and new People made from people you write to. Uses the cheap model and the proactive budget.</span>
+          </span>
+        </label>
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <FormLabel>Link at most every (minutes)</FormLabel>
+            <input
+              type="number"
+              min={5}
+              max={1440}
+              step={5}
+              value={draft.linkerIntervalMinutes ?? ""}
+              onChange={(e) => setDraft((d) => ({ ...d, linkerIntervalMinutes: Number(e.target.value) }))}
+              className={inputClass}
+            />
           </div>
         </div>
 

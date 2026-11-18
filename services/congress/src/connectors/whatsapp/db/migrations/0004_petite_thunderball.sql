@@ -1,0 +1,1 @@
+ALTER TABLE `chats` ADD `contact_queued_at` integer;

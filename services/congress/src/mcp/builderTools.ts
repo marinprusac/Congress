@@ -3,38 +3,41 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { mcpTextResult } from "../kit/mcp.js";
 import { aiUrgencySchema, RECORD_ICONS, operationSchema, SOURCE_COLORS } from "@congress/shared-types";
 import { currentRunContext } from "../ai/runContext.js";
-import { activeGrant, requestPublish } from "../ai/builder.js";
+import { BUILDER_ACTOR, requestPublish } from "../ai/builder.js";
 import { AskInvalidError } from "../ai/asks.js";
-import { DraftError, discardDraft, getDraft, listDrafts, previewDraft, setDraftOps, startDraft, type Draft } from "../typeEngine/drafts.js";
-import { getTypeBySlug, listTypes, listVersions, recordCount } from "../typeEngine/store.js";
+import { DraftError, discardDraft, getDraft, listDrafts, previewDraft, publishDraft, setDraftOps, startDraft, type Draft } from "../typeEngine/drafts.js";
+import { publishEvent } from "../events.js";
+import { getTypeBySlug, listTypes, listVersions, PublishError, recordCount } from "../typeEngine/store.js";
 import { listConnectors } from "../connectors/runtime.js";
 
-// /mcp/builder: drafting record-type changes, only in a thread the owner
-// granted builder mode (re-checked on every call; a grant can end mid-run).
+// /mcp/builder: every AI run may create and change record types on its own.
+// Only a change that would lose data (delete_type, values a kind change
+// can't convert) waits for the owner's approval through request_publish.
 
-const OPS_GUIDE = `Ops, applied in order: create_type (a new type's first op), set_type_meta, add_field, rename_field, retire_field, restore_field, change_field_kind, set_field_options, reorder_fields, set_title_field (a text field; every type needs one), set_layout (a richtext body field), set_time_range ({ start, end, allDay? }: pairs date/datetime fields into one control and the feed's time), set_map_point ({ latitude, longitude, radius? }: pairs number fields into one map picker), set_actions, set_feed_rules, set_time_triggers, set_event_notifications, delete_type. set_event_notifications { notifications: [{ event, title?, body? }] } picks which of the type's events push a notification to the owner (event = created, updated, deleted, a toggle action's onEvent/offEvent, or a time trigger step/clearEvent name); every event is recorded to history regardless, and none notify unless listed. Title and body are {{payload.recordId|type|title|url}} templates, defaulting to the event label and the record title; the link is always the record. Notify only when the owner would want to be interrupted. Fields are referenced by id or current slug. Renames are free; retiring keeps the data (restore_field brings it back); change_field_kind rebuilds the table and clears values that can't convert (preview_draft counts them). Nothing is dropped by these ops. delete_type { } deletes the whole type and all its records for good (a snapshot is kept for 14 days); it must be the only op in its own draft, is refused while other types have active relation fields to it (retire those first), and never deletes anything in a connected source. Only use it when the owner asked to delete the type. Relations: kind "relation" with options.target (an existing type's slug, e.g. "person") and options.many for several; target and many are fixed once added, and a type other types link to keeps its slug. Keys: a text field with options.key "email" or "phone" holds one value per line, each unique across the type (used to find records, e.g. people). Every type has an icon, set with create_type or set_type_meta "icon"; pick one that fits what the type holds (default "file"), from exactly: ${RECORD_ICONS.join(", ")}. A type also has a colour, set with create_type or set_type_meta "color" (one of ${SOURCE_COLORS.join(", ")}); it tints the type's label in the feed, so give types that sit side by side different colours (left unset, one is derived from the slug). set_type_meta autoCreate ("never" | "corresponded" | "any") says whether connected sources may create records on their own. Bindings wire a connector's source records into a type (describe_types lists connectors and their source kinds): set_binding { connector, kind, label, fields: [{ source, target, mode: "sync" | "pull" }], lock?: { fact, equals? } (synced fields turn read-only where the fact doesn't hold), create?: { targetField } (a synced field whose value picks where new records go; "" keeps a record local), delete: "push" | "never", actions: [{ id, label, act, args, when, unless }] } adds or replaces the binding for that connector + kind; remove_binding { connector, kind } detaches its records (they stay, no longer synced). Unbound fields stay local. Pull-only for relations and readonly fields. options.hidden keeps a field out of the record screen (still stored and readable by the AI): use it for fields the owner can't edit and doesn't need to see, e.g. unread counts and flags. Feed rules also take { op: "ongoing", field: start, end } (under way now) and { op: "within_last", field, hours } (in the past few hours, newer first). A type whose bindings all lack create only gets records from its source.`;
+const OPS_GUIDE = `Ops, applied in order: create_type (a new type's first op), set_type_meta, add_field, rename_field, retire_field, restore_field, change_field_kind, set_field_options, reorder_fields, set_title_field (a text field; every type needs one), set_layout (a richtext body field), set_time_range ({ start, end, allDay? }: pairs date/datetime fields into one control and the feed's time), set_map_point ({ latitude, longitude, radius? }: pairs number fields into one map picker), set_actions, set_feed_rules, set_time_triggers, set_event_notifications, delete_type. set_event_notifications { notifications: [{ event, title?, body? }] } picks which of the type's events push a notification to the owner (event = created, updated, deleted, a toggle action's onEvent/offEvent, or a time trigger step/clearEvent name); every event is recorded to history regardless, and none notify unless listed. Title and body are {{payload.recordId|type|title|url}} templates, defaulting to the event label and the record title; the link is always the record. Notify only when the owner would want to be interrupted. Fields are referenced by id or current slug. Renames are free; retiring keeps the data (restore_field brings it back); change_field_kind rebuilds the table and clears values that can't convert (preview_draft counts them). Nothing is dropped by these ops. delete_type { } deletes the whole type and all its records for good (a snapshot is kept for 14 days); it must be the only op in its own draft, is refused while other types have active relation fields to it (retire those first), and never deletes anything in a connected source. It always needs the owner's approval (request_publish). Relations: kind "relation" with options.target (an existing type's slug, e.g. "person") and options.many for several; target and many are fixed once added, and a type other types link to keeps its slug. Keys: a text field with options.key "email" or "phone" holds one value per line, each unique across the type (used to find records, e.g. people). Every type has an icon, set with create_type or set_type_meta "icon"; pick one that fits what the type holds (default "file"), from exactly: ${RECORD_ICONS.join(", ")}. A type also has a colour, set with create_type or set_type_meta "color" (one of ${SOURCE_COLORS.join(", ")}); it tints the type's label in the feed, so give types that sit side by side different colours (left unset, one is derived from the slug). set_type_meta autoCreate ("never" | "corresponded" | "any") says whether connected sources may create records on their own. Bindings wire a connector's source records into a type (describe_types lists connectors and their source kinds): set_binding { connector, kind, label, fields: [{ source, target, mode: "sync" | "pull" }], lock?: { fact, equals? } (synced fields turn read-only where the fact doesn't hold), create?: { targetField } (a synced field whose value picks where new records go; "" keeps a record local), delete: "push" | "never", actions: [{ id, label, act, args, when, unless }] } adds or replaces the binding for that connector + kind; remove_binding { connector, kind } detaches its records (they stay, no longer synced). Unbound fields stay local. Pull-only for relations and readonly fields. options.hidden keeps a field out of the record screen (still stored and readable by the AI): use it for fields the owner can't edit and doesn't need to see, e.g. unread counts and flags. Feed rules also take { op: "ongoing", field: start, end } (under way now) and { op: "within_last", field, hours } (in the past few hours, newer first). A type whose bindings all lack create only gets records from its source.`;
 
-class NotGranted extends Error {}
-
-function threadWithGrant(): number {
-  const { threadId } = currentRunContext();
-  if (!activeGrant(threadId)) throw new NotGranted();
-  return threadId!;
-}
+// Drafts are owned by the run's thread; autonomous runs (no thread) share 0.
+const draftThread = (): number => currentRunContext().threadId ?? 0;
 
 function ownDraft(draftId: string): Draft {
+  return getDraft(draftId);
+}
+
+// What publishing would lose: a delete, or values a kind change can't keep.
+export function needsApproval(draftId: string): string | null {
   const draft = getDraft(draftId);
-  if (draft.threadId !== threadWithGrant()) throw new DraftError("That draft belongs to another thread.");
-  return draft;
+  if (draft.ops.some((o) => o.op === "delete_type")) return "it deletes a type";
+  const p = previewDraft(draftId);
+  const lost = p.warnings.filter((w) => w.count > 0);
+  if (lost.length) return `records would lose values (${lost.map((w) => `${w.label}: ${w.count}`).join(", ")})`;
+  return null;
 }
 
 async function guarded(fn: () => unknown) {
   try {
     return mcpTextResult(await fn());
   } catch (err) {
-    if (err instanceof NotGranted) {
-      return mcpTextResult({ error: "not_granted", message: "Builder mode isn't granted in this thread (or it ended). Ask with request_builder_mode." });
-    }
+    if (err instanceof DraftError || err instanceof PublishError) return mcpTextResult({ error: "invalid", message: err.message });
     if (err instanceof DraftError || err instanceof AskInvalidError) return mcpTextResult({ error: "invalid", message: err.message });
     throw err;
   }
@@ -53,39 +56,32 @@ function draftState(draft: Draft) {
   };
 }
 
-// Every tool is always registered (a run's tool list is fixed at its start) and
-// refuses without a grant; runs only get this server while their thread has one.
 export function registerBuilderTools(server: McpServer) {
   server.registerTool(
     "builder_status",
     {
       title: "Builder Status",
-      description: "Whether builder mode is granted in this thread, until when, and your open drafts.",
+      description: "Your open drafts in this thread.",
       inputSchema: {},
     },
     () =>
-      guarded(() => {
-        const g = activeGrant(currentRunContext().threadId);
-        const drafts = g ? listDrafts({ threadId: g.threadId, openOnly: true }).map((d) => ({ draftId: d.id, slug: d.slug, opCount: d.ops.length, stale: d.stale })) : [];
-        return { granted: Boolean(g), until: g?.expiresAt.toISOString() ?? null, drafts };
-      })
+      guarded(() => ({
+        drafts: listDrafts({ threadId: draftThread(), openOnly: true }).map((d) => ({ draftId: d.id, slug: d.slug, opCount: d.ops.length, stale: d.stale })),
+      }))
   );
 
   server.registerTool(
     "describe_types",
     {
       title: "Describe Types",
-      description: "Every record type, hidden ones included: full definition (fields with ids, feed rules, actions, time triggers, bindings), version, record count, and whether it's premade; plus the running connectors and their source kinds (fields, facts) for bindings.",
+      description: "Every record type, hidden ones included: full definition (fields with ids, feed rules, actions, time triggers, bindings), version, record count; plus the running connectors and their source kinds (fields, facts) for bindings.",
       inputSchema: {},
     },
     () =>
       guarded(() => {
-        threadWithGrant();
         const all = listTypes({ includeHidden: true });
         const types = all.map((t) => ({
           version: t.version,
-          origin: t.origin,
-          customized: t.forked,
           recordCount: recordCount(t.id),
           linkedFrom: all.flatMap((o) =>
             o.definition.fields
@@ -108,7 +104,6 @@ export function registerBuilderTools(server: McpServer) {
     },
     ({ slug }) =>
       guarded(() => {
-        threadWithGrant();
         const type = getTypeBySlug(slug);
         if (!type) throw new DraftError(`no type "${slug}"`);
         return listVersions(type.id).map((v) => ({ version: v.version, actor: v.actor, createdAt: v.createdAt, changes: v.changes.map((c) => c.text) }));
@@ -125,7 +120,7 @@ export function registerBuilderTools(server: McpServer) {
         rollbackTo: z.number().int().positive().optional().describe("Roll the type back to this version (fields added since come back retired)."),
       },
     },
-    ({ slug, rollbackTo }) => guarded(() => draftState(startDraft({ threadId: threadWithGrant(), slug, rollbackTo })))
+    ({ slug, rollbackTo }) => guarded(() => draftState(startDraft({ threadId: draftThread(), slug, rollbackTo })))
   );
 
   server.registerTool(
@@ -151,7 +146,7 @@ export function registerBuilderTools(server: McpServer) {
     {
       title: "Preview Draft",
       description:
-        "Exactly what publishing the draft would do right now: the changes in words, the SQL steps, whether the table is rebuilt, warnings with how many records lose a value, blockers, and errors. Nothing is written. Tell the owner about warnings before asking to publish.",
+        "Exactly what publishing the draft would do right now: the changes in words, the SQL steps, whether the table is rebuilt, warnings with how many records lose a value, blockers, and errors. Nothing is written. A draft with warnings (values lost) or a delete_type needs request_publish; anything else publish_draft publishes directly.",
       inputSchema: { draftId: z.string() },
     },
     ({ draftId }) =>
@@ -188,7 +183,7 @@ export function registerBuilderTools(server: McpServer) {
     {
       title: "Request Publish",
       description:
-        "Ask the owner to approve publishing a draft. They see its changes and warnings; on approval Congress publishes exactly that draft and tells you the result in a follow-up run. Changing the draft afterwards voids the approval.",
+        "Ask the owner to approve publishing a draft that would lose data (delete_type, or warnings in preview_draft). They see its changes and warnings; on approval Congress publishes exactly that draft and tells you the result in a follow-up run. Changing the draft afterwards voids the approval.",
       inputSchema: {
         draftId: z.string(),
         title: z.string().min(1).max(120).describe('Short headline, e.g. "Create the Book type".'),
@@ -201,6 +196,30 @@ export function registerBuilderTools(server: McpServer) {
         ownDraft(draftId);
         const { message, delivery } = await requestPublish({ draftId, title, summary, urgency }, currentRunContext());
         return { ok: true, messageId: message.id, delivery };
+      })
+  );
+
+  server.registerTool(
+    "publish_draft",
+    {
+      title: "Publish Draft",
+      description:
+        "Publish a draft now, without asking: create a type, add/rename/retire fields, change feed rules, bindings, triggers, roll back. Refused when it would lose data (delete_type, or values a kind change can't convert); use request_publish for those. Keep types general (not tied to one provider), and tell the owner what you built when it's relevant to them.",
+      inputSchema: { draftId: z.string() },
+    },
+    ({ draftId }) =>
+      guarded(() => {
+        ownDraft(draftId);
+        const reason = needsApproval(draftId);
+        if (reason) throw new DraftError(`needs the owner's approval: ${reason}. Use request_publish.`);
+        const { type } = publishDraft(draftId, BUILDER_ACTOR);
+        publishEvent({
+          chamber: "congress",
+          type: "congress.type_published",
+          actor: "congress",
+          payload: { slug: type.definition.slug, label: type.definition.label, version: type.version, summary: "Published by the AI" },
+        });
+        return { ok: true, slug: type.definition.slug, version: type.version };
       })
   );
 }

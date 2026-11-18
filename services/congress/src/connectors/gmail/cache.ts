@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, isNull, lte } from "drizzle-orm";
 import type { ConnectorContext, SourceRecord } from "../contract.js";
 import { gmailDb as db } from "./db/client.js";
-import { accounts, peopleSkip, settings, threadAddresses, threads } from "./db/schema.js";
+import { accounts, settings, threadAddresses, threads } from "./db/schema.js";
 import { categoryOf, headerValue, parseAddress, type RawGmailMessage } from "./mime.js";
 import type { RawThread } from "./api.js";
 
@@ -110,34 +110,6 @@ export function listThreadRows(opts: { from?: string; to?: string } = {}): Threa
 
 export const addressesOf = (key: string) => db.select().from(threadAddresses).where(eq(threadAddresses.threadKey, key)).all();
 
-// Links addresses to People: To of the owner's sent mail may create one (once
-// allowed), everyone else only matches an existing Person. Returns whether any changed.
-export function linkPeople(ctx: ConnectorContext, key: string): boolean {
-  const create = getSettings().createPeople;
-  let changed = false;
-  for (const a of db.select().from(threadAddresses).where(and(eq(threadAddresses.threadKey, key), isNull(threadAddresses.personId))).all()) {
-    const mayCreate = a.sentTo && create && !db.select().from(peopleSkip).where(eq(peopleSkip.email, a.email)).get();
-    const id = mayCreate ? ctx.people.resolve({ email: a.email, name: a.name }, "corresponded") : ctx.people.find(a.email);
-    if (!id) continue;
-    db.update(threadAddresses).set({ personId: id }).where(and(eq(threadAddresses.threadKey, key), eq(threadAddresses.email, a.email))).run();
-    changed = true;
-  }
-  return changed;
-}
-
-// Addresses the owner wrote to that aren't linked to a Person yet.
-export function unlinkedSentTo(): { email: string; name: string | null }[] {
-  return db
-    .selectDistinct({ email: threadAddresses.email, name: threadAddresses.name })
-    .from(threadAddresses)
-    .where(and(eq(threadAddresses.sentTo, true), isNull(threadAddresses.personId)))
-    .all();
-}
-
-export function skipPeople(emails: string[]): void {
-  for (const email of emails) db.insert(peopleSkip).values({ email }).onConflictDoNothing().run();
-}
-
 // Each account's scopes and label, refreshed every sync (facts need them without a ctx).
 const accountInfo = new Map<number, { email: string; label: string; modify: boolean }>();
 export function rememberAccounts(list: { id: number; email: string; label: string; modify: boolean }[]): void {
@@ -148,7 +120,8 @@ export function rememberAccounts(list: { id: number; email: string; label: strin
 export function toSourceRecord(row: ThreadRow): SourceRecord {
   const labels = JSON.parse(row.labelIds) as string[];
   const account = accountInfo.get(row.accountId);
-  const people = addressesOf(row.key).flatMap((a) => (a.personId ? [a.personId] : []));
+  // For the AI's linking: who's on the thread, and whom the owner wrote to.
+  const addresses = addressesOf(row.key).map((a) => `${a.name ? `${a.name} <${a.email}>` : a.email}${a.sentTo ? " (you wrote to them)" : ""}`);
   return {
     kind: "thread",
     key: row.key,
@@ -167,7 +140,7 @@ export function toSourceRecord(row: ThreadRow): SourceRecord {
       hasAttachments: row.hasAttachments,
       account: account ? account.label || account.email : String(row.accountId),
       gmailLink: account ? gmailThreadUrl(account.email, row.threadId) : null,
-      people,
+      addresses,
     },
     facts: { canMarkRead: row.unread && Boolean(account?.modify) },
     updatedAt: row.syncedAt.toISOString(),
@@ -198,14 +171,13 @@ export function forgetAccount(accountId: number): string[] {
   return keys;
 }
 
-export type GmailSettings = { includeAllCategories: boolean; publishEvents: boolean; createPeople: boolean };
+export type GmailSettings = { includeAllCategories: boolean; publishEvents: boolean };
 
 export function getSettings(): GmailSettings {
   const row = db.select().from(settings).where(eq(settings.id, 1)).get();
   return {
     includeAllCategories: row?.includeAllCategories ?? false,
     publishEvents: row?.publishEvents ?? false,
-    createPeople: row?.createPeople ?? false,
   };
 }
 

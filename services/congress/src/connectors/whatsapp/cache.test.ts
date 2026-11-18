@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { ConnectorContext } from "../contract.js";
 import { setReaderSocket } from "./readerClient.js";
 import { runWhatsappMigrations, whatsappDb } from "./db/client.js";
-import { chatRecord, getChatRow, peopleToCreate, phoneOf, setCreatePeople, syncWhatsapp } from "./cache.js";
+import { getChatRow, NEW_CONTACT_EVENT, phoneOf, syncWhatsapp } from "./cache.js";
 import { whatsappConnector } from "./index.js";
 
 const ANA = "385911111111@s.whatsapp.net";
@@ -49,82 +49,58 @@ beforeAll(async () => {
 afterAll(() => server.close());
 
 const resolved: string[] = [];
-const found: string[] = [];
-const emitted: { key: string; quiet: boolean }[] = [];
+const published: { type: string; payload: Record<string, unknown> }[] = [];
+const emitted: string[] = [];
+const people: Record<string, string> = {};
 const ctx = {
   people: {
-    find: (k: string | { phone?: string }) => (found.push(typeof k === "string" ? k : (k.phone ?? "")), null),
+    find: (k: string | { phone?: string }) => people[typeof k === "string" ? k : (k.phone ?? "")] ?? null,
     resolve: (input: { phone?: string }) => (resolved.push(input.phone ?? ""), `person-${input.phone}`),
   },
-  emitChange: (_kind: string, key: string, _deleted?: boolean, quiet = false) => emitted.push({ key, quiet }),
+  publish: (type: string, payload: Record<string, unknown>) => published.push({ type, payload }),
+  emitChange: (_kind: string, key: string) => emitted.push(key),
 } as unknown as ConnectorContext;
 
 beforeEach(() => {
-  setCreatePeople(false);
   whatsappDb.run(sql`delete from chats`);
   resolved.length = 0;
-  found.length = 0;
+  published.length = 0;
   emitted.length = 0;
+  for (const k of Object.keys(people)) delete people[k];
 });
 
-describe("the WhatsApp connector's chats", () => {
+describe("the WhatsApp connector", () => {
   it("reads phone numbers only from 1:1 phone chats", () => {
     expect(phoneOf(ANA)).toBe("+385911111111");
     expect(phoneOf(GROUP)).toBeNull();
     expect(phoneOf("12345@lid")).toBeNull();
   });
 
-  it("keeps every chat, quietly, and only links People until creation is allowed", async () => {
+  it("makes no records and no People; offers the AI a direct contact once", async () => {
     expect(await syncWhatsapp(ctx)).toEqual({ changed: 3, error: null });
-    expect(emitted.every((e) => e.quiet)).toBe(true);
+    expect(emitted).toEqual([]);
     expect(resolved).toEqual([]);
-    expect(found.sort()).toEqual(["+385911111111", "+385922222222"]);
-    expect(chatRecord(getChatRow(ANA)!).values).toMatchObject({ name: "Ana", preview: "see you", unread: 2, hasUnread: true, phone: "+385911111111", people: [] });
-    expect(chatRecord(getChatRow(GROUP)!).values).toMatchObject({ preview: "Eve: ok", isGroup: true, phone: "" });
-    expect(peopleToCreate().map((c) => c.jid)).toEqual([ANA]);
+    expect(published).toEqual([{ type: NEW_CONTACT_EVENT, payload: { jid: ANA, phone: "+385911111111", name: "Ana", ownerMessages: 5 } }]);
+    expect(getChatRow(ANA)?.contactQueuedAt).toBeInstanceOf(Date);
+    expect(getChatRow(BOB)?.contactQueuedAt).toBeNull();
+    await syncWhatsapp(ctx);
+    expect(published).toHaveLength(1);
   });
 
-  it("creates a Person only for the 1:1 chat the owner wrote in at least five times", async () => {
-    setCreatePeople(true);
+  it("doesn't offer a contact a Person already has the number of", async () => {
+    people["+385911111111"] = "person-ana";
     await syncWhatsapp(ctx);
-    expect(resolved).toEqual(["+385911111111"]);
-    expect(getChatRow(ANA)?.personId).toBe("person-+385911111111");
-    expect(getChatRow(BOB)?.personId).toBeNull();
-    expect(emitted.map((e) => e.key).sort()).toEqual([ANA, BOB, GROUP].sort());
+    expect(published).toEqual([]);
+    expect(getChatRow(ANA)?.contactQueuedAt).toBeInstanceOf(Date);
   });
 
-  it("lets the owner switch People creation, and counts who is waiting", async () => {
+  it("serves only status and pairing, and never POSTs to the reader on sync", async () => {
+    requests.length = 0;
     await syncWhatsapp(ctx);
+    expect(requests.filter((r) => r.startsWith("POST"))).toEqual([]);
     const app = whatsappConnector.routes!(ctx);
-    expect(await (await app.request("/settings")).json()).toEqual({ createPeople: false, minOwnerMessages: 5, pending: 1 });
-    const put = await app.request("/settings", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ createPeople: true }) });
-    expect(await put.json()).toMatchObject({ createPeople: true });
-    expect((await app.request("/settings", { method: "PUT", body: "{}" })).status).toBe(400);
-  });
-
-  it("inherits the phone's mute, and notices a timed mute ending", async () => {
-    type Muteable = (typeof chats)[number] & { mutedUntil?: number };
-    const [ana, bob] = chats as [Muteable, Muteable, Muteable];
-    ana.mutedUntil = -1;
-    bob.mutedUntil = Date.now() + 60_000;
-    await syncWhatsapp(ctx);
-    expect(chatRecord(getChatRow(ANA)!).values.muted).toBe(true);
-    expect(chatRecord(getChatRow(BOB)!).values.muted).toBe(true);
-    expect(chatRecord(getChatRow(GROUP)!).values.muted).toBe(false);
-    // Bob's mute lapses without the reader saying anything.
-    bob.mutedUntil = Date.now() - 1;
-    emitted.length = 0;
-    await syncWhatsapp(ctx);
-    expect(emitted.map((e) => e.key)).toEqual([BOB]);
-    expect(chatRecord(getChatRow(BOB)!).values.muted).toBe(false);
-    delete ana.mutedUntil;
-    delete bob.mutedUntil;
-  });
-
-  it("marks read only in the reader, never telling WhatsApp", async () => {
-    const rec = await whatsappConnector.push!.act(ctx, "chat", ANA, "markReadLocally", {});
-    expect(rec.values).toMatchObject({ unread: 0, hasUnread: false });
-    expect(requests.filter((r) => r.startsWith("POST"))).toEqual([`POST /chats/${encodeURIComponent(ANA)}/read`]);
-    whatsappDb.run(sql`delete from chats`);
+    expect((await app.request("/chats")).status).toBe(404);
+    expect(whatsappConnector.push).toBeUndefined();
+    expect(whatsappConnector.source).toEqual([]);
   });
 });

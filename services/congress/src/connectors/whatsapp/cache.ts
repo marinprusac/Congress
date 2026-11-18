@@ -1,9 +1,8 @@
 import { desc, eq } from "drizzle-orm";
-import type { ConnectorContext, SourceRecord, SyncResult } from "../contract.js";
+import type { ConnectorContext, SyncResult } from "../contract.js";
 import { whatsappDb as db } from "./db/client.js";
-import { chats, settings } from "./db/schema.js";
+import { chats } from "./db/schema.js";
 import { readerJson, readerPath } from "./readerClient.js";
-import { jidLabel } from "./aiRead.js";
 
 type ChatRow = typeof chats.$inferSelect;
 
@@ -34,42 +33,6 @@ export const phoneOf = (jid: string): string | null => {
 
 export const getChatRow = (jid: string): ChatRow | undefined => db.select().from(chats).where(eq(chats.jid, jid)).get();
 export const listChatRows = (): ChatRow[] => db.select().from(chats).orderBy(desc(chats.lastAt)).all();
-
-export function getWhatsappSettings() {
-  return db.select().from(settings).where(eq(settings.id, 1)).get() ?? { id: 1, createPeople: true };
-}
-
-export function setCreatePeople(on: boolean): void {
-  db.insert(settings).values({ id: 1, createPeople: on }).onConflictDoUpdate({ target: settings.id, set: { createPeople: on } }).run();
-}
-
-function preview(c: ChatRow): string {
-  const body = c.lastRevoked ? "(deleted)" : c.lastText || (c.lastType && c.lastType !== "text" ? `[${c.lastType}]` : "");
-  const who = c.lastFromMe ? "You: " : c.isGroup && c.lastSender ? `${c.lastSender}: ` : "";
-  return `${who}${body}`.slice(0, 200);
-}
-
-export function chatRecord(c: ChatRow): SourceRecord {
-  const hasUnread = c.unreadCount > 0 || c.markedUnread;
-  return {
-    kind: "chat",
-    key: c.jid,
-    values: {
-      name: c.name || jidLabel(c.jid),
-      lastAt: new Date(c.lastAt).toISOString(),
-      preview: preview(c),
-      unread: c.unreadCount,
-      hasUnread,
-      muted: c.muted,
-      lastFromMe: c.lastFromMe,
-      isGroup: c.isGroup,
-      phone: phoneOf(c.jid) ?? "",
-      people: c.personId ? [c.personId] : [],
-    },
-    facts: { hasUnread },
-    updatedAt: c.syncedAt.toISOString(),
-  };
-}
 
 const rowOf = (c: ReaderChat) => ({
   jid: c.jid,
@@ -103,36 +66,43 @@ export function storeChat(c: ReaderChat): boolean {
   return changed;
 }
 
-// A chat makes a Person only once the owner wrote at least this many messages in it (one-offs don't count).
+// A 1:1 chat is direct contact once the owner wrote at least this many messages in it (one-offs don't count).
 export const MIN_OWNER_MESSAGES = 5;
 
 // The owner's messages among the chat's last 100.
-async function countOwnerMessages(c: ChatRow): Promise<number> {
-  const page = await readerJson<{ messages: { fromMe: boolean }[] }>(readerPath(`/chats/${encodeURIComponent(c.jid)}/messages`, { limit: "100" }, ["limit"]));
+async function countOwnerMessages(jid: string): Promise<number> {
+  const page = await readerJson<{ messages: { fromMe: boolean }[] }>(readerPath(`/chats/${encodeURIComponent(jid)}/messages`, { limit: "100" }, ["limit"]));
   return page.messages.filter((m) => m.fromMe).length;
 }
 
-// Links a 1:1 chat to a Person by phone: creates one only if the owner wrote in it (and creation is on).
-export async function linkPerson(ctx: ConnectorContext, jid: string): Promise<boolean> {
+export const NEW_CONTACT_EVENT = "whatsapp.new_contact";
+
+// Hands a 1:1 chat to the AI linker once, when it became direct contact and
+// no Person has its phone yet. The AI decides whether to make a Person.
+export async function offerContact(ctx: ConnectorContext, jid: string): Promise<boolean> {
   const c = getChatRow(jid);
   const phone = c && !c.isGroup ? phoneOf(c.jid) : null;
-  if (!c || !phone || c.personId) return false;
+  if (!c || !phone || c.contactQueuedAt) return false;
+  const done = () => db.update(chats).set({ contactQueuedAt: new Date() }).where(eq(chats.jid, jid)).run();
+  if (ctx.people.find({ phone })) {
+    done();
+    return false;
+  }
   let owned = c.ownerMessages;
   if (owned === null) {
-    owned = await countOwnerMessages(c);
+    owned = await countOwnerMessages(jid);
     db.update(chats).set({ ownerMessages: owned }).where(eq(chats.jid, jid)).run();
   }
-  const name = c.name.trim() || null;
-  const id = owned >= MIN_OWNER_MESSAGES && getWhatsappSettings().createPeople ? ctx.people.resolve({ phone, name }, "corresponded") : ctx.people.find({ phone });
-  if (!id) return false;
-  db.update(chats).set({ personId: id }).where(eq(chats.jid, jid)).run();
+  if (owned < MIN_OWNER_MESSAGES) return false;
+  ctx.publish(NEW_CONTACT_EVENT, { jid, phone, name: c.name.trim() || null, ownerMessages: owned });
+  done();
   return true;
 }
 
 let running: Promise<SyncResult> | null = null;
 
-// Every chat the reader knows (it's a local socket, so the whole list is cheap).
-// Changes are pulled quietly: chat activity is too frequent to announce.
+// Every chat the reader knows (a local socket, so the whole list is cheap),
+// kept only to spot new direct contacts; messages stay in the reader.
 export function syncWhatsapp(ctx: ConnectorContext): Promise<SyncResult> {
   running ??= (async (): Promise<SyncResult> => {
     let changed = 0;
@@ -141,12 +111,8 @@ export function syncWhatsapp(ctx: ConnectorContext): Promise<SyncResult> {
       do {
         const page = await readerJson<{ chats: ReaderChat[]; nextCursor: string }>(readerPath("/chats", { limit: "200", cursor }, ["limit", "cursor"]));
         for (const c of page.chats) {
-          const touched = storeChat(c);
-          const linked = await linkPerson(ctx, c.jid).catch(() => false);
-          if (touched || linked) {
-            ctx.emitChange("chat", c.jid, false, true);
-            changed++;
-          }
+          if (storeChat(c)) changed++;
+          await offerContact(ctx, c.jid).catch(() => false);
         }
         cursor = page.nextCursor || undefined;
       } while (cursor);
@@ -159,6 +125,3 @@ export function syncWhatsapp(ctx: ConnectorContext): Promise<SyncResult> {
   });
   return running;
 }
-
-// The 1:1 chats the owner wrote enough in that no Person matches yet (the dry-run count).
-export const peopleToCreate = () => listChatRows().filter((c) => !c.isGroup && phoneOf(c.jid) && (c.ownerMessages ?? 0) >= MIN_OWNER_MESSAGES && !c.personId);

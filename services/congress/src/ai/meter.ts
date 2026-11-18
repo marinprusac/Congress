@@ -57,6 +57,8 @@ export interface EventLike {
 // The AI's own doings never count; watched events count triple.
 export function eventWeight(event: EventLike, watchedTypes: Set<string>): number {
   if (event.actor === "congress" || event.type.startsWith("congress.ai_")) return 0;
+  // Linker work (ai/linker.ts), not something to look at.
+  if (event.type === "whatsapp.new_contact") return 0;
   if (watchedTypes.has(event.type)) return 3;
   if (event.type === "congress.app_updated" || event.type === "logs.rule_updated") return 0.25;
   return 1;

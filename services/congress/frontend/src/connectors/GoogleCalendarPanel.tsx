@@ -59,7 +59,7 @@ export function GoogleCalendarPanel({ status }: { status: ConnectorStatus }) {
       {status.lastError && !data?.accounts.some((a) => a.lastError) && <p className="break-words font-mono text-xs text-alert">{status.lastError}</p>}
       {data && (
         <p className="font-mono text-xs text-dust">
-          {data.counts.events} events · {data.counts.attendees} guests · {data.counts.people} linked to People
+          {data.counts.events} events · {data.counts.attendees} guests
         </p>
       )}
 

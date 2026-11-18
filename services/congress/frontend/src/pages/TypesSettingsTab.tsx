@@ -4,11 +4,11 @@ import type { FieldDefinition, TypeOverview } from "@congress/shared-types";
 import { RecordTypeIcon, sourceColorStyle, useSourceColor } from "@congress/congress-ui";
 import { fetchTypeOverviews, fetchTypeVersions } from "@/lib/recordsApi";
 
-// Read-only: types change only through the AI's builder mode.
+// Read-only here: types change through the AI, built-in ones included.
 
-const originLabel = (t: TypeOverview) => (t.origin === "custom" ? "Custom" : t.forked ? "Premade, customized" : "Premade");
+const originLabel = (t: TypeOverview) => (t.origin === "custom" ? "Added" : "Built in");
 
-const actorLabel = (actor: string) => (actor === "premade" ? "Congress" : actor === "ai-builder" ? "AI (approved)" : actor);
+const actorLabel = (actor: string) => (actor === "premade" ? "Congress" : actor === "ai-builder" ? "AI" : actor === "me" ? "You" : actor);
 
 function describeField(f: FieldDefinition): string {
   const bits: string[] = [f.options.target ? `${f.options.many ? "many " : ""}${f.options.target}` : f.kind];
@@ -105,7 +105,7 @@ export function TypesSettingsTab() {
     <div>
       <h3 className="font-display text-xl text-ink">Record types</h3>
       <p className="mb-3 font-mono text-xs text-dust">
-        To add or change a type, ask the AI in a chat. It asks for builder mode first, and every change needs your approval.
+        Every type, built in or added, is changed the same way: by the AI, on its own or when you ask in a chat. Only a change that would lose data (deleting a type, clearing values) waits for your approval.
       </p>
       {isLoading && <p className="font-mono text-sm text-dust">Loading —</p>}
       {isError && <p className="font-mono text-sm text-alert">Failed to load types.</p>}

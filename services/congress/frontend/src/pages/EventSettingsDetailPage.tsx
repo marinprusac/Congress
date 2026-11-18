@@ -111,8 +111,7 @@ export function EventSettingsDetailPage({ eventType, onBack }: { eventType: stri
 
         {row.managedByType ? (
           <p className="font-mono text-sm text-dust">
-            {row.notify ? "Pushes a notification." : "Doesn't push a notification."} Set by the {row.managedByType} type — ask the AI to change it
-            in builder mode.
+            {row.notify ? "Pushes a notification." : "Doesn't push a notification."} Set by the {row.managedByType} type — ask the AI to change it.
           </p>
         ) : (
         <div>

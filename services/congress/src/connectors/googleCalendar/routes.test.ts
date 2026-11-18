@@ -18,7 +18,7 @@ describe("calendar panel routes", () => {
     const body = await (await calendarPanelRoutes(ctx).request("/status")).json();
     expect(body).toMatchObject({
       accounts: [{ id: 1, label: "Me", lastError: null, calendars: [{ id: "primary", selected: true, primary: true }, { id: "work", selected: false }] }],
-      counts: { events: 1, attendees: 1, people: 0 },
+      counts: { events: 1, attendees: 1 },
       settings: { intervalMinutes: 5 },
     });
   });

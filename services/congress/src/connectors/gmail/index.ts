@@ -42,7 +42,7 @@ export const gmailConnector = defineConnector({
         { slug: "hasAttachments", kind: "boolean", label: "Attachments" },
         { slug: "account", kind: "text", label: "Account" },
         { slug: "gmailLink", kind: "text", label: "Gmail link" },
-        { slug: "people", kind: "relation", label: "People", many: true, target: "person" },
+        { slug: "addresses", kind: "text", label: "People on the thread", many: true },
       ],
       facts: [{ slug: "canMarkRead", label: "Can mark read" }],
     },

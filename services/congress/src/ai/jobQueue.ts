@@ -3,7 +3,7 @@ import type { AiQueueEntry, AiQueueSnapshot } from "@congress/shared-types";
 // A single in-process job queue, concurrency 1 - never two `claude`
 // subprocesses at once. Lower priority number runs first (FIFO within one).
 // Queued jobs can be removed; the running one is told to stop via its signal.
-export const PRIORITY = { interactive: 0, tracking: 1, proactive: 2, gate: 3 } as const;
+export const PRIORITY = { interactive: 0, tracking: 1, proactive: 2, gate: 3, link: 4 } as const;
 
 export class JobCancelledError extends Error {
   constructor() {

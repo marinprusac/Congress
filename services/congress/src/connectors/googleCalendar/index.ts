@@ -37,7 +37,6 @@ export const googleCalendar = defineConnector({
         { slug: "calendarColor", kind: "text", label: "Calendar color" },
         { slug: "response", kind: "enum", label: "Your response" },
         { slug: "attendees", kind: "text", label: "Guests", many: true },
-        { slug: "people", kind: "relation", label: "People", many: true, target: "person" },
       ],
       keys: [{ field: "attendees", kind: "email" }],
       facts: [

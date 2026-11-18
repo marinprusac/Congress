@@ -191,7 +191,12 @@ export const aiSettingsSchema = z.object({
   proactiveBudgetUsd: z.number().min(0),
   gateModel: z.string().min(1),
   gateSensitivity: z.enum(["low", "normal", "high"]),
-  heartbeatHours: z.number().min(0.5).max(48),
+  heartbeatHours: z.number().min(0.25).max(48),
+  // The cheap model: the linker and light proactive runs.
+  lightModel: z.string().min(1),
+  // The AI linker: connects new records (and new WhatsApp contacts) to People and each other.
+  linkerEnabled: z.boolean(),
+  linkerIntervalMinutes: z.number().int().min(5).max(24 * 60),
 });
 export type AiSettings = z.infer<typeof aiSettingsSchema>;
 
@@ -234,7 +239,7 @@ export type AiRunResult = z.infer<typeof aiRunResultSchema>;
 
 // chat/answer: the owner's threads. remote: a Chamber's POST /run.
 // proactive/tracking/gate: runs Congress starts on its own.
-export type AiRunKind = "chat" | "answer" | "remote" | "proactive" | "tracking" | "gate";
+export type AiRunKind = "chat" | "answer" | "remote" | "proactive" | "tracking" | "gate" | "link";
 
 // Server-sent on GET /congress/ai/runs/stream. The job queue is
 // concurrency-1, so there is at most one active run at a time.

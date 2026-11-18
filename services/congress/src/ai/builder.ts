@@ -12,14 +12,15 @@ import { aiBuilderGrants, aiMessages } from "../db/schema.js";
 import { dismissNotificationByKey } from "../notifications.js";
 import { publishEvent } from "../events.js";
 import { DraftError, draftHash, getDraft, previewDraft, publishDraft } from "../typeEngine/drafts.js";
-import { PublishError } from "../typeEngine/store.js";
+import { getType, PublishError } from "../typeEngine/store.js";
 import { AskInvalidError, createAsk, dedupeKey, requireOpenAsk, type AskOrigin } from "./asks.js";
 import { insertMessage, updateMessageRow } from "./threads.js";
 import { notifyThreadUpdated } from "./runStream.js";
 import { startThreadRun } from "./chat.js";
 
-// Builder mode: the AI may draft type changes only in a thread the owner
-// granted, until the grant expires; every publish needs its own approval.
+// Builder: the AI changes types on its own (mcp/builderTools.ts); a change
+// that would lose data needs the owner's approval here. Grants (older builder
+// grants, and internet mode) live in the same table.
 
 export const BUILDER_ACTOR = "ai-builder";
 const ASK_TTL_MS = 24 * 60 * 60 * 1000;
@@ -128,7 +129,6 @@ export function endGrant(threadId: number, kind: GrantKind = "builder", now = ne
 }
 
 export async function requestPublish(input: { draftId: string; title: string; summary: string; urgency?: AiUrgency }, origin: AskOrigin) {
-  if (!activeGrant(origin.threadId)) throw new AskInvalidError("Builder mode isn't granted in this thread.");
   let draft;
   try {
     draft = getDraft(input.draftId);
@@ -136,12 +136,13 @@ export async function requestPublish(input: { draftId: string; title: string; su
     if (err instanceof DraftError) throw new AskInvalidError(err.message);
     throw err;
   }
-  if (draft.threadId !== origin.threadId) throw new AskInvalidError("That draft belongs to another thread.");
   if (draft.state !== "open") throw new AskInvalidError(`That draft is ${draft.state}.`);
   const preview = previewDraft(draft.id);
   const problems = [...preview.errors, ...preview.blockers.map((b) => `${b.label} (${b.count})`)];
-  if (problems.length || !preview.definition) throw new AskInvalidError(`Fix the draft first: ${problems.join("; ")}`);
-  const pending = openAskInThread(draft.threadId, "type_publish").filter((m) => {
+  // A delete has no resulting definition; it is labelled by the type it removes.
+  const label = preview.definition?.label ?? (draft.typeId ? getType(draft.typeId)?.definition.label : undefined);
+  if (problems.length || !label) throw new AskInvalidError(`Fix the draft first: ${problems.join("; ")}`);
+  const pending = (origin.threadId ? openAskInThread(origin.threadId, "type_publish") : []).filter((m) => {
     const p = typePublishPayloadSchema.safeParse(JSON.parse(m.payloadJson ?? "null"));
     return p.success && p.data.draftId === draft.id;
   });
@@ -151,7 +152,7 @@ export async function requestPublish(input: { draftId: string; title: string; su
     title: input.title,
     draftId: draft.id,
     hash: draftHash(draft),
-    typeLabel: preview.definition.label,
+    typeLabel: label,
     isNew: !draft.typeId,
     rollbackTo: draft.rollbackTo,
     changes: preview.changes,

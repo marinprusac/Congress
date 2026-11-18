@@ -82,10 +82,11 @@ describe("the Event premade bound to Google Calendar", () => {
     expect(soonEvents).toEqual([expect.objectContaining({ title: "Coffee", url: `/e/${soon}` })]);
   });
 
-  it("links guests to People and locks someone else's invitation", () => {
+  it("leaves People to the AI, shows the guests, and locks someone else's invitation", () => {
     const invite = byGoogleId("invite");
-    expect(invite.values).toMatchObject({ people: [boss], response: "needsAction" });
+    expect(invite.values).toMatchObject({ people: [], response: "needsAction" });
     const b = withBinding(invite).binding!;
+    expect(b.live.attendees).toEqual(expect.arrayContaining([expect.stringContaining("@")]));
     expect(b.lockReason).toBe("Read-only in Google Calendar");
     expect(b.actions.map((a) => a.id)).toEqual(["accept", "maybe", "decline"]);
     expect(b.live).toMatchObject({ htmlLink: "https://calendar.google.com/invite", calendarLabel: "Me" });
@@ -95,6 +96,9 @@ describe("the Event premade bound to Google Calendar", () => {
     updateRecord(invite.id, { hidden: true }, { actor: "me" });
     expect(g.state.calls.length).toBe(calls);
     updateRecord(invite.id, { hidden: false }, { actor: "me" });
+    // People is local now: linking never reaches Google.
+    updateRecord(invite.id, { people: [boss] }, { actor: "congress" });
+    expect(g.state.calls.length).toBe(calls);
   });
 
   it("accepts an invitation in Google", async () => {

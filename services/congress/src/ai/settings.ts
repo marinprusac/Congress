@@ -18,7 +18,10 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
   proactiveBudgetUsd: 2,
   gateModel: "claude-haiku-4-5-20251001",
   gateSensitivity: "normal",
-  heartbeatHours: 4,
+  heartbeatHours: 1,
+  lightModel: "claude-haiku-5-5",
+  linkerEnabled: true,
+  linkerIntervalMinutes: 15,
 };
 
 export const { getSettings: getAiSettings, updateSettings: updateAiSettings } = createSingleRowSettings<
@@ -43,6 +46,9 @@ export const { getSettings: getAiSettings, updateSettings: updateAiSettings } = 
     gateModel: row.gateModel,
     gateSensitivity: row.gateSensitivity,
     heartbeatHours: row.heartbeatHours,
+    lightModel: row.lightModel,
+    linkerEnabled: row.linkerEnabled,
+    linkerIntervalMinutes: row.linkerIntervalMinutes,
   }),
   defaults: DEFAULT_AI_SETTINGS,
 });

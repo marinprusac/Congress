@@ -20,7 +20,7 @@ export interface CalendarPanelStatus {
     lastError: string | null;
     calendars: { id: string; summary: string; color: string | null; primary: boolean; selected: boolean }[];
   }[];
-  counts: { events: number; attendees: number; people: number };
+  counts: { events: number; attendees: number };
   settings: CalendarSettings;
 }
 

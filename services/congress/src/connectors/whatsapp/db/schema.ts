@@ -21,6 +21,8 @@ export const chats = sqliteTable("chats", {
   // 1:1 only: the owner's messages among the last 100 (null until counted) - how direct the contact is.
   ownerMessages: integer("owner_messages"),
   personId: text("person_id"),
+  // When the chat was handed to the AI linker as a new direct contact (once).
+  contactQueuedAt: integer("contact_queued_at", { mode: "timestamp_ms" }),
   syncedAt: integer("synced_at", { mode: "timestamp_ms" }).notNull(),
 });
 

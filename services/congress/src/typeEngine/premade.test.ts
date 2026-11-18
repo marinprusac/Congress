@@ -4,7 +4,6 @@ import { getTypeByPremadeKey, publish } from "./store.js";
 import { installPremades, type Premade } from "./premade/index.js";
 import { NOTE } from "./premade/note.js";
 import { PERSON } from "./premade/person.js";
-import { CHAT } from "./premade/chat.js";
 
 beforeAll(() => runRecordsMigrations());
 
@@ -55,22 +54,6 @@ describe("installPremades", () => {
       ["birthday", "date", null],
       ["notes", "richtext", null],
     ]);
-  });
-
-  it("hides Chat's non-editable bookkeeping fields from the record screen", () => {
-    installPremades([PERSON, CHAT]);
-    const chat = getTypeByPremadeKey("chat")!;
-    const hidden = chat.definition.fields.filter((f) => f.options.hidden).map((f) => f.slug);
-    expect(hidden).toEqual(["last_at", "preview", "unread", "has_unread", "last_from_me", "group"]);
-  });
-
-  it("fills Muted from WhatsApp and keeps chats out of the feed", () => {
-    installPremades([PERSON, CHAT]);
-    const chat = getTypeByPremadeKey("chat")!;
-    const muted = chat.definition.fields.find((f) => f.slug === "muted")!;
-    expect(muted.options.hidden).toBeFalsy();
-    expect(chat.definition.bindings[0]!.fields).toContainEqual({ source: "muted", target: muted.id, mode: "pull" });
-    expect(chat.definition.feedRules).toEqual([]);
   });
 
   it("refuses a hidden required field", () => {

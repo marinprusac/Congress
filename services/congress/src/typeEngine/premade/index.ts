@@ -11,11 +11,10 @@ import { EVENT } from "./event.js";
 import { EMAIL } from "./email.js";
 import { ROUTINE, WORKOUT } from "./fitness.js";
 import { PLACE } from "./place.js";
-import { CHAT } from "./chat.js";
 
-// Premade types ship as ordered batches of operations, applied once each at
-// boot like migrations. A batch that no longer applies (the owner changed the
-// type) marks it forked and is skipped; boot never fails over it.
+// The built-in types' seed: ordered op batches, applied once each like
+// migrations until the types are detached (typeEngine/index.ts). After that
+// they are ordinary types; these batches only seed a fresh install.
 
 export interface Premade {
   key: string;
@@ -23,7 +22,7 @@ export interface Premade {
 }
 
 // Event and Email link People, so they come after Person.
-export const PREMADES: Premade[] = [NOTE, TASK, DOCUMENT, PERSON, EVENT, EMAIL, WORKOUT, ROUTINE, PLACE, CHAT];
+export const PREMADES: Premade[] = [NOTE, TASK, DOCUMENT, PERSON, EVENT, EMAIL, WORKOUT, ROUTINE, PLACE];
 
 export function installPremades(list: Premade[] = PREMADES): void {
   for (const premade of list) {
@@ -51,4 +50,14 @@ export function installPremades(list: Premade[] = PREMADES): void {
       }
     }
   }
+}
+
+type Binding = Extract<Operation, { op: "set_binding" }>["binding"];
+
+// The batch's binding again, without the given source fields (they become local).
+export function unbindSource(batch: Operation[], ...sources: string[]): Operation {
+  const op = batch.find((o): o is Extract<Operation, { op: "set_binding" }> => o.op === "set_binding");
+  if (!op) throw new Error("no binding in batch");
+  const binding: Binding = { ...op.binding, fields: op.binding.fields.filter((f) => !sources.includes(f.source)) };
+  return { op: "set_binding", binding };
 }

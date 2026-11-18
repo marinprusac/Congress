@@ -13,6 +13,7 @@ const KIND_LABEL: Record<string, string> = {
   proactive: "Proactive",
   tracking: "Check",
   gate: "Look",
+  link: "Linking",
 };
 
 function verdictLine(run: AiRunDetail): string | null {

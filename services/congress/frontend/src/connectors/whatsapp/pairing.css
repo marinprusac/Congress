@@ -1,0 +1,38 @@
+.wa-more {
+  display: block;
+  width: 100%;
+  margin: 0.75rem 0;
+  padding: 0.6rem;
+  border: 1px solid var(--color-dust);
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  text-align: center;
+  text-transform: uppercase;
+}
+.wa-pairing {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-dust);
+}
+.wa-pairing-lead {
+  color: var(--color-ink);
+  font-size: 1rem;
+}
+.wa-pairing-steps {
+  margin: 0.5rem 0 0 1.25rem;
+  list-style: decimal;
+  color: var(--color-slate);
+  font-size: 0.9rem;
+}
+.wa-pairing-note {
+  margin-top: 0.5rem;
+  color: var(--color-dust);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+.wa-qr {
+  display: block;
+  width: min(18rem, 100%);
+  margin: 0.75rem auto 0;
+}

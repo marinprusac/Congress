@@ -42,7 +42,7 @@ export function buildMcpServers(
     congress: { type: "http", url: `${selfBaseUrl()}/mcp`, headers: congressHeaders },
   };
   if (getLocalSource("e")) mcpServers.types = { type: "http", url: `${selfBaseUrl()}/mcp/types`, headers: congressHeaders };
-  // Only for a thread with a builder-mode grant (the server re-checks it).
+  // Every tool-using run may build types (mcp/builderTools.ts).
   if (opts.builder) mcpServers.builder = { type: "http", url: `${selfBaseUrl()}/mcp/builder`, headers: congressHeaders };
   // Likewise for internet mode.
   if (opts.internet) mcpServers.web = { type: "http", url: `${selfBaseUrl()}/mcp/web`, headers: congressHeaders };

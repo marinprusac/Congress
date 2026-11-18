@@ -1,10 +1,8 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { showToast } from "@congress/congress-ui";
 import type { ConnectorStatus } from "@/lib/connectorsListApi";
-import { fetchPairing, fetchSettings, fetchStatus, saveSettings, startPairing, type PairingSnapshot } from "@/views/whatsapp/api";
-import { qrPath } from "@/views/whatsapp/format";
-import "@/views/whatsapp/whatsapp.css";
+import { fetchPairing, fetchStatus, startPairing, qrPath, type PairingSnapshot } from "./whatsapp/pairing";
+import "./whatsapp/pairing.css";
 
 // Always dark-on-white with a quiet zone, whatever the theme: scanners need it.
 function QrCode({ rows }: { rows: string[] }) {
@@ -34,18 +32,17 @@ export function PairingPanel() {
   useEffect(() => {
     if (state === "success") {
       void queryClient.invalidateQueries({ queryKey: ["status"] });
-      void queryClient.invalidateQueries({ queryKey: ["chats"] });
     }
   }, [state, queryClient]);
 
   if (state === "success") {
-    return <div className="wa-pairing"><p className="wa-pairing-lead">Linked. Your chats and history are arriving — this can take a few minutes.</p></div>;
+    return <div className="wa-pairing"><p className="wa-pairing-lead">Linked. Your history is arriving; the AI can read it in a few minutes.</p></div>;
   }
 
   const rows = pairing.data?.qr;
   return (
     <div className="wa-pairing">
-      <p className="wa-pairing-lead">Link WhatsApp to read your messages here. Nothing is ever sent from Congress.</p>
+      <p className="wa-pairing-lead">Link WhatsApp so Congress's AI can read your chats. Nothing is ever sent from Congress.</p>
       {state === "waiting" ? (
         rows && rows.length > 0 ? (
           <>
@@ -74,18 +71,10 @@ export function PairingPanel() {
   );
 }
 
-// Settings → Connectors: the link, and whether chats you write in create People.
+// Settings → Connectors: the link. New direct contacts go to the AI linker.
 export function WhatsappPanel({ status }: { status: ConnectorStatus }) {
-  const queryClient = useQueryClient();
   const reader = useQuery({ queryKey: ["status"], queryFn: fetchStatus, refetchInterval: 15_000, retry: false });
-  const settings = useQuery({ queryKey: ["whatsapp", "settings"], queryFn: fetchSettings, enabled: status.state === "active" });
-  const save = useMutation({
-    mutationFn: saveSettings,
-    onSuccess: (s) => queryClient.setQueryData(["whatsapp", "settings"], s),
-    onError: (err: Error) => showToast(err.message, "error"),
-  });
   if (status.state === "offline") return <p className="font-mono text-sm text-alert">Offline: {status.lastError}</p>;
-  const s = settings.data;
   return (
     <div className="space-y-3 font-mono text-xs text-slate">
       {reader.data?.state === "not_paired" ? (
@@ -93,15 +82,7 @@ export function WhatsappPanel({ status }: { status: ConnectorStatus }) {
       ) : (
         <p>{reader.isError ? "The WhatsApp reader isn't running." : reader.data ? `Reader: ${reader.data.state.replace("_", " ")}` : "Checking the reader —"}</p>
       )}
-      {s && (
-        <label className="flex items-start gap-2">
-          <input type="checkbox" checked={s.createPeople} disabled={save.isPending} onChange={(e) => save.mutate(e.target.checked)} className="mt-0.5" />
-          <span>
-            Make a Person from each 1:1 chat you've written in at least {s.minOwnerMessages} times
-            {s.pending > 0 && ` (${s.pending} waiting)`}. Groups and everyone else only link to existing People.
-          </span>
-        </label>
-      )}
+      <p>Chats stay in WhatsApp; the AI reads them, and decides who among the people you write to becomes a Person.</p>
     </div>
   );
 }

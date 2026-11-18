@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { runGmailMigrations } from "./db/client.js";
-import { addressesOf, getAccountState, getThreadRow, skipPeople, toSourceRecord, unlinkedSentTo, updateSettings } from "./cache.js";
+import { addressesOf, getAccountState, getThreadRow, toSourceRecord, updateSettings } from "./cache.js";
 import { fakeGmail, msg, resetGmailCache } from "./fakeGmail.js";
 import { syncAll } from "./sync.js";
 import { threadDetail } from "./detail.js";
@@ -75,7 +75,7 @@ describe("gmail sync", () => {
 });
 
 describe("people from mail", () => {
-  it("creates People only from the To of mail the owner sent, once allowed", async () => {
+  it("never links or creates People; lists the addresses for the AI", async () => {
     const { state, ctx } = fakeGmail();
     state.threads.t1 = [
       msg("m1", "t1", { from: "Ana <ana@example.com>", to: "me@example.com", cc: '"Doe, Carl" <carl@example.com>' }),
@@ -84,21 +84,15 @@ describe("people from mail", () => {
     state.people["carl@example.com"] = "person-carl";
     await syncAll(ctx);
     expect(state.resolved).toEqual([]);
-    const rows = addressesOf("1:t1").sort((a, b) => a.email.localeCompare(b.email));
-    expect(rows.map((a) => [a.email, a.name, a.sentTo, a.personId])).toEqual([
-      ["ana@example.com", "Ana", true, null],
-      ["bea@example.com", "Bea", true, null],
-      ["carl@example.com", "Doe, Carl", false, "person-carl"],
-      ["dan@example.com", null, false, null],
+    expect(state.found).toEqual([]);
+    const values = toSourceRecord(getThreadRow("1:t1")!).values;
+    expect(values.people).toBeUndefined();
+    expect((values.addresses as string[]).sort()).toEqual([
+      "Ana <ana@example.com> (you wrote to them)",
+      "Bea <bea@example.com> (you wrote to them)",
+      "Doe, Carl <carl@example.com>",
+      "dan@example.com",
     ]);
-
-    expect(unlinkedSentTo().map((a) => a.email).sort()).toEqual(["ana@example.com", "bea@example.com"]);
-    skipPeople(["bea@example.com"]);
-    updateSettings({ createPeople: true });
-    await syncAll(ctx);
-    expect(state.resolved).toEqual([{ email: "ana@example.com", evidence: "corresponded" }]);
-    expect((toSourceRecord(getThreadRow("1:t1")!).values.people as string[]).sort()).toEqual(["person-ana@example.com", "person-carl"]);
-    expect(state.found).not.toContain("me@example.com");
   });
 });
 

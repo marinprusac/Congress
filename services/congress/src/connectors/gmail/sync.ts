@@ -1,4 +1,3 @@
-import { isNull } from "drizzle-orm";
 import type { ConnectorContext, SyncResult } from "../contract.js";
 import { GoogleApiError } from "../googleApi.js";
 import { gmailDb as db } from "./db/client.js";
@@ -8,7 +7,6 @@ import {
   getAccountState,
   getSettings,
   getThreadRow,
-  linkPeople,
   liveMessages,
   rememberAccounts,
   removeThread,
@@ -47,7 +45,6 @@ export async function refreshThread(ctx: ConnectorContext, account: Account, thr
   const prev = getThreadRow(key);
   const seen = new Set(prev ? (JSON.parse(prev.messageIds) as string[]) : []);
   writeThread(summary);
-  linkPeople(ctx, key);
   ctx.emitChange("thread", key, false, opts.quiet);
   if (opts.announce) publishReceived(ctx, account, raw, seen);
   return key;
@@ -132,12 +129,6 @@ export async function syncAccount(ctx: ConnectorContext, account: Account): Prom
   }
 }
 
-// Addresses not yet linked get another look (People made since, or creation now allowed).
-function relinkAll(ctx: ConnectorContext): void {
-  const keys = new Set(db.selectDistinct({ key: threadAddresses.threadKey }).from(threadAddresses).where(isNull(threadAddresses.personId)).all().map((r) => r.key));
-  for (const key of keys) if (linkPeople(ctx, key)) ctx.emitChange("thread", key);
-}
-
 let running: Promise<SyncResult> | null = null;
 
 // Every account that granted Gmail access; one pass at a time.
@@ -159,7 +150,6 @@ export function syncAll(ctx: ConnectorContext): Promise<SyncResult> {
         errors.push(`${a.email}: ${message}`);
       }
     }
-    relinkAll(ctx);
     return { changed, error: errors.length ? errors.join("; ") : null };
   })().finally(() => {
     running = null;

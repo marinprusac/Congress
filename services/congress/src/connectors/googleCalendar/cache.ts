@@ -101,28 +101,6 @@ export function attendeesOf(key: string): AttendeeRow[] {
   return db.select().from(eventAttendees).where(eq(eventAttendees.eventKey, key)).all();
 }
 
-export function linkAttendee(key: string, email: string, personId: string): void {
-  db.update(eventAttendees)
-    .set({ personId })
-    .where(and(eq(eventAttendees.eventKey, key), eq(eventAttendees.email, email)))
-    .run();
-}
-
-// Guests not yet linked to a Person.
-export function pendingAttendees() {
-  return db
-    .select({
-      eventKey: eventAttendees.eventKey,
-      email: eventAttendees.email,
-      self: eventAttendees.self,
-      resource: eventAttendees.resource,
-      personId: eventAttendees.personId,
-    })
-    .from(eventAttendees)
-    .where(and(isNull(eventAttendees.personId), eq(eventAttendees.self, false), eq(eventAttendees.resource, false)))
-    .all();
-}
-
 // Both return the removed event keys, so the caller can emit their deletes.
 export function purgeCalendar(accountId: number, calendarId: string): string[] {
   const keys = eventsOfCalendar(accountId, calendarId).map((e) => e.key);
@@ -185,7 +163,6 @@ export function toSourceRecord(row: EventRow, attendees: AttendeeRow[] = attende
       calendarColor: cal?.color ?? null,
       response: facts.selfResponse,
       attendees: attendees.filter((a) => !a.resource).map((a) => a.email),
-      people: [...new Set(attendees.flatMap((a) => (a.personId ? [a.personId] : [])))],
     },
     facts: { editable: facts.editable, isInvitation: facts.isInvitation, canRsvp: facts.canRsvp, selfResponse: facts.selfResponse },
     updatedAt: row.googleUpdated,
@@ -204,12 +181,11 @@ export function listEventRows(opts: { from?: string; to?: string } = {}): EventR
     .all();
 }
 
-export function cacheCounts(): { events: number; attendees: number; people: number } {
+export function cacheCounts(): { events: number; attendees: number } {
   const one = (q: string) => (db.get<{ n: number }>(sql.raw(q))?.n ?? 0);
   return {
     events: one("select count(*) n from events"),
     attendees: one("select count(*) n from event_attendees where self = 0 and resource = 0"),
-    people: one("select count(distinct person_id) n from event_attendees where person_id is not null"),
   };
 }
 

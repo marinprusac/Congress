@@ -7,12 +7,11 @@ Congress is one service. There are no plug-in modules: what used to be
 ## 1. A record type (no code)
 
 A type is a SQLite table with real columns, defined at runtime and rendered
-generically (list, editor, search, feed, AI tools). Ask the AI for builder
-mode, or add a **premade** in `src/typeEngine/premade/<name>.ts`: an ordered
-list of operation batches (`create_type`, `add_field`, `set_title_field`,
-`set_feed_rules`, `set_binding`, `set_type_meta`, ...) applied once each at
-boot, like migrations. A later batch is how you change a premade type (the
-Mail, Chat and Place premades each end with an "unhide" batch).
+generically (list, editor, search, feed, AI tools). Ask the AI: it creates
+and changes types itself with its builder tools. Every type is data; the
+built-in ones' batches in `src/typeEngine/premade/` only seed a fresh install
+(`seed.ts`, then they're detached), so a change to a deployed type is an
+operation the AI publishes (or a one-time boot step), never a new batch.
 
 You get for free: `/e/<id>` pages, Search, `[[record:e:<id>|Title]]` chips,
 relations, feed rules, time triggers, events (`<prefix>.created|updated|deleted`)
@@ -21,8 +20,8 @@ and MCP tools (`list_/get_/create_/update_/delete_/search_<type>`).
 ## 2. A connector (code)
 
 A connector is hand-written sync code with its own cache DB, declared with
-`defineConnector` (`src/connectors/contract.ts`). Look at `whatsapp/` (small,
-read-only), `gmail/` (live content, search, one write) or `hevy/` (push) as
+`defineConnector` (`src/connectors/contract.ts`). Look at `whatsapp/` (tiny: no
+records, AI tools only), `gmail/` (live content, search, one write) or `hevy/` (push) as
 templates.
 
 - **Source schema**: `source: [{ kind, fields, facts }]` - what it can give a
@@ -38,11 +37,12 @@ templates.
   that never become records).
 - **`push`**: `create`/`update`/`delete`/`act`. Omit what the source must never
   receive: the binding's `delete: "never"` and refusing in `push` are how a
-  read-only source stays read-only (WhatsApp refuses all but a local
-  mark-read, and a test asserts it).
-- **People**: `ctx.people.find({email|phone})` links to existing People;
-  `ctx.people.resolve(key, "corresponded")` may create one - only from direct
-  contact (the owner wrote to them), never from mere presence on a list.
+  read-only source stays read-only (WhatsApp has no push at all, and a test
+  asserts it).
+- **People**: don't link or create them in code. Expose who's involved as an
+  unmapped source value (Gmail's `addresses`, marked "you wrote to them";
+  Calendar's `attendees`) and the AI linker does the rest. `ctx.people.find`
+  is fine for deduplication (WhatsApp skips contacts a Person already has).
 - **Extras**: `routes(ctx)` (setup-panel API at `/congress/connectors/<name>/*`),
   `hooks(ctx)` (unauthenticated webhook at `.../hook/*` - check your own
   token), `events` (catalog) + `ctx.publish`, `tools(ctx, server)` (AI tools

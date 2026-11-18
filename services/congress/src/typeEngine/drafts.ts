@@ -6,7 +6,6 @@ import { typeDrafts } from "./db/schema.js";
 import {
   getType,
   getTypeBySlug,
-  markForked,
   previewPublish,
   previewRollback,
   publish,
@@ -185,8 +184,6 @@ export function publishDraft(id: string, actor: string, expectedHash?: string): 
     }
     throw err;
   }
-  // An owner-approved change to a premade type means its later batches no longer apply.
-  if (result.type.origin === "premade" && !result.type.forked) markForked(result.type.id);
   recordsDb
     .update(typeDrafts)
     .set({ state: "published", typeId: result.type.id, publishedVersion: result.type.version, problemsJson: null, updatedAt: new Date() })
