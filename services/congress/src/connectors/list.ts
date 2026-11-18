@@ -1,4 +1,5 @@
 import type { Connector } from "./contract.js";
+import { enableBankingConnector } from "./enablebanking/index.js";
 import { gmailConnector } from "./gmail/index.js";
 import { googleCalendar } from "./googleCalendar/index.js";
 import { healthConnector } from "./health/index.js";
@@ -7,4 +8,4 @@ import { locationConnector } from "./location/index.js";
 import { whatsappConnector } from "./whatsapp/index.js";
 
 // Every connector Congress starts at boot.
-export const CONNECTORS: Connector[] = [googleCalendar, gmailConnector, hevyConnector, healthConnector, locationConnector, whatsappConnector];
+export const CONNECTORS: Connector[] = [googleCalendar, gmailConnector, enableBankingConnector, hevyConnector, healthConnector, locationConnector, whatsappConnector];
