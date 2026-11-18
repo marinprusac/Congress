@@ -7,6 +7,7 @@ import { getTypeByPremadeKey, PublishError } from "./store.js";
 
 export const DETACHED_KEY = "types-detached";
 export const CHAT_REMOVED_KEY = "chat-type-removed";
+export const EMAIL_REMOVED_KEY = "email-type-removed";
 
 const ran = (key: string) => Boolean(recordsDb.select().from(imports).where(eq(imports.key, key)).get());
 const mark = (key: string, stats: object) => recordsDb.insert(imports).values({ key, ranAt: new Date(), statsJson: JSON.stringify(stats) }).run();
@@ -19,18 +20,23 @@ export function seedTypes(): void {
     mark(DETACHED_KEY, {});
   }
   removeChatType();
+  removeEmailType();
 }
 
-// Once: chats belong to WhatsApp (the AI reads them there), so the Chat type
-// and its records go. deleteType snapshots the records DB first.
-export function removeChatType(): void {
-  if (ran(CHAT_REMOVED_KEY)) return;
-  const chat = getTypeByPremadeKey("chat");
+// Once each: chats belong to WhatsApp and mail to Gmail (the AI reads them
+// there), so the Chat and Email types and their records go. deleteType
+// snapshots the records DB first.
+function removeType(key: string, premadeKey: string): void {
+  if (ran(key)) return;
+  const type = getTypeByPremadeKey(premadeKey);
   try {
-    if (chat) deleteType(chat.id, "congress");
-    mark(CHAT_REMOVED_KEY, { deleted: Boolean(chat) });
+    if (type) deleteType(type.id, "congress");
+    mark(key, { deleted: Boolean(type) });
   } catch (err) {
     if (!(err instanceof PublishError)) throw err;
-    console.warn(`[types] Chat type not removed: ${err.message}`);
+    console.warn(`[types] ${premadeKey} type not removed: ${err.message}`);
   }
 }
+
+export const removeChatType = () => removeType(CHAT_REMOVED_KEY, "chat");
+export const removeEmailType = () => removeType(EMAIL_REMOVED_KEY, "email");

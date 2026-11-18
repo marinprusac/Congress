@@ -43,8 +43,6 @@ describe("the types MCP server", () => {
     "accept_event",
     "maybe_event",
     "decline_event",
-    // Email is Gmail's only: no create, and Mark read.
-    ...["delete_email", "get_email", "list_emails", "search_emails", "update_email", "mark_read_email"],
     // Hevy's: records come from Hevy only (a new routine has its own page).
     ...["workout", "routine"].flatMap((s) => [`delete_${s}`, `get_${s}`, `list_${s}s`, `search_${s}s`, `update_${s}`]),
   ];

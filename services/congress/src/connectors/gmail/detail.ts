@@ -1,6 +1,6 @@
-import type { ConnectorContext, SourceRecord } from "../contract.js";
+import type { ConnectorContext } from "../contract.js";
 import { canRead, getAttachmentData, getLabel, getMessageFull, getThreadFull, getThreadMetadata, listThreadIds, mapLimit } from "./api.js";
-import { getAccountState, gmailThreadUrl, liveMessages, parseThreadKey, summarize, threadKey, toSourceRecord } from "./cache.js";
+import { getAccountState, gmailThreadUrl, liveMessages, parseThreadKey, summarize, type Summary } from "./cache.js";
 import { collectParts, decodeBase64Url, headerValue, htmlToText, parseAddress, stripQuoted, type AttachmentInfo, type BodyPart, type RawGmailMessage } from "./mime.js";
 
 export interface MessageDetail {
@@ -11,8 +11,7 @@ export interface MessageDetail {
   date: string;
   unread: boolean;
   text: string;
-  html: string | null;
-  attachments: (AttachmentInfo & { url: string | null })[];
+  attachments: AttachmentInfo[];
 }
 
 export interface ThreadDetail {
@@ -35,18 +34,13 @@ async function decodePart(ctx: ConnectorContext, accountId: number, messageId: s
   return decodeBase64Url(data, part.charset);
 }
 
-export const attachmentUrl = (accountId: number, messageId: string, a: AttachmentInfo) =>
-  a.attachmentId
-    ? `/congress/connectors/gmail/attachments/${accountId}/${encodeURIComponent(messageId)}/${encodeURIComponent(a.attachmentId)}?${new URLSearchParams({ filename: a.filename, type: a.mimeType })}`
-    : null;
-
-async function toMessage(ctx: ConnectorContext, accountId: number, raw: RawGmailMessage, opts: { html: boolean; stripQuotes: boolean; maxChars?: number }): Promise<MessageDetail> {
+async function toMessage(ctx: ConnectorContext, accountId: number, raw: RawGmailMessage): Promise<MessageDetail> {
   const headers = raw.payload?.headers;
   const parts = collectParts(raw.payload);
   const [plain, html] = await Promise.all([decodePart(ctx, accountId, raw.id, parts.text), decodePart(ctx, accountId, raw.id, parts.html)]);
   let text = plain?.trim() ? plain : html ? htmlToText(html) : (raw.snippet ?? "");
-  if (opts.stripQuotes) text = stripQuoted(text) || text;
-  if (opts.maxChars && text.length > opts.maxChars) text = `${text.slice(0, opts.maxChars)}\n… [truncated]`;
+  text = stripQuoted(text) || text;
+  if (text.length > 20_000) text = `${text.slice(0, 20_000)}\n… [truncated]`;
   return {
     messageId: raw.id,
     from: parseAddress(headerValue(headers, "From")),
@@ -55,36 +49,32 @@ async function toMessage(ctx: ConnectorContext, accountId: number, raw: RawGmail
     date: new Date(Number(raw.internalDate ?? 0)).toISOString(),
     unread: raw.labelIds?.includes("UNREAD") ?? false,
     text,
-    html: opts.html ? html : null,
-    attachments: parts.attachments.map((a) => ({ ...a, url: attachmentUrl(accountId, raw.id, a) })),
+    attachments: parts.attachments,
   };
 }
 
-// The whole thread, live. For the AI (opts.ai): quotes stripped, no HTML, capped.
-export async function threadDetail(ctx: ConnectorContext, key: string, opts: Record<string, string>): Promise<ThreadDetail> {
+// The whole thread, live, for the AI: quotes stripped, no HTML, capped.
+export async function threadDetail(ctx: ConnectorContext, key: string): Promise<ThreadDetail> {
   const parsed = parseThreadKey(key);
   if (!parsed) throw new Error(`Not a Gmail thread: ${key}`);
   const a = account(ctx, parsed.accountId);
-  const ai = opts.ai === "1";
-  const raw = await getThreadFull(ctx, parsed.accountId, parsed.threadId);
-  const msgs = liveMessages(raw);
-  const messages = await Promise.all(
-    msgs.map((m) => toMessage(ctx, parsed.accountId, m, { html: !ai, stripQuotes: ai || opts.stripQuotes === "1", maxChars: ai ? 20_000 : undefined }))
-  );
+  const msgs = liveMessages(await getThreadFull(ctx, parsed.accountId, parsed.threadId));
   return {
     key,
     accountEmail: a.email,
     subject: headerValue(msgs[0]?.payload?.headers, "Subject")?.trim() || "(no subject)",
     gmailUrl: gmailThreadUrl(a.email, parsed.threadId),
-    messages,
+    messages: await Promise.all(msgs.map((m) => toMessage(ctx, parsed.accountId, m))),
   };
 }
 
 const readable = (ctx: ConnectorContext) => ctx.google.accounts().filter((a) => !a.needsReconnect && canRead(a.scopes));
 const own = (ctx: ConnectorContext) => new Set(ctx.google.accounts().map((a) => a.email.toLowerCase()));
 
-// Live Gmail search (its own query syntax) over every account; nothing is cached.
-export async function searchThreads(ctx: ConnectorContext, query: string, limit: number): Promise<SourceRecord[]> {
+export type ThreadHit = Omit<Summary, "accountId" | "threadId" | "addresses"> & { account: string; people: string[] };
+
+// Live Gmail search (its own query syntax) over every account; nothing is stored.
+export async function searchThreads(ctx: ConnectorContext, query: string, limit: number): Promise<ThreadHit[]> {
   const per = await Promise.all(
     readable(ctx).map(async (a) => {
       try {
@@ -92,7 +82,9 @@ export async function searchThreads(ctx: ConnectorContext, query: string, limit:
         const raws = await mapLimit(threads, 6, (t) => getThreadMetadata(ctx, a.id, t.id));
         return raws.flatMap((raw) => {
           const s = summarize(a.id, raw, own(ctx));
-          return s ? [toSourceRecord(s.row)] : [];
+          if (!s) return [];
+          const { accountId: _a, threadId: _t, addresses, ...rest } = s;
+          return [{ ...rest, account: a.email, people: addresses.map((p) => `${p.name ? `${p.name} <${p.email}>` : p.email}${p.sentTo ? " (you wrote to them)" : ""}`) }];
         });
       } catch (err) {
         console.warn(`[gmail] search failed for ${a.email}: ${(err as Error).message}`);
@@ -102,13 +94,8 @@ export async function searchThreads(ctx: ConnectorContext, query: string, limit:
   );
   return per
     .flat()
-    .sort((x, y) => String(y.values.lastAt).localeCompare(String(x.values.lastAt)))
+    .sort((x, y) => y.lastAt.localeCompare(x.lastAt))
     .slice(0, limit);
-}
-
-export async function attachmentBytes(ctx: ConnectorContext, accountId: number, messageId: string, attachmentId: string): Promise<Buffer> {
-  account(ctx, accountId);
-  return Buffer.from(await getAttachmentData(ctx, accountId, messageId, attachmentId), "base64url");
 }
 
 const TEXT_LIKE = /^(text\/|application\/(json|xml|csv|x-yaml|yaml|javascript|ics)|message\/rfc822)/i;
@@ -143,4 +130,3 @@ export async function mailboxSummary(ctx: ConnectorContext) {
   );
 }
 
-export { threadKey };

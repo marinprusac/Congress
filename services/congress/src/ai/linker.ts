@@ -59,7 +59,7 @@ export function settledBatch(now = Date.now()) {
 type Item = typeof aiLinkQueue.$inferSelect;
 
 // A record's values, short enough for a cheap model: long text clipped, the
-// source's unmapped values (mail addresses, guests) included.
+// source's unmapped values (calendar guests) included.
 function recordLine(id: string): string | null {
   const dto = getRecord(id);
   if (!dto) return null;
@@ -79,8 +79,8 @@ export function linkPromptBody(items: Item[]): string | null {
     `## Linking pass
 Nobody asked: you're drawing connections between the owner's records, quietly. Never contact the owner here (no send_message, ask_question or propose_actions) and change nothing but links and People.
 
-- **People:** where a record's type has a People field, add the People it involves (search_people, then update_<type> with the existing ids plus the new ones; never remove a link). Create a Person (find_or_create_person, with their email or phone and name) only from the owner's direct contact: an address marked "you wrote to them", or a WhatsApp contact below whose chat shows a real personal conversation (whatsapp_read_chat, a few messages are enough). Never from calendar guests alone, mail the owner didn't answer, newsletters, no-reply or automated senders, businesses, or group chats.
-- **Connections:** when a record clearly concerns another record (a mail about an event, a note about a task or person, an event at a Place), add it with create_record_connection. Only clear, specific links; when unsure, skip. Look at get_record_connections first so you don't repeat one.
+- **People:** where a record's type has a People field, add the People it involves (search_people, then update_<type> with the existing ids plus the new ones; never remove a link). Create a Person (find_or_create_person, with their email or phone and name) only from the owner's direct contact: a person the owner wrote to in mail (gmail_search with in:sent; the people marked "you wrote to them"), or a WhatsApp contact below whose chat shows a real personal conversation (whatsapp_read_chat, a few messages are enough). Never from calendar guests alone, mail the owner didn't answer, newsletters, no-reply or automated senders, businesses, or group chats.
+- **Connections:** when a record clearly concerns another record (a note about a task or person, an event at a Place), add it with create_record_connection. Only clear, specific links; when unsure, skip. Look at get_record_connections first so you don't repeat one.
 - **Types:** only if these items show a recurring kind of thing no type covers, you may create one with the builder tools. Rarely.
 
 Be economical: a few searches per item at most. End with one line on what you linked (the owner doesn't see it).`,

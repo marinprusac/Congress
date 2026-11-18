@@ -1,6 +1,5 @@
 import type { ComponentType } from "react";
 import type { RecordDto } from "@congress/shared-types";
-import { GmailThread } from "./GmailThread";
 import { HevyRoutine } from "./HevyRoutine";
 import { HevyWorkout } from "./HevyWorkout";
 
@@ -16,7 +15,6 @@ export interface LiveProps {
 }
 
 export const LIVE_RENDERERS: Record<string, ComponentType<LiveProps>> = {
-  "gmail:thread": GmailThread,
   "hevy:workout": HevyWorkout,
   "hevy:routine": HevyRoutine,
 };

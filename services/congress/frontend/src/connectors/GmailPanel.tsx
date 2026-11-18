@@ -38,12 +38,11 @@ export function GmailPanel({ status }: { status: ConnectorStatus }) {
         <div key={a.id} className="border-t border-dust pt-2">
           <div className="flex items-baseline justify-between gap-3">
             <span className="min-w-0 truncate font-mono text-sm text-ink">{a.label}</span>
-            <span className="shrink-0 font-mono text-xs text-dust">{a.hasAccess ? `${a.threads} threads` : "No Gmail access"}</span>
+            <span className="shrink-0 font-mono text-xs text-dust">{a.hasAccess ? syncedAgo(a.lastSyncedAt) : "No Gmail access"}</span>
           </div>
           {a.lastError && <p className="break-words font-mono text-xs text-alert">{a.lastError}</p>}
-          {(!a.hasAccess || !a.canMarkRead || a.needsReconnect) && (
+          {(!a.hasAccess || a.needsReconnect) && (
             <p className="font-mono text-xs text-dust">
-              {a.hasAccess && !a.canMarkRead ? "Can't mark mail read yet. " : ""}
               <a href={googleConnectHref({ returnTo: "/settings?from=accounts" })} className="btn">
                 {a.hasAccess ? "Grant access" : "Connect Gmail"}
               </a>

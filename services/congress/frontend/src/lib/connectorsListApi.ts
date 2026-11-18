@@ -47,7 +47,7 @@ export const saveCalendarSettings = (patch: Partial<CalendarSettings>) =>
   send<CalendarSettings>(`${GCAL}/settings`, { method: "PUT", body: JSON.stringify(patch) });
 
 export interface GmailPanelStatus {
-  accounts: { id: number; label: string; hasAccess: boolean; canMarkRead: boolean; needsReconnect: boolean; threads: number; lastSyncedAt: string | null; lastError: string | null }[];
+  accounts: { id: number; label: string; hasAccess: boolean; needsReconnect: boolean; lastSyncedAt: string | null; lastError: string | null }[];
   settings: { includeAllCategories: boolean };
 }
 

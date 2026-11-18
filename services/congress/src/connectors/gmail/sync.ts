@@ -1,63 +1,28 @@
 import type { ConnectorContext, SyncResult } from "../contract.js";
 import { GoogleApiError } from "../googleApi.js";
-import { gmailDb as db } from "./db/client.js";
-import { threadAddresses } from "./db/schema.js";
-import { canModify, canRead, getProfile, getThreadMetadata, listHistory, listThreadIds, mapLimit, type RawThread } from "./api.js";
-import {
-  getAccountState,
-  getSettings,
-  getThreadRow,
-  liveMessages,
-  rememberAccounts,
-  removeThread,
-  setAccountState,
-  summarize,
-  threadKey,
-  writeThread,
-} from "./cache.js";
+import { canRead, getProfile, getThreadMetadata, listHistory, mapLimit } from "./api.js";
+import { getAccountState, getSettings, gmailThreadUrl, liveMessages, setAccountState } from "./cache.js";
 import { categoryOf, displayFrom, headerValue, parseAddress } from "./mime.js";
 
-const BACKFILL_QUERY = "newer_than:30d -in:spam -in:trash -in:chats";
-const BACKFILL_MAX = 500;
 // Older mail surfacing through history (e.g. moved back to the inbox) isn't "received".
 const RECEIVED_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 type Account = { id: number; email: string; label: string };
 
-const ownAddresses = (ctx: ConnectorContext) => new Set(ctx.google.accounts().map((a) => a.email.toLowerCase()));
-
-// Re-reads one thread from Gmail into the cache and announces the change.
-// announce: publish mail.received for messages not seen before.
-export async function refreshThread(ctx: ConnectorContext, account: Account, threadId: string, opts: { quiet?: boolean; announce?: boolean } = {}): Promise<string | null> {
-  const key = threadKey(account.id, threadId);
-  let raw: RawThread;
+// Publishes mail.received for the given newly added messages of a thread.
+async function announce(ctx: ConnectorContext, account: Account, threadId: string, added: Set<string>): Promise<void> {
+  const { includeAllCategories } = getSettings();
+  let raw;
   try {
     raw = await getThreadMetadata(ctx, account.id, threadId);
   } catch (err) {
-    if (!(err instanceof GoogleApiError && err.status === 404)) throw err;
-    raw = { id: threadId, messages: [] };
+    if (err instanceof GoogleApiError && err.status === 404) return;
+    throw err;
   }
-  const summary = summarize(account.id, raw, ownAddresses(ctx));
-  if (!summary) {
-    if (removeThread(key)) ctx.emitChange("thread", key, true);
-    return null;
-  }
-  const prev = getThreadRow(key);
-  const seen = new Set(prev ? (JSON.parse(prev.messageIds) as string[]) : []);
-  writeThread(summary);
-  ctx.emitChange("thread", key, false, opts.quiet);
-  if (opts.announce) publishReceived(ctx, account, raw, seen);
-  return key;
-}
-
-function publishReceived(ctx: ConnectorContext, account: Account, raw: RawThread, seen: Set<string>): void {
-  const { publishEvents, includeAllCategories } = getSettings();
-  if (!publishEvents) return;
   const now = Date.now();
-  const recordId = ctx.records.idFor("thread", threadKey(account.id, raw.id));
   for (const m of liveMessages(raw)) {
     const labels = m.labelIds ?? [];
-    if (seen.has(m.id) || !labels.includes("INBOX") || labels.includes("SENT")) continue;
+    if (!added.has(m.id) || !labels.includes("INBOX") || labels.includes("SENT")) continue;
     if (now - Number(m.internalDate ?? 0) > RECEIVED_MAX_AGE_MS) continue;
     const category = categoryOf(labels);
     if (!includeAllCategories && category !== "primary") continue;
@@ -66,65 +31,53 @@ function publishReceived(ctx: ConnectorContext, account: Account, raw: RawThread
       accountId: account.id,
       account: account.email,
       messageId: m.id,
-      threadId: raw.id,
-      // The record's id and page once bound; else the Mail Chamber's (aliases, redirects).
-      recordId: recordId ?? `thread-${account.id}:${raw.id}`,
+      threadId,
       from: displayFrom(from),
       fromEmail: from.email ?? "",
       subject: headerValue(m.payload?.headers, "Subject")?.trim() || "(no subject)",
       snippet: m.snippet ?? "",
       category,
-      url: recordId ? `/e/${recordId}` : `/mail/t/${account.id}/${raw.id}`,
+      url: gmailThreadUrl(account.email, threadId),
     });
   }
 }
 
-// The last 30 days, quietly (no events for mail that was already there).
-async function backfill(ctx: ConnectorContext, account: Account): Promise<void> {
-  const { historyId } = await getProfile(ctx, account.id);
-  const ids: string[] = [];
-  let pageToken: string | undefined;
-  do {
-    const page = await listThreadIds(ctx, account.id, { q: BACKFILL_QUERY, maxResults: 100, pageToken });
-    ids.push(...page.threads.map((t) => t.id));
-    pageToken = page.nextPageToken;
-  } while (pageToken && ids.length < BACKFILL_MAX);
-  await mapLimit(ids.slice(0, BACKFILL_MAX), 6, (id) => refreshThread(ctx, account, id, { quiet: true }));
-  setAccountState(account.id, { historyId });
-}
-
-// Applies Gmail's history since the cursor: refreshes every touched thread
-// we keep, and any thread that got new mail.
+// Applies Gmail's history since the cursor: announces new inbox mail. Nothing
+// is stored but the cursor.
 export async function applyHistory(ctx: ConnectorContext, account: Account, startHistoryId: string): Promise<void> {
-  const touched = new Set<string>();
-  const grew = new Set<string>();
+  const added = new Map<string, Set<string>>();
   let latest = startHistoryId;
   let pageToken: string | undefined;
   do {
     const page = await listHistory(ctx, account.id, startHistoryId, pageToken);
     for (const r of page.history) {
       for (const { message } of r.messagesAdded ?? []) {
-        touched.add(message.threadId);
-        if (!(message.labelIds ?? []).some((l) => ["DRAFT", "SPAM", "TRASH"].includes(l))) grew.add(message.threadId);
+        if ((message.labelIds ?? []).some((l) => ["DRAFT", "SPAM", "TRASH"].includes(l))) continue;
+        const ids = added.get(message.threadId) ?? new Set<string>();
+        ids.add(message.id);
+        added.set(message.threadId, ids);
       }
-      for (const { message } of [...(r.labelsAdded ?? []), ...(r.labelsRemoved ?? []), ...(r.messagesDeleted ?? [])]) touched.add(message.threadId);
     }
     latest = page.historyId;
     pageToken = page.nextPageToken;
   } while (pageToken);
-  const todo = [...touched].filter((id) => grew.has(id) || getThreadRow(threadKey(account.id, id)));
-  await mapLimit(todo, 6, (id) => refreshThread(ctx, account, id, { announce: true }));
+  if (getSettings().publishEvents) await mapLimit([...added], 6, ([threadId, ids]) => announce(ctx, account, threadId, ids));
   setAccountState(account.id, { historyId: latest });
+}
+
+// The first pass only takes the cursor: mail that was already there isn't news.
+async function startCursor(ctx: ConnectorContext, account: Account): Promise<void> {
+  setAccountState(account.id, { historyId: (await getProfile(ctx, account.id)).historyId });
 }
 
 export async function syncAccount(ctx: ConnectorContext, account: Account): Promise<void> {
   const state = getAccountState(account.id);
-  if (!state?.historyId) return backfill(ctx, account);
+  if (!state?.historyId) return startCursor(ctx, account);
   try {
     await applyHistory(ctx, account, state.historyId);
   } catch (err) {
     // 404: the cursor is too old; start over.
-    if (err instanceof GoogleApiError && err.status === 404) await backfill(ctx, account);
+    if (err instanceof GoogleApiError && err.status === 404) await startCursor(ctx, account);
     else throw err;
   }
 }
@@ -135,7 +88,6 @@ let running: Promise<SyncResult> | null = null;
 export function syncAll(ctx: ConnectorContext): Promise<SyncResult> {
   running ??= (async () => {
     const all = ctx.google.accounts();
-    rememberAccounts(all.map((a) => ({ id: a.id, email: a.email, label: a.label, modify: canModify(a.scopes) })));
     const errors: string[] = [];
     let changed = 0;
     for (const a of all) {

@@ -3,7 +3,7 @@ import type { RawGmailMessage } from "./mime.js";
 
 export const GMAIL_READONLY = "https://www.googleapis.com/auth/gmail.readonly";
 export const GMAIL_MODIFY = "https://www.googleapis.com/auth/gmail.modify";
-// Modify covers reading plus marking read; nothing is ever sent or deleted.
+// Granted as gmail.modify (earlier grants stay valid); Congress only ever reads.
 export const MAIL_SCOPES = [GMAIL_MODIFY];
 
 export const canRead = (scopes: string[]) => scopes.includes(GMAIL_READONLY) || scopes.includes(GMAIL_MODIFY);
@@ -17,11 +17,8 @@ function readScopes(ctx: ConnectorContext, accountId: number): string[] {
   return account && canModify(account.scopes) ? [GMAIL_MODIFY] : [GMAIL_READONLY];
 }
 
-export function gmail<T>(ctx: ConnectorContext, accountId: number, path: string, write?: { body: unknown }): Promise<T> {
-  const init: RequestInit = write
-    ? { method: "POST", body: JSON.stringify(write.body), signal: AbortSignal.timeout(30_000) }
-    : { signal: AbortSignal.timeout(30_000) };
-  return ctx.google.fetch(accountId, `${BASE}${path}`, init, write ? [GMAIL_MODIFY] : readScopes(ctx, accountId)) as Promise<T>;
+export function gmail<T>(ctx: ConnectorContext, accountId: number, path: string): Promise<T> {
+  return ctx.google.fetch(accountId, `${BASE}${path}`, { signal: AbortSignal.timeout(30_000) }, readScopes(ctx, accountId)) as Promise<T>;
 }
 
 const METADATA = ["From", "To", "Cc", "Subject", "Date"].map((h) => `metadataHeaders=${h}`).join("&");
@@ -51,9 +48,6 @@ export const getThreadFull = (ctx: ConnectorContext, accountId: number, threadId
 
 export const getMessageFull = (ctx: ConnectorContext, accountId: number, messageId: string) =>
   gmail<RawGmailMessage>(ctx, accountId, `/messages/${encodeURIComponent(messageId)}?format=full`);
-
-export const markThreadReadInGmail = (ctx: ConnectorContext, accountId: number, threadId: string) =>
-  gmail<unknown>(ctx, accountId, `/threads/${encodeURIComponent(threadId)}/modify`, { body: { removeLabelIds: ["UNREAD"] } });
 
 export async function getAttachmentData(ctx: ConnectorContext, accountId: number, messageId: string, attachmentId: string): Promise<string> {
   const body = await gmail<{ data?: string }>(ctx, accountId, `/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`);

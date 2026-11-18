@@ -21,7 +21,7 @@ and MCP tools (`list_/get_/create_/update_/delete_/search_<type>`).
 
 A connector is hand-written sync code with its own cache DB, declared with
 `defineConnector` (`src/connectors/contract.ts`). Look at `whatsapp/` (tiny: no
-records, AI tools only), `gmail/` (live content, search, one write) or `hevy/` (push) as
+records, AI tools only), `gmail/` (same, plus a history-cursor poll that publishes events) or `hevy/` (push) as
 templates.
 
 - **Source schema**: `source: [{ kind, fields, facts }]` - what it can give a
@@ -40,8 +40,9 @@ templates.
   read-only source stays read-only (WhatsApp has no push at all, and a test
   asserts it).
 - **People**: don't link or create them in code. Expose who's involved as an
-  unmapped source value (Gmail's `addresses`, marked "you wrote to them";
-  Calendar's `attendees`) and the AI linker does the rest. `ctx.people.find`
+  unmapped source value (Calendar's `attendees`) or let the AI read them
+  through its tools (Gmail's `gmail_search` marks "you wrote to them") and the AI
+  linker does the rest. `ctx.people.find`
   is fine for deduplication (WhatsApp skips contacts a Person already has).
 - **Extras**: `routes(ctx)` (setup-panel API at `/congress/connectors/<name>/*`),
   `hooks(ctx)` (unauthenticated webhook at `.../hook/*` - check your own

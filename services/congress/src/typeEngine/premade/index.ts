@@ -8,7 +8,6 @@ import { TASK } from "./task.js";
 import { DOCUMENT } from "./document.js";
 import { PERSON } from "./person.js";
 import { EVENT } from "./event.js";
-import { EMAIL } from "./email.js";
 import { ROUTINE, WORKOUT } from "./fitness.js";
 import { PLACE } from "./place.js";
 
@@ -21,8 +20,8 @@ export interface Premade {
   batches: Operation[][];
 }
 
-// Event and Email link People, so they come after Person.
-export const PREMADES: Premade[] = [NOTE, TASK, DOCUMENT, PERSON, EVENT, EMAIL, WORKOUT, ROUTINE, PLACE];
+// Event links People, so it comes after Person.
+export const PREMADES: Premade[] = [NOTE, TASK, DOCUMENT, PERSON, EVENT, WORKOUT, ROUTINE, PLACE];
 
 export function installPremades(list: Premade[] = PREMADES): void {
   for (const premade of list) {

@@ -1,34 +1,27 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { runGmailMigrations } from "./db/client.js";
-import { addressesOf, getAccountState, getThreadRow, toSourceRecord, updateSettings } from "./cache.js";
+import { getAccountState, updateSettings } from "./cache.js";
 import { fakeGmail, msg, resetGmailCache } from "./fakeGmail.js";
 import { syncAll } from "./sync.js";
-import { threadDetail } from "./detail.js";
+import { searchThreads, threadDetail } from "./detail.js";
 import { gmailConnector } from "./index.js";
 import { GMAIL_READONLY } from "./api.js";
-import { ConnectorRefusedError } from "../contract.js";
 
 beforeAll(() => runGmailMigrations());
 beforeEach(() => resetGmailCache());
 
 describe("gmail sync", () => {
-  it("backfills threads quietly and keeps the cursor", async () => {
+  it("only takes the history cursor the first time: no records, no events", async () => {
     const { state, ctx } = fakeGmail();
-    state.threads.t1 = [msg("m1", "t1", { subject: "Lunch?" }), msg("m2", "t1", { from: "Bob <bob@example.com>", hoursAgo: 0.1 })];
-    state.threads.t2 = [msg("m3", "t2", { labels: ["SENT"], from: "me@example.com", to: "Ana <ana@example.com>" })];
+    state.threads.t1 = [msg("m1", "t1", { subject: "Lunch?" })];
     expect(await syncAll(ctx)).toEqual({ changed: 1, error: null });
     expect(getAccountState(1)?.historyId).toBe("100");
-    expect(state.changes).toEqual([
-      { kind: "thread", key: "1:t1", deleted: false, quiet: true },
-      { kind: "thread", key: "1:t2", deleted: false, quiet: true },
-    ]);
+    expect(state.changes).toEqual([]);
     expect(state.published).toEqual([]);
-    const rec = toSourceRecord(getThreadRow("1:t1")!);
-    expect(rec.values).toMatchObject({ subject: "Lunch?", from: "Bob <bob@example.com>", messageCount: 2, unread: true, inbox: true, category: "primary" });
-    expect(rec.facts).toEqual({ canMarkRead: true });
+    expect(state.calls.filter((c) => c.url.startsWith("/threads"))).toEqual([]);
   });
 
-  it("refreshes threads history touches, and announces new mail only once allowed", async () => {
+  it("announces new inbox mail only once allowed, never stores it, and emits no source changes", async () => {
     const { state, ctx } = fakeGmail();
     state.threads.t1 = [msg("m1", "t1")];
     await syncAll(ctx);
@@ -38,93 +31,84 @@ describe("gmail sync", () => {
     };
     grow("m2");
     await syncAll(ctx);
-    expect(getThreadRow("1:t1")!.messageCount).toBe(2);
     expect(state.published).toEqual([]);
 
     updateSettings({ publishEvents: true });
-    state.records["1:t1"] = "rec1";
     grow("m3");
     grow("m4", ["SENT"]);
+    grow("m5", ["INBOX", "UNREAD", "CATEGORY_PROMOTIONS"]);
     await syncAll(ctx);
     expect(state.published.map((p) => p.payload.messageId)).toEqual(["m3"]);
-    expect(state.published[0]).toMatchObject({ type: "mail.received", payload: { recordId: "rec1", url: "/e/rec1", from: "Jane Doe" } });
-  });
+    expect(state.published[0]).toMatchObject({
+      type: "mail.received",
+      payload: { threadId: "t1", from: "Jane Doe", url: "https://mail.google.com/mail/u/me%40example.com/#all/t1" },
+    });
+    expect(state.published[0]!.payload).not.toHaveProperty("recordId");
+    expect(state.changes).toEqual([]);
 
-  it("skips label changes on threads it doesn't keep, and drops a trashed thread", async () => {
-    const { state, ctx } = fakeGmail();
-    state.threads.t1 = [msg("m1", "t1")];
+    updateSettings({ includeAllCategories: true });
+    grow("m6", ["INBOX", "UNREAD", "CATEGORY_PROMOTIONS"]);
     await syncAll(ctx);
-    state.history.push({ labelsAdded: [{ message: { id: "x", threadId: "old" } }] });
-    state.threads.t1 = [msg("m1", "t1", { labels: ["TRASH"] })];
-    state.history.push({ labelsAdded: [{ message: { id: "m1", threadId: "t1" } }] });
-    state.calls = [];
-    await syncAll(ctx);
-    expect(state.calls.some((c) => c.url.includes("/threads/old"))).toBe(false);
-    expect(getThreadRow("1:t1")).toBeUndefined();
-    expect(state.changes.at(-1)).toEqual({ kind: "thread", key: "1:t1", deleted: true, quiet: false });
+    expect(state.published.map((p) => p.payload.messageId)).toEqual(["m3", "m6"]);
   });
 
   it("starts over when the history cursor expired", async () => {
     const { state, ctx } = fakeGmail();
     await syncAll(ctx);
+    state.historyId = "200";
     state.historyExpired = true;
-    state.threads.t5 = [msg("m5", "t5")];
     await syncAll(ctx);
-    expect(getThreadRow("1:t5")).toBeDefined();
+    expect(getAccountState(1)?.historyId).toBe("200");
+  });
+
+  it("offers no source kinds and no writes", () => {
+    expect(gmailConnector.source).toEqual([]);
+    expect(gmailConnector.push).toBeUndefined();
+    expect(gmailConnector.read.list("thread")).toEqual([]);
   });
 });
 
-describe("people from mail", () => {
-  it("never links or creates People; lists the addresses for the AI", async () => {
+describe("reading live", () => {
+  it("reads a thread plainly for the AI", async () => {
+    const { state, ctx } = fakeGmail();
+    state.threads.t1 = [msg("m1", "t1", { body: "Hi there\n\nOn Mon, Bob wrote:\n> old" })];
+    const detail = await threadDetail(ctx, "1:t1");
+    expect(detail).toMatchObject({ subject: "Subject t1", accountEmail: "me@example.com", messages: [{ messageId: "m1", text: "Hi there" }] });
+    expect(detail.messages[0]).not.toHaveProperty("html");
+  });
+
+  it("searches live and lists who's on the thread, marking who the owner wrote to; nothing is cached", async () => {
     const { state, ctx } = fakeGmail();
     state.threads.t1 = [
       msg("m1", "t1", { from: "Ana <ana@example.com>", to: "me@example.com", cc: '"Doe, Carl" <carl@example.com>' }),
       msg("m2", "t1", { labels: ["SENT"], from: "me@example.com", to: "Ana <ana@example.com>, Bea <bea@example.com>", cc: "dan@example.com" }),
     ];
-    state.people["carl@example.com"] = "person-carl";
-    await syncAll(ctx);
-    expect(state.resolved).toEqual([]);
-    expect(state.found).toEqual([]);
-    const values = toSourceRecord(getThreadRow("1:t1")!).values;
-    expect(values.people).toBeUndefined();
-    expect((values.addresses as string[]).sort()).toEqual([
+    const [hit] = await searchThreads(ctx, "anything", 5);
+    expect(hit).toMatchObject({ key: "1:t1", subject: "Subject t1", messageCount: 2, account: "me@example.com" });
+    expect([...hit!.people].sort()).toEqual([
       "Ana <ana@example.com> (you wrote to them)",
       "Bea <bea@example.com> (you wrote to them)",
       "Doe, Carl <carl@example.com>",
       "dan@example.com",
     ]);
-  });
-});
-
-describe("reading and marking read", () => {
-  it("reads a thread live, plainly for the AI", async () => {
-    const { state, ctx } = fakeGmail();
-    state.threads.t1 = [msg("m1", "t1", { body: "Hi there\n\nOn Mon, Bob wrote:\n> old" })];
-    const detail = await threadDetail(ctx, "1:t1", { ai: "1" });
-    expect(detail).toMatchObject({ subject: "Subject t1", accountEmail: "me@example.com", messages: [{ messageId: "m1", html: null, text: "Hi there" }] });
+    expect(state.resolved).toEqual([]);
+    expect(state.found).toEqual([]);
   });
 
-  it("marks a thread read with modify scope, and refuses without it", async () => {
+  it("only ever reads: every call is a GET with a read scope", async () => {
     const { state, ctx } = fakeGmail();
-    state.threads.t1 = [msg("m1", "t1")];
-    await syncAll(ctx);
-    const after = await gmailConnector.push!.act(ctx, "thread", "1:t1", "markRead", {});
-    expect(after.values.unread).toBe(false);
-    expect(state.calls.find((c) => c.method === "POST")?.url).toBe("/threads/t1/modify");
-
     state.accounts[0]!.scopes = [GMAIL_READONLY];
-    await expect(gmailConnector.push!.act(ctx, "thread", "1:t1", "markRead", {})).rejects.toThrow(ConnectorRefusedError);
-    state.calls = [];
+    state.threads.t1 = [msg("m1", "t1")];
     await syncAll(ctx);
-    expect(state.calls.every((c) => c.scopes?.[0] === GMAIL_READONLY)).toBe(true);
+    await searchThreads(ctx, "x", 5);
+    await threadDetail(ctx, "1:t1");
+    expect(state.calls.every((c) => c.method === "GET" && c.scopes?.[0] === GMAIL_READONLY)).toBe(true);
   });
 
-  it("forgets a disconnected account's threads", async () => {
-    const { state, ctx } = fakeGmail();
-    state.threads.t1 = [msg("m1", "t1")];
+  it("forgets a disconnected account's cursor", async () => {
+    const { ctx } = fakeGmail();
     await syncAll(ctx);
     gmailConnector.onEvent!(ctx, { chamber: "congress", type: "google.account_disconnected", payload: { accountId: 1 }, occurredAt: "" });
-    expect(getThreadRow("1:t1")).toBeUndefined();
-    expect(state.changes.at(-1)).toMatchObject({ key: "1:t1", deleted: true });
+    expect(getAccountState(1)).toBeUndefined();
   });
 });

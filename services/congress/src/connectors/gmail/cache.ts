@@ -1,11 +1,11 @@
-import { and, desc, eq, gte, isNull, lte } from "drizzle-orm";
-import type { ConnectorContext, SourceRecord } from "../contract.js";
+import { eq } from "drizzle-orm";
 import { gmailDb as db } from "./db/client.js";
-import { accounts, settings, threadAddresses, threads } from "./db/schema.js";
+import { accounts, settings } from "./db/schema.js";
 import { categoryOf, headerValue, parseAddress, type RawGmailMessage } from "./mime.js";
 import type { RawThread } from "./api.js";
 
-type ThreadRow = typeof threads.$inferSelect;
+// Nothing about a thread is stored: only each account's history cursor and the
+// settings. Threads are read live from Gmail.
 
 export const threadKey = (accountId: number, threadId: string) => `${accountId}:${threadId}`;
 
@@ -32,11 +32,25 @@ function splitAddresses(value: string | undefined): { name: string | null; email
 }
 
 export interface Summary {
-  row: ThreadRow;
+  key: string;
+  accountId: number;
+  threadId: string;
+  subject: string;
+  from: string;
+  lastAt: string;
+  snippet: string;
+  messageCount: number;
+  unread: boolean;
+  inbox: boolean;
+  category: string;
+  starred: boolean;
+  important: boolean;
+  hasAttachments: boolean;
+  // Who's on the thread; sentTo: the owner wrote to them (direct contact).
   addresses: { email: string; name: string | null; sentTo: boolean }[];
 }
 
-// Pure: a thread's cache row and addresses, the owner's own addresses left out.
+// Pure: a thread's summary, the owner's own addresses left out.
 export function summarize(accountId: number, raw: RawThread, own: Set<string>): Summary | null {
   const msgs = liveMessages(raw).sort((a, b) => Number(a.internalDate ?? 0) - Number(b.internalDate ?? 0));
   const first = msgs[0];
@@ -58,92 +72,21 @@ export function summarize(accountId: number, raw: RawThread, own: Set<string>): 
     for (const a of splitAddresses(headerValue(h, "Cc"))) add(a, false);
   }
   return {
-    row: {
-      key: threadKey(accountId, raw.id),
-      accountId,
-      threadId: raw.id,
-      subject: headerValue(first.payload?.headers, "Subject")?.trim() || "(no subject)",
-      fromName: from.name,
-      fromEmail: from.email?.toLowerCase() ?? null,
-      lastAt: Number(last.internalDate ?? 0),
-      snippet: last.snippet ?? "",
-      messageCount: msgs.length,
-      unread: msgs.some((m) => (m.labelIds ?? []).includes("UNREAD")),
-      inbox: labels.includes("INBOX"),
-      labelIds: JSON.stringify(labels),
-      hasAttachments: msgs.some((m) => (m.payload?.mimeType ?? "").toLowerCase() === "multipart/mixed"),
-      messageIds: JSON.stringify(msgs.map((m) => m.id)),
-      syncedAt: new Date(),
-    },
+    key: threadKey(accountId, raw.id),
+    accountId,
+    threadId: raw.id,
+    subject: headerValue(first.payload?.headers, "Subject")?.trim() || "(no subject)",
+    from: from.name ? (from.email ? `${from.name} <${from.email.toLowerCase()}>` : from.name) : (from.email?.toLowerCase() ?? ""),
+    lastAt: new Date(Number(last.internalDate ?? 0)).toISOString(),
+    snippet: last.snippet ?? "",
+    messageCount: msgs.length,
+    unread: msgs.some((m) => (m.labelIds ?? []).includes("UNREAD")),
+    inbox: labels.includes("INBOX"),
+    category: categoryOf(labels),
+    starred: labels.includes("STARRED"),
+    important: labels.includes("IMPORTANT"),
+    hasAttachments: msgs.some((m) => (m.payload?.mimeType ?? "").toLowerCase() === "multipart/mixed"),
     addresses: [...addresses.values()],
-  };
-}
-
-// Upserts a thread and its addresses, keeping People already linked.
-export function writeThread(s: Summary): void {
-  const key = s.row.key;
-  db.transaction((tx) => {
-    tx.insert(threads).values(s.row).onConflictDoUpdate({ target: threads.key, set: s.row }).run();
-    const prev = new Map(tx.select().from(threadAddresses).where(eq(threadAddresses.threadKey, key)).all().map((a) => [a.email, a.personId]));
-    tx.delete(threadAddresses).where(eq(threadAddresses.threadKey, key)).run();
-    for (const a of s.addresses) {
-      tx.insert(threadAddresses).values({ threadKey: key, email: a.email, name: a.name, sentTo: a.sentTo, personId: prev.get(a.email) ?? null }).run();
-    }
-  });
-}
-
-export function removeThread(key: string): boolean {
-  return db.transaction((tx) => {
-    tx.delete(threadAddresses).where(eq(threadAddresses.threadKey, key)).run();
-    return tx.delete(threads).where(eq(threads.key, key)).run().changes > 0;
-  });
-}
-
-export const getThreadRow = (key: string): ThreadRow | undefined => db.select().from(threads).where(eq(threads.key, key)).get();
-
-export function listThreadRows(opts: { from?: string; to?: string } = {}): ThreadRow[] {
-  const conds = [opts.from ? gte(threads.lastAt, Date.parse(opts.from)) : undefined, opts.to ? lte(threads.lastAt, Date.parse(opts.to)) : undefined].filter(
-    (c) => c !== undefined
-  );
-  return db.select().from(threads).where(conds.length ? and(...conds) : undefined).orderBy(desc(threads.lastAt)).all();
-}
-
-export const addressesOf = (key: string) => db.select().from(threadAddresses).where(eq(threadAddresses.threadKey, key)).all();
-
-// Each account's scopes and label, refreshed every sync (facts need them without a ctx).
-const accountInfo = new Map<number, { email: string; label: string; modify: boolean }>();
-export function rememberAccounts(list: { id: number; email: string; label: string; modify: boolean }[]): void {
-  accountInfo.clear();
-  for (const a of list) accountInfo.set(a.id, a);
-}
-
-export function toSourceRecord(row: ThreadRow): SourceRecord {
-  const labels = JSON.parse(row.labelIds) as string[];
-  const account = accountInfo.get(row.accountId);
-  // For the AI's linking: who's on the thread, and whom the owner wrote to.
-  const addresses = addressesOf(row.key).map((a) => `${a.name ? `${a.name} <${a.email}>` : a.email}${a.sentTo ? " (you wrote to them)" : ""}`);
-  return {
-    kind: "thread",
-    key: row.key,
-    values: {
-      subject: row.subject,
-      from: row.fromName ? (row.fromEmail ? `${row.fromName} <${row.fromEmail}>` : row.fromName) : (row.fromEmail ?? ""),
-      lastAt: new Date(row.lastAt).toISOString(),
-      snippet: row.snippet,
-      messageCount: row.messageCount,
-      unread: row.unread,
-      inbox: row.inbox,
-      category: categoryOf(labels),
-      starred: labels.includes("STARRED"),
-      important: labels.includes("IMPORTANT"),
-      sent: labels.includes("SENT"),
-      hasAttachments: row.hasAttachments,
-      account: account ? account.label || account.email : String(row.accountId),
-      gmailLink: account ? gmailThreadUrl(account.email, row.threadId) : null,
-      addresses,
-    },
-    facts: { canMarkRead: row.unread && Boolean(account?.modify) },
-    updatedAt: row.syncedAt.toISOString(),
   };
 }
 
@@ -160,15 +103,9 @@ export function setAccountState(accountId: number, values: Partial<typeof accoun
 
 export const listAccountStates = () => db.select().from(accounts).all();
 
-// Everything tied to an account the owner disconnected; the removed thread keys.
-export function forgetAccount(accountId: number): string[] {
-  const keys = db.select({ key: threads.key }).from(threads).where(eq(threads.accountId, accountId)).all().map((r) => r.key);
-  db.transaction((tx) => {
-    for (const key of keys) tx.delete(threadAddresses).where(eq(threadAddresses.threadKey, key)).run();
-    tx.delete(threads).where(eq(threads.accountId, accountId)).run();
-    tx.delete(accounts).where(eq(accounts.accountId, accountId)).run();
-  });
-  return keys;
+// Everything tied to an account the owner disconnected.
+export function forgetAccount(accountId: number): void {
+  db.delete(accounts).where(eq(accounts.accountId, accountId)).run();
 }
 
 export type GmailSettings = { includeAllCategories: boolean; publishEvents: boolean };
