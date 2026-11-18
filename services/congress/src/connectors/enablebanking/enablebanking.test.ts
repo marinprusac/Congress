@@ -228,6 +228,17 @@ describe("panel and callback", () => {
     expect(takePendingAuth(input.state)).toEqual({ bank: "Revolut", country: "LT" });
   });
 
+  it("asks for as long as the bank allows, up to 180 days", async () => {
+    vi.mocked(listBanks).mockResolvedValue([{ name: "Revolut", country: "LT", maximum_consent_validity: 180 * 86_400 }, { name: "Long", country: "LT", maximum_consent_validity: 400 * 86_400 }]);
+    vi.mocked(startAuth).mockResolvedValue({ url: "https://bank.example/consent" });
+    for (const bank of ["Revolut", "Long"]) await post("/connect", { bank, country: "LT", origin: "https://congress.example.com" });
+    for (const call of vi.mocked(startAuth).mock.calls) {
+      const days = (Date.parse(call[1].validUntil) - Date.now()) / 86_400_000;
+      expect(days).toBeGreaterThan(179.9);
+      expect(days).toBeLessThanOrEqual(180);
+    }
+  });
+
   it("refuses an unknown bank and a non-https origin", async () => {
     vi.mocked(listBanks).mockResolvedValue([]);
     expect((await post("/connect", { bank: "Nope", country: "SE", origin: "https://x.example" })).status).toBe(400);

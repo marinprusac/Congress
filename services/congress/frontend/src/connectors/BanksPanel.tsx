@@ -106,7 +106,7 @@ export function BanksPanel({ status }: { status: ConnectorStatus }) {
 
       {data?.hasCredentials && (
         <div className="space-y-2 border-t border-dust pt-2">
-          <p className="font-mono text-xs text-slate">Connect a bank (re-approve about every 90 days)</p>
+          <p className="font-mono text-xs text-slate">Connect a bank (re-approve about every 6 months)</p>
           <div className="flex min-w-0 gap-2">
             <input
               value={country}

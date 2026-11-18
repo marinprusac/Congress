@@ -6,7 +6,8 @@ import { BankApiError, createSession, deleteSession, listBanks, signJwt, startAu
 import { addPendingAuth, credentials, getBankSettings, getConnection, listAccounts, listConnections, saveConnection, takePendingAuth, updateBankSettings, updateConnection } from "./cache.js";
 
 const DAY = 86_400_000;
-const DEFAULT_CONSENT_DAYS = 90;
+// Longest consent asked for; the bank's own maximum applies if lower (Sparbanken Skåne, Zagrebačka banka and Revolut allow 180).
+const MAX_CONSENT_DAYS = 180;
 export const CALLBACK_PATH = "/congress/connectors/enablebanking/hook/callback";
 
 const fail = (c: { json: (b: unknown, s: 400 | 409 | 502) => Response }, err: unknown) => c.json({ error: (err as Error).message }, err instanceof BankApiError && err.status < 500 ? 400 : 502);
@@ -67,9 +68,8 @@ export function bankPanelRoutes(ctx: ConnectorContext): Hono {
     try {
       const bank = (await listBanks(creds, country)).find((b) => b.name === body.data.bank);
       if (!bank) return c.json({ error: `${body.data.bank} isn't offered in ${country}` }, 400);
-      // As long as the bank allows, up to 90 days.
-      const maxDays = bank.maximum_consent_validity ? Math.floor(bank.maximum_consent_validity / 86_400) : DEFAULT_CONSENT_DAYS;
-      const validUntil = new Date(Date.now() + Math.min(DEFAULT_CONSENT_DAYS, maxDays) * DAY - 60_000).toISOString();
+      const maxDays = bank.maximum_consent_validity ? Math.floor(bank.maximum_consent_validity / 86_400) : 90;
+      const validUntil = new Date(Date.now() + Math.min(MAX_CONSENT_DAYS, maxDays) * DAY - 60_000).toISOString();
       const state = randomBytes(24).toString("hex");
       addPendingAuth(state, bank.name, country);
       const { url } = await startAuth(creds, { bank: bank.name, country, validUntil, state, redirectUrl: body.data.origin + CALLBACK_PATH });
