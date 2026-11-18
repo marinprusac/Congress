@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import type { SourceRecord } from "../contract.js";
 import { bankDb as db } from "./db/client.js";
 import { accounts, connections, pendingAuths, settings, transactions } from "./db/schema.js";
@@ -60,6 +60,40 @@ export const markFetched = (uid: string, at: number) => db.update(accounts).set(
 
 export const isExpired = (c: ConnectionRow, now = Date.now()) => c.status !== "active" || Date.parse(c.validUntil) <= now;
 
+// --- account labels
+
+export interface AccountInfo {
+  uid: string;
+  bank: string;
+  name: string;
+  iban: string | null;
+  currency: string;
+  // What tells accounts apart to the owner and the AI: bank, currency, name, IBAN tail.
+  label: string;
+}
+
+export function accountLabel(a: { name: string; iban: string | null; currency: string }, bank: string): string {
+  const tail = a.iban ? `…${a.iban.slice(-4)}` : "";
+  return [bank, a.currency, a.name, tail].filter(Boolean).join(" · ");
+}
+
+export function listAccountInfos(): AccountInfo[] {
+  const banks = new Map(listConnections().map((c) => [c.sessionId, c.bank]));
+  return listAccounts().map((a) => {
+    const bank = banks.get(a.sessionId) ?? "";
+    return { uid: a.uid, bank, name: a.name, iban: a.iban, currency: a.currency, label: accountLabel(a, bank) };
+  });
+}
+
+// Accounts a free-text reference names: uid, IBAN or any part of the label ("revolut", "SE31", "…7374", "SEK").
+export function matchAccounts(ref: string, all = listAccountInfos()): AccountInfo[] {
+  const q = ref.trim().toLowerCase();
+  if (!q) return all;
+  const exact = all.filter((a) => a.uid.toLowerCase() === q || a.iban?.toLowerCase() === q);
+  if (exact.length) return exact;
+  return all.filter((a) => `${a.label} ${a.iban ?? ""}`.toLowerCase().includes(q.replace(/^…/, "")));
+}
+
 // --- transactions
 
 export const getTransactionRow = (key: string): TxRow | undefined => db.select().from(transactions).where(eq(transactions.key, key)).get();
@@ -73,13 +107,14 @@ export function upsertTransaction(accountUid: string, t: BankTransaction): boole
   return true;
 }
 
-export function listTransactionRows(opts: { from?: string; to?: string } = {}): TxRow[] {
-  const conds = [opts.from ? gte(transactions.bookingDate, opts.from.slice(0, 10)) : undefined, opts.to ? lte(transactions.bookingDate, opts.to.slice(0, 10)) : undefined].filter((c) => c !== undefined);
+export function listTransactionRows(opts: { from?: string; to?: string; accountUids?: string[] } = {}): TxRow[] {
+  const conds = [opts.accountUids ? inArray(transactions.accountUid, opts.accountUids) : undefined, opts.from ? gte(transactions.bookingDate, opts.from.slice(0, 10)) : undefined, opts.to ? lte(transactions.bookingDate, opts.to.slice(0, 10)) : undefined].filter((c) => c !== undefined);
   return db.select().from(transactions).where(conds.length ? and(...conds) : undefined).orderBy(desc(transactions.bookingDate)).all();
 }
 
 export function transactionRecord(row: TxRow): SourceRecord {
   const account = db.select().from(accounts).where(eq(accounts.uid, row.accountUid)).get();
+  const accountText = account ? accountLabel(account, getConnection(account.sessionId)?.bank ?? "") : "";
   const label = row.counterparty || row.description || "Transaction";
   return {
     kind: "transaction",
@@ -91,7 +126,7 @@ export function transactionRecord(row: TxRow): SourceRecord {
       currency: row.currency,
       counterparty: row.counterparty,
       description: row.description,
-      account: account ? (account.name || account.iban || "") : "",
+      account: accountText,
     },
     facts: {},
     updatedAt: row.updatedAt.toISOString(),

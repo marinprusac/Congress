@@ -288,7 +288,7 @@ describe("read-only", () => {
     connect();
     vi.mocked(fetchTransactions).mockResolvedValue([tx("e1", "12.5", "2026-11-10")]);
     await syncBanks(ctx, NOW);
-    expect(enableBankingConnector.read.get("transaction", "acc-1:e1")).toMatchObject({ values: { title: "Konzum", amount: -12.5, currency: "EUR", account: "Main", date: "2026-11-10" } });
+    expect(enableBankingConnector.read.get("transaction", "acc-1:e1")).toMatchObject({ values: { title: "Konzum", amount: -12.5, currency: "EUR", account: "Zagrebačka banka · EUR · Main · …HR12", date: "2026-11-10" } });
     expect(enableBankingConnector.read.list("transaction", { from: "2026-11-11" })).toEqual([]);
     expect(transactionRecord(getTransactionRow("acc-1:e1")!).kind).toBe("transaction");
   });
@@ -301,17 +301,64 @@ describe("tools", () => {
     return async (name: string, input: Record<string, unknown> = {}) => JSON.parse((await handlers.get(name)!(input)).content[0]!.text);
   }
 
-  it("sums spending per currency and counterparty", async () => {
-    connect();
-    vi.mocked(fetchTransactions).mockResolvedValue([tx("e1", "10", "2026-11-10"), tx("e2", "5", "2026-11-11"), { ...tx("e3", "100", "2026-11-12"), credit_debit_indicator: "CRDT", debtor: { name: "Employer" } }]);
+  // Two banks, three accounts: Sparbanken has an SEK current account and a savings account, Revolut an EUR one.
+  async function threeAccounts() {
+    saveConnection({
+      sessionId: "sp", bank: "Sparbanken Skåne", country: "SE", validUntil: "2027-02-01T00:00:00Z",
+      accounts: [{ uid: "sp-1", name: "", iban: "SE31000000007374", currency: "SEK" }, { uid: "sp-2", name: "Sparkonto", iban: "SE61000000007416", currency: "SEK" }],
+    });
+    saveConnection({ sessionId: "rv", bank: "Revolut", country: "LT", validUntil: "2027-02-01T00:00:00Z", accounts: [{ uid: "rv-1", name: "", iban: "LT45000000003206", currency: "EUR" }] });
+    const sek = (id: string, amount: string, who: string, date = "2026-11-10") => tx(id, amount, date, { transaction_amount: { currency: "SEK", amount }, creditor: { name: who } });
+    vi.mocked(fetchTransactions).mockImplementation(async (_c, uid) => {
+      if (uid === "sp-1") return [sek("a", "200", "ICA"), sek("b", "50", "Coop")];
+      if (uid === "sp-2") return [{ ...sek("c", "900", "Landlord"), credit_debit_indicator: "CRDT", debtor: { name: "Me" } }];
+      return [tx("d", "12", "2026-11-11", { creditor: { name: "Spotify" } })];
+    });
     await syncBanks(ctx, NOW);
-    expect(await tools()("banks_spending", { from: "2026-11-01", to: "2026-11-30", top: 5 })).toEqual([{ currency: "EUR", in: 100, out: 15, topSpending: [{ counterparty: "Konzum", amount: 15 }] }]);
+  }
+
+  it("sums spending per account, then per currency, so accounts can be told apart", async () => {
+    await threeAccounts();
+    const out = await tools()("banks_spending", { from: "2026-11-01", to: "2026-11-30", top: 5 });
+    expect(out.accounts.map((a: { label: string }) => a.label).sort()).toEqual(["Revolut · EUR · …3206", "Sparbanken Skåne · SEK · Sparkonto · …7416", "Sparbanken Skåne · SEK · …7374"]);
+    expect(out.accounts.find((a: { accountId: string }) => a.accountId === "sp-1")).toMatchObject({ bank: "Sparbanken Skåne", currency: "SEK", in: 0, out: 250, topSpending: [{ counterparty: "ICA", amount: 200 }, { counterparty: "Coop", amount: 50 }] });
+    expect(out.accounts.find((a: { accountId: string }) => a.accountId === "sp-2")).toMatchObject({ in: 900, out: 0 });
+    expect(out.totalsPerCurrency).toEqual(expect.arrayContaining([{ currency: "SEK", in: 900, out: 250 }, { currency: "EUR", in: 0, out: 12 }]));
+  });
+
+  it("limits to one account by id, IBAN, bank name, currency or IBAN tail", async () => {
+    await threeAccounts();
+    const spent = async (account: string) => (await tools()("banks_spending", { from: "2026-11-01", to: "2026-11-30", account, top: 5 })).accounts.map((a: { accountId: string }) => a.accountId).sort();
+    expect(await spent("sp-1")).toEqual(["sp-1"]);
+    expect(await spent("LT45000000003206")).toEqual(["rv-1"]);
+    expect(await spent("revolut")).toEqual(["rv-1"]);
+    expect(await spent("EUR")).toEqual(["rv-1"]);
+    expect(await spent("…7416")).toEqual(["sp-2"]);
+    expect(await spent("sparbanken")).toEqual(["sp-1", "sp-2"]);
+    const none = await tools()("banks_spending", { from: "2026-11-01", to: "2026-11-30", account: "nordea" });
+    expect(none.error).toContain("No account matches");
+    expect(none.accounts).toHaveLength(3);
+  });
+
+  it("lists transactions with their account, filtered by account and text", async () => {
+    await threeAccounts();
+    const all = await tools()("banks_list_transactions", {});
+    expect(all).toHaveLength(4);
+    expect(all.find((t: { counterparty: string }) => t.counterparty === "Spotify")).toMatchObject({ account: "Revolut · EUR · …3206", accountId: "rv-1", amount: -12, currency: "EUR" });
+    expect((await tools()("banks_list_transactions", { account: "sparkonto" })).map((t: { counterparty: string }) => t.counterparty)).toEqual(["Me"]);
+    expect((await tools()("banks_list_transactions", { query: "ica", limit: 5 })).map((t: { counterparty: string }) => t.counterparty)).toEqual(["ICA"]);
+    expect((await tools()("banks_list_transactions", { account: "nordea" })).error).toContain("No account matches");
+  });
+
+  it("gives records the same account label, not a bare name", async () => {
+    await threeAccounts();
+    expect(enableBankingConnector.read.get("transaction", "sp-1:a")?.values.account).toBe("Sparbanken Skåne · SEK · …7374");
   });
 
   it("doesn't read balances for an expired consent", async () => {
     connect("2026-01-01T00:00:00Z");
     const out = await tools()("banks_list_accounts");
-    expect(out[0]).toMatchObject({ consentExpired: true, balances: [] });
+    expect(out[0]).toMatchObject({ accountId: "acc-1", label: "Zagrebačka banka · EUR · Main · …HR12", consentExpired: true, balances: [] });
     expect(fetchBalances).not.toHaveBeenCalled();
   });
 });
