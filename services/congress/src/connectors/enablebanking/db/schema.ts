@@ -39,6 +39,8 @@ export const accounts = sqliteTable("accounts", {
   currency: text("currency").notNull(),
   // Latest booking date pulled, so the next sync overlaps from just before it.
   syncedThrough: text("synced_through"),
+  // When the bank was last asked (ms), kept across restarts so deploys don't burn its daily read allowance.
+  lastFetchedAt: integer("last_fetched_at"),
 });
 
 export const transactions = sqliteTable(

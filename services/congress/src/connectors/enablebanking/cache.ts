@@ -56,6 +56,7 @@ export const getConnection = (sessionId: string) => db.select().from(connections
 export const updateConnection = (sessionId: string, patch: Partial<Omit<ConnectionRow, "sessionId">>) => db.update(connections).set(patch).where(eq(connections.sessionId, sessionId)).run();
 export const listAccounts = (sessionId?: string): AccountRow[] => (sessionId ? db.select().from(accounts).where(eq(accounts.sessionId, sessionId)).all() : db.select().from(accounts).all());
 export const setSyncedThrough = (uid: string, date: string) => db.update(accounts).set({ syncedThrough: date }).where(eq(accounts.uid, uid)).run();
+export const markFetched = (uid: string, at: number) => db.update(accounts).set({ lastFetchedAt: at }).where(eq(accounts.uid, uid)).run();
 
 export const isExpired = (c: ConnectionRow, now = Date.now()) => c.status !== "active" || Date.parse(c.validUntil) <= now;
 

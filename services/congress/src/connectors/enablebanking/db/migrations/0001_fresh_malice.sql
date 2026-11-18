@@ -1,0 +1,1 @@
+ALTER TABLE `accounts` ADD `last_fetched_at` integer;

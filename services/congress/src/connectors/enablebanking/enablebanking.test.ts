@@ -39,6 +39,7 @@ const ctx = {
 } as ConnectorContext;
 
 const NOW = Date.parse("2026-11-18T12:00:00Z");
+const H = 3_600_000;
 const tx = (id: string, amount: string, date: string, extra: Record<string, unknown> = {}) => ({
   entry_reference: id,
   transaction_amount: { currency: "EUR", amount },
@@ -124,7 +125,7 @@ describe("sync", () => {
 
     changes.length = 0;
     vi.mocked(fetchTransactions).mockResolvedValueOnce([tx("e2", "5", "2026-11-12"), tx("e3", "7", "2026-11-17")]);
-    expect(await syncBanks(ctx, NOW)).toEqual({ changed: 1, error: null });
+    expect(await syncBanks(ctx, NOW + 6 * H)).toEqual({ changed: 1, error: null });
     expect(vi.mocked(fetchTransactions).mock.calls[1]![2]).toBe("2026-11-05");
     expect(changes).toEqual([{ kind: "transaction", key: "acc-1:e3", deleted: false, quiet: false }]);
   });
@@ -135,7 +136,7 @@ describe("sync", () => {
     await syncBanks(ctx, NOW);
     changes.length = 0;
     vi.mocked(fetchTransactions).mockResolvedValueOnce([tx("e1", "10.40", "2026-11-10")]);
-    await syncBanks(ctx, NOW);
+    await syncBanks(ctx, NOW + 6 * H);
     expect(changes).toHaveLength(1);
     expect(getTransactionRow("acc-1:e1")!.amount).toBe(-10.4);
   });
@@ -151,7 +152,7 @@ describe("sync", () => {
     connect("2026-11-22T00:00:00Z");
     vi.mocked(fetchTransactions).mockResolvedValue([]);
     await syncBanks(ctx, NOW);
-    await syncBanks(ctx, NOW);
+    await syncBanks(ctx, NOW + 6 * H);
     expect(published.filter((p) => p.type === "banks.consent_expiring")).toHaveLength(1);
   });
 
@@ -161,10 +162,29 @@ describe("sync", () => {
       if (uid === "bad") throw new Error("429");
       return [tx("e1", "1", "2026-11-10")];
     });
-    for (let i = 0; i < 3; i++) expect((await syncBanks(ctx, NOW)).error).toContain("429");
+    for (let i = 0; i < 3; i++) expect((await syncBanks(ctx, NOW + i * 6 * H)).error).toContain("429");
     expect(getTransactionRow("ok:e1")).toBeDefined();
     expect(published.filter((p) => p.type === "banks.sync_failing")).toHaveLength(1);
     expect(getBankSettings().consecutiveFailures).toBe(3);
+  });
+
+  it("asks each account at most once per 5 hours, however often it's started or synced by hand", async () => {
+    connect();
+    vi.mocked(fetchTransactions).mockResolvedValue([]);
+    await syncBanks(ctx, NOW);
+    await syncBanks(ctx, NOW + 1000);
+    await syncBanks(ctx, NOW + 4 * H);
+    expect(fetchTransactions).toHaveBeenCalledTimes(1);
+    await syncBanks(ctx, NOW + 5 * H + 1);
+    expect(fetchTransactions).toHaveBeenCalledTimes(2);
+  });
+
+  it("counts a failed attempt too, so an erroring bank isn't hammered on every restart", async () => {
+    connect();
+    vi.mocked(fetchTransactions).mockRejectedValue(new Error("429"));
+    await syncBanks(ctx, NOW);
+    await syncBanks(ctx, NOW + H);
+    expect(fetchTransactions).toHaveBeenCalledTimes(1);
   });
 
   it("clears the failure streak after a clean sync", async () => {
@@ -172,7 +192,7 @@ describe("sync", () => {
     vi.mocked(fetchTransactions).mockRejectedValueOnce(new Error("boom")).mockResolvedValue([]);
     await syncBanks(ctx, NOW);
     expect(getBankSettings().consecutiveFailures).toBe(1);
-    await syncBanks(ctx, NOW);
+    await syncBanks(ctx, NOW + 6 * H);
     expect(getBankSettings()).toMatchObject({ consecutiveFailures: 0, lastError: null });
   });
 });

@@ -1,6 +1,6 @@
 import type { ConnectorContext, SyncResult } from "../contract.js";
 import { fetchTransactions } from "./client.js";
-import { credentials, getBankSettings, isExpired, listAccounts, listConnections, setSyncedThrough, updateBankSettings, updateConnection, upsertTransaction } from "./cache.js";
+import { credentials, getBankSettings, isExpired, listAccounts, listConnections, markFetched, setSyncedThrough, updateBankSettings, updateConnection, upsertTransaction } from "./cache.js";
 import { normalizeTransactions } from "./normalize.js";
 
 // A first pull reaches back this far (banks cap what they serve; 90 days is the usual SCA window).
@@ -10,6 +10,9 @@ const OVERLAP_DAYS = 7;
 const WARN_DAYS = 7;
 const FAILURE_ALERT_THRESHOLD = 3;
 const DAY = 86_400_000;
+// Banks allow ~4 unattended reads per account a day: never ask one account more often than this,
+// however often the service restarts or Sync now is pressed.
+const MIN_GAP_MS = 5 * 3_600_000;
 
 const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
@@ -33,6 +36,8 @@ export function syncBanks(ctx: ConnectorContext, now = Date.now()): Promise<Sync
         ctx.publish("banks.consent_expiring", { bank: conn.bank, validUntil: conn.validUntil });
       }
       for (const acc of listAccounts(conn.sessionId)) {
+        if (acc.lastFetchedAt !== null && now - acc.lastFetchedAt < MIN_GAP_MS) continue;
+        markFetched(acc.uid, now);
         try {
           const first = acc.syncedThrough === null;
           const from = first ? day(now - FIRST_DAYS * DAY) : day(Date.parse(acc.syncedThrough!) - OVERLAP_DAYS * DAY);
