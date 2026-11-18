@@ -2,7 +2,6 @@ import type { ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ManifestView } from "@congress/shared-types";
 import { HealthCard } from "@/views/health/HealthViews";
-import { TodayMapWidget } from "@/views/map/TodayMapWidget";
 import { fetchTypes, TYPES_KEY } from "@/lib/recordsApi";
 
 // Every view the owner can open or pin: Congress's own hand-written ones,
@@ -17,28 +16,10 @@ export interface ViewSource {
 // `type`: shown once that type is in use.
 const CORE_VIEWS: (ViewSource & { type: string })[] = [
   {
-    name: "events",
-    displayName: "Calendar",
-    type: "event",
-    views: [
-      { id: "timeline", label: "Timeline", fullPath: "/" },
-      { id: "week", label: "Week", fullPath: "/week" },
-    ],
-  },
-  {
     name: "fitness",
     displayName: "Fitness",
     type: "workout",
     views: [{ id: "health", label: "Health", fullPath: "/health", card: true, Card: HealthCard }],
-  },
-  {
-    name: "map",
-    displayName: "Map",
-    type: "place",
-    views: [
-      { id: "today-map", label: "Today", fullPath: "/", card: true, Card: TodayMapWidget },
-      { id: "pending", label: "Visits to classify", fullPath: "/pending" },
-    ],
   },
 ];
 

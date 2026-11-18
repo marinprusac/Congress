@@ -65,8 +65,8 @@ describe("Place records as the location connector's input", () => {
     expect(await locationConnector.feed!(new Date())).toEqual([]);
     writeRow({ traccarUrl: "https://traccar.example", traccarToken: "t", traccarDeviceId: 1 });
     const groups = await locationConnector.feed!(new Date());
-    expect(groups.map((g) => g.source)).toEqual(["map", "e"]);
-    expect(groups[0]!.candidates).toEqual([{ kind: "view", viewId: "today-map", score: 15 }]);
+    expect(groups.map((g) => g.source)).toEqual(["e"]);
+    expect(groups[0]!.candidates).toEqual([]);
     writeRow({ traccarUrl: null, traccarToken: null, traccarDeviceId: null });
     expect((await listPlaces()).map((p) => p.name)).toEqual(["Cafe"]);
   });

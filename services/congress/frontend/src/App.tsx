@@ -14,11 +14,8 @@ import { NotificationsPage } from "@/pages/NotificationsPage";
 import { ViewPage } from "@/pages/ViewPage";
 import { RecordPage } from "@/records/RecordPage";
 import { LegacyRedirect } from "@/records/LegacyRedirect";
-import { TimelinePage, WeekPage } from "@/views/calendar/CalendarViews";
 import { HealthPage } from "@/views/health/HealthViews";
 import { NewRoutinePage } from "@/views/fitness/NewRoutinePage";
-import { MapPage } from "@/views/map/MapPage";
-import { PendingVisitsPage } from "@/views/map/PendingVisitsPage";
 
 // The shell's top-level paths (keep the service worker's denylist in sw.ts in step).
 export function App() {
@@ -52,19 +49,16 @@ export function App() {
         {/* A view card with no full-screen page of its own, given the whole
             screen. */}
         <Route path="/view/:chamber/:viewId" element={<ViewPage />} />
-        {/* The calendar's views over Event records. */}
-        <Route path="/events" element={<TimelinePage />} />
-        <Route path="/events/week" element={<WeekPage />} />
+        {/* The calendar and map screens are gone; their data (Event and Place records) stays. */}
+        <Route path="/events/*" element={<Navigate to="/" replace />} />
         {/* Fitness: Apple Health, and a new Hevy routine (it needs exercises before it exists). */}
         <Route path="/fitness/health" element={<HealthPage />} />
         <Route path="/e/new/routine" element={<NewRoutinePage />} />
-        {/* The Map: the day's places and trips, and stops to classify (location connector). */}
-        <Route path="/map" element={<MapPage />} />
-        <Route path="/map/pending" element={<PendingVisitsPage />} />
+        <Route path="/map" element={<Navigate to="/" replace />} />
         <Route path="/map/p/:id" element={<LegacyRedirect chamber="map" idPrefix="place-" noun="place" />} />
         <Route path="/map/places/new" element={<Navigate to="/e/new/place" replace />} />
         <Route path="/map/settings" element={<Navigate to="/settings?from=accounts" replace />} />
-        <Route path="/map/*" element={<Navigate to="/map" replace />} />
+        <Route path="/map/*" element={<Navigate to="/" replace />} />
         {/* WhatsApp chats aren't read in Congress any more (the AI reads them). */}
         <Route path="/whatsapp" element={<Navigate to="/" replace />} />
         <Route path="/whatsapp/*" element={<Navigate to="/" replace />} />
@@ -90,8 +84,7 @@ export function App() {
           }
         />
         <Route path="/calendar/new" element={<Navigate to="/e/new/event" replace />} />
-        <Route path="/calendar/week" element={<Navigate to="/events/week" replace />} />
-        <Route path="/calendar/*" element={<Navigate to="/events" replace />} />
+                <Route path="/calendar/*" element={<Navigate to="/" replace />} />
         <Route path="/documents/d/:id" element={<LegacyRedirect chamber="documents" idPrefix="document-" noun="document" />} />
         <Route path="/documents/new" element={<Navigate to="/e/new/document" replace />} />
         <Route path="/documents/*" element={<Navigate to="/" replace />} />
