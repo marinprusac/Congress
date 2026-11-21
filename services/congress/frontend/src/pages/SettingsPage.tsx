@@ -12,7 +12,6 @@ import {
 import { SignOutControl } from "@/components/LoginGate";
 import { LogsTab } from "@/pages/LogsTab";
 import { AiSettingsTab } from "@/pages/AiSettingsTab";
-import { HomeSettingsTab } from "@/pages/HomeSettingsTab";
 import { ConnectorsTab } from "@/pages/ConnectorsTab";
 import { TypesSettingsTab } from "@/pages/TypesSettingsTab";
 
@@ -54,7 +53,7 @@ function GeneralTab() {
   );
 }
 
-const SETTINGS_TABS = ["general", "home", "logs", "ai", "accounts", "types"];
+const SETTINGS_TABS = ["general", "logs", "ai", "accounts", "types"];
 
 // Unified Settings, reached from the tab bar; "?from=<tab>" opens one
 // (e.g. the AI-paused banners' "?from=ai").
@@ -63,7 +62,7 @@ export function SettingsPage() {
   const back = useBackNavigation();
 
   // A link can open Settings straight to a tab with "?from=<tab>" (e.g. the
-  // AI-paused banners' "?from=ai", Home's pin bubble "?from=home") - a bare
+  // AI-paused banners' "?from=ai") - a bare
   // "/settings" (the tab bar) falls back to General.
   const [searchParams] = useSearchParams();
   const requestedTab = searchParams.get("from");
@@ -87,15 +86,6 @@ export function SettingsPage() {
             onClick={() => setTab("general")}
           >
             General
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "home"}
-            className={tab === "home" ? "settings-tab active" : "settings-tab"}
-            onClick={() => setTab("home")}
-          >
-            Home
           </button>
           <button
             type="button"
@@ -137,8 +127,6 @@ export function SettingsPage() {
         <section className="settings-tab-panel">
           {tab === "general" ? (
             <GeneralTab />
-          ) : tab === "home" ? (
-            <HomeSettingsTab />
           ) : tab === "logs" ? (
             <LogsTab />
           ) : tab === "ai" ? (

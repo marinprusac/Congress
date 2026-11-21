@@ -113,31 +113,6 @@ describe("session-only routes", () => {
 });
 
 describe("request validation", () => {
-  it("round-trips the home screen's pinned views, in order, without touching dark mode", async () => {
-    const pinnedViews = [
-      { chamber: "calendar", viewId: "upcoming" },
-      { chamber: "tasks", viewId: "open" },
-    ];
-    const put = await app.request(
-      "/congress/settings",
-      { method: "PUT", headers: { ...json, ...session() }, body: JSON.stringify({ pinnedViews }) },
-      bindings()
-    );
-    expect(put.status).toBe(200);
-    const got = (await (await app.request("/congress/settings", { headers: session() }, bindings())).json()) as { pinnedViews: unknown; darkMode: unknown };
-    expect(got.pinnedViews).toEqual(pinnedViews);
-    expect(typeof got.darkMode).toBe("boolean");
-  });
-
-  it("400s a malformed pinned view", async () => {
-    const res = await app.request(
-      "/congress/settings",
-      { method: "PUT", headers: { ...json, ...session() }, body: JSON.stringify({ pinnedViews: [{ chamber: "tasks" }] }) },
-      bindings()
-    );
-    expect(res.status).toBe(400);
-  });
-
   it("400s a settings update with the wrong shape", async () => {
     const res = await app.request(
       "/congress/settings",

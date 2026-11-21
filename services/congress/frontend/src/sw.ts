@@ -25,7 +25,7 @@ precacheAndRoute(self.__WB_MANIFEST);
 // only ever shows up in a real browser). Keep this in step with App.tsx.
 registerRoute(
   new NavigationRoute(createHandlerBoundToURL("index.html"), {
-    denylist: [/^\/(?!$|search$|notifications$|settings$|chat$|chat\/|view\/|e\/|events$|events\/|fitness\/|map$|map\/|whatsapp$|whatsapp\/)/],
+    denylist: [/^\/(?!$|search$|notifications$|settings$|chat$|chat\/|e\/|events$|events\/|fitness\/|map$|map\/|whatsapp$|whatsapp\/)/],
   })
 );
 

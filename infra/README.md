@@ -2,7 +2,7 @@
 
 Congress runs on a single Hetzner VPS (`178.105.180.7`) as **one** plain
 `systemd` unit (`congress-core`) bound to `127.0.0.1`, no Docker. Everything
-(types, connectors, views, the AI) runs in that one process; the only other
+(types, connectors, the AI) runs in that one process; the only other
 unit is the WhatsApp reader daemon (below).
 
 This deviates from the project brief's original access model (Tailscale-only,
@@ -63,7 +63,7 @@ deploy). This isn't set up by any script here — add it by hand once, e.g. via
 marin ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart congress-*, /usr/bin/systemctl reload caddy
 ```
 
-## Adding a connector, type or view
+## Adding a connector or type
 
 Nothing on the infra side: they are code in `services/congress`, Caddy only
 ever points at Congress, and `build-artifacts.sh` builds the one frontend.

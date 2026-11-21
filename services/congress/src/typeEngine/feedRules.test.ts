@@ -56,8 +56,8 @@ describe("feedCandidatesFor", () => {
     const sqlite = seed();
     const local = feedCandidatesFor(def, now, (sql, params) => sqlite.prepare(sql).all(...params) as never, (r) => String(r.title));
     const ranked = rankFeed([
-      { chamber: { name: "e", views: [] }, candidates: local },
-      { chamber: { name: "mail", views: [] }, candidates: [{ kind: "record", recordId: "thread-1", score: 95 }] },
+      { chamber: { name: "e" }, candidates: local },
+      { chamber: { name: "mail" }, candidates: [{ kind: "record", recordId: "thread-1", score: 95 }] },
     ]);
     expect(ranked.map((r) => (r.kind === "record" ? `${r.chamber}:${r.recordId}` : ""))).toEqual(["mail:thread-1", "e:late", "e:soon", "e:edge"]);
   });

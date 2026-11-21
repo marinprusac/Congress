@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchLive } from "@/lib/recordsApi";
 import type { LiveProps } from "./index";
-import { formatSet, type WorkoutSet } from "@/views/health/format";
+import { formatSet, type WorkoutSet } from "@/lib/workoutFormat";
 
 // A workout's sets from the hevy connector (src/connectors/hevy/cache.ts workoutDetail).
 interface WorkoutDetail {

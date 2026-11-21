@@ -11,10 +11,8 @@ import { MemoryPage } from "@/chat/MemoryPage";
 import { useChatInvalidation } from "@/chat/useChatData";
 import { SearchPage } from "@/pages/SearchPage";
 import { NotificationsPage } from "@/pages/NotificationsPage";
-import { ViewPage } from "@/pages/ViewPage";
 import { RecordPage } from "@/records/RecordPage";
 import { LegacyRedirect } from "@/records/LegacyRedirect";
-import { HealthPage } from "@/views/health/HealthViews";
 import { NewRoutinePage } from "@/views/fitness/NewRoutinePage";
 
 // The shell's top-level paths (keep the service worker's denylist in sw.ts in step).
@@ -34,8 +32,7 @@ export function App() {
           page that fails only loses its own content, never the way back out. */}
       <TabBar />
       <Routes>
-        {/* Congress's own home: the AI composer, pinned views and the "For
-            You" feed. Works with no Chamber registered. */}
+        {/* Congress's own home: the AI composer and the "For You" feed. Works with no Chamber registered. */}
         <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
@@ -46,13 +43,9 @@ export function App() {
           <Route path="memory" element={<MemoryPage />} />
           <Route path=":threadId" element={<ThreadView />} />
         </Route>
-        {/* A view card with no full-screen page of its own, given the whole
-            screen. */}
-        <Route path="/view/:chamber/:viewId" element={<ViewPage />} />
         {/* The calendar and map screens are gone; their data (Event and Place records) stays. */}
         <Route path="/events/*" element={<Navigate to="/" replace />} />
-        {/* Fitness: Apple Health, and a new Hevy routine (it needs exercises before it exists). */}
-        <Route path="/fitness/health" element={<HealthPage />} />
+        {/* A new Hevy routine (it needs exercises before it exists). */}
         <Route path="/e/new/routine" element={<NewRoutinePage />} />
         <Route path="/map" element={<Navigate to="/" replace />} />
         <Route path="/map/p/:id" element={<LegacyRedirect chamber="map" idPrefix="place-" noun="place" />} />
@@ -93,7 +86,7 @@ export function App() {
         <Route path="/fitness/workouts/:id" element={<LegacyRedirect chamber="fitness" idPrefix="workout-" noun="workout" />} />
         <Route path="/fitness/routines/new" element={<Navigate to="/e/new/routine" replace />} />
         <Route path="/fitness/routines/:id" element={<LegacyRedirect chamber="fitness" idPrefix="routine-" noun="routine" />} />
-        <Route path="/fitness/metrics" element={<Navigate to="/fitness/health" replace />} />
+        <Route path="/fitness/metrics" element={<Navigate to="/" replace />} />
         <Route path="/fitness/settings" element={<Navigate to="/settings?from=accounts" replace />} />
         <Route path="/fitness/*" element={<Navigate to="/" replace />} />
         {/* Old URLs of Chambers folded into Congress - bookmarks and the

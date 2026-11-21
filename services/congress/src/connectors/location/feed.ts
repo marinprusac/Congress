@@ -1,8 +1,8 @@
-import type { FeedCandidate, ManifestView } from "@congress/shared-types";
+import type { FeedCandidate } from "@congress/shared-types";
 import type { Visit } from "./types.js";
 
 // The location connector's feed, pure: the Place you're at right now.
-export function mapFeed(today: Visit[]): { source: string; views: ManifestView[]; candidates: FeedCandidate[] }[] {
+export function mapFeed(today: Visit[]): { source: string; candidates: FeedCandidate[] }[] {
   const known = today.filter((v) => v.status === "confirmed" || v.status === "adhoc");
   const current = known.find((v) => v.departedAt === null && v.placeId !== null);
   const here: FeedCandidate[] = current
@@ -16,5 +16,5 @@ export function mapFeed(today: Visit[]): { source: string; views: ManifestView[]
         },
       ]
     : [];
-  return [{ source: "e", views: [], candidates: here }];
+  return [{ source: "e", candidates: here }];
 }

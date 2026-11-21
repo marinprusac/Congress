@@ -1,7 +1,7 @@
 import { useSyncExternalStore, type CSSProperties } from "react";
 import { hashSourceColor, isSourceColor, type SourceColor } from "@congress/shared-types";
 
-// Colours for sources that are not record types (a connector's own views).
+// Colours for sources that are not record types (a connector's own sources).
 const CHAMBER_COLORS: Readonly<Record<string, SourceColor>> = {
   events: "cobalt",
   fitness: "mint",

@@ -1,4 +1,4 @@
-import type { FeedCandidate, FeedItem, FeedPreview, ManifestView } from "@congress/shared-types";
+import type { FeedCandidate, FeedItem, FeedPreview } from "@congress/shared-types";
 import { resolveRecords } from "./records.js";
 import { listLocalSources } from "./recordSources.js";
 import { listConnectors } from "./connectors/runtime.js";
@@ -8,71 +8,37 @@ import { listConnectors } from "./connectors/runtime.js";
 // deliberately the one place a smarter ranker (e.g. Haiku re-ranking the same
 // candidates) can slot in later.
 
-// A declared view the Chamber didn't score (or a Chamber with no /api/feed
-// at all) still shows up, just below anything actually time-relevant - the
-// feed doubles as the way to reach a view.
-export const DEFAULT_VIEW_SCORE = 10;
-
 const MAX_ITEMS = 50;
 
 export interface ChamberCandidates {
-  chamber: { name: string; views: ManifestView[] };
+  chamber: { name: string };
   candidates: FeedCandidate[];
 }
 
-type Unresolved =
-  | Extract<FeedItem, { kind: "view" }>
-  | { kind: "record"; chamber: string; recordId: string; score: number; reason?: string; preview?: FeedPreview };
+type Unresolved = { kind: "record"; chamber: string; recordId: string; score: number; reason?: string; preview?: FeedPreview };
 
-// Pure: merges every Chamber's candidates into one list sorted by score
-// (ties keep registration order). Only views with a feed card take part -
-// feed items show information inline, and a card-less view would be a bare
-// link (those are reached through Search and the pinned row). Carded views
-// a Chamber didn't score get DEFAULT_VIEW_SCORE; candidates naming a view
-// the Chamber never declared (or one without a card) are dropped; an
-// record named twice keeps its best-scored candidate.
+// Pure: merges every source's candidates into one list sorted by score
+// (ties keep registration order); a record named twice keeps its best-scored
+// candidate.
 export function rankFeed(perChamber: ChamberCandidates[]): Unresolved[] {
   const items: Unresolved[] = [];
-  const seenRecords = new Map<string, Unresolved & { kind: "record" }>();
+  const seenRecords = new Map<string, Unresolved>();
 
   for (const { chamber, candidates } of perChamber) {
-    const cardViews = chamber.views.filter((v) => v.card === true);
-    const viewsById = new Map(cardViews.map((v) => [v.id, v]));
-    const scoredViews = new Map<string, { score: number; reason?: string }>();
-
     for (const candidate of candidates) {
-      if (candidate.kind === "view") {
-        if (!viewsById.has(candidate.viewId)) continue;
-        const prev = scoredViews.get(candidate.viewId);
-        if (!prev || candidate.score > prev.score) scoredViews.set(candidate.viewId, { score: candidate.score, reason: candidate.reason });
-      } else {
-        const prev = seenRecords.get(candidate.recordId);
-        if (prev && prev.score >= candidate.score) continue;
-        const item = {
-          kind: "record" as const,
-          chamber: chamber.name,
-          recordId: candidate.recordId,
-          score: candidate.score,
-          reason: candidate.reason,
-          preview: candidate.preview,
-        };
-        if (prev) items.splice(items.indexOf(prev), 1, item);
-        else items.push(item);
-        seenRecords.set(candidate.recordId, item);
-      }
-    }
-
-    for (const view of cardViews) {
-      const scored = scoredViews.get(view.id);
-      items.push({
-        kind: "view",
+      const prev = seenRecords.get(candidate.recordId);
+      if (prev && prev.score >= candidate.score) continue;
+      const item = {
+        kind: "record" as const,
         chamber: chamber.name,
-        viewId: view.id,
-        label: view.label,
-        fullPath: view.fullPath,
-        score: scored?.score ?? DEFAULT_VIEW_SCORE,
-        reason: scored?.reason,
-      });
+        recordId: candidate.recordId,
+        score: candidate.score,
+        reason: candidate.reason,
+        preview: candidate.preview,
+      };
+      if (prev) items.splice(items.indexOf(prev), 1, item);
+      else items.push(item);
+      seenRecords.set(candidate.recordId, item);
     }
   }
 
@@ -84,29 +50,25 @@ export async function getFeed(): Promise<FeedItem[]> {
   const perChamber: ChamberCandidates[] = [];
   for (const source of listLocalSources()) {
     try {
-      perChamber.unshift({ chamber: { name: source.namespace, views: [] }, candidates: source.feedCandidates(new Date()) });
+      perChamber.unshift({ chamber: { name: source.namespace }, candidates: source.feedCandidates(new Date()) });
     } catch (err) {
       console.warn(`[feed] ${source.namespace} failed: ${(err as Error).message}`);
     }
   }
   for (const c of listConnectors()) {
     try {
-      for (const out of (await c.feed?.(new Date())) ?? []) perChamber.push({ chamber: { name: out.source, views: out.views }, candidates: out.candidates });
+      for (const out of (await c.feed?.(new Date())) ?? []) perChamber.push({ chamber: { name: out.source }, candidates: out.candidates });
     } catch (err) {
       console.warn(`[feed] connector ${c.name} failed: ${(err as Error).message}`);
     }
   }
   const ranked = rankFeed(perChamber);
 
-  const refs = ranked.flatMap((item) => (item.kind === "record" ? [{ id: item.recordId, chamber: item.chamber }] : []));
+  const refs = ranked.flatMap((item) => [{ id: item.recordId, chamber: item.chamber }]);
   const resolved = new Map((await resolveRecords(refs)).map((r) => [r.id, r]));
 
   const items: FeedItem[] = [];
   for (const item of ranked) {
-    if (item.kind === "view") {
-      items.push(item);
-      continue;
-    }
     const hit = resolved.get(item.recordId);
     // Deleted or currently unresolvable records just drop out of the feed.
     if (!hit || "deleted" in hit || "unavailable" in hit) continue;

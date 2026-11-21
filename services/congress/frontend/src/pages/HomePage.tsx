@@ -9,13 +9,10 @@ import {
   staggerDelayMs,
   StackLink,
   useAppliedTheme,
-  useCapitolSettings,
   useFlipList,
   useSourceColor,
   useStackNav,
 } from "@congress/congress-ui";
-import { ViewSlot, viewHref } from "@/components/ViewSlot";
-import { findCoreView, findView as findViewSource, useViewSources } from "@/views/coreViews";
 import { HomeAsks } from "@/components/HomeAsks";
 import { GearIcon } from "@/components/TabBar";
 import { feedQueryKey, fetchFeed } from "@/lib/feedApi";
@@ -23,40 +20,9 @@ import { feedSlots } from "@/lib/feedLayout";
 import { fetchTypes, TYPES_KEY } from "@/lib/recordsApi";
 import { formatPreviewTime } from "@/lib/formatPreviewTime";
 
-// One pinned view: its source square (coloured by its source) and label.
-function PinnedView({ source, view }: { source: { name: string }; view: { id: string; label: string; fullPath?: string } }) {
-  const color = useSourceColor(source.name);
-  return (
-    <StackLink to={viewHref(source.name, view)} className="home-pin" style={sourceColorStyle(color)}>
-      <span className="home-pin-mark" />
-      {view.label}
-    </StackLink>
-  );
-}
-
-// The owner's pinned views - fixed shortcuts under the nameplate, ahead of
-// the ranked feed. Pinning happens in Settings -> Home.
-function PinnedViews() {
-  const { data: settings } = useCapitolSettings();
-  const sources = useViewSources();
-  const pinned = (settings?.pinnedViews ?? []).map((p) => findViewSource(sources, p.chamber, p.viewId)).filter((v) => v !== null);
-
-  return (
-    <nav className="home-rail" aria-label="Pinned views">
-      {pinned.map(({ source, view }) => (
-        <PinnedView key={`${source.name}:${view.id}`} source={source} view={view} />
-      ))}
-      <StackLink to="/settings?from=home" className="home-pin home-pin--add" aria-label="Pin a view">
-        <span className="home-pin-mark" />
-        Pin
-      </StackLink>
-    </nav>
-  );
-}
-
 // A record: a kicker (its type, in the type's colour, and why it is here),
 // then its own information inline. The whole card opens the record.
-function RecordCard({ item, lead, typeLabel }: { item: Extract<FeedItem, { kind: "record" }>; lead: boolean; typeLabel?: string }) {
+function RecordCard({ item, lead, typeLabel }: { item: FeedItem; lead: boolean; typeLabel?: string }) {
   const nav = useStackNav();
   const color = useSourceColor(item.chamber, item.type);
   const preview = item.preview;
@@ -82,17 +48,8 @@ function RecordCard({ item, lead, typeLabel }: { item: Extract<FeedItem, { kind:
   );
 }
 
-function FeedEntry({ item, lead, typeLabel }: { item: FeedItem; lead: boolean; typeLabel?: string }) {
-  if (item.kind === "view") {
-    const core = findCoreView(item.chamber, item.viewId);
-    if (!core?.view.Card) return null;
-    return <ViewSlot source={core.source} view={core.view} Card={core.view.Card} reason={item.reason} />;
-  }
-  return <RecordCard item={item} lead={lead} typeLabel={typeLabel} />;
-}
-
 function feedKey(item: FeedItem): string {
-  return item.kind === "view" ? `v:${item.chamber}:${item.viewId}` : `e:${item.recordId}`;
+  return `e:${item.recordId}`;
 }
 
 // Card-shaped placeholders while the feed loads.
@@ -110,7 +67,7 @@ function FeedSkeleton() {
   );
 }
 
-// Congress's home: a "For You" feed. The owner's pinned views, then every active Chamber's views and records ranked by how
+// Congress's home: a "For You" feed. Every source's records ranked by how
 // much they matter right now (GET /congress/feed - the ranking itself lives
 // server-side, see services/congress/src/feed.ts).
 export function HomePage() {
@@ -142,7 +99,6 @@ export function HomePage() {
       />
       <main className="chamber-main home-main">
         <HomeAsks />
-        <PinnedViews />
         {feed.isLoading && <FeedSkeleton />}
         {feed.isError && <p className="font-mono text-sm text-alert">Couldn't load the feed.</p>}
         {feed.data && feed.data.length === 0 && <p className="font-mono text-sm text-dust">— Nothing here yet —</p>}
@@ -157,7 +113,7 @@ export function HomePage() {
                 data-flip-key={key}
                 className={`feed-slot feed-slot--${slot}${introIndex === undefined ? "" : " motion-rise"}`}
                 style={introIndex === undefined ? undefined : ({ "--stagger": `${staggerDelayMs(introIndex)}ms` } as CSSProperties)}>
-                <FeedEntry item={item} lead={slot === "lead"} typeLabel={item.kind === "record" && item.type ? typeLabels.get(item.type) : undefined} />
+                <RecordCard item={item} lead={slot === "lead"} typeLabel={item.type ? typeLabels.get(item.type) : undefined} />
               </div>
             );
           })}

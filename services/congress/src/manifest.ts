@@ -10,7 +10,6 @@ export const capitolManifest: Manifest = {
     home: "/",
     settings: "/settings",
   },
-  views: [],
   exhibitTypes: [],
   events: [],
 };

@@ -66,7 +66,7 @@ app.put("/congress/settings", requireSession, async (c) => {
   return c.json(await updateSettings(parsed.data));
 });
 
-// The home "For You" feed: every source's scored views and records, merged and ranked. See feed.ts.
+// The home "For You" feed: every source's scored records, merged and ranked. See feed.ts.
 app.get("/congress/feed", requireSession, async (c) => c.json({ items: await getFeed() }));
 
 // Congress's own AI: the chat, the shared budget/pause settings and the

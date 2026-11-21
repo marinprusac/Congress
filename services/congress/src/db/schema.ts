@@ -53,7 +53,6 @@ export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
   darkMode: integer("dark_mode", { mode: "boolean" }).notNull().default(false),
   // The home screen's pinned "stories" row, in display order.
-  pinnedViews: text("pinned_views", { mode: "json" }).$type<{ chamber: string; viewId: string }[]>().notNull().default([]),
   // Set once legacyImport.ts has copied the retired Capitol/Logs Chambers'
   // own SQLite files into the tables below - see that file.
   legacyImportedAt: integer("legacy_imported_at", { mode: "timestamp_ms" }),

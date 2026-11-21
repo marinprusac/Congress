@@ -10,26 +10,6 @@ export const manifestRoutesSchema = z.object({
 });
 export type ManifestRoutes = z.infer<typeof manifestRoutesSchema>;
 
-// One entry per *view* a Chamber offers - a screen that genuinely can't be
-// expressed as a list of records (Calendar's Week, the Map, Fitness's
-// Health charts). A plain list of records (open tasks, upcoming events) is
-// deliberately NOT a view: those records reach the home feed and Search on
-// their own. `fullPath` (relative to the Chamber, e.g. "/" for Calendar's Timeline)
-// is the full-screen page. `card` says the Chamber also exports a compact
-// feed card for it (the component keyed by `id` in its remote-entry `views`
-// export, e.g. a map preview); without one the feed shows the view as a
-// single row that opens it. A view needs at least one of the two.
-export const manifestViewSchema = z
-  .object({
-    id: z.string().min(1),
-    label: z.string().min(1),
-    description: z.string().optional(),
-    fullPath: z.string().startsWith("/").optional(),
-    card: z.boolean().optional(),
-  })
-  .refine((v) => v.card === true || v.fullPath !== undefined, { message: "A view needs a feed card, a fullPath, or both." });
-export type ManifestView = z.infer<typeof manifestViewSchema>;
-
 // One entry per kind of Record a Chamber lets the owner create - what the
 // home screen's "+" sheet lists. `createPath` (relative to the Chamber) opens
 // that Chamber's own editor on a new, unsaved Record.
@@ -161,13 +141,12 @@ export const manifestSchema = z.object({
   routes: manifestRoutesSchema,
   // Filled in by Congress when it loads the Chamber (its /mcp/<name> mount).
   mcpUrl: z.string().url().optional(),
-  // Home feed views and "+"-creatable Record types - see the schemas above.
+  // "+"-creatable Record types - see the schemas above.
   // Defaulted so a Chamber registering an older manifest shape (or one with
   // neither) never has to think about these fields.
-  views: z.array(manifestViewSchema).default([]),
   exhibitTypes: z.array(manifestRecordTypeSchema).default([]),
-  // Domain events this Chamber may publish. Defaulted the same way as
-  // views - most Chambers publish none.
+  // Domain events this Chamber may publish. Defaulted the same way -
+  // most Chambers publish none.
   events: z.array(manifestEventSchema).default([]),
   // Google OAuth scopes this Chamber needs from Congress's Google connector.
   googleScopes: z.array(z.string()).optional(),

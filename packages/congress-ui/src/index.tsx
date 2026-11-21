@@ -27,7 +27,6 @@ export { useBackNavigation, ChamberIndexRedirect } from "./chamberNav.js";
 export { ChamberMark, CapitolMark, getChamberIcon } from "./ChamberMarks.js";
 export { RecordTypeIcon, getRecordIcon, setRecordTypeIcons } from "./RecordTypeIcon.js";
 export { pickSourceColor, setRecordTypeColors, sourceColorStyle, useSourceColor } from "./sourceColor.js";
-export { ViewCard } from "./ViewCard.js";
 export { useAiRunStream, fetchAiSettings, aiSettingsQueryKey, type AiRunStreamState, type AiToolCall } from "./useAiRunStream.js";
 export {
   useAiStream,

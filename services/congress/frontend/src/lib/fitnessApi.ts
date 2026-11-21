@@ -1,17 +1,5 @@
 // The hevy and health connectors (server: src/connectors/hevy, src/connectors/health).
 
-export type HealthMetricType = "weight" | "vo2Max" | "activeEnergy" | "restingEnergy" | "sleepAsleep";
-export interface HealthMetric {
-  id: number;
-  metricType: HealthMetricType;
-  value: number;
-  unit: string;
-  startDate: string;
-  endDate: string;
-  sourceName: string | null;
-}
-export type HealthLatest = Partial<Record<HealthMetricType, HealthMetric>>;
-
 export interface RoutineSetInput {
   type: "normal" | "warmup" | "dropset" | "failure";
   weightKg: number | null;
@@ -48,8 +36,6 @@ async function send<T>(path: string, init?: RequestInit): Promise<T> {
   return body;
 }
 
-export const fetchHealthLatest = () => send<HealthLatest>("/health/latest");
-export const fetchHealthSeries = (type: HealthMetricType, limit = 20) => send<HealthMetric[]>(`/health/series/${type}?limit=${limit}`);
 export const fetchHealthStatus = () => send<{ hasToken: boolean; lastIngestAt: string | null; samples: number }>("/health/status");
 export const newHealthToken = () => send<{ token: string }>("/health/token", { method: "POST" });
 

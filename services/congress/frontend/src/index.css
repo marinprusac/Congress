@@ -176,56 +176,6 @@
   }
 }
 
-/* The pinned views: a rail of labelled source squares under the nameplate. */
-.home-rail {
-  display: flex;
-  align-items: center;
-  gap: 1.1rem;
-  margin: 0 -1.5rem 1.1rem;
-  padding: 0.55rem 1.5rem 0.6rem;
-  overflow-x: auto;
-  border-bottom: var(--border-heavy);
-  scrollbar-width: none;
-}
-
-.home-rail::-webkit-scrollbar {
-  display: none;
-}
-
-.home-pin {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 0.45rem;
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  white-space: nowrap;
-  color: var(--color-ink);
-}
-
-.home-pin-mark {
-  display: block;
-  width: 0.95rem;
-  height: 0.95rem;
-  border: var(--border-heavy);
-  background: var(--src, transparent);
-}
-
-.home-pin--add .home-pin-mark {
-  border-style: dashed;
-  background: transparent;
-}
-
-@media (min-width: 641px) {
-  .home-rail {
-    margin-inline: 0;
-    padding-inline: 0;
-    gap: 1.5rem;
-  }
-}
-
 .home-feed {
   display: flex;
   flex-direction: column;
@@ -256,13 +206,9 @@
   .home-feed > .feed-skeleton {
     grid-column: span 4;
   }
-
-  .feed-slot--view {
-    grid-column: span 6;
-  }
 }
 
-/* One feed card: a record, or a view shown as a figure under a caption. */
+/* One feed card: a record. */
 .feed-card {
   border: var(--border-heavy);
   background: var(--color-paper);
@@ -271,8 +217,7 @@
 }
 
 @media (hover: hover) {
-  .feed-card:has(> .feed-record:hover),
-  .feed-card--figure:hover {
+  .feed-card:has(> .feed-record:hover) {
     translate: -2px -2px;
     box-shadow: 6px 6px 0 var(--color-ink);
   }
@@ -281,72 +226,6 @@
 .feed-card:has(> .feed-record:active) {
   translate: 4px 4px;
   box-shadow: none;
-}
-
-/* The caption line over a view card. */
-.feed-card-header {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.4rem 0.7rem;
-  border-bottom: var(--border-heavy);
-}
-
-.feed-card-title {
-  min-width: 0;
-  flex: 0 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0 0.4rem;
-  border: var(--border-heavy);
-  background: var(--src, var(--color-paper));
-  color: var(--on-src, var(--color-ink));
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-/* The reason gives way (truncates) before the view's own title does. */
-.feed-card-reason {
-  min-width: 0;
-  flex: 1 1 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: right;
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  color: var(--color-slate);
-}
-
-.feed-card-open {
-  flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--color-ink);
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
-}
-
-/* A view card's body has a fixed height: the Chamber's own component was
-   built for a fixed-size cell and scrolls internally (ViewCard). */
-.feed-card-body {
-  position: relative;
-  height: 15rem;
-  padding: 0.75rem;
-  overflow: hidden;
-}
-
-.feed-card-body--full {
-  height: calc(100dvh - var(--mobile-nav-height) - 9rem);
-  min-height: 20rem;
 }
 
 /* A single record: its own information inline (time, facts, an excerpt),
@@ -771,19 +650,10 @@
   box-shadow: none;
 }
 
-.home-pin:active .home-pin-mark {
-  translate: 2px 2px;
-}
-
 /* useFlipList containers are their items' offsetParent. */
 .home-feed,
 .notification-list {
   position: relative;
-}
-
-/* A feed item whose view has no card renders nothing; drop its gap. */
-.home-feed > div:empty {
-  display: none;
 }
 
 .feed-skeleton {
@@ -798,11 +668,6 @@
 .feed-skeleton-body {
   width: 90%;
   height: 2.4em;
-}
-
-/* A view card fades in the first time its Chamber component loads. */
-.feed-card-body > .motion-fade-in {
-  height: 100%;
 }
 
 @keyframes notification-leave {

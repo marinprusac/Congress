@@ -89,7 +89,7 @@ describe("the e namespace", () => {
 
   it("puts rule candidates in the feed", async () => {
     const feed = await getFeed();
-    expect(feed.map((i) => (i.kind === "record" ? `${i.chamber}:${i.name}` : i.viewId))).toEqual(["e:Desert Solitaire"]);
+    expect(feed.map((i) => `${i.chamber}:${i.name}`)).toEqual(["e:Desert Solitaire"]);
   });
 
   it("adds catalog entries for visible types only", async () => {

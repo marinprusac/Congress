@@ -1,13 +1,3 @@
-import type { HealthMetric } from "@/lib/fitnessApi";
-
-// Active and resting energy come one row per day each, stamped with the same start.
-export function mergeCalories(active: HealthMetric[], resting: HealthMetric[]) {
-  const byDate = new Map<string, { startDate: string; active: number; resting: number }>();
-  for (const m of active) byDate.set(m.startDate, { ...(byDate.get(m.startDate) ?? { startDate: m.startDate, active: 0, resting: 0 }), active: m.value });
-  for (const m of resting) byDate.set(m.startDate, { ...(byDate.get(m.startDate) ?? { startDate: m.startDate, active: 0, resting: 0 }), resting: m.value });
-  return [...byDate.values()].sort((a, b) => (a.startDate < b.startDate ? 1 : -1));
-}
-
 export interface WorkoutSet {
   index: number;
   weightKg: number | null;

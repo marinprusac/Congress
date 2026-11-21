@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { FeedCandidate, FieldKind, KeyKind, ManifestEvent, ManifestView } from "@congress/shared-types";
+import type { FeedCandidate, FieldKind, KeyKind, ManifestEvent } from "@congress/shared-types";
 import type { PublishedEvent } from "../events.js";
 import type { Evidence } from "../typeEngine/lookups.js";
 
@@ -65,7 +65,6 @@ export interface ConnectorContext {
 
 export interface FeedGroup {
   source: string;
-  views: ManifestView[];
   candidates: FeedCandidate[];
 }
 

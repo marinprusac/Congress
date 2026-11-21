@@ -10,14 +10,10 @@ import {
   useRecordSearch,
   useStackNav,
 } from "@congress/congress-ui";
-import { viewHref } from "@/components/ViewSlot";
-import { useViewSources } from "@/views/coreViews";
 import { fetchTypes } from "@/lib/recordsApi";
 import { TYPES_KEY } from "@/records/RecordPage";
 
-// Search doubles as the way into everything: before typing, every view
-// Congress offers (the catalog) and the most recent records; while typing,
-// matching views and records.
+// Search: the most recent records before typing, matching records while typing.
 export function SearchPage() {
   useAppliedTheme();
   const nav = useStackNav();
@@ -31,13 +27,6 @@ export function SearchPage() {
   const typeLabels = new Map((types ?? []).map((t) => [t.definition.slug, t.definition.label]));
 
   const needle = query.trim().toLowerCase();
-  const sources = useViewSources();
-  const views = sources.flatMap((c) =>
-    c.views
-      .filter((v) => !needle || v.label.toLowerCase().includes(needle) || c.displayName.toLowerCase().includes(needle))
-      .map((v) => ({ chamber: c, view: v }))
-  );
-  const displayNames = new Map(sources.map((c) => [c.name, c.displayName]));
 
   return (
     <div className="chamber-shell">
@@ -54,19 +43,6 @@ export function SearchPage() {
           enterKeyHint="search"
         />
 
-        {views.length > 0 && (
-          <>
-            <h2 className="search-section-title">Views</h2>
-            {views.map(({ chamber, view }) => (
-              <StackLink key={`${chamber.name}:${view.id}`} to={viewHref(chamber.name, view)} className="search-row">
-                <ChamberMark name={chamber.name} />
-                <span className="search-row-name">{view.label}</span>
-                <span className="search-row-meta">{chamber.displayName}</span>
-              </StackLink>
-            ))}
-          </>
-        )}
-
         <h2 className="search-section-title">{needle ? "Records" : "Recent"}</h2>
         {loading && results.length === 0 && <p className="font-mono text-xs text-dust">Searching —</p>}
         {!loading && results.length === 0 && <p className="font-mono text-xs text-dust">{needle ? "No matches" : "— Nothing yet —"}</p>}
@@ -79,7 +55,7 @@ export function SearchPage() {
           >
             {result.chamber === "e" ? <RecordTypeIcon type={result.type} /> : <ChamberMark name={result.chamber} />}
             <span className="search-row-name">{result.name}</span>
-            <span className="search-row-meta">{result.chamber === "e" ? (typeLabels.get(result.type) ?? result.type) : (displayNames.get(result.chamber) ?? result.chamber)}</span>
+            <span className="search-row-meta">{result.chamber === "e" ? (typeLabels.get(result.type) ?? result.type) : result.chamber}</span>
           </button>
         ))}
       </main>
