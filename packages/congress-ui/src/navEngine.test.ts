@@ -102,14 +102,14 @@ describe("navStack", () => {
     expect(tabOfPath("/chat/12")).toBe("chats");
     expect(tabOfPath("/chatter")).toBeNull();
     expect(tabOfPath("/notes/n/1")).toBeNull();
-    expect(tabOfPath("/settings?from=home")).toBeNull();
+    expect(tabOfPath("/e/7?from=home")).toBeNull();
   });
 
   it("gives a cold deep link a root underneath and strips the tab hint", () => {
     expect(planColdStart("/notes/n/1").paths).toEqual(["/", "/notes/n/1"]);
     expect(planColdStart("/chat/4")).toMatchObject({ tab: "chats", paths: ["/chat", "/chat/4"] });
     expect(planColdStart("/search?q=a")).toMatchObject({ tab: "search", paths: ["/search?q=a"] });
-    expect(planColdStart("/tasks/t/2?navtab=notifications&x=1#h")).toMatchObject({ tab: "notifications", paths: ["/notifications", "/tasks/t/2?x=1#h"] });
+    expect(planColdStart("/tasks/t/2?navtab=settings&x=1#h")).toMatchObject({ tab: "settings", paths: ["/settings", "/tasks/t/2?x=1#h"] });
     expect(planColdStart("/tasks/t/2?navtab=bogus")).toMatchObject({ tab: "home", paths: ["/", "/tasks/t/2"] });
   });
 
@@ -231,7 +231,7 @@ describe("NavEngine", () => {
     const b = new FakeBrowser("/");
     const engine = b.start();
     await settle();
-    await run(engine.push("/settings"));
+    await run(engine.push("/e/9"));
     await run(engine.push("/chat/9"));
     expect(engine.activeTab()).toBe("chats");
     expect(b.paths).toEqual(["/chat", "/chat/9"]);
@@ -239,16 +239,16 @@ describe("NavEngine", () => {
     expect(b.location.path).toBe("/chat");
     // Home kept its place.
     await run(engine.selectTab("home"));
-    expect(b.paths).toEqual(["/", "/settings"]);
+    expect(b.paths).toEqual(["/", "/e/9"]);
   });
 
-  it("opens a notification in the Notifications tab", async () => {
+  it("opens a page in the Settings tab", async () => {
     const b = new FakeBrowser("/");
     const engine = b.start();
     await settle();
-    await run(engine.open("/tasks/t/1", "notifications"));
-    expect(engine.activeTab()).toBe("notifications");
-    expect(b.paths).toEqual(["/notifications", "/tasks/t/1"]);
+    await run(engine.open("/tasks/t/1", "settings"));
+    expect(engine.activeTab()).toBe("settings");
+    expect(b.paths).toEqual(["/settings", "/tasks/t/1"]);
   });
 
   it("restores scroll on the way back and starts pushed pages at the top", async () => {

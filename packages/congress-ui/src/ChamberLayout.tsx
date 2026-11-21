@@ -15,7 +15,7 @@ interface ChamberLayoutProps {
 
 // Shared shell for every Chamber's own frontend: a header with a back
 // button, then the page. There is no Chamber-level navigation any more -
-// Congress's tab bar (Home · Search · + · Notifications · Settings) is the
+// Congress's tab bar (Home · Search · + · Chats · Settings) is the
 // one way around, and a Chamber's pages are reached from the home feed,
 // Search and the "+" sheet.
 export function ChamberLayout({ title, ownChamber, extraActions }: ChamberLayoutProps) {

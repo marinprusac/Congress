@@ -7,7 +7,6 @@ import {
   useCapitolSettings,
   capitolSettingsQueryKey,
   updateCapitolSettings,
-  useBackNavigation,
 } from "@congress/congress-ui";
 import { SignOutControl } from "@/components/LoginGate";
 import { LogsTab } from "@/pages/LogsTab";
@@ -59,7 +58,6 @@ const SETTINGS_TABS = ["general", "logs", "ai", "accounts", "types"];
 // (e.g. the AI-paused banners' "?from=ai").
 export function SettingsPage() {
   useAppliedTheme();
-  const back = useBackNavigation();
 
   // A link can open Settings straight to a tab with "?from=<tab>" (e.g. the
   // AI-paused banners' "?from=ai") - a bare
@@ -74,7 +72,6 @@ export function SettingsPage() {
       <ChamberHeader
         title="Settings"
         titleHref=""
-        onBack={back}
       />
       <main className="chamber-main">
         <div className="settings-tabs" role="tablist" aria-label="Settings categories">

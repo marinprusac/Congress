@@ -49,7 +49,7 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("message", (event: MessageEvent) => {
     const data = event.data as { type?: unknown; url?: unknown; tab?: unknown } | null;
     if (data?.type !== "congress:open" || typeof data.url !== "string" || !data.url.startsWith("/")) return;
-    const tab = NAV_TABS.includes(data.tab as NavTab) ? (data.tab as NavTab) : "notifications";
+    const tab = NAV_TABS.includes(data.tab as NavTab) ? (data.tab as NavTab) : "home";
     openInTab(data.url, tab);
   });
 }

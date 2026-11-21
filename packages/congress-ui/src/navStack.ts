@@ -3,15 +3,15 @@
 // edge-swipe and every in-app back button agree). Pure state transitions
 // only - navEngine.ts drives the router and history from them.
 
-export type NavTab = "home" | "search" | "chats" | "notifications";
+export type NavTab = "home" | "search" | "chats" | "settings";
 
-export const NAV_TABS: readonly NavTab[] = ["home", "search", "chats", "notifications"];
+export const NAV_TABS: readonly NavTab[] = ["home", "search", "chats", "settings"];
 
 export const TAB_ROOT: Record<NavTab, string> = {
   home: "/",
   search: "/search",
   chats: "/chat",
-  notifications: "/notifications",
+  settings: "/settings",
 };
 
 // Query parameter a cold link (a push-notification tap opening a fresh
@@ -49,13 +49,13 @@ function isNavTab(value: unknown): value is NavTab {
 }
 
 // The tab a path always belongs to, whichever tab it was opened from. Any
-// other page (a Chamber page, a view, Settings) belongs to the tab it was
+// other page (a record page) belongs to the tab it was
 // pushed onto.
 export function tabOfPath(path: string): NavTab | null {
   const pathname = pathnameOf(path);
   if (pathname === "/") return "home";
   if (pathname === "/search") return "search";
-  if (pathname === "/notifications") return "notifications";
+  if (pathname === "/settings") return "settings";
   if (pathname === "/chat" || pathname.startsWith("/chat/")) return "chats";
   return null;
 }
@@ -71,7 +71,7 @@ function rootStack(tab: NavTab): NavStack {
 export function initialNavState(): NavState {
   return {
     active: "home",
-    stacks: { home: rootStack("home"), search: rootStack("search"), chats: rootStack("chats"), notifications: rootStack("notifications") },
+    stacks: { home: rootStack("home"), search: rootStack("search"), chats: rootStack("chats"), settings: rootStack("settings") },
   };
 }
 

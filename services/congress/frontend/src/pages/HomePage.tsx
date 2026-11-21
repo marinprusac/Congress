@@ -14,7 +14,6 @@ import {
   useStackNav,
 } from "@congress/congress-ui";
 import { HomeAsks } from "@/components/HomeAsks";
-import { GearIcon } from "@/components/TabBar";
 import { feedQueryKey, fetchFeed } from "@/lib/feedApi";
 import { feedSlots } from "@/lib/feedLayout";
 import { fetchTypes, TYPES_KEY } from "@/lib/recordsApi";
@@ -87,16 +86,7 @@ export function HomePage() {
 
   return (
     <div className="chamber-shell">
-      <ChamberHeader
-        variant="nameplate"
-        title="Congress"
-        titleHref=""
-        extraActions={
-          <StackLink to="/settings" className="chamber-header-icon-link" aria-label="Settings">
-            <GearIcon />
-          </StackLink>
-        }
-      />
+      <ChamberHeader variant="nameplate" title="Congress" titleHref="" />
       <main className="chamber-main home-main">
         <HomeAsks />
         {feed.isLoading && <FeedSkeleton />}

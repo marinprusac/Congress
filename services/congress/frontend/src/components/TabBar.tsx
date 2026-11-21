@@ -1,7 +1,6 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { isPlainClick, selectNavTab, tabOfPath, useActiveNavTab, type NavTab } from "@congress/congress-ui";
-import { useNotifications } from "@/lib/notifications";
 import { CreateSheet } from "@/components/CreateSheet";
 import { useThreads } from "@/chat/useChatData";
 
@@ -33,15 +32,6 @@ function PlusIcon() {
   );
 }
 
-function BellIcon() {
-  return (
-    <svg viewBox="0 0 24 24" {...stroke} aria-hidden="true">
-      <path d="M6 9a6 6 0 0 1 12 0c0 3.5 1 5 2 6H4c1-1 2-2.5 2-6Z" />
-      <path d="M9.5 18a2.5 2.5 0 0 0 5 0" />
-    </svg>
-  );
-}
-
 function ChatIcon() {
   return (
     <svg viewBox="0 0 24 24" {...stroke} aria-hidden="true">
@@ -51,7 +41,7 @@ function ChatIcon() {
   );
 }
 
-export function GearIcon() {
+function GearIcon() {
   return (
     <svg viewBox="0 0 24 24" {...stroke} aria-hidden="true">
       <circle cx="12" cy="12" r="3" />
@@ -102,13 +92,12 @@ function Tab({
   );
 }
 
-// The shell's one navigation: Home · Search · + · Notifications · Settings.
+// The shell's one navigation: Home · Search · + · Chats · Settings.
 // A bottom tab bar on a phone, a slim left rail on desktop (see index.css).
 // There is no per-Chamber navigation any more - Chambers are reached through
 // the feed, Search, and the "+" sheet.
 export function TabBar() {
   const { pathname } = useLocation();
-  const { unreadCount } = useNotifications();
   // Chats needing a look: unread, or waiting on an answer.
   const threads = useThreads(false);
   const chatBadge = (threads.data ?? []).filter((t) => t.unread || t.openAskCount > 0).length;
@@ -116,7 +105,7 @@ export function TabBar() {
   const active = useActiveNavTab() ?? tabOfPath(pathname);
   const [creating, setCreating] = useState(false);
   // Slot of the active tab, for the sliding indicator (2 is "+").
-  const activeIndex = active === "home" ? 0 : active === "search" ? 1 : active === "chats" ? 3 : active === "notifications" ? 4 : -1;
+  const activeIndex = active === "home" ? 0 : active === "search" ? 1 : active === "chats" ? 3 : active === "settings" ? 4 : -1;
 
   // "/" jumps to Search from anywhere that isn't a text field (desktop).
   useEffect(() => {
@@ -156,14 +145,8 @@ export function TabBar() {
           <ChatIcon />
           {chatBadge > 0 && <span key={chatBadge} className="shell-tab-badge shell-tab-badge--accent">{chatBadge > 9 ? "9+" : chatBadge}</span>}
         </Tab>
-        <Tab
-          tab="notifications"
-          to="/notifications"
-          label="Inbox"
-          ariaLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
-          active={active === "notifications"}>
-          <BellIcon />
-          {unreadCount > 0 && <span key={unreadCount} className="shell-tab-badge">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+        <Tab tab="settings" to="/settings" label="Settings" active={active === "settings"}>
+          <GearIcon />
         </Tab>
       </nav>
       <CreateSheet open={creating} onClose={() => setCreating(false)} />

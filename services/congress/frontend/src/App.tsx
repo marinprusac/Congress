@@ -10,7 +10,6 @@ import { ThreadView } from "@/chat/ThreadView";
 import { MemoryPage } from "@/chat/MemoryPage";
 import { useChatInvalidation } from "@/chat/useChatData";
 import { SearchPage } from "@/pages/SearchPage";
-import { NotificationsPage } from "@/pages/NotificationsPage";
 import { RecordPage } from "@/records/RecordPage";
 import { LegacyRedirect } from "@/records/LegacyRedirect";
 import { NewRoutinePage } from "@/views/fitness/NewRoutinePage";
@@ -27,16 +26,15 @@ export function App() {
       <TypeIconSync />
       {/* One stack of pages per tab, kept equal to browser history. */}
       <StackNavigator />
-      {/* The shell's one navigation (Home · Search · + · Notifications ·
-          Settings), a sibling of Routes rather than nested in any page, so a
+      {/* The shell's one navigation (Home · Search · + · Chats · Settings), a sibling of Routes rather than nested in any page, so a
           page that fails only loses its own content, never the way back out. */}
       <TabBar />
       <Routes>
         {/* Congress's own home: the AI composer and the "For You" feed. Works with no Chamber registered. */}
         <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchPage />} />
-        <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/notifications" element={<Navigate to="/" replace />} />
         {/* Congress's own AI chat: threads, one per conversation. */}
         <Route path="/chat" element={<ChatLayout />}>
           <Route index element={<ChatIndex />} />
