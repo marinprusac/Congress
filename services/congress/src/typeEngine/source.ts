@@ -1,5 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
-import type { RecordResolveResult, RecordSearchResult, FeedCandidate, ManifestEvent } from "@congress/shared-types";
+import type { RecordResolveResult, RecordSearchResult, ManifestEvent } from "@congress/shared-types";
 import { scoreRecordMatch } from "../kit/recordScore.js";
 import type { LocalRecordSource } from "../recordSources.js";
 import { recordsDb, recordsSqlite } from "./db/client.js";
@@ -8,7 +8,6 @@ import { getType, listTypes } from "./store.js";
 import { activeFields } from "./operations.js";
 import { quoteIdent } from "./ddl.js";
 import { addManualRef, NAMESPACE, readRow, recordUrl, removeManualRef, titleOf, typeOfRecord } from "./records.js";
-import { feedCandidatesFor } from "./feedRules.js";
 import { aliasesForIds, legacyIdsFor } from "./aliases.js";
 import type { Stored } from "./casts.js";
 
@@ -85,16 +84,6 @@ export const typeEngineSource: LocalRecordSource = {
   canonicalize: aliasesForIds,
   legacyIdsOf: legacyIdsFor,
 
-  feedCandidates(now): FeedCandidate[] {
-    return listTypes().flatMap((t) =>
-      feedCandidatesFor(
-        t.definition,
-        now,
-        (sql, params) => recordsSqlite.prepare(sql).all(...params) as Row[],
-        (row) => titleOf(t.definition, row)
-      )
-    );
-  },
 };
 
 // Event catalog entries for every type (see eventCatalogSync.ts): record

@@ -7,14 +7,14 @@ Congress is one service. There are no plug-in modules: what used to be
 ## 1. A record type (no code)
 
 A type is a SQLite table with real columns, defined at runtime and rendered
-generically (list, editor, search, feed, AI tools). Ask the AI: it creates
+generically (list, editor, search, AI tools). Ask the AI: it creates
 and changes types itself with its builder tools. Every type is data; the
 built-in ones' batches in `src/typeEngine/premade/` only seed a fresh install
 (`seed.ts`, then they're detached), so a change to a deployed type is an
 operation the AI publishes (or a one-time boot step), never a new batch.
 
 You get for free: `/e/<id>` pages, Search, `[[record:e:<id>|Title]]` chips,
-relations, feed rules, time triggers, events (`<prefix>.created|updated|deleted`)
+relations, time triggers, events (`<prefix>.created|updated|deleted`)
 and MCP tools (`list_/get_/create_/update_/delete_/search_<type>`).
 
 ## 2. A connector (code)
@@ -47,7 +47,7 @@ templates.
 - **Extras**: `routes(ctx)` (setup-panel API at `/congress/connectors/<name>/*`),
   `hooks(ctx)` (unauthenticated webhook at `.../hook/*` - check your own
   token), `events` (catalog) + `ctx.publish`, `tools(ctx, server)` (AI tools
-  that aren't per-record), `feed(now)` (feed records), `onRecordChange` and
+  that aren't per-record), `onRecordChange` and
   `ctx.records.list(type)` (react to records), `googleScopes`.
 - Register it in `connectors/list.ts`. Its cache DB uses `createLazyDb` and
   its own `drizzle.<name>.config.ts`.

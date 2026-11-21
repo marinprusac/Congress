@@ -8,7 +8,6 @@ import { traccarConfig } from "./settings.js";
 import { listVisits } from "./visits.js";
 import { locationRoutes } from "./routes.js";
 import { registerLocationTools } from "./tools.js";
-import { mapFeed } from "./feed.js";
 import { MAP_EVENTS } from "./mapEvents.js";
 import { startOfDay, dayOf } from "../../typeEngine/zone.js";
 import type { PlaceSummary } from "./types.js";
@@ -87,10 +86,5 @@ export const locationConnector = defineConnector({
   tools: (_ctx, server) => registerLocationTools(server),
   onRecordChange(_ctx, change) {
     if (change.type === "place") onPlaceChange(change);
-  },
-  // Only once it's tracking (the Map cutover gives it Traccar).
-  async feed(now) {
-    if (!traccarConfig()) return [];
-    return mapFeed(await listVisits({ from: new Date(startOfDay(dayOf(now.getTime()))) }));
   },
 });

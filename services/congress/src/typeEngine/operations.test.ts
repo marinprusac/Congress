@@ -98,16 +98,6 @@ describe("applyOperations", () => {
     expect(def.fields[1]!.options).toEqual({});
   });
 
-  it("stores feed rules by field id and checks datetime ops", () => {
-    const ok = build([
-      { op: "add_field", slug: "due", label: "Due", kind: "datetime" },
-      { op: "set_feed_rules", rules: [{ when: { op: "overdue", field: "due" }, score: 90, preview: ["title"] }] },
-    ]);
-    expect(ok.errors).toEqual([]);
-    expect(ok.def.feedRules[0]).toMatchObject({ when: { op: "overdue", field: "fld_due" }, preview: ["fld_title"] });
-    const bad = build([{ op: "set_feed_rules", rules: [{ when: { op: "overdue", field: "title" }, score: 90 }] }]);
-    expect(bad.errors[0]).toMatch(/datetime/);
-  });
 });
 
 describe("time triggers, toggle events and new kinds", () => {

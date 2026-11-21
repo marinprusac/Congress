@@ -60,14 +60,4 @@ describe("Place records as the location connector's input", () => {
     const direct = await routes.request(`/visits/${pending.id}/classify`, { method: "POST", body: JSON.stringify({ action: "assign_place", placeId: cafe }) });
     expect(await direct.json()).toEqual({ gone: true });
   });
-
-  it("offers the feed only once it's tracking", async () => {
-    expect(await locationConnector.feed!(new Date())).toEqual([]);
-    writeRow({ traccarUrl: "https://traccar.example", traccarToken: "t", traccarDeviceId: 1 });
-    const groups = await locationConnector.feed!(new Date());
-    expect(groups.map((g) => g.source)).toEqual(["e"]);
-    expect(groups[0]!.candidates).toEqual([]);
-    writeRow({ traccarUrl: null, traccarToken: null, traccarDeviceId: null });
-    expect((await listPlaces()).map((p) => p.name)).toEqual(["Cafe"]);
-  });
 });

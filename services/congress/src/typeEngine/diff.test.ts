@@ -58,13 +58,11 @@ describe("diffDefinitions", () => {
     ]);
   });
 
-  it("describes actions, feed rules and time triggers in words", () => {
+  it("describes actions and time triggers in words", () => {
     const task = TASK.batches.reduce<TypeDefinition | null>((def, ops) => build(ops, def), null)!;
     const lines = diffDefinitions(null, task).filter((c) => c.area !== "fields" && c.area !== "type" && c.area !== "layout");
     expect(lines.map((c) => c.text)).toEqual([
       "Action: Complete/Reopen toggles completed (on → completed, off → reopened), stamps completed_at",
-      "Feed rule: due overdue and completed = false → score 90 “Overdue”",
-      "Feed rule: due within 48h and completed = false → score 85",
       "Time trigger: due (end of day) and completed = false: due_soon 1d before, overdue at the time; clears with due_cleared",
     ]);
     expect(diffDefinitions(task, task)).toEqual([]);

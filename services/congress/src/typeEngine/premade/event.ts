@@ -34,32 +34,6 @@ const FIRST: Operation[] = [
   { op: "set_layout", body: "description" },
   { op: "set_actions", actions: [{ kind: "toggle", field: "hidden", on: "Show", off: "Hide", onEvent: "hidden", offEvent: "shown" }] },
   {
-    op: "set_feed_rules",
-    rules: [
-      {
-        when: { op: "ongoing", field: "start", end: "end" },
-        and: [{ field: "all_day", value: false }, { field: "hidden", value: false }],
-        score: 85,
-        reason: "Happening now",
-        preview: ["location", "description"],
-      },
-      {
-        when: { op: "within_next", field: "start", hours: 3 },
-        and: [{ field: "all_day", value: false }, { field: "hidden", value: false }],
-        score: 95,
-        reason: "Soon",
-        preview: ["location", "description"],
-      },
-      {
-        when: { op: "ongoing", field: "start", end: "end" },
-        and: [{ field: "all_day", value: true }, { field: "hidden", value: false }],
-        score: 40,
-        reason: "Today",
-        preview: ["location", "description"],
-      },
-    ],
-  },
-  {
     op: "set_binding",
     binding: {
       connector: "google-calendar",
@@ -111,7 +85,7 @@ export const EVENT: Premade = {
     ],
     // Icons arrived after the first install, so existing types get them in a later batch.
     [{ op: "set_type_meta", icon: "calendar" }],
-    // The source colour (feed kicker, pins, chips).
+    // The source colour (chips, dashboard cards).
     [{ op: "set_type_meta", color: "cobalt" }],
     // People are linked by the AI now, not the connector: `people` becomes a local field.
     [unbindSource(FIRST, "people")],

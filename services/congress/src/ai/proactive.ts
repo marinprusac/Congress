@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "../db/client.js";
 import { aiEventBuffer } from "../db/schema.js";
 import { onEventPublished, publishEvent, type PublishedEvent } from "../events.js";
-import { getFeed } from "../feed.js";
+import { listDashboardForAi } from "../dashboard.js";
 import { enqueue, JobCancelledError, PRIORITY, queueSnapshot } from "./jobQueue.js";
 import { runAi, type RunOutcome } from "./engine.js";
 import { getAiSettings } from "./settings.js";
@@ -99,15 +99,7 @@ export async function buildDigest(since: number, zone: string): Promise<{ text: 
   const events = eventsSince(since);
   const items = listTracking(["active"]);
   const asks = (await listAsksForAi()).asks.filter((a) => a.state === "open" || a.state === "scheduled");
-  const feed = await getFeed().catch(() => []);
-  const upcoming = feed
-    .filter((f) => f.kind === "record")
-    .slice(0, 10)
-    .map((f) => {
-      const p = f.kind === "record" ? f.preview : undefined;
-      const when = p?.time?.start ? ` (${localTime(new Date(p.time.start), zone)})` : "";
-      return `- ${f.chamber}: ${p?.title ?? (f.kind === "record" ? f.name : "")}${when}${f.reason ? ` - ${f.reason}` : ""}`;
-    });
+  const cards = listDashboardForAi();
   const sections = [
     `### Events since the last look (${events.length})`,
     events.length ? events.map((e) => `- ${localTime(e.occurredAt, zone)} ${e.chamber} · ${e.type}${e.payloadJson ? ` ${e.payloadJson.slice(0, 200)}` : ""}`).join("\n") : "- none",
@@ -115,15 +107,15 @@ export async function buildDigest(since: number, zone: string): Promise<{ text: 
     items.length ? items.map((i) => trackedItemLine(i, zone)).join("\n") : "- none",
     `### Already waiting on the owner`,
     asks.length ? asks.map((a) => `- ${a.kind} (${a.state}): ${a.title || a.text.slice(0, 80)}`).join("\n") : "- nothing",
-    `### Coming up / on the owner's plate`,
-    upcoming.length ? upcoming.join("\n") : "- nothing notable",
+    `### On the dashboard now`,
+    cards.length ? cards.map((c) => `- #${c.id} ${c.title}${c.expiresAt ? ` (until ${localTime(new Date(c.expiresAt), zone)})` : ""}`).join("\n") : "- nothing",
   ];
   return { text: sections.join("\n"), eventCount: events.length };
 }
 
 export function gatePromptBody(digest: string): string {
   return `## Gate: should the assistant act on its own right now?
-You decide whether Congress's assistant should take a proactive look now - to tell the owner something, ask them something, tidy or organise their records, or prepare a change for approval. Say act=true for something specific and timely the owner would genuinely want (a deadline getting close, something that changed and matters, a follow-up that's due, records worth organising), never for routine noise, and never for something already waiting on the owner. Pick depth "light" unless the work clearly needs the stronger model.
+You decide whether Congress's assistant should take a proactive look now - to tell the owner something, ask them something, tidy or organise their records, refresh the home dashboard (something on it is stale, or something new belongs there), or prepare a change for approval. Say act=true for something specific and timely the owner would genuinely want (a deadline getting close, something that changed and matters, a follow-up that's due, records worth organising), never for routine noise, and never for something already waiting on the owner. Pick depth "light" unless the work clearly needs the stronger model.
 
 ${digest}
 
@@ -137,7 +129,7 @@ Suggested urgency: ${verdict.urgency}.
 
 ${digest}
 
-Look at the relevant data with your tools and do what's genuinely useful. Reach the owner only through send_message / ask_question / propose_actions (check list_open_asks first; never repeat yourself). If it turns out nothing is needed, do nothing visible. Update tracked items if this changed them. End with a one-line summary (the owner doesn't see it).`;
+Look at the relevant data with your tools and do what's genuinely useful. Reach the owner only through send_message / ask_question / propose_actions (check list_open_asks first; never repeat yourself). If it turns out nothing is needed, do nothing visible. Keep the home dashboard right with dashboard_list / dashboard_add / dashboard_update / dashboard_remove: put up what matters now, drop what's stale. Update tracked items if this changed them. End with a one-line summary (the owner doesn't see it).`;
 }
 
 // ---- Runtime ----

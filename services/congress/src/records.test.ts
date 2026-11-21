@@ -25,7 +25,6 @@ function makeSource(namespace: string, parts: Partial<LocalRecordSource>): Local
     chip: () => null,
     addManualRef: () => null,
     removeManualRef: () => null,
-    feedCandidates: () => [],
     ...parts,
   };
   registerLocalSource(source);

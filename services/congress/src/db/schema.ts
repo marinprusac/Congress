@@ -52,7 +52,6 @@ export const exhibitRefs = sqliteTable(
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey().default(1),
   darkMode: integer("dark_mode", { mode: "boolean" }).notNull().default(false),
-  // The home screen's pinned "stories" row, in display order.
   // Set once legacyImport.ts has copied the retired Capitol/Logs Chambers'
   // own SQLite files into the tables below - see that file.
   legacyImportedAt: integer("legacy_imported_at", { mode: "timestamp_ms" }),
@@ -401,5 +400,19 @@ export const googleAccounts = sqliteTable("google_accounts", {
   tokenExpiry: integer("token_expiry", { mode: "timestamp_ms" }).notNull(),
   needsReconnect: integer("needs_reconnect", { mode: "boolean" }).notNull().default(false),
   connectedAt: integer("connected_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+// The home dashboard: cards the AI puts there (dashboard.ts). Lower position shows first.
+export const dashboardCards = sqliteTable("dashboard_cards", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  kicker: text("kicker"),
+  color: text("color"),
+  size: text("size").notNull().default("normal"),
+  blocksJson: text("blocks_json", { mode: "json" }).$type<unknown[]>().notNull().default([]),
+  position: integer("position").notNull().default(0),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });

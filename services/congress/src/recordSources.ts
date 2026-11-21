@@ -1,4 +1,4 @@
-import type { RecordResolveResult, RecordSearchResult, FeedCandidate } from "@congress/shared-types";
+import type { RecordResolveResult, RecordSearchResult } from "@congress/shared-types";
 
 // A record namespace served in-process by Congress itself (the type
 // engine's "e"), next to the Chambers reached over chamberFetch.
@@ -11,7 +11,6 @@ export interface LocalRecordSource {
   chip(id: string): { id: string; name: string; url: string } | null;
   addManualRef(id: string, targetRecordId: string): string[] | null;
   removeManualRef(id: string, targetRecordId: string): string[] | null;
-  feedCandidates(now: Date): FeedCandidate[];
   // Old record ids this namespace replaced (e.g. notes' note-42): legacy id
   // -> id here, and the reverse.
   canonicalize?(ids: string[]): Map<string, string>;

@@ -27,7 +27,7 @@ describe("source colours", () => {
   it("loads a stored definition that predates colours", () => {
     const base = {
       slug: "note", label: "Note", pluralLabel: "Notes", icon: "file", tableName: "x_note", titleField: null, fields: [],
-      layout: { body: null }, actions: [], feedRules: [], eventPrefix: "note", hidden: false,
+      layout: { body: null }, actions: [], eventPrefix: "note", hidden: false,
     };
     expect(typeDefinitionSchema.parse(base).color).toBeUndefined();
     expect(typeDefinitionSchema.parse({ ...base, color: "tomato" }).color).toBe("tomato");

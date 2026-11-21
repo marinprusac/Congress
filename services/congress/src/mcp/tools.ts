@@ -4,6 +4,7 @@ import { mcpTextResult } from "../kit/mcp.js";
 import { buildChipToken } from "@congress/shared-types";
 import { registerAskTools } from "./askTools.js";
 import { registerMemoryTools } from "./memoryTools.js";
+import { registerDashboardTools } from "./dashboardTools.js";
 import {
   searchRecords,
   resolveRecords,
@@ -194,4 +195,5 @@ export function registerTools(server: McpServer) {
 
   registerAskTools(server);
   registerMemoryTools(server);
+  registerDashboardTools(server);
 }

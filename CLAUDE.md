@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Congress is a personal, self-hosted productivity system for a single user, deployed at `congress.marinprusac.com`. It's a monorepo with one service and a few shared packages. The full design intent is in `docs/congress-project-brief.md`; read it for the "why" behind anything that looks unusual. Note that two things have changed since that brief was written: the brief specifies Tailscale-only private access, but the deployed system now uses public access gated by a master-password session cookie instead (see `infra/README.md`, "Access control"); and the brief describes independent Chamber services with one widget each in an iframe, but the system is now one service with a ranked "For You" home feed (the AI lives in the Chats tab) and no widgets or per-source navigation — see `docs/frontend.md` and `docs/writing-a-connector.md`. Trust `infra/README.md` and this file over the brief on deployment/access and homepage details respectively.
+Congress is a personal, self-hosted productivity system for a single user, deployed at `congress.marinprusac.com`. It's a monorepo with one service and a few shared packages. The full design intent is in `docs/congress-project-brief.md`; read it for the "why" behind anything that looks unusual. Note that two things have changed since that brief was written: the brief specifies Tailscale-only private access, but the deployed system now uses public access gated by a master-password session cookie instead (see `infra/README.md`, "Access control"); and the brief describes independent Chamber services with one widget each in an iframe, but the system is now one service with an AI-owned home dashboard (the AI also lives in the Chats tab) and no widgets or per-source navigation — see `docs/frontend.md` and `docs/writing-a-connector.md`. Trust `infra/README.md` and this file over the brief on deployment/access and homepage details respectively.
 
 Three names are used consistently in code, folders, and package names:
 
-- **Congress** — both the whole system and its one service: `services/congress` is session auth, the **type engine** (runtime record types, records, search, bindings), the **connectors** (hand-written sync code: Google Calendar, Gmail, Hevy, Apple Health, Traccar, WhatsApp), the **home screen** (the feed, Search, "+"), the **event log/notification center** (see `docs/events-and-notifications.md`), the system's one **AI** (see `docs/ai.md`), and the PWA shell. One process (`congress-core`), and the only thing Caddy ever points at.
+- **Congress** — both the whole system and its one service: `services/congress` is session auth, the **type engine** (runtime record types, records, search, bindings), the **connectors** (hand-written sync code: Google Calendar, Gmail, Hevy, Apple Health, Traccar, WhatsApp), the **home screen** (the AI-owned dashboard, Search, "+"), the **event log/notification center** (see `docs/events-and-notifications.md`), the system's one **AI** (see `docs/ai.md`), and the PWA shell. One process (`congress-core`), and the only thing Caddy ever points at.
 - **Capitol** and **Logs** no longer exist as Chambers — they were folded into Congress as core features (the home screen at `/`, event settings/history under Settings → Logs). The name "Capitol" survives only in a few legacy identifiers (`CapitolMark`, `useCapitolSettings`, `capitolSettingsSchema`). The one-time importers of the old Logs and Deputy data have run in production and are removed (see git history).
 - **Chamber** — retired. Congress used to load independent modules called Chambers; Notes, Tasks, Documents, Calendar, Mail, Fitness, Map and WhatsApp all became built-in types plus connectors (WhatsApp chats and Gmail mail later left Congress entirely: the AI reads them live through its tools) (phase 7, finished 2026-10-01), and the machinery that ran them (chamber-kit, the registry, gateway dispatch, `ChamberHost`, remote builds, `create-chamber`) is gone. The name survives in identifiers (`ChamberHeader`, `ChamberMark`, `chamber` fields that now mean a record's source namespace such as `e`) and in the folder `services/chamber-whatsapp`, which holds only the Go reader daemon. To add something new: a type (ask the AI) or a connector; see `docs/writing-a-connector.md`.
 
@@ -63,7 +63,7 @@ The frontend dev server proxies `/api`, `/auth`, `/congress` and `/mcp` to Congr
 
 ### Server shape
 
-Congress is the only service Caddy points at (`server.ts`): `/auth`; `/congress/*` (session-gated: settings, feed, records and types, connectors, AI, notifications; a connector's setup-panel API is `/congress/connectors/<name>/*` and its unauthenticated webhooks `/hook/*`); `/mcp`, `/mcp/types`, `/mcp/builder` and `/mcp/web` (the AI's tools, gated by the internal token `CONGRESS_INTERNAL_TOKEN`); the Health Auto Export Shortcut's old URL `/api/fitness/health/ingest`; source icons at `/congress/chambers/:name/icon` (`CORE_ICONS` in `gateway.ts`); then the SPA from `frontend/dist` (`kit/static.ts`). Any other `/api/*` is a JSON 404.
+Congress is the only service Caddy points at (`server.ts`): `/auth`; `/congress/*` (session-gated: settings, dashboard, records and types, connectors, AI, notifications; a connector's setup-panel API is `/congress/connectors/<name>/*` and its unauthenticated webhooks `/hook/*`); `/mcp`, `/mcp/types`, `/mcp/builder` and `/mcp/web` (the AI's tools, gated by the internal token `CONGRESS_INTERNAL_TOKEN`); the Health Auto Export Shortcut's old URL `/api/fitness/health/ingest`; source icons at `/congress/chambers/:name/icon` (`CORE_ICONS` in `gateway.ts`); then the SPA from `frontend/dist` (`kit/static.ts`). Any other `/api/*` is a JSON 404.
 
 The frontend is one bundle. Pages are ordinary routes in `App.tsx`. Old Chamber URLs (`/mail/...`, `/notes/...`) are redirects there. The service worker's shell allowlist (`sw.ts`) must list every top-level path `App.tsx` serves.
 
@@ -74,7 +74,7 @@ Read the one that matches the area you are touching; each holds the detailed des
 
 | Area | Doc |
 | --- | --- |
-| Home feed, tab bar/shell, stack navigation, settings & theming | `docs/frontend.md` |
+| Home dashboard, tab bar/shell, stack navigation, settings & theming | `docs/frontend.md` |
 | Runtime record types: storage, operations, field kinds, files, relations, keys, triggers, records, the AI's builder tools, backups | `docs/type-engine.md` |
 | Connectors, bindings, and each shipped connector (Gmail, Hevy/Health, Location, WhatsApp, Google Calendar) | `docs/connectors.md` |
 | Adding a connector or type | `docs/writing-a-connector.md` |
@@ -91,7 +91,7 @@ Hard rules worth keeping in your head without opening a doc:
 - **WhatsApp is read-only, forever.** Nothing may send or upload anything to WhatsApp, in the UI or for the AI.
 - **Definitions change only through operations.** Every type is data (built-in ones are only a seed for a fresh install); the AI creates and changes types on its own, and only a change that would lose data waits for the owner's approval.
 - **Connectors never write type records**; they emit source changes that bindings pull in. They never link or create People either: connections are drawn by the AI linker (`ai/linker.ts`).
-- **Feed items carry their information inline**; a list of records is never a feed item on its own.
+- **The home dashboard is AI-owned**: cards go on and come off only through the AI's `dashboard_*` tools (no code path or UI adds or removes one, no automatic feed); each card carries its information inline, never a bare link.
 - **Every AI run is isolated from the machine** (MCP tools only, fixed empty cwd); keep it that way.
 - People are created only from direct contact by the owner, never from guests or senders (the AI judges it).
 - Pushing to `main` is the deploy.

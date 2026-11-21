@@ -4,7 +4,7 @@ import { recordsDb, recordsSqlite } from "./db/client.js";
 import { imports, recordTriggerState } from "./db/schema.js";
 import { listTypes, onTypesChanged, type StoredType } from "./store.js";
 import { quoteIdent } from "./ddl.js";
-import { andClauses } from "./feedRules.js";
+import { andClauses } from "./conditions.js";
 import { EVENT_SOURCE, eventPayload, onRecordWrite, titleOf } from "./records.js";
 import { addDays, dayOf, endOfDay, ownerZone, refreshOwnerZone, startOfDay } from "./zone.js";
 import { publishEvent } from "../events.js";

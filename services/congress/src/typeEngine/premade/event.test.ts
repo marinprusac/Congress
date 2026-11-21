@@ -11,7 +11,6 @@ import { recordsSqlite } from "../db/client.js";
 import { getTypeBySlug } from "../store.js";
 import { startTimeTriggers, stopTimeTriggers } from "../triggers.js";
 import { createRecord, getRecord, listRecords, RecordLockedError, titleOf, updateRecord } from "../records.js";
-import { feedCandidatesFor } from "../feedRules.js";
 import { setOwnerZoneForTests, startOfDay } from "../zone.js";
 import { bindingTargets, flushOutbox, runBindingAction, startBindings, stopBindings, withBinding } from "../bindings/runtime.js";
 import { startConnectors, stopConnectors } from "../../connectors/registry.js";
@@ -129,24 +128,6 @@ describe("the Event premade bound to Google Calendar", () => {
     ]);
   });
 
-  it("puts events under way and starting soon in the feed, never hidden ones", () => {
-    const def = getTypeBySlug("event")!.definition;
-    const now = new Date();
-    const at = (ms: number) => new Date(now.getTime() + ms).toISOString();
-    const local = (title: string, start: number, end: number, extra: Record<string, unknown> = {}) =>
-      createRecord("event", { title, start: at(start), end: at(end), ...extra }, { actor: "me" }).id;
-    const going = local("Going on", -600_000, 600_000);
-    const soon = local("Soon", 3_600_000, 7_200_000);
-    const hidden = local("Hidden", -600_000, 600_000, { hidden: true });
-    const query = (sql: string, params: Stored[]) => recordsSqlite.prepare(sql).all(...params) as Record<string, Stored>[];
-    const candidates = feedCandidatesFor(def, now, query, (row) => titleOf(def, row));
-    const reason = (id: string) => candidates.filter((c) => c.kind === "record" && c.recordId === id).map((c) => c.reason);
-    expect(reason(going)).toEqual(["Happening now"]);
-    expect(reason(soon)).toEqual(["Soon"]);
-    expect(reason(hidden)).toEqual([]);
-    const preview = candidates.find((c) => c.kind === "record" && c.recordId === going)!;
-    expect(preview.kind === "record" && preview.preview?.time).toEqual({ start: at(-600_000), end: at(600_000) });
-  });
 });
 
 describe("the AI's event tools", () => {

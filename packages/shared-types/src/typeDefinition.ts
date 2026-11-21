@@ -28,7 +28,7 @@ export const fieldOptionsSchema = z
     required: z.boolean().optional(),
     unique: z.boolean().optional(),
     searchable: z.boolean().optional(),
-    // Gets its own index (sorting, feed rules, time triggers).
+    // Gets its own index (sorting, time triggers).
     indexed: z.boolean().optional(),
     integer: z.boolean().optional(),
     options: z.array(enumOptionSchema).max(100).optional(),
@@ -68,26 +68,6 @@ export const typeActionSchema = z.object({
   stampField: z.string().optional(),
 });
 export type TypeAction = z.infer<typeof typeActionSchema>;
-
-export const feedRuleSchema = z.object({
-  when: z.discriminatedUnion("op", [
-    z.object({ op: z.literal("within_next"), field: z.string(), hours: z.number().positive().max(24 * 365) }),
-    z.object({ op: z.literal("overdue"), field: z.string() }),
-    z.object({ op: z.literal("eq"), field: z.string(), value: z.union([z.string(), z.number(), z.boolean()]) }),
-    z.object({ op: z.literal("is_set"), field: z.string() }),
-    z.object({ op: z.literal("updated_within"), hours: z.number().positive().max(24 * 365) }),
-    // Under way now: field (start) <= now < end.
-    z.object({ op: z.literal("ongoing"), field: z.string(), end: z.string() }),
-    // Happened within the last hours (field in the past, newer scores higher).
-    z.object({ op: z.literal("within_last"), field: z.string(), hours: z.number().positive().max(24 * 365) }),
-  ]),
-  // Extra conditions that must also hold (e.g. done = false).
-  and: z.array(z.object({ field: z.string(), value: z.union([z.string(), z.number(), z.boolean(), z.null()]) })).max(5).optional(),
-  score: z.number().min(0).max(100),
-  reason: z.string().max(60).optional(),
-  preview: z.array(z.string()).max(4).optional(),
-});
-export type FeedRule = z.infer<typeof feedRuleSchema>;
 
 // A ladder of events relative to a date/datetime field: a record's state is
 // the latest step it has reached; falling back out of every step fires clearEvent.
@@ -166,7 +146,6 @@ export const typeDefinitionSchema = z.object({
     mapPoint: z.object({ latitude: z.string(), longitude: z.string(), radius: z.string().nullable() }).nullable().optional(),
   }),
   actions: z.array(typeActionSchema),
-  feedRules: z.array(feedRuleSchema),
   timeTriggers: z.array(timeTriggerSchema).default([]),
   // Which of this type's events notify the owner; every event is recorded regardless.
   eventNotifications: z.array(eventNotificationSchema).default([]),
@@ -218,7 +197,6 @@ export const operationSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("set_time_range"), range: z.object({ start: fieldRef, end: fieldRef, allDay: fieldRef.nullable().optional() }).nullable() }),
   z.object({ op: z.literal("set_map_point"), point: z.object({ latitude: fieldRef, longitude: fieldRef, radius: fieldRef.nullable().optional() }).nullable() }),
   z.object({ op: z.literal("set_actions"), actions: z.array(typeActionSchema).max(5) }),
-  z.object({ op: z.literal("set_feed_rules"), rules: z.array(feedRuleSchema).max(10) }),
   z.object({ op: z.literal("set_time_triggers"), triggers: z.array(timeTriggerSchema).max(3) }),
   // Deletes the whole type and its records; must be a draft's only op.
   z.object({ op: z.literal("delete_type") }),
@@ -274,7 +252,7 @@ export type RecordDto = z.infer<typeof recordDtoSchema>;
 
 // One human-readable line of a definition diff (Settings → Types, publish asks).
 export const definitionChangeSchema = z.object({
-  area: z.enum(["type", "fields", "layout", "actions", "feed", "triggers", "notifications", "bindings"]),
+  area: z.enum(["type", "fields", "layout", "actions", "triggers", "notifications", "bindings"]),
   text: z.string(),
 });
 export type DefinitionChange = z.infer<typeof definitionChangeSchema>;

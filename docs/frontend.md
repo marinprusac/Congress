@@ -1,13 +1,13 @@
 # Frontend: shell, navigation and theming
 
-How the PWA shell, home feed, stack navigation and theming fit together. Mobile-first rules live in `CLAUDE.md`.
+How the PWA shell, home dashboard, stack navigation and theming fit together. Mobile-first rules live in `CLAUDE.md`.
 
-## Home: feed and the shell
+## Home: dashboard and the shell
 
 Congress's shell has one navigation: a tab bar — Home · Search · + · Chats · Settings (`components/TabBar.tsx`) — fixed to the bottom on a phone (it publishes `--mobile-nav-height`, which every bottom-docked element already offsets by) and a slim left rail on desktop (`--chamber-picker-width`). Pages have **no navigation of their own**: a page has a back button (`ChamberLayout` → `useBackNavigation`).
 
-- **Home** (`pages/HomePage.tsx`): the nameplate (`ChamberHeader` `variant="nameplate"`: wordmark, gear, 5px rule), the "Congress asks" strip, then the **feed**: `GET /congress/feed` (`services/congress/src/feed.ts`) gathers every source's scored candidates (the type engine's feed rules, connectors' `feed()`), merges and ranks them (`rankFeed` — the one place a smarter ranker, e.g. Haiku, can later slot in) and resolves records. **Every feed item shows its information inline**: a record candidate carries a `preview` (title, ISO time the browser formats in the owner's zone, short fields, a plain-text excerpt — see `kit/feedText.ts`'s `plainTextPreview`). A bare "open X" row never belongs in the feed.
-- **Feed layout** (`lib/feedLayout.ts`): the first ranked record with a preview is the **lead story** (a headline); records show a **kicker** (type label underlined in the type's colour, plus the reason) instead of an icon. On a phone the feed is one column; from 641px it is a 12-column grid in ranker order (lead 8, records 4). `useFlipList` needs each item wrapper (`.feed-slot`) to stay a direct child of `.home-feed`, and the press/hover movement lives on `.feed-card`, never the wrapper.
+- **Home** (`pages/HomePage.tsx`): the nameplate (`ChamberHeader` `variant="nameplate"`: wordmark, 5px rule), the "Congress asks" strip, then the **dashboard**: `GET /congress/dashboard` (`services/congress/src/dashboard.ts`) returns the cards, top first, expired ones swept. **The dashboard is entirely the AI's**: cards are added, changed, reordered and removed only through the `dashboard_*` MCP tools (`mcp/dashboardTools.ts`: `dashboard_list/add/update/remove/reorder`); there is no automatic feed, no ranking, and no UI to add or dismiss a card. The prompt tells the AI to keep it short and current, and the proactive digest lists what is on it so a proactive run can refresh it.
+- **Cards** (`shared-types/src/dashboard.ts`, `components/DashboardCard.tsx`): free-form — a kicker, a title, a colour, a size (`wide` spans 8 of 12 columns from 641px; every card is full width on a phone) and up to 12 **blocks**: `text` (Markdown, may hold `[[record:...]]` chips), `record` (a record row, resolved to its current name; a deleted record's block is hidden), `stat`, `facts`, `list`, `time` (formatted in the browser's zone). Cards may carry `expiresAt`; at most 30 exist. Stored blocks that stop parsing are skipped, not fatal. `useFlipList` needs each card wrapper (`.feed-slot`) to stay a direct child of `.home-feed`. A finished AI run invalidates the dashboard query; it also polls every minute.
 - **Search** (`pages/SearchPage.tsx`) lists recent records when empty; while typing, matching records. **"+"** (`components/CreateSheet.tsx`) lists every type the owner can create by hand and opens its editor.
 
 ## Stack navigation
@@ -22,7 +22,7 @@ Navigation is a stack of pages **per tab** (Home, Search, Chats, Settings), with
 
 ## Settings & theming
 
-Owner-wide (not per-device) preferences use a single-row settings table — `id` always `1`, select-then-insert-or-update — via `kit/settings.ts`'s `createSingleRowSettings`. Congress's dark mode setting is applied everywhere (every feed card is a real component in the same document, not an iframe) through `useAppliedTheme`/`useCapitolSettings` in `congress-ui`, plus a pre-paint inline bootstrap script in `frontend/index.html` that applies a cached `localStorage` theme value before first render to avoid a flash of the wrong theme.
+Owner-wide (not per-device) preferences use a single-row settings table — `id` always `1`, select-then-insert-or-update — via `kit/settings.ts`'s `createSingleRowSettings`. Congress's dark mode setting is applied everywhere (every dashboard card is a real component in the same document, not an iframe) through `useAppliedTheme`/`useCapitolSettings` in `congress-ui`, plus a pre-paint inline bootstrap script in `frontend/index.html` that applies a cached `localStorage` theme value before first render to avoid a flash of the wrong theme.
 
 ## Visual language
 

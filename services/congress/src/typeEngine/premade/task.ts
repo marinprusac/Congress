@@ -21,13 +21,6 @@ export const TASK: Premade = {
         ],
       },
       {
-        op: "set_feed_rules",
-        rules: [
-          { when: { op: "overdue", field: "due" }, and: [{ field: "completed", value: false }], score: 90, reason: "Overdue", preview: ["due", "description"] },
-          { when: { op: "within_next", field: "due", hours: 48 }, and: [{ field: "completed", value: false }], score: 85, preview: ["due", "description"] },
-        ],
-      },
-      {
         op: "set_time_triggers",
         triggers: [
           {
@@ -48,7 +41,7 @@ export const TASK: Premade = {
     [{ op: "set_type_meta", hidden: false }],
     // Icons arrived after the first install, so existing types get them in a later batch.
     [{ op: "set_type_meta", icon: "square-check" }],
-    // The source colour (feed kicker, pins, chips).
+    // The source colour (chips, dashboard cards).
     [{ op: "set_type_meta", color: "mint" }],
   ],
 };

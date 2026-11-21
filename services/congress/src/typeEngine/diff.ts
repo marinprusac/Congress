@@ -2,7 +2,6 @@ import type {
   Binding,
   DefinitionChange,
   FactCondition,
-  FeedRule,
   FieldDefinition,
   FieldOptions,
   TimeTrigger,
@@ -77,10 +76,6 @@ export function diffDefinitions(before: TypeDefinition | null, after: TypeDefini
   if (changed(before?.actions, after.actions)) {
     if (!after.actions.length) add("actions", "Remove all actions");
     for (const a of after.actions) add("actions", `Action: ${describeAction(after, a)}`);
-  }
-  if (changed(before?.feedRules, after.feedRules)) {
-    if (!after.feedRules.length) add("feed", "Remove all feed rules");
-    for (const r of after.feedRules) add("feed", `Feed rule: ${describeRule(after, r)}`);
   }
   if (changed(before?.timeTriggers, after.timeTriggers)) {
     if (!after.timeTriggers.length) add("triggers", "Remove all time triggers");
@@ -161,25 +156,6 @@ function describeAction(def: TypeDefinition, a: TypeAction): string {
   const events = [a.onEvent && `on → ${a.onEvent}`, a.offEvent && `off → ${a.offEvent}`].filter(Boolean).join(", ");
   const stamp = a.stampField ? `, stamps ${fieldLabel(def, a.stampField)}` : "";
   return `${a.off}/${a.on} toggles ${fieldLabel(def, a.field)}${events ? ` (${events})` : ""}${stamp}`;
-}
-
-function describeRule(def: TypeDefinition, r: FeedRule): string {
-  const w = r.when;
-  const when =
-    w.op === "within_next"
-      ? `${fieldLabel(def, w.field)} within ${w.hours}h`
-      : w.op === "overdue"
-        ? `${fieldLabel(def, w.field)} overdue`
-        : w.op === "within_last"
-          ? `${fieldLabel(def, w.field)} within the last ${w.hours}h`
-        : w.op === "ongoing"
-          ? `under way (${fieldLabel(def, w.field)} to ${fieldLabel(def, w.end)})`
-          : w.op === "eq"
-          ? `${fieldLabel(def, w.field)} = ${JSON.stringify(w.value)}`
-          : w.op === "is_set"
-            ? `${fieldLabel(def, w.field)} is set`
-            : `updated within ${w.hours}h`;
-  return `${when}${describeConditions(def, r.and)} → score ${r.score}${r.reason ? ` “${r.reason}”` : ""}`;
 }
 
 function formatOffset(minutes: number): string {

@@ -274,6 +274,13 @@
       "when": 1795273174898,
       "tag": "0038_outgoing_scarlet_spider",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "6",
+      "when": 1795274471647,
+      "tag": "0039_mighty_bill_hollister",
+      "breakpoints": true
     }
   ]
 }

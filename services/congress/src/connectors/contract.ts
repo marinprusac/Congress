@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { FeedCandidate, FieldKind, KeyKind, ManifestEvent } from "@congress/shared-types";
+import type { FieldKind, KeyKind, ManifestEvent } from "@congress/shared-types";
 import type { PublishedEvent } from "../events.js";
 import type { Evidence } from "../typeEngine/lookups.js";
 
@@ -63,11 +63,6 @@ export interface ConnectorContext {
   reschedule(): void;
 }
 
-export interface FeedGroup {
-  source: string;
-  candidates: FeedCandidate[];
-}
-
 // A record of some type was written (by anyone); `values` is absent for a delete.
 export interface RecordChange {
   type: string;
@@ -114,9 +109,6 @@ export interface Connector {
   onEvent?(ctx: ConnectorContext, event: PublishedEvent): void;
   // Records it reads as input changed (e.g. a Place moved).
   onRecordChange?(ctx: ConnectorContext, change: RecordChange): void;
-  // Feed candidates, grouped by source: a hand-written view's card (Congress's
-  // frontend renders it) under its view source, a record under "e".
-  feed?(now: Date): FeedGroup[] | Promise<FeedGroup[]>;
   // Extra AI tools on /mcp/types (named <prefix>_*), for what isn't per record.
   tools?(ctx: ConnectorContext, server: McpServer): void;
 }

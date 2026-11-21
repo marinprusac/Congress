@@ -22,7 +22,7 @@ export const PLACE: Premade = {
     [{ op: "set_type_meta", hidden: false }],
     // Icons arrived after the first install, so existing types get them in a later batch.
     [{ op: "set_type_meta", icon: "map-pin" }],
-    // The source colour (feed kicker, pins, chips).
+    // The source colour (chips, dashboard cards).
     [{ op: "set_type_meta", color: "lilac" }],
   ],
 };

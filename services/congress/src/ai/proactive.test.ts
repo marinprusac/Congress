@@ -5,7 +5,7 @@ import type { RunContext, RunOutcome } from "./engine.js";
 
 const runAi = vi.fn<(ctx: RunContext) => Promise<RunOutcome>>();
 vi.mock("./engine.js", () => ({ runAi: (ctx: RunContext) => runAi(ctx) }));
-vi.mock("../feed.js", () => ({ getFeed: async () => [] }));
+vi.mock("../dashboard.js", () => ({ listDashboardForAi: () => [] }));
 
 import { db, runMigrations } from "../db/client.js";
 import { updateAiSettings } from "./settings.js";

@@ -32,7 +32,7 @@ import { publicKey, saveSubscription, removeSubscription } from "./pushSubscript
 import { mcpApp } from "./mcp/server.js";
 import { parseRunContext, withRunContext } from "./ai/runContext.js";
 import { aiRoutes } from "./ai/routes.js";
-import { getFeed } from "./feed.js";
+import { listDashboard } from "./dashboard.js";
 import { googleConnectorRoutes } from "./connectors/google/routes.js";
 import { callHook, connectorRoutes } from "./connectors/routes.js";
 import { typeRoutes } from "./typeEngine/routes.js";
@@ -66,8 +66,8 @@ app.put("/congress/settings", requireSession, async (c) => {
   return c.json(await updateSettings(parsed.data));
 });
 
-// The home "For You" feed: every source's scored records, merged and ranked. See feed.ts.
-app.get("/congress/feed", requireSession, async (c) => c.json({ items: await getFeed() }));
+// The home dashboard: the cards the AI put there. See dashboard.ts.
+app.get("/congress/dashboard", requireSession, async (c) => c.json({ cards: await listDashboard() }));
 
 // Congress's own AI: the chat, the shared budget/pause settings and the
 // live run stream - see ai/routes.ts.

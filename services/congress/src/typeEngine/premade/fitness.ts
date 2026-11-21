@@ -17,10 +17,6 @@ export const WORKOUT: Premade = {
       { op: "add_field", slug: "exercise_count", label: "Exercise count", kind: "number" },
       { op: "add_field", slug: "volume_kg", label: "Volume (kg)", kind: "number" },
       {
-        op: "set_feed_rules",
-        rules: [{ when: { op: "within_last", field: "end", hours: 12 }, score: 50, reason: "Just trained", preview: ["exercises", "volume_kg"] }],
-      },
-      {
         op: "set_binding",
         binding: {
           connector: "hevy",
@@ -43,13 +39,13 @@ export const WORKOUT: Premade = {
     ],
     // Cutover: in use.
     [{ op: "set_type_meta", hidden: false }],
-    // Not editable and not worth showing: kept for feed rules, search and the AI.
+    // Not editable and not worth showing: kept for search and the AI.
     [
       { op: "set_field_options", field: "exercise_count", options: { hidden: true } },
     ],
     // Icons arrived after the first install, so existing types get them in a later batch.
     [{ op: "set_type_meta", icon: "dumbbell" }],
-    // The source colour (feed kicker, pins, chips).
+    // The source colour (chips, dashboard cards).
     [{ op: "set_type_meta", color: "mustard" }],
   ],
 };
@@ -84,13 +80,13 @@ export const ROUTINE: Premade = {
       { op: "set_type_meta", hidden: true },
     ],
     [{ op: "set_type_meta", hidden: false }],
-    // Not editable and not worth showing: kept for feed rules, search and the AI.
+    // Not editable and not worth showing: kept for search and the AI.
     [
       { op: "set_field_options", field: "exercise_count", options: { hidden: true } },
     ],
     // Icons arrived after the first install, so existing types get them in a later batch.
     [{ op: "set_type_meta", icon: "list-checks" }],
-    // The source colour (feed kicker, pins, chips).
+    // The source colour (chips, dashboard cards).
     [{ op: "set_type_meta", color: "mustard" }],
   ],
 };

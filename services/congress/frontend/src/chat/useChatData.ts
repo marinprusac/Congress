@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import type { AiMessage, AiThreadMessagesPage } from "@congress/shared-types";
 import { useAiStream, useAiStreamEvents, type AiLiveRun } from "@congress/congress-ui";
+import { dashboardQueryKey } from "@/lib/dashboardApi";
 import { aiAsksQueryKey, aiThreadMessagesQueryKey, aiThreadQueryKey, aiThreadsQueryKey, fetchAiThread, fetchAiThreadMessages, fetchAiThreads } from "@/lib/aiApi";
 
 export type MessagesData = InfiniteData<AiThreadMessagesPage, number | undefined>;
@@ -38,6 +39,8 @@ export function useChatInvalidation(): void {
     void queryClient.invalidateQueries({ queryKey: aiThreadsQueryKey });
     void queryClient.invalidateQueries({ queryKey: aiThreadQueryKey(threadId) });
     void queryClient.invalidateQueries({ queryKey: aiAsksQueryKey });
+    // A finished run may have changed the dashboard.
+    if (event.type === "run_finished") void queryClient.invalidateQueries({ queryKey: dashboardQueryKey });
   });
 }
 

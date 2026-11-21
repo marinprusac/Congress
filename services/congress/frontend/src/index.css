@@ -198,54 +198,22 @@
     gap: 1.4rem;
   }
 
-  .feed-slot--lead {
+  .feed-slot--wide {
     grid-column: span 8;
   }
 
-  .feed-slot--item,
+  .feed-slot--normal,
   .home-feed > .feed-skeleton {
     grid-column: span 4;
   }
 }
 
-/* One feed card: a record. */
+/* One dashboard card. */
 .feed-card {
   border: var(--border-heavy);
   background: var(--color-paper);
   box-shadow: var(--shadow-hard);
   transition: translate var(--dur-press) var(--ease-out), box-shadow var(--dur-press) var(--ease-out);
-}
-
-@media (hover: hover) {
-  .feed-card:has(> .feed-record:hover) {
-    translate: -2px -2px;
-    box-shadow: 6px 6px 0 var(--color-ink);
-  }
-}
-
-.feed-card:has(> .feed-record:active) {
-  translate: 4px 4px;
-  box-shadow: none;
-}
-
-/* A single record: its own information inline (time, facts, an excerpt),
-   the whole card tappable. */
-.feed-record {
-  display: flex;
-  width: 100%;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.3rem;
-  padding: 0.8rem 0.85rem 0.85rem;
-  text-align: left;
-}
-
-/* Type label (underlined in the type's colour) and why it is here. */
-.feed-kicker {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
 }
 
 .feed-kicker-label {
@@ -258,32 +226,7 @@
   letter-spacing: 0.09em;
 }
 
-.feed-kicker-reason {
-  min-width: 0;
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
-.feed-record-time,
-.feed-record-fields {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--color-slate);
-}
-
-.feed-record-body {
-  font-size: 0.9rem;
-  line-height: 1.4;
-  color: var(--color-ink);
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-}
-
-/* The full title, wrapping if it must - context goes on the lines below. */
+/* The card title, wrapping if it must. */
 .feed-record-name {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -291,28 +234,6 @@
   font-size: 1.15rem;
   font-weight: 700;
   line-height: 1.2;
-  color: var(--color-ink);
-}
-
-/* The lead story: the first ranked record, set as a headline. */
-.feed-card--lead .feed-record {
-  gap: 0.4rem;
-}
-
-.feed-card--lead .feed-record-name {
-  margin-top: 0.15rem;
-  font-size: 1.8rem;
-  font-weight: 900;
-  line-height: 1.04;
-  letter-spacing: -0.02em;
-}
-
-.feed-card--lead .feed-record-time {
-  margin-top: 0.15rem;
-  padding-top: 0.4rem;
-  border-top: 1px solid var(--color-ink);
-  font-family: var(--font-body);
-  font-size: 0.95rem;
   color: var(--color-ink);
 }
 
@@ -536,8 +457,7 @@
   }
 }
 
-/* Tappable rows: a tint. Feed cards press onto their shadow (see .feed-card). */
-.feed-record:active,
+/* Tappable rows: a tint. */
 .search-row:active,
 .create-sheet-option:active {
   scale: none;
@@ -608,4 +528,140 @@
   height: 0.9rem;
   border: var(--border-heavy);
   background: var(--src, var(--color-paper));
+}
+
+/* ---- Dashboard card blocks ---- */
+.dash-card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.8rem 0.85rem 0.9rem;
+}
+
+.dash-card-body > * {
+  max-width: 100%;
+}
+
+.dash-text,
+.dash-list-item {
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--color-ink);
+}
+
+.dash-text > :first-child,
+.dash-list-item > :first-child {
+  margin-top: 0;
+}
+
+.dash-text > :last-child,
+.dash-list-item > :last-child {
+  margin-bottom: 0;
+}
+
+.dash-stat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.15rem 0.6rem;
+}
+
+.dash-stat-value {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.dash-stat-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dash-stat-note,
+.dash-record-note {
+  flex-basis: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--color-slate);
+}
+
+.dash-facts {
+  display: grid;
+  width: 100%;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.dash-fact {
+  display: contents;
+}
+
+.dash-fact dt {
+  color: var(--color-dust);
+}
+
+.dash-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  list-style: square;
+}
+
+.dash-list--ordered {
+  list-style: decimal;
+}
+
+.dash-time {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--color-slate);
+}
+
+.dash-time-label {
+  margin-right: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-dust);
+}
+
+.dash-record {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.dash-record-link {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.55rem;
+  border: var(--border-heavy);
+  color: var(--color-ink);
+}
+
+.dash-record-link svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+  color: var(--src, var(--color-slate));
+}
+
+.dash-record-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-record-link:active {
+  background: var(--color-ink);
+  color: var(--color-parchment);
 }

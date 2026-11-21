@@ -10,7 +10,6 @@ import {
   resolveRecords,
   searchRecords,
 } from "../records.js";
-import { getFeed } from "../feed.js";
 import { syncEventCatalog } from "../eventCatalogSync.js";
 import { getEventSettingsByType, updateEventSettings } from "../eventSettings.js";
 import { listNotifications } from "../notifications.js";
@@ -35,7 +34,6 @@ beforeAll(async () => {
       { op: "set_title_field", field: "title" },
       { op: "add_field", slug: "blurb", label: "Blurb", kind: "richtext", options: { searchable: true } },
       { op: "add_field", slug: "read", label: "Read", kind: "boolean" },
-      { op: "set_feed_rules", rules: [{ when: { op: "eq", field: "read", value: false }, score: 30, reason: "Unread" }] },
     ],
   });
   publish({
@@ -85,11 +83,6 @@ describe("the e namespace", () => {
     expect((await getConnections(draft)).map((c) => c.id)).toEqual([dune]);
     expect(await removeManualConnection(draft, dune)).toEqual({ refs: [] });
     expect(await getConnections(dune)).toEqual([]);
-  });
-
-  it("puts rule candidates in the feed", async () => {
-    const feed = await getFeed();
-    expect(feed.map((i) => `${i.chamber}:${i.name}`)).toEqual(["e:Desert Solitaire"]);
   });
 
   it("adds catalog entries for visible types only", async () => {

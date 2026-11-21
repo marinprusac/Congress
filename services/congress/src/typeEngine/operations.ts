@@ -51,7 +51,6 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       fields: [],
       layout: { body: null },
       actions: [],
-      feedRules: [],
       timeTriggers: [],
       eventNotifications: [],
       eventPrefix: op.slug,
@@ -218,24 +217,6 @@ function applyOne(def: TypeDefinition | null, op: Operation, taken: ReadonlySet<
       d.eventNotifications = op.notifications;
       return d;
     }
-    case "set_feed_rules": {
-      d.feedRules = op.rules.map((rule) => {
-        const w = rule.when;
-        const when =
-          w.op === "ongoing"
-            ? { ...w, field: findField(d, w.field).id, end: findField(d, w.end).id }
-            : "field" in w
-              ? { ...w, field: findField(d, w.field).id }
-              : w;
-        return {
-          ...rule,
-          when,
-          and: rule.and?.map((c) => ({ ...c, field: findField(d, c.field).id })),
-          preview: rule.preview?.map((ref) => findField(d, ref).id),
-        } as TypeDefinition["feedRules"][number];
-      });
-      return d;
-    }
     case "set_binding": {
       const b = op.binding;
       const seen = new Set<string>();
@@ -302,13 +283,6 @@ export function validateDefinition(def: TypeDefinition): string[] {
     if (f.options.hidden && f.options.required) errors.push(`"${f.slug}" can't be both hidden and required`);
   }
   const isTime = (f: FieldDefinition) => f.kind === "datetime" || f.kind === "date";
-  for (const { when } of def.feedRules) {
-    if (when.op !== "within_next" && when.op !== "within_last" && when.op !== "overdue" && when.op !== "ongoing") continue;
-    for (const id of when.op === "ongoing" ? [when.field, when.end] : [when.field]) {
-      const f = def.fields.find((x) => x.id === id);
-      if (f && !isTime(f)) errors.push(`feed rule ${when.op} needs a date or datetime field, "${f.slug}" is ${f.kind}`);
-    }
-  }
   const ladderFields = new Set<string>();
   for (const t of def.timeTriggers) {
     const f = def.fields.find((x) => x.id === t.field);
